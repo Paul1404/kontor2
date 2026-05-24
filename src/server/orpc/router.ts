@@ -8,6 +8,7 @@ import { importRouter } from "~/server/orpc/procedures/import";
 import { membersRouter } from "~/server/orpc/procedures/members";
 import { organizationSettingsRouter } from "~/server/orpc/procedures/organization-settings";
 import { relationshipsRouter } from "~/server/orpc/procedures/relationships";
+import { reportsRouter } from "~/server/orpc/procedures/reports";
 import { sepaRouter } from "~/server/orpc/procedures/sepa";
 import { settingsRouter } from "~/server/orpc/procedures/settings";
 
@@ -24,6 +25,7 @@ export const appRouter = {
   organization: organizationSettingsRouter,
   feeRuns: feeRunsRouter,
   import: importRouter,
+  reports: reportsRouter,
 };
 
 export type AppRouter = typeof appRouter;

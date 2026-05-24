@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Building2,
   Coins,
+  FileBarChart,
   FileSpreadsheet,
   LayoutDashboard,
   Mail,
@@ -36,6 +37,12 @@ const SECTIONS: NavSection[] = [
         to: "/app/beitrag",
         label: "Beitragsläufe",
         icon: <Coins className="size-[18px]" />,
+        vorstandOnly: true,
+      },
+      {
+        to: "/app/berichte",
+        label: "Berichte",
+        icon: <FileBarChart className="size-[18px]" />,
         vorstandOnly: true,
       },
       { to: "/app/audit", label: "Audit Log", icon: <ScrollText className="size-[18px]" /> },

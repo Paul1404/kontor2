@@ -15,9 +15,9 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { triggerDownload } from "~/lib/download";
 import { formatCurrency } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
-import { triggerDownload } from "~/routes/app/beitrag/index";
 
 export const Route = createFileRoute("/app/beitrag/neu")({
   component: NewFeeRunPage,
@@ -183,9 +183,7 @@ function SetupStep(props: {
     <Card>
       <CardHeader>
         <CardTitle>Abrechnungsjahr und Fälligkeit</CardTitle>
-        <CardDescription>
-          Welches Beitragsjahr soll abgebucht werden und wann?
-        </CardDescription>
+        <CardDescription>Welches Beitragsjahr soll abgebucht werden und wann?</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -253,11 +251,7 @@ function PreviewStep(props: {
     <>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <SummaryTile label="Posten" value={p.totals.count.toString()} />
-        <SummaryTile
-          label="Summe"
-          value={formatCurrency(p.totals.grandTotal)}
-          highlight
-        />
+        <SummaryTile label="Summe" value={formatCurrency(p.totals.grandTotal)} highlight />
         <SummaryTile label="Ausgeschlossen" value={p.excluded.length.toString()} />
       </div>
 
@@ -466,7 +460,9 @@ function IncludedTable(props: { candidates: PreviewData["candidates"] }) {
                         <div className="text-xs text-warning">{c.warnings.join(" · ")}</div>
                       ) : null}
                     </td>
-                    <td className="px-4 py-2 text-muted-foreground">{c.artName ?? `Art ${c.art}`}</td>
+                    <td className="px-4 py-2 text-muted-foreground">
+                      {c.artName ?? `Art ${c.art}`}
+                    </td>
                     <td className="px-4 py-2 text-right tabular-nums">
                       {formatCurrency(c.amount)}
                       {c.includesAufnahmegebuhr ? (
@@ -507,7 +503,7 @@ function DoneStep({
           <Button
             onClick={async () => {
               const res = await orpc.feeRuns.downloadXml({ id: result.feeRunId });
-              triggerDownload(res.filename ?? result.xmlFilename, res.content);
+              triggerDownload(res.filename ?? result.xmlFilename, res.content, "application/xml");
             }}
           >
             <Download className="size-4" /> pain.008 herunterladen

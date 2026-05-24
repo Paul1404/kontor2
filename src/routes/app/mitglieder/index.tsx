@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Loader2, Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Loader2, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
+import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -58,13 +59,30 @@ function MembersListPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Mitglieder</h1>
           <p className="text-sm text-muted-foreground">Suchen, filtern und Profile öffnen.</p>
         </div>
-        {canEdit ? (
-          <Link to="/app/mitglieder/neu">
-            <Button>
-              <Plus className="size-4" /> Neues Mitglied
-            </Button>
-          </Link>
-        ) : null}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={async () => {
+              const res = await orpc.reports.membersExport({
+                q,
+                status,
+                abteilungId,
+                includeAusgetretene,
+              });
+              triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+            }}
+          >
+            <Download className="size-4" /> Als CSV
+          </Button>
+          {canEdit ? (
+            <Link to="/app/mitglieder/neu">
+              <Button>
+                <Plus className="size-4" /> Neues Mitglied
+              </Button>
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <Card>
