@@ -8,6 +8,8 @@ export type SmtpDispatchConfig = {
   host: string;
   port: number;
   secure: boolean;
+  requireTls: boolean;
+  allowInvalidCerts: boolean;
   username: string | null;
   password: string | null;
   fromAddress: string;
@@ -22,6 +24,8 @@ export async function loadSmtpConfig(): Promise<SmtpDispatchConfig | null> {
     host: row.host,
     port: row.port,
     secure: row.secure,
+    requireTls: row.requireTls,
+    allowInvalidCerts: row.allowInvalidCerts,
     username: row.username,
     password: row.passwordEncrypted ?? null,
     fromAddress: row.fromAddress,
@@ -34,6 +38,8 @@ function transporterFor(cfg: SmtpDispatchConfig): Transporter {
     h: cfg.host,
     p: cfg.port,
     s: cfg.secure,
+    rt: cfg.requireTls,
+    ai: cfg.allowInvalidCerts,
     u: cfg.username,
     pw: cfg.password ? "set" : "unset",
   });
@@ -42,9 +48,18 @@ function transporterFor(cfg: SmtpDispatchConfig): Transporter {
     host: cfg.host,
     port: cfg.port,
     secure: cfg.secure,
+    requireTLS: !cfg.secure && cfg.requireTls,
     auth: cfg.username
       ? { user: cfg.username, pass: cfg.password ?? "" }
       : undefined,
+    tls: {
+      // Send SNI with the configured hostname so the MTA returns the right cert.
+      servername: cfg.host,
+      // Some self-hosted MTAs have certs without DNS SANs or with mismatched
+      // names; the admin can opt-in to skip verification.
+      rejectUnauthorized: !cfg.allowInvalidCerts,
+      minVersion: "TLSv1.2",
+    },
   });
   cachedTransport = { signature: sig, transporter: t };
   return t;

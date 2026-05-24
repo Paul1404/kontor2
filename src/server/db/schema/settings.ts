@@ -12,6 +12,8 @@ export const smtpConfigTable = pgTable("smtp_config", {
   host: text("host").notNull(),
   port: integer("port").notNull(),
   secure: boolean("secure").notNull().default(true),
+  requireTls: boolean("require_tls").notNull().default(true),
+  allowInvalidCerts: boolean("allow_invalid_certs").notNull().default(false),
   username: text("username"),
   passwordEncrypted: encryptedText("password_encrypted"),
   fromAddress: text("from_address").notNull(),
