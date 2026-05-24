@@ -42,10 +42,16 @@ export const membersRouter = {
         conditions.push(isNotNull(membersTable.verstorbenAm) as never);
       }
       if (input.status === "aktiv") {
-        conditions.push(eq(membersTable.aktiv, "Y") as never);
+        // Match the dashboard's "Aktive Mitglieder" definition: not exited
+        // and not deceased. The Linear `Aktiv` column is a free-form string
+        // ("J"/"N"/empty in German source data) and not reliable here.
+        conditions.push(isNull(membersTable.verstorbenAm) as never);
       }
       if (input.status === "passiv") {
-        conditions.push(eq(membersTable.aktivPasiv, "P") as never);
+        conditions.push(
+          eq(membersTable.aktivPasiv, "P") as never,
+          isNull(membersTable.verstorbenAm) as never,
+        );
       }
 
       if (input.q.trim()) {
