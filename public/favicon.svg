@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SV Untereuerheim">
+  <rect width="64" height="64" rx="12" fill="#1d4ed8"/>
+  <text x="32" y="40" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-weight="800" font-size="26" text-anchor="middle" fill="#ffffff" letter-spacing="-0.5">SVU</text>
+</svg>
