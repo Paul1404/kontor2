@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -42,6 +42,9 @@ function MembersListPage() {
     queryFn: () => orpc.members.abteilungenList(),
   });
 
+  const me = useQuery({ queryKey: ["me"], queryFn: () => orpc.auth.me() });
+  const canEdit = me.data?.role === "vorstand" || me.data?.role === "admin";
+
   const list = useQuery({
     queryKey: ["members.list", { q, status, abteilungId, includeAusgetretene, page }],
     queryFn: () =>
@@ -50,11 +53,18 @@ function MembersListPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Mitglieder</h1>
-        <p className="text-sm text-muted-foreground">
-          Suchen, filtern und Profile öffnen.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Mitglieder</h1>
+          <p className="text-sm text-muted-foreground">Suchen, filtern und Profile öffnen.</p>
+        </div>
+        {canEdit ? (
+          <Link to="/app/mitglieder/neu">
+            <Button>
+              <Plus className="size-4" /> Neues Mitglied
+            </Button>
+          </Link>
+        ) : null}
       </div>
 
       <Card>
@@ -159,9 +169,7 @@ function MembersListPage() {
                       </td>
                       <td className="px-4 py-3">{[m.plz, m.ort].filter(Boolean).join(" ")}</td>
                       <td className="px-4 py-3 text-muted-foreground">{m.email ?? ""}</td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {formatDate(m.eintritt)}
-                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{formatDate(m.eintritt)}</td>
                       <td className="px-4 py-3">
                         <StatusBadge member={m} />
                       </td>

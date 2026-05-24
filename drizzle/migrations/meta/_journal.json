@@ -15,6 +15,13 @@
       "when": 1779614019556,
       "tag": "0001_smtp_tls_options",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779616219571,
+      "tag": "0002_relationships_and_member_write",
+      "breakpoints": true
     }
   ]
 }

@@ -2,13 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Loader2, LogIn } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
@@ -98,9 +92,7 @@ function LoginPage() {
         </CardContent>
       </Card>
 
-      <p className="absolute bottom-4 text-xs text-muted-foreground">
-        SV Untereuerheim 1945 e.V.
-      </p>
+      <p className="absolute bottom-4 text-xs text-muted-foreground">SV Untereuerheim 1945 e.V.</p>
     </div>
   );
 }

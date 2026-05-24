@@ -91,33 +91,31 @@ export const attachmentsRouter = {
       return { id: row!.id };
     }),
 
-  remove: vorstandProc
-    .input(v.object({ id: v.string() }))
-    .handler(async ({ context, input }) => {
-      const rows = await context.db
-        .select()
-        .from(attachmentsTable)
-        .where(eq(attachmentsTable.id, input.id))
-        .limit(1);
-      const att = rows[0];
-      if (!att) throw new ORPCError("NOT_FOUND", { message: "Anhang nicht gefunden." });
-      await context.db.delete(attachmentsTable).where(eq(attachmentsTable.id, input.id));
-      try {
-        await deleteObject(att.s3Key);
-      } catch {
-        /* tolerate orphan in S3; record is gone */
-      }
-      await appendAudit(context.db, {
-        entityType: "member_attachment",
-        entityId: input.id,
-        action: "delete",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: { filename: { before: att.filename, after: null } },
-      });
-      return { ok: true };
-    }),
+  remove: vorstandProc.input(v.object({ id: v.string() })).handler(async ({ context, input }) => {
+    const rows = await context.db
+      .select()
+      .from(attachmentsTable)
+      .where(eq(attachmentsTable.id, input.id))
+      .limit(1);
+    const att = rows[0];
+    if (!att) throw new ORPCError("NOT_FOUND", { message: "Anhang nicht gefunden." });
+    await context.db.delete(attachmentsTable).where(eq(attachmentsTable.id, input.id));
+    try {
+      await deleteObject(att.s3Key);
+    } catch {
+      /* tolerate orphan in S3; record is gone */
+    }
+    await appendAudit(context.db, {
+      entityType: "member_attachment",
+      entityId: input.id,
+      action: "delete",
+      source: "ui",
+      actorId: context.session!.user.id,
+      actorEmail: context.session!.user.email,
+      changes: { filename: { before: att.filename, after: null } },
+    });
+    return { ok: true };
+  }),
 
   /**
    * Internal helper used by the /api/files/:id redirect route. Not normally

@@ -1,4 +1,13 @@
-import { bigint, integer, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
 
 export const importSourceEnum = pgEnum("import_source", ["sql_upload", "svums_push"]);
@@ -12,6 +21,7 @@ export const importBatchesTable = pgTable("import_batches", {
   contractsWritten: integer("contracts_written").notNull().default(0),
   feeTypesWritten: integer("fee_types_written").notNull().default(0),
   sepaWritten: integer("sepa_written").notNull().default(0),
+  relationshipsWritten: integer("relationships_written").notNull().default(0),
   parsedTables: text("parsed_tables").array(),
   skippedTables: text("skipped_tables").array(),
   errors: jsonb("errors").$type<Array<{ table: string; message: string }>>(),

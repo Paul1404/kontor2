@@ -12,7 +12,10 @@ const EnvSchema = v.object({
 
   APP_SECRET: v.pipe(
     v.string(),
-    v.regex(/^[0-9a-fA-F]{64}$/, "must be 64 hex chars (32 bytes), generate with `openssl rand -hex 32`"),
+    v.regex(
+      /^[0-9a-fA-F]{64}$/,
+      "must be 64 hex chars (32 bytes), generate with `openssl rand -hex 32`",
+    ),
   ),
 
   AWS_ENDPOINT_URL: v.pipe(v.string(), v.url()),

@@ -11,14 +11,12 @@ import { env } from "~/server/env";
 const RoleSchema = v.picklist(roleEnum.enumValues);
 
 export const authRouter = {
-  me: authedProc
-    .input(v.void())
-    .handler(async ({ context }) => ({
-      id: context.session!.user.id,
-      email: context.session!.user.email,
-      name: context.session!.user.name,
-      role: (context.session!.user.role as string) ?? "readonly",
-    })),
+  me: authedProc.input(v.void()).handler(async ({ context }) => ({
+    id: context.session!.user.id,
+    email: context.session!.user.email,
+    name: context.session!.user.name,
+    role: (context.session!.user.role as string) ?? "readonly",
+  })),
 
   listUsers: adminProc.input(v.void()).handler(async ({ context }) => {
     const rows = await context.db.select().from(users);
@@ -100,8 +98,10 @@ export const authRouter = {
       const inv = rows[0];
       if (!inv) throw new ORPCError("NOT_FOUND", { message: "Einladung nicht gefunden." });
       if (inv.revokedAt) throw new ORPCError("FORBIDDEN", { message: "Einladung widerrufen." });
-      if (inv.acceptedAt) throw new ORPCError("FORBIDDEN", { message: "Einladung bereits eingelöst." });
-      if (inv.expiresAt < new Date()) throw new ORPCError("FORBIDDEN", { message: "Einladung abgelaufen." });
+      if (inv.acceptedAt)
+        throw new ORPCError("FORBIDDEN", { message: "Einladung bereits eingelöst." });
+      if (inv.expiresAt < new Date())
+        throw new ORPCError("FORBIDDEN", { message: "Einladung abgelaufen." });
       return { email: inv.email, role: inv.role };
     }),
 
@@ -128,7 +128,9 @@ export const authRouter = {
         headers: context.headers,
       });
       if (!newUser?.user?.id) {
-        throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Konto konnte nicht angelegt werden." });
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Konto konnte nicht angelegt werden.",
+        });
       }
       await context.db
         .update(users)

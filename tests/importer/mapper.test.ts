@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { mapContractRow, mapMemberRow, mapSepaRow } from "~/server/importer/linear-mapper";
+import {
+  mapContractRow,
+  mapMemberRow,
+  mapSepaRow,
+  mapVerknRow,
+} from "~/server/importer/linear-mapper";
 
 describe("mapMemberRow", () => {
   it("returns null when AdrNr is missing", () => {
@@ -76,5 +81,49 @@ describe("mapContractRow / mapSepaRow", () => {
     });
     expect(s?.status).toBe("AKTIV");
     expect(s?.gueltigAb).toBeInstanceOf(Date);
+  });
+});
+
+describe("mapVerknRow", () => {
+  it("requires both ADRNR and VERKN", () => {
+    expect(mapVerknRow({})).toBeNull();
+    expect(mapVerknRow({ ADRNR: 1 })).toBeNull();
+    expect(mapVerknRow({ VERKN: 2 })).toBeNull();
+  });
+
+  it("maps the Linear verkn pair with full kind", () => {
+    // Real-world sample shape from a Linear datesicherung.sql dump.
+    const row = mapVerknRow({
+      ADRNR: 13,
+      VERKN: 14,
+      Beziehung: "Familienmitglied",
+      Name: "Schmidt",
+      Funktion: "Ehepartner",
+    });
+    expect(row).not.toBeNull();
+    expect(row?.fromAdrNr).toBe(13);
+    expect(row?.toAdrNr).toBe(14);
+    expect(row?.beziehung).toBe("Familienmitglied");
+    expect(row?.name).toBe("Schmidt");
+    expect(row?.funktion).toBe("Ehepartner");
+  });
+
+  it("preserves sparse pair-only rows (NULL Beziehung)", () => {
+    // The reference dump has many rows that are just (ADRNR, VERKN) with
+    // every other column NULL -- these still need to come through so the
+    // direction-of-link is preserved.
+    const row = mapVerknRow({ ADRNR: 8, VERKN: 517 });
+    expect(row?.fromAdrNr).toBe(8);
+    expect(row?.toAdrNr).toBe(517);
+    expect(row?.beziehung).toBeNull();
+    expect(row?.name).toBeNull();
+  });
+
+  it("decimal sources from MySQL decimal(19,8) coerce to int", () => {
+    // Linear stores ADRNR/VERKN as decimal(19,8) which the tokenizer yields
+    // as JS numbers like 8.00000000. coerceInt must truncate cleanly.
+    const row = mapVerknRow({ ADRNR: 13.0, VERKN: 742.0 });
+    expect(row?.fromAdrNr).toBe(13);
+    expect(row?.toAdrNr).toBe(742);
   });
 });

@@ -8,7 +8,7 @@
 export type Cell = string | number | boolean | null;
 export type Row = Cell[];
 
-export const SUPPORTED_TABLES = new Set(["adresse", "mgart", "mgvert", "adrsepa"]);
+export const SUPPORTED_TABLES = new Set(["adresse", "mgart", "mgvert", "adrsepa", "verkn"]);
 
 const ESCAPES: Record<string, string> = {
   n: "\n",
@@ -239,10 +239,7 @@ function endsStatement(line: string): boolean {
   return line.trimEnd().endsWith(";");
 }
 
-export function parseDump(
-  text: string,
-  supported: Set<string> = SUPPORTED_TABLES,
-): ParsedDump {
+export function parseDump(text: string, supported: Set<string> = SUPPORTED_TABLES): ParsedDump {
   const out: ParsedDump = { columns: {}, rows: {} };
   const lines = text.split(/\r?\n/);
   const n = lines.length;
@@ -296,7 +293,9 @@ export function parseDump(
         }
       } catch (err) {
         if (process.env.NODE_ENV !== "production") {
-          console.warn(`[importer] skipping malformed INSERT for ${table}: ${(err as Error).message}`);
+          console.warn(
+            `[importer] skipping malformed INSERT for ${table}: ${(err as Error).message}`,
+          );
         }
       }
       continue;

@@ -3,13 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, Upload, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/import")({
@@ -51,7 +45,9 @@ function ImportPage() {
       <Card>
         <CardHeader>
           <CardTitle>Datei hochladen</CardTitle>
-          <CardDescription>Der Inhalt wird normalisiert und in das aktuelle Schema überführt.</CardDescription>
+          <CardDescription>
+            Der Inhalt wird normalisiert und in das aktuelle Schema überführt.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/30 px-6 py-10 text-center transition-colors hover:bg-muted/50">

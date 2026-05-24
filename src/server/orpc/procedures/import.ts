@@ -33,17 +33,19 @@ export const importRouter = {
       const members = (dump.rows.adresse ?? []).map((r) =>
         rowToDict(dump.columns.adresse ?? [], r),
       );
-      const feeTypes = (dump.rows.mgart ?? []).map((r) =>
-        rowToDict(dump.columns.mgart ?? [], r),
-      );
+      const feeTypes = (dump.rows.mgart ?? []).map((r) => rowToDict(dump.columns.mgart ?? [], r));
       const contracts = (dump.rows.mgvert ?? []).map((r) =>
         rowToDict(dump.columns.mgvert ?? [], r),
       );
-      const sepa = (dump.rows.adrsepa ?? []).map((r) =>
-        rowToDict(dump.columns.adrsepa ?? [], r),
+      const sepa = (dump.rows.adrsepa ?? []).map((r) => rowToDict(dump.columns.adrsepa ?? [], r));
+      const relationships = (dump.rows.verkn ?? []).map((r) =>
+        rowToDict(dump.columns.verkn ?? [], r),
       );
 
-      if (members.length + feeTypes.length + contracts.length + sepa.length === 0) {
+      if (
+        members.length + feeTypes.length + contracts.length + sepa.length + relationships.length ===
+        0
+      ) {
         throw new ORPCError("BAD_REQUEST", {
           message: "Keine verarbeitbaren Tabellen im Dump gefunden.",
         });
@@ -59,6 +61,7 @@ export const importRouter = {
         feeTypes,
         contracts,
         sepa,
+        relationships,
         requestId: context.requestId,
       });
       return result;

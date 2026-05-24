@@ -75,7 +75,9 @@ async function checkS3(): Promise<void> {
   }
 }
 
-type Result = { name: string; ok: true; ms: number } | { name: string; ok: false; ms: number; error: string };
+type Result =
+  | { name: string; ok: true; ms: number }
+  | { name: string; ok: false; ms: number; error: string };
 
 async function run(name: string, fn: () => Promise<void>): Promise<Result> {
   const start = performance.now();

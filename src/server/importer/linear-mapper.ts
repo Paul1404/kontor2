@@ -400,6 +400,40 @@ export function mapContractRow(d: LinearRow): Record<string, unknown> | null {
   };
 }
 
+export function mapVerknRow(d: LinearRow): Record<string, unknown> | null {
+  const fromAdrNr = coerceInt(d.ADRNR ?? d.AdrNr ?? null);
+  const toAdrNr = coerceInt(d.VERKN ?? d.Verkn ?? null);
+  if (fromAdrNr === null || toAdrNr === null) return null;
+  return {
+    fromAdrNr,
+    toAdrNr,
+    beziehung: coerceStr(d.Beziehung ?? null, 40),
+    matchcode: coerceStr(d.Matchcode ?? null, 40),
+    name: coerceStr(d.Name ?? null, 40),
+    anrede: coerceStr(d.Anrede ?? null, 6),
+    telefon: coerceStr(d.Telefon ?? null, 30),
+    abteilung: coerceStr(d.Abteilung ?? null, 40),
+    nachname: coerceStr(d.Nachname ?? null, 40),
+    art: coerceStr(d.Art ?? null, 2),
+    artName: coerceStr(d.ArtName ?? null, 20),
+    rg: coerceStr(d.Rg ?? null, 1),
+    funktion: coerceStr(d.Funktion ?? null, 80),
+    post: coerceStr(d.Post ?? null, 1),
+    fax: coerceStr(d.Fax ?? null, 40),
+    email: coerceStr(d.EMail ?? null, 250),
+    eb: coerceStr(d.EB ?? null, 1),
+    vkennung: coerceStr(d.VKennung ?? null, 60),
+    datVon: coerceDate(d.DatVon ?? null),
+    datBis: coerceDate(d.DatBis ?? null),
+    vEmail: coerceStr(d.VEmail ?? null, 250),
+    kennungV1: coerceStr(d.KennungV1 ?? null, 60),
+    kennungV2: coerceStr(d.KennungV2 ?? null, 60),
+    kennungV3: coerceStr(d.KennungV3 ?? null, 60),
+    kennungV4: coerceStr(d.KennungV4 ?? null, 60),
+    kennungV5: coerceStr(d.KennungV5 ?? null, 60),
+  };
+}
+
 export function mapSepaRow(d: LinearRow): Record<string, unknown> | null {
   const adrNr = coerceInt(d.AdrNr ?? null);
   const mandatsNr = coerceStr(d.MandatsNr ?? null, 50);

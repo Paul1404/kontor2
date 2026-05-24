@@ -3,13 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, Mail, Save, ShieldAlert, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
@@ -182,7 +176,9 @@ function SmtpPage() {
                 <div className="mt-3 flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-foreground">
                   <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                   <span>
-                    Die TLS-Zertifikatsprüfung ist abgeschaltet. Verbindung bleibt verschlüsselt, aber der Server wird nicht authentifiziert. Nur in vertrauenswürdigen Netzwerken aktivieren.
+                    Die TLS-Zertifikatsprüfung ist abgeschaltet. Verbindung bleibt verschlüsselt,
+                    aber der Server wird nicht authentifiziert. Nur in vertrauenswürdigen Netzwerken
+                    aktivieren.
                   </span>
                 </div>
               ) : null}
@@ -211,7 +207,11 @@ function SmtpPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <Field label="Empfänger" hint="Adresse, an die die Testmail gehen soll" className="sm:flex-1 sm:max-w-sm">
+            <Field
+              label="Empfänger"
+              hint="Adresse, an die die Testmail gehen soll"
+              className="sm:flex-1 sm:max-w-sm"
+            >
               <Input
                 type="email"
                 value={testTo}
