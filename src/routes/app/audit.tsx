@@ -1,10 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
+import {
+  actionLabel,
+  entityLabel,
+  fieldLabel,
+  formatAuditValue,
+  isHiddenField,
+} from "~/lib/audit-labels";
 import { formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -29,42 +36,11 @@ function AuditPage() {
         </p>
       </div>
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 font-medium">Zeitpunkt</th>
-                <th className="px-4 py-3 font-medium">Benutzer</th>
-                <th className="px-4 py-3 font-medium">Aktion</th>
-                <th className="px-4 py-3 font-medium">Quelle</th>
-                <th className="px-4 py-3 font-medium">Entität</th>
-                <th className="px-4 py-3 font-medium">Änderungen</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {list.data?.rows.map((r) => (
-                <tr key={r.id} className="align-top transition-colors hover:bg-muted/30">
-                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                    {formatDateTime(r.createdAt)}
-                  </td>
-                  <td className="px-4 py-3 text-foreground">{r.actorEmail ?? "system"}</td>
-                  <td className="px-4 py-3">
-                    <Badge variant="outline">{r.action}</Badge>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{r.source}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                    {r.entityType}:{r.entityId.slice(0, 8)}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {Object.keys(r.changes ?? {})
-                      .slice(0, 8)
-                      .join(", ")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className="divide-y divide-border">
+          {list.data?.rows.map((r) => (
+            <AuditRow key={r.id} row={r as never} />
+          ))}
+        </ul>
         <div className="flex items-center justify-between border-t border-border bg-card px-4 py-3 text-sm">
           <span className="text-muted-foreground">{list.data?.total ?? 0} Einträge</span>
           <div className="flex items-center gap-2">
@@ -91,5 +67,89 @@ function AuditPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+type AuditRowData = {
+  id: string;
+  action: string;
+  source: string;
+  actorEmail: string | null;
+  entityType: string;
+  entityId: string;
+  changes: Record<string, { before: unknown; after: unknown }> | null;
+  createdAt: string | Date;
+};
+
+function AuditRow({ row }: { row: AuditRowData }) {
+  const [open, setOpen] = useState(false);
+  const visibleChanges = Object.entries(row.changes ?? {}).filter(([k]) => !isHiddenField(k));
+  const summary = visibleChanges
+    .slice(0, 4)
+    .map(([k]) => fieldLabel(k))
+    .join(", ");
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
+      >
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <Badge variant="outline">{actionLabel(row.action)}</Badge>
+            <span className="font-medium">{entityLabel(row.entityType)}</span>
+            <span className="font-mono text-xs text-muted-foreground">
+              {row.entityId.slice(0, 8)}
+            </span>
+            {row.source !== "ui" ? (
+              <Badge variant="secondary" className="text-xs">
+                {row.source}
+              </Badge>
+            ) : null}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {visibleChanges.length === 0
+              ? "Keine sichtbaren Felder geändert"
+              : `${visibleChanges.length} Feld${visibleChanges.length === 1 ? "" : "er"}: ${summary}${visibleChanges.length > 4 ? "…" : ""}`}
+          </div>
+          {row.actorEmail ? (
+            <div className="text-xs text-muted-foreground">von {row.actorEmail}</div>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+            {formatDateTime(row.createdAt)}
+          </span>
+          <ChevronDown
+            className={`size-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </div>
+      </button>
+      {open && visibleChanges.length > 0 ? (
+        <div className="border-t border-border bg-muted/30 px-4 py-2">
+          <table className="w-full text-xs">
+            <thead className="text-left text-muted-foreground">
+              <tr>
+                <th className="px-2 py-1.5 font-medium">Feld</th>
+                <th className="px-2 py-1.5 font-medium">Vorher</th>
+                <th className="px-2 py-1.5 font-medium">Nachher</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleChanges.map(([k, change]) => (
+                <tr key={k} className="border-t border-border/40">
+                  <td className="px-2 py-1.5 font-medium">{fieldLabel(k)}</td>
+                  <td className="px-2 py-1.5 text-muted-foreground">
+                    {formatAuditValue(k, change.before)}
+                  </td>
+                  <td className="px-2 py-1.5">{formatAuditValue(k, change.after)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </li>
   );
 }

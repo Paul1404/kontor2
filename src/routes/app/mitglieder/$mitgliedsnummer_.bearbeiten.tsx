@@ -28,9 +28,10 @@ function EditMemberPage() {
   const mut = useMutation({
     mutationFn: async (values: StammdatenValues) => {
       if (!detail.data) return;
+      const initialIban = ((detail.data.member as Record<string, unknown>).iban1 as string) ?? "";
       return orpc.members.update({
         memberId: detail.data.member.id,
-        patch: buildPatch(values) as never,
+        patch: buildPatch(values, initialIban.replace(/\s+/g, "").toUpperCase()) as never,
       });
     },
     onSuccess: async () => {

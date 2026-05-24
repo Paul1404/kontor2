@@ -77,6 +77,9 @@ export function SepaCard({
             {mandate.map((s) => (
               <li key={s.id} className="flex items-center justify-between py-2">
                 <div className="flex flex-col">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Mandatsreferenz
+                  </span>
                   <span className="tabular-nums font-medium">{s.mandatsNr}</span>
                   <span className="text-xs text-muted-foreground">
                     {s.lastschriftart ?? ""} {s.typ ? `· ${s.typ}` : ""}
@@ -172,9 +175,13 @@ function AddMandateForm({
             onChange={(e) => setTyp(e.target.value)}
             className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
           >
-            <option value="CORE">CORE</option>
-            <option value="B2B">B2B</option>
+            <option value="CORE">CORE — Privatpersonen (Standard)</option>
+            <option value="B2B">B2B — Firmenkunden</option>
           </select>
+          <p className="text-xs text-muted-foreground">
+            CORE für Mitglieder mit Privatkonto. B2B nur, wenn das Konto auf eine Firma läuft und
+            ein Firmenmandat hinterlegt ist.
+          </p>
         </div>
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs uppercase tracking-wide text-muted-foreground">

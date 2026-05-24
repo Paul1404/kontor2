@@ -24,7 +24,7 @@ function NewMemberPage() {
     mutationFn: (values: StammdatenValues) =>
       orpc.members.create({
         mitglnr: mitglnr.trim().length > 0 ? mitglnr.trim() : null,
-        patch: buildPatch(values) as never,
+        patch: buildPatch(values, "") as never,
       }),
     onSuccess: async (result) => {
       await qc.invalidateQueries({ queryKey: ["members.list"] });

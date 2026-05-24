@@ -346,9 +346,11 @@ export const membersRouter = {
           .orderBy(asc(relationshipsTable.beziehung), asc(relationshipsTable.toAdrNr)),
       ]);
 
-      // Strip the encrypted IBAN ciphertexts from the response. UI only sees last4.
-      const { iban1, iban2, iban3, ...stamm } = m;
-      void iban1;
+      // The IBAN columns are AES-256-GCM ciphertext at rest but our custom
+      // drizzle type decrypts on read. We expose iban1 in clear (the page
+      // is gated to authed users; vorstand sees the full IBAN). iban2/iban3
+      // are unused in the UI today, so drop their ciphertexts.
+      const { iban2, iban3, ...stamm } = m;
       void iban2;
       void iban3;
 

@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -61,6 +61,7 @@ export function ContractsCard({
         {adding && canEdit ? (
           <AddContractForm
             memberId={memberId}
+            existingArt={vertraege.map((v) => v.art)}
             onCancel={() => setAdding(false)}
             onCreated={async () => {
               setAdding(false);
@@ -134,33 +135,45 @@ export function ContractsCard({
 
 function AddContractForm({
   memberId,
+  existingArt,
   onCancel,
   onCreated,
 }: {
   memberId: string;
+  existingArt: number[];
   onCancel: () => void;
   onCreated: () => void | Promise<void>;
 }) {
+  // Pull the globally configured Beitragsarten so the user picks one
+  // instead of typing free-form data. The form is intentionally minimal:
+  // pick a type → date → done. Betrag and Bezeichnung come from settings.
+  const feeTypes = useQuery({
+    queryKey: ["feeTypes.list"],
+    queryFn: () => orpc.feeTypes.list(),
+  });
+
   const [vertragNr, setVertragNr] = useState("");
-  const [art, setArt] = useState("1");
-  const [artName, setArtName] = useState("");
-  const [betrag, setBetrag] = useState("");
-  const [vertragBegin, setVertragBegin] = useState("");
+  const [art, setArt] = useState<string>("");
+  const [vertragBegin, setVertragBegin] = useState(() => new Date().toISOString().slice(0, 10));
   const [error, setError] = useState<string | null>(null);
+
+  // Hide inactive Beitragsarten and anything the member already has.
+  const options = (feeTypes.data ?? []).filter(
+    (f) => f.nichAktiv !== "J" && !existingArt.includes(f.art),
+  );
+  const selected = options.find((f) => String(f.art) === art) ?? null;
 
   const create = useMutation({
     mutationFn: () => {
-      const artInt = Number.parseInt(art, 10);
-      if (!Number.isFinite(artInt)) {
-        throw new Error("Art muss eine Zahl sein.");
-      }
+      if (!selected) throw new Error("Bitte eine Beitragsart wählen.");
+      if (!vertragNr.trim()) throw new Error("Vertragsnummer ist erforderlich.");
       return orpc.contracts.create({
         memberId,
         patch: {
           vertragNr: vertragNr.trim(),
-          art: artInt,
-          artName: artName.trim() || null,
-          betrag: betrag.trim() || null,
+          art: selected.art,
+          artName: selected.bezeichnung ?? null,
+          betrag: selected.betrag1 ?? null,
           vertragBegin: vertragBegin || null,
         },
       });
@@ -171,39 +184,44 @@ function AddContractForm({
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="flex flex-col gap-1.5 md:col-span-2">
+          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+            Beitragsart
+          </Label>
+          {feeTypes.isLoading ? (
+            <div className="flex h-10 items-center px-1 text-sm text-muted-foreground">
+              <Loader2 className="mr-2 size-3.5 animate-spin" /> Lade Beitragsarten…
+            </div>
+          ) : options.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Keine verfügbaren Beitragsarten. Erst unter Einstellungen → Beitragsarten anlegen.
+            </p>
+          ) : (
+            <select
+              value={art}
+              onChange={(e) => setArt(e.target.value)}
+              className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+            >
+              <option value="">Bitte wählen…</option>
+              {options.map((f) => (
+                <option key={f.art} value={f.art}>
+                  {f.bezeichnung ?? `Art ${f.art}`}
+                  {f.betrag1 ? ` — ${formatCurrency(f.betrag1)}` : ""}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs uppercase tracking-wide text-muted-foreground">
             Vertragsnummer
           </Label>
-          <Input value={vertragNr} onChange={(e) => setVertragNr(e.target.value)} required />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            Art (Nummer)
-          </Label>
           <Input
-            type="number"
-            inputMode="numeric"
-            value={art}
-            onChange={(e) => setArt(e.target.value)}
+            value={vertragNr}
+            onChange={(e) => setVertragNr(e.target.value)}
+            placeholder="z. B. 2026-001"
             required
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            Art-Bezeichnung
-          </Label>
-          <Input value={artName} onChange={(e) => setArtName(e.target.value)} />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            Betrag (EUR)
-          </Label>
-          <Input
-            inputMode="decimal"
-            value={betrag}
-            onChange={(e) => setBetrag(e.target.value.replace(",", "."))}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -215,6 +233,21 @@ function AddContractForm({
           />
         </div>
       </div>
+
+      {selected ? (
+        <div className="grid grid-cols-2 gap-3 rounded-md border border-border/60 bg-background p-3 text-xs text-muted-foreground">
+          <div>
+            <div className="uppercase tracking-wide">Bezeichnung</div>
+            <div className="text-sm text-foreground">{selected.bezeichnung ?? "—"}</div>
+          </div>
+          <div>
+            <div className="uppercase tracking-wide">Betrag</div>
+            <div className="text-sm text-foreground tabular-nums">
+              {formatCurrency(selected.betrag1) || "—"}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
@@ -229,7 +262,7 @@ function AddContractForm({
             setError(null);
             create.mutate();
           }}
-          disabled={create.isPending || !vertragNr.trim()}
+          disabled={!selected || !vertragNr.trim() || create.isPending}
         >
           {create.isPending ? (
             <Loader2 className="size-4 animate-spin" />

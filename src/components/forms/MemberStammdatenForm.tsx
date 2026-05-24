@@ -1,19 +1,20 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, Save, X } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
+import { LAND_OPTIONS } from "~/lib/country";
+import { orpc } from "~/lib/orpc";
 
 export type StammdatenValues = {
   anrede: string;
   titel1: string;
   vorname: string;
   nachname: string;
-  geborene: string;
   geburtsdatum: string;
-  geburtsort: string;
   strasse: string;
   hausnummer: string;
   plz: string;
@@ -24,13 +25,9 @@ export type StammdatenValues = {
   eMailName: string;
   eintritt: string;
   austritt: string;
-  verstorbenAm: string;
   aktivPasiv: "A" | "P" | "";
-  bank1: string;
-  bic1: string;
   iban1: string;
   abwKontoInh: string;
-  mandatsrefenz: string;
   notes: string;
 };
 
@@ -39,26 +36,20 @@ export const EMPTY_STAMM: StammdatenValues = {
   titel1: "",
   vorname: "",
   nachname: "",
-  geborene: "",
   geburtsdatum: "",
-  geburtsort: "",
   strasse: "",
   hausnummer: "",
   plz: "",
   ort: "",
-  land: "",
+  land: "1",
   telefon1: "",
   telefon2: "",
   eMailName: "",
   eintritt: "",
   austritt: "",
-  verstorbenAm: "",
   aktivPasiv: "",
-  bank1: "",
-  bic1: "",
   iban1: "",
   abwKontoInh: "",
-  mandatsrefenz: "",
   notes: "",
 };
 
@@ -70,7 +61,7 @@ function toDateInput(value: string | Date | null | undefined): string {
 }
 
 export function buildInitialValues(
-  member: Partial<Record<keyof StammdatenValues, unknown>> | null,
+  member: Partial<Record<keyof StammdatenValues | "iban1Plain", unknown>> | null,
 ): StammdatenValues {
   if (!member) return EMPTY_STAMM;
   return {
@@ -78,29 +69,25 @@ export function buildInitialValues(
     titel1: (member.titel1 as string) ?? "",
     vorname: (member.vorname as string) ?? "",
     nachname: (member.nachname as string) ?? "",
-    geborene: (member.geborene as string) ?? "",
     geburtsdatum: toDateInput(member.geburtsdatum as string | Date | null),
-    geburtsort: (member.geburtsort as string) ?? "",
     strasse: (member.strasse as string) ?? "",
     hausnummer: (member.hausnummer as string) ?? "",
     plz: (member.plz as string) ?? "",
     ort: (member.ort as string) ?? "",
-    land: (member.land as string) ?? "",
+    land: (member.land as string) ?? "1",
     telefon1: (member.telefon1 as string) ?? "",
     telefon2: (member.telefon2 as string) ?? "",
     eMailName: ((member as Record<string, unknown>).eMailName as string) ?? "",
     eintritt: toDateInput(member.eintritt as string | Date | null),
     austritt: toDateInput(member.austritt as string | Date | null),
-    verstorbenAm: toDateInput(member.verstorbenAm as string | Date | null),
     aktivPasiv: (member.aktivPasiv === "A" ? "A" : member.aktivPasiv === "P" ? "P" : "") as
       | "A"
       | "P"
       | "",
-    bank1: (member.bank1 as string) ?? "",
-    bic1: (member.bic1 as string) ?? "",
-    iban1: "",
+    iban1: ((member.iban1 as string | null | undefined) ?? "")
+      .replace(/\s+/g, "")
+      .toUpperCase(),
     abwKontoInh: (member.abwKontoInh as string) ?? "",
-    mandatsrefenz: (member.mandatsrefenz as string) ?? "",
     notes: (member.notes as string) ?? "",
   };
 }
@@ -110,16 +97,17 @@ export function buildInitialValues(
  * strings become `null`; the IBAN is only included when the user actually
  * typed something (so existing ciphertext is not overwritten with a blank).
  */
-export function buildPatch(values: StammdatenValues): Record<string, string | null> {
+export function buildPatch(
+  values: StammdatenValues,
+  initialIban: string,
+): Record<string, string | null> {
   const out: Record<string, string | null> = {};
   const nullable = (s: string) => (s.trim().length > 0 ? s.trim() : null);
   out.anrede = nullable(values.anrede);
   out.titel1 = nullable(values.titel1);
   out.vorname = nullable(values.vorname);
   out.nachname = nullable(values.nachname);
-  out.geborene = nullable(values.geborene);
   out.geburtsdatum = nullable(values.geburtsdatum);
-  out.geburtsort = nullable(values.geburtsort);
   out.strasse = nullable(values.strasse);
   out.hausnummer = nullable(values.hausnummer);
   out.plz = nullable(values.plz);
@@ -130,20 +118,14 @@ export function buildPatch(values: StammdatenValues): Record<string, string | nu
   out.eMailName = nullable(values.eMailName);
   out.eintritt = nullable(values.eintritt);
   out.austritt = nullable(values.austritt);
-  out.verstorbenAm = nullable(values.verstorbenAm);
-  // Only emit aktivPasiv when the user actually picked a value. Sending
-  // null here would overwrite an existing value to null; the server's
-  // patch helper only touches keys present in the object.
   if (values.aktivPasiv === "A" || values.aktivPasiv === "P") {
     out.aktivPasiv = values.aktivPasiv;
   }
-  out.bank1 = nullable(values.bank1);
-  out.bic1 = nullable(values.bic1);
   out.abwKontoInh = nullable(values.abwKontoInh);
-  out.mandatsrefenz = nullable(values.mandatsrefenz);
   out.notes = nullable(values.notes);
-  if (values.iban1.trim().length > 0) {
-    out.iban1 = values.iban1.replace(/\s+/g, "").toUpperCase();
+  const normIban = values.iban1.replace(/\s+/g, "").toUpperCase();
+  if (normIban !== initialIban) {
+    out.iban1 = normIban.length > 0 ? normIban : null;
   }
   return out;
 }
@@ -180,6 +162,18 @@ export function MemberStammdatenForm({
     e.preventDefault();
     void onSubmit(values);
   }
+
+  const cleanedIban = useMemo(
+    () => values.iban1.replace(/\s+/g, "").toUpperCase(),
+    [values.iban1],
+  );
+  const ibanLookup = useQuery({
+    queryKey: ["banks.lookupByIban", cleanedIban],
+    queryFn: () => orpc.banks.lookupByIban({ iban: cleanedIban }),
+    enabled: cleanedIban.length >= 12 && cleanedIban.startsWith("DE"),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const derived = ibanLookup.data?.found ? ibanLookup.data : null;
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -218,20 +212,11 @@ export function MemberStammdatenForm({
                 required
               />
             </FormField>
-            <FormField label="Geburtsname">
-              <Input value={values.geborene} onChange={(e) => update("geborene", e.target.value)} />
-            </FormField>
             <FormField label="Geburtsdatum">
               <Input
                 type="date"
                 value={values.geburtsdatum}
                 onChange={(e) => update("geburtsdatum", e.target.value)}
-              />
-            </FormField>
-            <FormField label="Geburtsort">
-              <Input
-                value={values.geburtsort}
-                onChange={(e) => update("geburtsort", e.target.value)}
               />
             </FormField>
             <FormField label="Straße">
@@ -250,7 +235,17 @@ export function MemberStammdatenForm({
               <Input value={values.ort} onChange={(e) => update("ort", e.target.value)} />
             </FormField>
             <FormField label="Land">
-              <Input value={values.land} onChange={(e) => update("land", e.target.value)} />
+              <select
+                value={values.land}
+                onChange={(e) => update("land", e.target.value)}
+                className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              >
+                {LAND_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </FormField>
             <FormField label="Status">
               <select
@@ -290,13 +285,6 @@ export function MemberStammdatenForm({
                 onChange={(e) => update("austritt", e.target.value)}
               />
             </FormField>
-            <FormField label="Verstorben am">
-              <Input
-                type="date"
-                value={values.verstorbenAm}
-                onChange={(e) => update("verstorbenAm", e.target.value)}
-              />
-            </FormField>
             <FormField label="Notizen" full>
               <Textarea
                 value={values.notes}
@@ -312,25 +300,37 @@ export function MemberStammdatenForm({
             <CardTitle>Bankverbindung</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 text-sm">
-            <FormField label="Bank">
-              <Input value={values.bank1} onChange={(e) => update("bank1", e.target.value)} />
-            </FormField>
-            <FormField label="IBAN (leer = unverändert)">
+            <FormField label="IBAN">
               <Input
                 value={values.iban1}
                 onChange={(e) => update("iban1", e.target.value)}
                 placeholder="DE..."
+                className="font-mono"
               />
             </FormField>
-            <FormField label="BIC">
-              <Input value={values.bic1} onChange={(e) => update("bic1", e.target.value)} />
-            </FormField>
-            <FormField label="Mandatsreferenz">
-              <Input
-                value={values.mandatsrefenz}
-                onChange={(e) => update("mandatsrefenz", e.target.value)}
-              />
-            </FormField>
+            <div className="flex flex-col gap-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
+              <div className="uppercase tracking-wide text-muted-foreground">
+                Bank (automatisch)
+              </div>
+              <div className="text-foreground">
+                {ibanLookup.isFetching && cleanedIban.length >= 12 ? (
+                  <span className="text-muted-foreground">Wird ermittelt…</span>
+                ) : derived ? (
+                  <>
+                    <div>{derived.name}</div>
+                    <div className="font-mono text-muted-foreground">BIC {derived.bic}</div>
+                  </>
+                ) : cleanedIban.length === 0 ? (
+                  <span className="text-muted-foreground">
+                    Bank und BIC werden aus der IBAN ermittelt.
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    Kein Treffer im Bundesbank-Verzeichnis. Bitte IBAN prüfen.
+                  </span>
+                )}
+              </div>
+            </div>
             <FormField label="Kontoinhaber (abweichend)">
               <Input
                 value={values.abwKontoInh}
