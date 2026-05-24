@@ -10,7 +10,7 @@ import { redis } from "~/server/redis/client";
 function buildAuth() {
   return betterAuth({
     baseURL: env().BETTER_AUTH_URL,
-    secret: env().BETTER_AUTH_SECRET,
+    secret: env().betterAuthSecret,
     database: drizzleAdapter(db(), {
       provider: "pg",
       usePlural: true,
