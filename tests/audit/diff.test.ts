@@ -12,10 +12,7 @@ describe("diff", () => {
   });
 
   it("masks IBAN columns to last4", () => {
-    const d = diff(
-      { iban1: "DE00 0000 0000 0000 1234" },
-      { iban1: "DE00 0000 0000 0000 5678" },
-    );
+    const d = diff({ iban1: "DE00 0000 0000 0000 1234" }, { iban1: "DE00 0000 0000 0000 5678" });
     expect(d.iban1).toEqual({ before: "1234", after: "5678" });
   });
 

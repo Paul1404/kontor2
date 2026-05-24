@@ -38,7 +38,7 @@ function tryStaticFile(pathname: string): { path: string; mime: string } | null 
     try {
       const s = statSync(full);
       if (s.isFile()) {
-        const ext = full.includes(".") ? full.split(".").pop() ?? "" : "";
+        const ext = full.includes(".") ? (full.split(".").pop() ?? "") : "";
         return { path: full, mime: MIME[ext] ?? "application/octet-stream" };
       }
     } catch {

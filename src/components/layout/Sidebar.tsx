@@ -67,7 +67,9 @@ export function Sidebar({ role }: { role: string }) {
         </div>
         <div className="flex flex-col leading-tight">
           <span className="text-[15px] font-semibold tracking-tight">SV Untereuerheim</span>
-          <span className="text-[11px] uppercase tracking-wider text-sidebar-muted">Vereinsverwaltung</span>
+          <span className="text-[11px] uppercase tracking-wider text-sidebar-muted">
+            Vereinsverwaltung
+          </span>
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-6 overflow-y-auto p-3 scrollbar-thin">
@@ -83,7 +85,8 @@ export function Sidebar({ role }: { role: string }) {
               ) : null}
               {items.map((n) => {
                 const active =
-                  location.pathname === n.to || (n.to !== "/app" && location.pathname.startsWith(n.to));
+                  location.pathname === n.to ||
+                  (n.to !== "/app" && location.pathname.startsWith(n.to));
                 return (
                   <Link
                     key={n.to}
@@ -102,7 +105,14 @@ export function Sidebar({ role }: { role: string }) {
                       )}
                       aria-hidden
                     />
-                    <span className={cn("transition-colors", active ? "text-brand" : "text-sidebar-muted group-hover:text-sidebar-foreground")}>
+                    <span
+                      className={cn(
+                        "transition-colors",
+                        active
+                          ? "text-brand"
+                          : "text-sidebar-muted group-hover:text-sidebar-foreground",
+                      )}
+                    >
                       {n.icon}
                     </span>
                     {n.label}
@@ -116,7 +126,9 @@ export function Sidebar({ role }: { role: string }) {
       <div className="border-t border-sidebar-border p-3">
         <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent/50 px-3 py-2 text-[11px] text-sidebar-muted">
           <ShieldCheck className="size-3.5 text-brand" />
-          <span>Rolle: <span className="font-medium text-sidebar-foreground">{role}</span></span>
+          <span>
+            Rolle: <span className="font-medium text-sidebar-foreground">{role}</span>
+          </span>
         </div>
       </div>
     </aside>

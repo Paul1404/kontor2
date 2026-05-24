@@ -3,13 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, UserPlus, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { orpc } from "~/lib/orpc";
@@ -62,7 +56,9 @@ function UsersPage() {
       <Card>
         <CardHeader>
           <CardTitle>Einladung versenden</CardTitle>
-          <CardDescription>Der Empfänger setzt sein Passwort über den Link in der E-Mail.</CardDescription>
+          <CardDescription>
+            Der Empfänger setzt sein Passwort über den Link in der E-Mail.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form

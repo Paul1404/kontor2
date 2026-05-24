@@ -42,10 +42,7 @@ async function run(): Promise<void> {
       },
     });
     if (result?.user?.id) {
-      await db()
-        .update(users)
-        .set({ emailVerified: true })
-        .where(eq(users.id, result.user.id));
+      await db().update(users).set({ emailVerified: true }).where(eq(users.id, result.user.id));
       console.log(`[bootstrap] created admin user ${e.SVUWV_BOOTSTRAP_ADMIN_EMAIL}`);
     }
   } catch (err) {

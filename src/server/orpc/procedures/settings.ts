@@ -35,7 +35,7 @@ export const settingsRouter = {
       requireTls: input.requireTls,
       allowInvalidCerts: input.allowInvalidCerts,
       username: input.username,
-      passwordEncrypted: input.password ? input.password : existing[0]?.passwordEncrypted ?? null,
+      passwordEncrypted: input.password ? input.password : (existing[0]?.passwordEncrypted ?? null),
       fromAddress: input.fromAddress,
       fromName: input.fromName,
       updatedAt: new Date(),

@@ -56,7 +56,9 @@ function AuditPage() {
                     {r.entityType}:{r.entityId.slice(0, 8)}
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {Object.keys(r.changes ?? {}).slice(0, 8).join(", ")}
+                    {Object.keys(r.changes ?? {})
+                      .slice(0, 8)
+                      .join(", ")}
                   </td>
                 </tr>
               ))}

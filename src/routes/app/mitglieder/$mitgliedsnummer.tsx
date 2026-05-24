@@ -1,9 +1,14 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Loader2, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
+import { ContractsCard } from "~/components/forms/ContractsCard";
+import { SepaCard } from "~/components/forms/SepaCard";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { formatCurrency, formatDate, formatDateTime, formatIbanMask } from "~/lib/format";
+import { formatDate, formatDateTime, formatIbanMask } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/mitglieder/$mitgliedsnummer")({
@@ -12,9 +17,22 @@ export const Route = createFileRoute("/app/mitglieder/$mitgliedsnummer")({
 
 function MemberDetailPage() {
   const { mitgliedsnummer } = Route.useParams();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const me = useQuery({ queryKey: ["me"], queryFn: () => orpc.auth.me() });
   const detail = useQuery({
     queryKey: ["members.get", mitgliedsnummer],
     queryFn: () => orpc.members.get({ mitgliedsnummer }),
+  });
+
+  const softDelete = useMutation({
+    mutationFn: (memberId: string) => orpc.members.softDelete({ memberId }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["members.list"] });
+      navigate({ to: "/app/mitglieder" });
+    },
   });
 
   if (detail.isLoading) return <p className="text-muted-foreground">Wird geladen...</p>;
@@ -22,11 +40,12 @@ function MemberDetailPage() {
     return <p className="text-destructive">Mitglied nicht gefunden.</p>;
   }
 
-  const { member, abteilungen, vertraege, sepa, anhaenge, audit } = detail.data;
+  const { member, abteilungen, vertraege, sepa, anhaenge, audit, beziehungen } = detail.data;
+  const canEdit = me.data?.role === "vorstand" || me.data?.role === "admin";
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link
             to="/app/mitglieder"
@@ -38,9 +57,48 @@ function MemberDetailPage() {
             {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Mitgliedsnummer: <span className="tabular-nums">{member.mitglnr}</span> · AdrNr {member.adrNr}
+            Mitgliedsnummer: <span className="tabular-nums">{member.mitglnr}</span> · AdrNr{" "}
+            {member.adrNr}
           </p>
         </div>
+        {canEdit ? (
+          <div className="flex items-center gap-2">
+            <Link to="/app/mitglieder/$mitgliedsnummer/bearbeiten" params={{ mitgliedsnummer }}>
+              <Button variant="outline" size="sm">
+                <Pencil className="size-4" /> Bearbeiten
+              </Button>
+            </Link>
+            {confirmDelete ? (
+              <>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => softDelete.mutate(member.id)}
+                  disabled={softDelete.isPending}
+                >
+                  {softDelete.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-4" />
+                  )}
+                  Endgültig löschen
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={softDelete.isPending}
+                >
+                  Abbrechen
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="size-4 text-destructive" /> Löschen
+              </Button>
+            )}
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -104,60 +162,26 @@ function MemberDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Verträge</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {vertraege.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Keine Verträge.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="text-left text-muted-foreground">
-                  <tr>
-                    <th className="py-1">Vertrag</th>
-                    <th className="py-1">Art</th>
-                    <th className="py-1 text-right">Betrag</th>
-                    <th className="py-1">Beginn</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vertraege.map((v) => (
-                    <tr key={v.id} className="border-t">
-                      <td className="py-1 tabular-nums">{v.vertragNr}</td>
-                      <td className="py-1">{v.artName ?? v.art}</td>
-                      <td className="py-1 text-right tabular-nums">{formatCurrency(v.betrag)}</td>
-                      <td className="py-1 text-muted-foreground">{formatDate(v.vertragBegin)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
+      <BeziehungenCard
+        memberId={member.id}
+        mitgliedsnummer={mitgliedsnummer}
+        beziehungen={beziehungen as never}
+        canEdit={canEdit}
+      />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>SEPA-Mandate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {sepa.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Keine Mandate.</p>
-            ) : (
-              <ul className="flex flex-col divide-y text-sm">
-                {sepa.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between py-2">
-                    <span className="tabular-nums">{s.mandatsNr}</span>
-                    <span className="text-muted-foreground">
-                      <Badge variant="outline">{s.status ?? "?"}</Badge> · {formatDate(s.gueltigAb)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <ContractsCard
+          memberId={member.id}
+          mitgliedsnummer={mitgliedsnummer}
+          vertraege={vertraege as never}
+          canEdit={canEdit}
+        />
+        <SepaCard
+          memberId={member.id}
+          mitgliedsnummer={mitgliedsnummer}
+          mandate={sepa as never}
+          canEdit={canEdit}
+        />
       </div>
 
       <Card>
@@ -225,7 +249,11 @@ function Field({ label, value }: { label: string; value: unknown }) {
     <div className="flex flex-col gap-0.5">
       <span className="text-xs uppercase text-muted-foreground tracking-wide">{label}</span>
       <span className="whitespace-pre-line">
-        {value == null || value === "" ? <span className="text-muted-foreground">k.A.</span> : String(value)}
+        {value == null || value === "" ? (
+          <span className="text-muted-foreground">k.A.</span>
+        ) : (
+          String(value)
+        )}
       </span>
     </div>
   );

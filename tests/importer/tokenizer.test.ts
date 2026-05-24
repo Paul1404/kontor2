@@ -43,7 +43,6 @@ describe("parseValues", () => {
     const rows = [...parseValues("(12.5, -3.14, 1.5e2)")];
     expect(rows[0]).toEqual([12.5, -3.14, 150]);
   });
-
 });
 
 describe("extractColumns", () => {

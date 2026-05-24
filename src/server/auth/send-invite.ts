@@ -49,9 +49,7 @@ function transporterFor(cfg: SmtpDispatchConfig): Transporter {
     port: cfg.port,
     secure: cfg.secure,
     requireTLS: !cfg.secure && cfg.requireTls,
-    auth: cfg.username
-      ? { user: cfg.username, pass: cfg.password ?? "" }
-      : undefined,
+    auth: cfg.username ? { user: cfg.username, pass: cfg.password ?? "" } : undefined,
     tls: {
       // Send SNI with the configured hostname so the MTA returns the right cert.
       servername: cfg.host,
@@ -98,7 +96,9 @@ export async function sendInviteEmail(opts: {
   }
 }
 
-export async function sendTestMail(opts: { to: string }): Promise<{ ok: true } | { ok: false; reason: string }> {
+export async function sendTestMail(opts: {
+  to: string;
+}): Promise<{ ok: true } | { ok: false; reason: string }> {
   const cfg = await loadSmtpConfig();
   if (!cfg) return { ok: false, reason: "smtp_not_configured" };
   const t = transporterFor(cfg);

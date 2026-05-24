@@ -63,4 +63,6 @@ export function auth(): ReturnType<typeof buildAuth> {
   return authInstance;
 }
 
-export type Session = NonNullable<Awaited<ReturnType<ReturnType<typeof auth>["api"]["getSession"]>>>;
+export type Session = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof auth>["api"]["getSession"]>>
+>;

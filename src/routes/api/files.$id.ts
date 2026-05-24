@@ -15,7 +15,11 @@ async function handle({ request, params }: { request: Request; params: { id: str
     .limit(1);
   const att = rows[0];
   if (!att) return new Response("Not found", { status: 404 });
-  const url = await presignDownload({ key: att.s3Key, filename: att.filename, expiresSeconds: 300 });
+  const url = await presignDownload({
+    key: att.s3Key,
+    filename: att.filename,
+    expiresSeconds: 300,
+  });
   return new Response(null, { status: 302, headers: { Location: url } });
 }
 

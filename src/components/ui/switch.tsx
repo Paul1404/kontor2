@@ -35,9 +35,7 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(
       </span>
       <span className="flex flex-col leading-tight">
         {label ? <span className="font-medium text-foreground">{label}</span> : null}
-        {description ? (
-          <span className="text-xs text-muted-foreground">{description}</span>
-        ) : null}
+        {description ? <span className="text-xs text-muted-foreground">{description}</span> : null}
       </span>
     </label>
   ),
