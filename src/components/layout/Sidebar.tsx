@@ -4,6 +4,7 @@ import {
   Coins,
   FileBarChart,
   FileSpreadsheet,
+  Layers,
   LayoutDashboard,
   Mail,
   ScrollText,
@@ -61,6 +62,18 @@ const SECTIONS: NavSection[] = [
         to: "/app/einstellungen/verein",
         label: "Vereinsdaten",
         icon: <Building2 className="size-[18px]" />,
+        adminOnly: true,
+      },
+      {
+        to: "/app/einstellungen/abteilungen",
+        label: "Abteilungen",
+        icon: <Layers className="size-[18px]" />,
+        adminOnly: true,
+      },
+      {
+        to: "/app/einstellungen/beitragsarten",
+        label: "Beitragsarten",
+        icon: <Coins className="size-[18px]" />,
         adminOnly: true,
       },
       {

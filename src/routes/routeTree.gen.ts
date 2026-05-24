@@ -24,6 +24,8 @@ import { Route as AppMitgliederMitgliedsnummerRouteImport } from './app/mitglied
 import { Route as AppEinstellungenVereinRouteImport } from './app/einstellungen/verein'
 import { Route as AppEinstellungenSmtpRouteImport } from './app/einstellungen/smtp'
 import { Route as AppEinstellungenBenutzerRouteImport } from './app/einstellungen/benutzer'
+import { Route as AppEinstellungenBeitragsartenRouteImport } from './app/einstellungen/beitragsarten'
+import { Route as AppEinstellungenAbteilungenRouteImport } from './app/einstellungen/abteilungen'
 import { Route as AppBerichteGeburtstageRouteImport } from './app/berichte/geburtstage'
 import { Route as AppBerichteFinanzenRouteImport } from './app/berichte/finanzen'
 import { Route as AppBerichteEhrungenRouteImport } from './app/berichte/ehrungen'
@@ -113,6 +115,18 @@ const AppEinstellungenBenutzerRoute =
     path: '/einstellungen/benutzer',
     getParentRoute: () => AppRouteRoute,
   } as any)
+const AppEinstellungenBeitragsartenRoute =
+  AppEinstellungenBeitragsartenRouteImport.update({
+    id: '/einstellungen/beitragsarten',
+    path: '/einstellungen/beitragsarten',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppEinstellungenAbteilungenRoute =
+  AppEinstellungenAbteilungenRouteImport.update({
+    id: '/einstellungen/abteilungen',
+    path: '/einstellungen/abteilungen',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 const AppBerichteGeburtstageRoute = AppBerichteGeburtstageRouteImport.update({
   id: '/berichte/geburtstage',
   path: '/berichte/geburtstage',
@@ -189,6 +203,8 @@ export interface FileRoutesByFullPath {
   '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
   '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
   '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
+  '/app/einstellungen/abteilungen': typeof AppEinstellungenAbteilungenRoute
+  '/app/einstellungen/beitragsarten': typeof AppEinstellungenBeitragsartenRoute
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
@@ -216,6 +232,8 @@ export interface FileRoutesByTo {
   '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
   '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
   '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
+  '/app/einstellungen/abteilungen': typeof AppEinstellungenAbteilungenRoute
+  '/app/einstellungen/beitragsarten': typeof AppEinstellungenBeitragsartenRoute
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
@@ -245,6 +263,8 @@ export interface FileRoutesById {
   '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
   '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
   '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
+  '/app/einstellungen/abteilungen': typeof AppEinstellungenAbteilungenRoute
+  '/app/einstellungen/beitragsarten': typeof AppEinstellungenBeitragsartenRoute
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
@@ -275,6 +295,8 @@ export interface FileRouteTypes {
     | '/app/berichte/ehrungen'
     | '/app/berichte/finanzen'
     | '/app/berichte/geburtstage'
+    | '/app/einstellungen/abteilungen'
+    | '/app/einstellungen/beitragsarten'
     | '/app/einstellungen/benutzer'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
@@ -302,6 +324,8 @@ export interface FileRouteTypes {
     | '/app/berichte/ehrungen'
     | '/app/berichte/finanzen'
     | '/app/berichte/geburtstage'
+    | '/app/einstellungen/abteilungen'
+    | '/app/einstellungen/beitragsarten'
     | '/app/einstellungen/benutzer'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
@@ -330,6 +354,8 @@ export interface FileRouteTypes {
     | '/app/berichte/ehrungen'
     | '/app/berichte/finanzen'
     | '/app/berichte/geburtstage'
+    | '/app/einstellungen/abteilungen'
+    | '/app/einstellungen/beitragsarten'
     | '/app/einstellungen/benutzer'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
@@ -459,6 +485,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppEinstellungenBenutzerRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/einstellungen/beitragsarten': {
+      id: '/app/einstellungen/beitragsarten'
+      path: '/einstellungen/beitragsarten'
+      fullPath: '/app/einstellungen/beitragsarten'
+      preLoaderRoute: typeof AppEinstellungenBeitragsartenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/abteilungen': {
+      id: '/app/einstellungen/abteilungen'
+      path: '/einstellungen/abteilungen'
+      fullPath: '/app/einstellungen/abteilungen'
+      preLoaderRoute: typeof AppEinstellungenAbteilungenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/berichte/geburtstage': {
       id: '/app/berichte/geburtstage'
       path: '/berichte/geburtstage'
@@ -564,6 +604,8 @@ interface AppRouteRouteChildren {
   AppBerichteEhrungenRoute: typeof AppBerichteEhrungenRoute
   AppBerichteFinanzenRoute: typeof AppBerichteFinanzenRoute
   AppBerichteGeburtstageRoute: typeof AppBerichteGeburtstageRoute
+  AppEinstellungenAbteilungenRoute: typeof AppEinstellungenAbteilungenRoute
+  AppEinstellungenBeitragsartenRoute: typeof AppEinstellungenBeitragsartenRoute
   AppEinstellungenBenutzerRoute: typeof AppEinstellungenBenutzerRoute
   AppEinstellungenSmtpRoute: typeof AppEinstellungenSmtpRoute
   AppEinstellungenVereinRoute: typeof AppEinstellungenVereinRoute
@@ -584,6 +626,8 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppBerichteEhrungenRoute: AppBerichteEhrungenRoute,
   AppBerichteFinanzenRoute: AppBerichteFinanzenRoute,
   AppBerichteGeburtstageRoute: AppBerichteGeburtstageRoute,
+  AppEinstellungenAbteilungenRoute: AppEinstellungenAbteilungenRoute,
+  AppEinstellungenBeitragsartenRoute: AppEinstellungenBeitragsartenRoute,
   AppEinstellungenBenutzerRoute: AppEinstellungenBenutzerRoute,
   AppEinstellungenSmtpRoute: AppEinstellungenSmtpRoute,
   AppEinstellungenVereinRoute: AppEinstellungenVereinRoute,
