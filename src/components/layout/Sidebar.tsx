@@ -1,5 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  Building2,
+  Coins,
   FileSpreadsheet,
   LayoutDashboard,
   Mail,
@@ -16,6 +18,7 @@ type NavItem = {
   label: string;
   icon: ReactNode;
   adminOnly?: boolean;
+  vorstandOnly?: boolean;
 };
 
 type NavSection = {
@@ -29,6 +32,12 @@ const SECTIONS: NavSection[] = [
     items: [
       { to: "/app", label: "Dashboard", icon: <LayoutDashboard className="size-[18px]" /> },
       { to: "/app/mitglieder", label: "Mitglieder", icon: <Users className="size-[18px]" /> },
+      {
+        to: "/app/beitrag",
+        label: "Beitragsläufe",
+        icon: <Coins className="size-[18px]" />,
+        vorstandOnly: true,
+      },
       { to: "/app/audit", label: "Audit Log", icon: <ScrollText className="size-[18px]" /> },
     ],
   },
@@ -39,6 +48,12 @@ const SECTIONS: NavSection[] = [
         to: "/app/import",
         label: "Import",
         icon: <FileSpreadsheet className="size-[18px]" />,
+        adminOnly: true,
+      },
+      {
+        to: "/app/einstellungen/verein",
+        label: "Vereinsdaten",
+        icon: <Building2 className="size-[18px]" />,
         adminOnly: true,
       },
       {
@@ -74,7 +89,11 @@ export function Sidebar({ role }: { role: string }) {
       </div>
       <nav className="flex flex-1 flex-col gap-6 overflow-y-auto p-3 scrollbar-thin">
         {SECTIONS.map((sect, sIdx) => {
-          const items = sect.items.filter((n) => !n.adminOnly || role === "admin");
+          const items = sect.items.filter((n) => {
+            if (n.adminOnly && role !== "admin") return false;
+            if (n.vorstandOnly && role !== "admin" && role !== "vorstand") return false;
+            return true;
+          });
           if (items.length === 0) return null;
           return (
             <div key={sect.label ?? `sec-${sIdx}`} className="flex flex-col gap-1">

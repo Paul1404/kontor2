@@ -8,397 +8,490 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root";
-import { Route as LoginRouteImport } from "./routes/login";
-import { Route as AppRouteRouteImport } from "./routes/app/route";
-import { Route as IndexRouteImport } from "./routes/index";
-import { Route as AppIndexRouteImport } from "./routes/app/index";
-import { Route as AppImportRouteImport } from "./routes/app/import";
-import { Route as AppAuditRouteImport } from "./routes/app/audit";
-import { Route as ApiHealthRouteImport } from "./routes/api/health";
-import { Route as AppMitgliederIndexRouteImport } from "./routes/app/mitglieder/index";
-import { Route as AppMitgliederNeuRouteImport } from "./routes/app/mitglieder/neu";
-import { Route as AppMitgliederMitgliedsnummerRouteImport } from "./routes/app/mitglieder/$mitgliedsnummer";
-import { Route as AppEinstellungenSmtpRouteImport } from "./routes/app/einstellungen/smtp";
-import { Route as AppEinstellungenBenutzerRouteImport } from "./routes/app/einstellungen/benutzer";
-import { Route as ApiRpcSplatRouteImport } from "./routes/api/rpc.$";
-import { Route as ApiIngestSvumsRouteImport } from "./routes/api/ingest.svums";
-import { Route as ApiFilesIdRouteImport } from "./routes/api/files.$id";
-import { Route as ApiAuthSplatRouteImport } from "./routes/api/auth.$";
-import { Route as AppMitgliederMitgliedsnummerBearbeitenRouteImport } from "./routes/app/mitglieder/$mitgliedsnummer.bearbeiten";
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppRouteRouteImport } from './routes/app/route'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppImportRouteImport } from './routes/app/import'
+import { Route as AppAuditRouteImport } from './routes/app/audit'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as AppMitgliederIndexRouteImport } from './routes/app/mitglieder/index'
+import { Route as AppBeitragIndexRouteImport } from './routes/app/beitrag/index'
+import { Route as AppMitgliederNeuRouteImport } from './routes/app/mitglieder/neu'
+import { Route as AppMitgliederMitgliedsnummerRouteImport } from './routes/app/mitglieder/$mitgliedsnummer'
+import { Route as AppEinstellungenVereinRouteImport } from './routes/app/einstellungen/verein'
+import { Route as AppEinstellungenSmtpRouteImport } from './routes/app/einstellungen/smtp'
+import { Route as AppEinstellungenBenutzerRouteImport } from './routes/app/einstellungen/benutzer'
+import { Route as AppBeitragNeuRouteImport } from './routes/app/beitrag/neu'
+import { Route as AppBeitragIdRouteImport } from './routes/app/beitrag/$id'
+import { Route as ApiRpcSplatRouteImport } from './routes/api/rpc.$'
+import { Route as ApiIngestSvumsRouteImport } from './routes/api/ingest.svums'
+import { Route as ApiFilesIdRouteImport } from './routes/api/files.$id'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth.$'
+import { Route as AppMitgliederMitgliedsnummerBearbeitenRouteImport } from './routes/app/mitglieder/$mitgliedsnummer.bearbeiten'
 
 const LoginRoute = LoginRouteImport.update({
-  id: "/login",
-  path: "/login",
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AppRouteRoute = AppRouteRouteImport.update({
-  id: "/app",
-  path: "/app",
+  id: '/app',
+  path: '/app',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const IndexRoute = IndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AppIndexRoute = AppIndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
   getParentRoute: () => AppRouteRoute,
-} as any);
+} as any)
 const AppImportRoute = AppImportRouteImport.update({
-  id: "/import",
-  path: "/import",
+  id: '/import',
+  path: '/import',
   getParentRoute: () => AppRouteRoute,
-} as any);
+} as any)
 const AppAuditRoute = AppAuditRouteImport.update({
-  id: "/audit",
-  path: "/audit",
+  id: '/audit',
+  path: '/audit',
   getParentRoute: () => AppRouteRoute,
-} as any);
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
-  id: "/api/health",
-  path: "/api/health",
+  id: '/api/health',
+  path: '/api/health',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AppMitgliederIndexRoute = AppMitgliederIndexRouteImport.update({
-  id: "/mitglieder/",
-  path: "/mitglieder/",
+  id: '/mitglieder/',
+  path: '/mitglieder/',
   getParentRoute: () => AppRouteRoute,
-} as any);
+} as any)
+const AppBeitragIndexRoute = AppBeitragIndexRouteImport.update({
+  id: '/beitrag/',
+  path: '/beitrag/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppMitgliederNeuRoute = AppMitgliederNeuRouteImport.update({
-  id: "/mitglieder/neu",
-  path: "/mitglieder/neu",
+  id: '/mitglieder/neu',
+  path: '/mitglieder/neu',
   getParentRoute: () => AppRouteRoute,
-} as any);
-const AppMitgliederMitgliedsnummerRoute = AppMitgliederMitgliedsnummerRouteImport.update({
-  id: "/mitglieder/$mitgliedsnummer",
-  path: "/mitglieder/$mitgliedsnummer",
+} as any)
+const AppMitgliederMitgliedsnummerRoute =
+  AppMitgliederMitgliedsnummerRouteImport.update({
+    id: '/mitglieder/$mitgliedsnummer',
+    path: '/mitglieder/$mitgliedsnummer',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppEinstellungenVereinRoute = AppEinstellungenVereinRouteImport.update({
+  id: '/einstellungen/verein',
+  path: '/einstellungen/verein',
   getParentRoute: () => AppRouteRoute,
-} as any);
+} as any)
 const AppEinstellungenSmtpRoute = AppEinstellungenSmtpRouteImport.update({
-  id: "/einstellungen/smtp",
-  path: "/einstellungen/smtp",
+  id: '/einstellungen/smtp',
+  path: '/einstellungen/smtp',
   getParentRoute: () => AppRouteRoute,
-} as any);
-const AppEinstellungenBenutzerRoute = AppEinstellungenBenutzerRouteImport.update({
-  id: "/einstellungen/benutzer",
-  path: "/einstellungen/benutzer",
+} as any)
+const AppEinstellungenBenutzerRoute =
+  AppEinstellungenBenutzerRouteImport.update({
+    id: '/einstellungen/benutzer',
+    path: '/einstellungen/benutzer',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppBeitragNeuRoute = AppBeitragNeuRouteImport.update({
+  id: '/beitrag/neu',
+  path: '/beitrag/neu',
   getParentRoute: () => AppRouteRoute,
-} as any);
+} as any)
+const AppBeitragIdRoute = AppBeitragIdRouteImport.update({
+  id: '/beitrag/$id',
+  path: '/beitrag/$id',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
-  id: "/api/rpc/$",
-  path: "/api/rpc/$",
+  id: '/api/rpc/$',
+  path: '/api/rpc/$',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const ApiIngestSvumsRoute = ApiIngestSvumsRouteImport.update({
-  id: "/api/ingest/svums",
-  path: "/api/ingest/svums",
+  id: '/api/ingest/svums',
+  path: '/api/ingest/svums',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const ApiFilesIdRoute = ApiFilesIdRouteImport.update({
-  id: "/api/files/$id",
-  path: "/api/files/$id",
+  id: '/api/files/$id',
+  path: '/api/files/$id',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: "/api/auth/$",
-  path: "/api/auth/$",
+  id: '/api/auth/$',
+  path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AppMitgliederMitgliedsnummerBearbeitenRoute =
   AppMitgliederMitgliedsnummerBearbeitenRouteImport.update({
-    id: "/bearbeiten",
-    path: "/bearbeiten",
+    id: '/bearbeiten',
+    path: '/bearbeiten',
     getParentRoute: () => AppMitgliederMitgliedsnummerRoute,
-  } as any);
+  } as any)
 
 export interface FileRoutesByFullPath {
-  "/": typeof IndexRoute;
-  "/app": typeof AppRouteRouteWithChildren;
-  "/login": typeof LoginRoute;
-  "/api/health": typeof ApiHealthRoute;
-  "/app/audit": typeof AppAuditRoute;
-  "/app/import": typeof AppImportRoute;
-  "/app/": typeof AppIndexRoute;
-  "/api/auth/$": typeof ApiAuthSplatRoute;
-  "/api/files/$id": typeof ApiFilesIdRoute;
-  "/api/ingest/svums": typeof ApiIngestSvumsRoute;
-  "/api/rpc/$": typeof ApiRpcSplatRoute;
-  "/app/einstellungen/benutzer": typeof AppEinstellungenBenutzerRoute;
-  "/app/einstellungen/smtp": typeof AppEinstellungenSmtpRoute;
-  "/app/mitglieder/$mitgliedsnummer": typeof AppMitgliederMitgliedsnummerRouteWithChildren;
-  "/app/mitglieder/neu": typeof AppMitgliederNeuRoute;
-  "/app/mitglieder/": typeof AppMitgliederIndexRoute;
-  "/app/mitglieder/$mitgliedsnummer/bearbeiten": typeof AppMitgliederMitgliedsnummerBearbeitenRoute;
+  '/': typeof IndexRoute
+  '/app': typeof AppRouteRouteWithChildren
+  '/login': typeof LoginRoute
+  '/api/health': typeof ApiHealthRoute
+  '/app/audit': typeof AppAuditRoute
+  '/app/import': typeof AppImportRoute
+  '/app/': typeof AppIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/files/$id': typeof ApiFilesIdRoute
+  '/api/ingest/svums': typeof ApiIngestSvumsRoute
+  '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/app/beitrag/$id': typeof AppBeitragIdRoute
+  '/app/beitrag/neu': typeof AppBeitragNeuRoute
+  '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
+  '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
+  '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
+  '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRouteWithChildren
+  '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
+  '/app/beitrag/': typeof AppBeitragIndexRoute
+  '/app/mitglieder/': typeof AppMitgliederIndexRoute
+  '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
 export interface FileRoutesByTo {
-  "/": typeof IndexRoute;
-  "/login": typeof LoginRoute;
-  "/api/health": typeof ApiHealthRoute;
-  "/app/audit": typeof AppAuditRoute;
-  "/app/import": typeof AppImportRoute;
-  "/app": typeof AppIndexRoute;
-  "/api/auth/$": typeof ApiAuthSplatRoute;
-  "/api/files/$id": typeof ApiFilesIdRoute;
-  "/api/ingest/svums": typeof ApiIngestSvumsRoute;
-  "/api/rpc/$": typeof ApiRpcSplatRoute;
-  "/app/einstellungen/benutzer": typeof AppEinstellungenBenutzerRoute;
-  "/app/einstellungen/smtp": typeof AppEinstellungenSmtpRoute;
-  "/app/mitglieder/$mitgliedsnummer": typeof AppMitgliederMitgliedsnummerRouteWithChildren;
-  "/app/mitglieder/neu": typeof AppMitgliederNeuRoute;
-  "/app/mitglieder": typeof AppMitgliederIndexRoute;
-  "/app/mitglieder/$mitgliedsnummer/bearbeiten": typeof AppMitgliederMitgliedsnummerBearbeitenRoute;
+  '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/api/health': typeof ApiHealthRoute
+  '/app/audit': typeof AppAuditRoute
+  '/app/import': typeof AppImportRoute
+  '/app': typeof AppIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/files/$id': typeof ApiFilesIdRoute
+  '/api/ingest/svums': typeof ApiIngestSvumsRoute
+  '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/app/beitrag/$id': typeof AppBeitragIdRoute
+  '/app/beitrag/neu': typeof AppBeitragNeuRoute
+  '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
+  '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
+  '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
+  '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRouteWithChildren
+  '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
+  '/app/beitrag': typeof AppBeitragIndexRoute
+  '/app/mitglieder': typeof AppMitgliederIndexRoute
+  '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  "/": typeof IndexRoute;
-  "/app": typeof AppRouteRouteWithChildren;
-  "/login": typeof LoginRoute;
-  "/api/health": typeof ApiHealthRoute;
-  "/app/audit": typeof AppAuditRoute;
-  "/app/import": typeof AppImportRoute;
-  "/app/": typeof AppIndexRoute;
-  "/api/auth/$": typeof ApiAuthSplatRoute;
-  "/api/files/$id": typeof ApiFilesIdRoute;
-  "/api/ingest/svums": typeof ApiIngestSvumsRoute;
-  "/api/rpc/$": typeof ApiRpcSplatRoute;
-  "/app/einstellungen/benutzer": typeof AppEinstellungenBenutzerRoute;
-  "/app/einstellungen/smtp": typeof AppEinstellungenSmtpRoute;
-  "/app/mitglieder/$mitgliedsnummer": typeof AppMitgliederMitgliedsnummerRouteWithChildren;
-  "/app/mitglieder/neu": typeof AppMitgliederNeuRoute;
-  "/app/mitglieder/": typeof AppMitgliederIndexRoute;
-  "/app/mitglieder/$mitgliedsnummer/bearbeiten": typeof AppMitgliederMitgliedsnummerBearbeitenRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/app': typeof AppRouteRouteWithChildren
+  '/login': typeof LoginRoute
+  '/api/health': typeof ApiHealthRoute
+  '/app/audit': typeof AppAuditRoute
+  '/app/import': typeof AppImportRoute
+  '/app/': typeof AppIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/files/$id': typeof ApiFilesIdRoute
+  '/api/ingest/svums': typeof ApiIngestSvumsRoute
+  '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/app/beitrag/$id': typeof AppBeitragIdRoute
+  '/app/beitrag/neu': typeof AppBeitragNeuRoute
+  '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
+  '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
+  '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
+  '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRouteWithChildren
+  '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
+  '/app/beitrag/': typeof AppBeitragIndexRoute
+  '/app/mitglieder/': typeof AppMitgliederIndexRoute
+  '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
+  fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | "/"
-    | "/app"
-    | "/login"
-    | "/api/health"
-    | "/app/audit"
-    | "/app/import"
-    | "/app/"
-    | "/api/auth/$"
-    | "/api/files/$id"
-    | "/api/ingest/svums"
-    | "/api/rpc/$"
-    | "/app/einstellungen/benutzer"
-    | "/app/einstellungen/smtp"
-    | "/app/mitglieder/$mitgliedsnummer"
-    | "/app/mitglieder/neu"
-    | "/app/mitglieder/"
-    | "/app/mitglieder/$mitgliedsnummer/bearbeiten";
-  fileRoutesByTo: FileRoutesByTo;
+    | '/'
+    | '/app'
+    | '/login'
+    | '/api/health'
+    | '/app/audit'
+    | '/app/import'
+    | '/app/'
+    | '/api/auth/$'
+    | '/api/files/$id'
+    | '/api/ingest/svums'
+    | '/api/rpc/$'
+    | '/app/beitrag/$id'
+    | '/app/beitrag/neu'
+    | '/app/einstellungen/benutzer'
+    | '/app/einstellungen/smtp'
+    | '/app/einstellungen/verein'
+    | '/app/mitglieder/$mitgliedsnummer'
+    | '/app/mitglieder/neu'
+    | '/app/beitrag/'
+    | '/app/mitglieder/'
+    | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
+  fileRoutesByTo: FileRoutesByTo
   to:
-    | "/"
-    | "/login"
-    | "/api/health"
-    | "/app/audit"
-    | "/app/import"
-    | "/app"
-    | "/api/auth/$"
-    | "/api/files/$id"
-    | "/api/ingest/svums"
-    | "/api/rpc/$"
-    | "/app/einstellungen/benutzer"
-    | "/app/einstellungen/smtp"
-    | "/app/mitglieder/$mitgliedsnummer"
-    | "/app/mitglieder/neu"
-    | "/app/mitglieder"
-    | "/app/mitglieder/$mitgliedsnummer/bearbeiten";
+    | '/'
+    | '/login'
+    | '/api/health'
+    | '/app/audit'
+    | '/app/import'
+    | '/app'
+    | '/api/auth/$'
+    | '/api/files/$id'
+    | '/api/ingest/svums'
+    | '/api/rpc/$'
+    | '/app/beitrag/$id'
+    | '/app/beitrag/neu'
+    | '/app/einstellungen/benutzer'
+    | '/app/einstellungen/smtp'
+    | '/app/einstellungen/verein'
+    | '/app/mitglieder/$mitgliedsnummer'
+    | '/app/mitglieder/neu'
+    | '/app/beitrag'
+    | '/app/mitglieder'
+    | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
   id:
-    | "__root__"
-    | "/"
-    | "/app"
-    | "/login"
-    | "/api/health"
-    | "/app/audit"
-    | "/app/import"
-    | "/app/"
-    | "/api/auth/$"
-    | "/api/files/$id"
-    | "/api/ingest/svums"
-    | "/api/rpc/$"
-    | "/app/einstellungen/benutzer"
-    | "/app/einstellungen/smtp"
-    | "/app/mitglieder/$mitgliedsnummer"
-    | "/app/mitglieder/neu"
-    | "/app/mitglieder/"
-    | "/app/mitglieder/$mitgliedsnummer/bearbeiten";
-  fileRoutesById: FileRoutesById;
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/login'
+    | '/api/health'
+    | '/app/audit'
+    | '/app/import'
+    | '/app/'
+    | '/api/auth/$'
+    | '/api/files/$id'
+    | '/api/ingest/svums'
+    | '/api/rpc/$'
+    | '/app/beitrag/$id'
+    | '/app/beitrag/neu'
+    | '/app/einstellungen/benutzer'
+    | '/app/einstellungen/smtp'
+    | '/app/einstellungen/verein'
+    | '/app/mitglieder/$mitgliedsnummer'
+    | '/app/mitglieder/neu'
+    | '/app/beitrag/'
+    | '/app/mitglieder/'
+    | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute;
-  AppRouteRoute: typeof AppRouteRouteWithChildren;
-  LoginRoute: typeof LoginRoute;
-  ApiHealthRoute: typeof ApiHealthRoute;
-  ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
-  ApiFilesIdRoute: typeof ApiFilesIdRoute;
-  ApiIngestSvumsRoute: typeof ApiIngestSvumsRoute;
-  ApiRpcSplatRoute: typeof ApiRpcSplatRoute;
+  IndexRoute: typeof IndexRoute
+  AppRouteRoute: typeof AppRouteRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  ApiHealthRoute: typeof ApiHealthRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiFilesIdRoute: typeof ApiFilesIdRoute
+  ApiIngestSvumsRoute: typeof ApiIngestSvumsRoute
+  ApiRpcSplatRoute: typeof ApiRpcSplatRoute
 }
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    "/login": {
-      id: "/login";
-      path: "/login";
-      fullPath: "/login";
-      preLoaderRoute: typeof LoginRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/app": {
-      id: "/app";
-      path: "/app";
-      fullPath: "/app";
-      preLoaderRoute: typeof AppRouteRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/": {
-      id: "/";
-      path: "/";
-      fullPath: "/";
-      preLoaderRoute: typeof IndexRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/app/": {
-      id: "/app/";
-      path: "/";
-      fullPath: "/app/";
-      preLoaderRoute: typeof AppIndexRouteImport;
-      parentRoute: typeof AppRouteRoute;
-    };
-    "/app/import": {
-      id: "/app/import";
-      path: "/import";
-      fullPath: "/app/import";
-      preLoaderRoute: typeof AppImportRouteImport;
-      parentRoute: typeof AppRouteRoute;
-    };
-    "/app/audit": {
-      id: "/app/audit";
-      path: "/audit";
-      fullPath: "/app/audit";
-      preLoaderRoute: typeof AppAuditRouteImport;
-      parentRoute: typeof AppRouteRoute;
-    };
-    "/api/health": {
-      id: "/api/health";
-      path: "/api/health";
-      fullPath: "/api/health";
-      preLoaderRoute: typeof ApiHealthRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/app/mitglieder/": {
-      id: "/app/mitglieder/";
-      path: "/mitglieder";
-      fullPath: "/app/mitglieder/";
-      preLoaderRoute: typeof AppMitgliederIndexRouteImport;
-      parentRoute: typeof AppRouteRoute;
-    };
-    "/app/mitglieder/neu": {
-      id: "/app/mitglieder/neu";
-      path: "/mitglieder/neu";
-      fullPath: "/app/mitglieder/neu";
-      preLoaderRoute: typeof AppMitgliederNeuRouteImport;
-      parentRoute: typeof AppRouteRoute;
-    };
-    "/app/mitglieder/$mitgliedsnummer": {
-      id: "/app/mitglieder/$mitgliedsnummer";
-      path: "/mitglieder/$mitgliedsnummer";
-      fullPath: "/app/mitglieder/$mitgliedsnummer";
-      preLoaderRoute: typeof AppMitgliederMitgliedsnummerRouteImport;
-      parentRoute: typeof AppRouteRoute;
-    };
-    "/app/einstellungen/smtp": {
-      id: "/app/einstellungen/smtp";
-      path: "/einstellungen/smtp";
-      fullPath: "/app/einstellungen/smtp";
-      preLoaderRoute: typeof AppEinstellungenSmtpRouteImport;
-      parentRoute: typeof AppRouteRoute;
-    };
-    "/app/einstellungen/benutzer": {
-      id: "/app/einstellungen/benutzer";
-      path: "/einstellungen/benutzer";
-      fullPath: "/app/einstellungen/benutzer";
-      preLoaderRoute: typeof AppEinstellungenBenutzerRouteImport;
-      parentRoute: typeof AppRouteRoute;
-    };
-    "/api/rpc/$": {
-      id: "/api/rpc/$";
-      path: "/api/rpc/$";
-      fullPath: "/api/rpc/$";
-      preLoaderRoute: typeof ApiRpcSplatRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/ingest/svums": {
-      id: "/api/ingest/svums";
-      path: "/api/ingest/svums";
-      fullPath: "/api/ingest/svums";
-      preLoaderRoute: typeof ApiIngestSvumsRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/files/$id": {
-      id: "/api/files/$id";
-      path: "/api/files/$id";
-      fullPath: "/api/files/$id";
-      preLoaderRoute: typeof ApiFilesIdRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/auth/$": {
-      id: "/api/auth/$";
-      path: "/api/auth/$";
-      fullPath: "/api/auth/$";
-      preLoaderRoute: typeof ApiAuthSplatRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/app/mitglieder/$mitgliedsnummer/bearbeiten": {
-      id: "/app/mitglieder/$mitgliedsnummer/bearbeiten";
-      path: "/bearbeiten";
-      fullPath: "/app/mitglieder/$mitgliedsnummer/bearbeiten";
-      preLoaderRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRouteImport;
-      parentRoute: typeof AppMitgliederMitgliedsnummerRoute;
-    };
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/import': {
+      id: '/app/import'
+      path: '/import'
+      fullPath: '/app/import'
+      preLoaderRoute: typeof AppImportRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/audit': {
+      id: '/app/audit'
+      path: '/audit'
+      fullPath: '/app/audit'
+      preLoaderRoute: typeof AppAuditRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/mitglieder/': {
+      id: '/app/mitglieder/'
+      path: '/mitglieder'
+      fullPath: '/app/mitglieder/'
+      preLoaderRoute: typeof AppMitgliederIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/beitrag/': {
+      id: '/app/beitrag/'
+      path: '/beitrag'
+      fullPath: '/app/beitrag/'
+      preLoaderRoute: typeof AppBeitragIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/mitglieder/neu': {
+      id: '/app/mitglieder/neu'
+      path: '/mitglieder/neu'
+      fullPath: '/app/mitglieder/neu'
+      preLoaderRoute: typeof AppMitgliederNeuRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/mitglieder/$mitgliedsnummer': {
+      id: '/app/mitglieder/$mitgliedsnummer'
+      path: '/mitglieder/$mitgliedsnummer'
+      fullPath: '/app/mitglieder/$mitgliedsnummer'
+      preLoaderRoute: typeof AppMitgliederMitgliedsnummerRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/verein': {
+      id: '/app/einstellungen/verein'
+      path: '/einstellungen/verein'
+      fullPath: '/app/einstellungen/verein'
+      preLoaderRoute: typeof AppEinstellungenVereinRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/smtp': {
+      id: '/app/einstellungen/smtp'
+      path: '/einstellungen/smtp'
+      fullPath: '/app/einstellungen/smtp'
+      preLoaderRoute: typeof AppEinstellungenSmtpRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/benutzer': {
+      id: '/app/einstellungen/benutzer'
+      path: '/einstellungen/benutzer'
+      fullPath: '/app/einstellungen/benutzer'
+      preLoaderRoute: typeof AppEinstellungenBenutzerRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/beitrag/neu': {
+      id: '/app/beitrag/neu'
+      path: '/beitrag/neu'
+      fullPath: '/app/beitrag/neu'
+      preLoaderRoute: typeof AppBeitragNeuRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/beitrag/$id': {
+      id: '/app/beitrag/$id'
+      path: '/beitrag/$id'
+      fullPath: '/app/beitrag/$id'
+      preLoaderRoute: typeof AppBeitragIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/api/rpc/$': {
+      id: '/api/rpc/$'
+      path: '/api/rpc/$'
+      fullPath: '/api/rpc/$'
+      preLoaderRoute: typeof ApiRpcSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ingest/svums': {
+      id: '/api/ingest/svums'
+      path: '/api/ingest/svums'
+      fullPath: '/api/ingest/svums'
+      preLoaderRoute: typeof ApiIngestSvumsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/files/$id': {
+      id: '/api/files/$id'
+      path: '/api/files/$id'
+      fullPath: '/api/files/$id'
+      preLoaderRoute: typeof ApiFilesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/mitglieder/$mitgliedsnummer/bearbeiten': {
+      id: '/app/mitglieder/$mitgliedsnummer/bearbeiten'
+      path: '/bearbeiten'
+      fullPath: '/app/mitglieder/$mitgliedsnummer/bearbeiten'
+      preLoaderRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRouteImport
+      parentRoute: typeof AppMitgliederMitgliedsnummerRoute
+    }
   }
 }
 
 interface AppMitgliederMitgliedsnummerRouteChildren {
-  AppMitgliederMitgliedsnummerBearbeitenRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRoute;
+  AppMitgliederMitgliedsnummerBearbeitenRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
 
-const AppMitgliederMitgliedsnummerRouteChildren: AppMitgliederMitgliedsnummerRouteChildren = {
-  AppMitgliederMitgliedsnummerBearbeitenRoute: AppMitgliederMitgliedsnummerBearbeitenRoute,
-};
+const AppMitgliederMitgliedsnummerRouteChildren: AppMitgliederMitgliedsnummerRouteChildren =
+  {
+    AppMitgliederMitgliedsnummerBearbeitenRoute:
+      AppMitgliederMitgliedsnummerBearbeitenRoute,
+  }
 
 const AppMitgliederMitgliedsnummerRouteWithChildren =
-  AppMitgliederMitgliedsnummerRoute._addFileChildren(AppMitgliederMitgliedsnummerRouteChildren);
+  AppMitgliederMitgliedsnummerRoute._addFileChildren(
+    AppMitgliederMitgliedsnummerRouteChildren,
+  )
 
 interface AppRouteRouteChildren {
-  AppAuditRoute: typeof AppAuditRoute;
-  AppImportRoute: typeof AppImportRoute;
-  AppIndexRoute: typeof AppIndexRoute;
-  AppEinstellungenBenutzerRoute: typeof AppEinstellungenBenutzerRoute;
-  AppEinstellungenSmtpRoute: typeof AppEinstellungenSmtpRoute;
-  AppMitgliederMitgliedsnummerRoute: typeof AppMitgliederMitgliedsnummerRouteWithChildren;
-  AppMitgliederNeuRoute: typeof AppMitgliederNeuRoute;
-  AppMitgliederIndexRoute: typeof AppMitgliederIndexRoute;
+  AppAuditRoute: typeof AppAuditRoute
+  AppImportRoute: typeof AppImportRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppBeitragIdRoute: typeof AppBeitragIdRoute
+  AppBeitragNeuRoute: typeof AppBeitragNeuRoute
+  AppEinstellungenBenutzerRoute: typeof AppEinstellungenBenutzerRoute
+  AppEinstellungenSmtpRoute: typeof AppEinstellungenSmtpRoute
+  AppEinstellungenVereinRoute: typeof AppEinstellungenVereinRoute
+  AppMitgliederMitgliedsnummerRoute: typeof AppMitgliederMitgliedsnummerRouteWithChildren
+  AppMitgliederNeuRoute: typeof AppMitgliederNeuRoute
+  AppBeitragIndexRoute: typeof AppBeitragIndexRoute
+  AppMitgliederIndexRoute: typeof AppMitgliederIndexRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppImportRoute: AppImportRoute,
   AppIndexRoute: AppIndexRoute,
+  AppBeitragIdRoute: AppBeitragIdRoute,
+  AppBeitragNeuRoute: AppBeitragNeuRoute,
   AppEinstellungenBenutzerRoute: AppEinstellungenBenutzerRoute,
   AppEinstellungenSmtpRoute: AppEinstellungenSmtpRoute,
-  AppMitgliederMitgliedsnummerRoute: AppMitgliederMitgliedsnummerRouteWithChildren,
+  AppEinstellungenVereinRoute: AppEinstellungenVereinRoute,
+  AppMitgliederMitgliedsnummerRoute:
+    AppMitgliederMitgliedsnummerRouteWithChildren,
   AppMitgliederNeuRoute: AppMitgliederNeuRoute,
+  AppBeitragIndexRoute: AppBeitragIndexRoute,
   AppMitgliederIndexRoute: AppMitgliederIndexRoute,
-};
+}
 
-const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(AppRouteRouteChildren);
+const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
+  AppRouteRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -409,16 +502,16 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFilesIdRoute: ApiFilesIdRoute,
   ApiIngestSvumsRoute: ApiIngestSvumsRoute,
   ApiRpcSplatRoute: ApiRpcSplatRoute,
-};
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from "./router.tsx";
-import type { createStart } from "@tanstack/react-start";
-declare module "@tanstack/react-start" {
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
   interface Register {
-    ssr: true;
-    router: Awaited<ReturnType<typeof getRouter>>;
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
   }
 }
