@@ -1,9 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
-import { Upload } from "lucide-react";
+import { CheckCircle2, Loader2, Upload, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/import")({
@@ -35,67 +41,106 @@ function ImportPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
+      <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Linear Webverein Import</h1>
         <p className="text-sm text-muted-foreground">
           SQL-Dump (mysqldump-Format) hochladen. Maximalgröße 50 MB.
         </p>
       </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Datei hochladen</CardTitle>
+          <CardDescription>Der Inhalt wird normalisiert und in das aktuelle Schema überführt.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <input
-            type="file"
-            accept=".sql,text/plain"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="block text-sm"
-          />
-          <div className="flex items-center gap-2">
+          <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/30 px-6 py-10 text-center transition-colors hover:bg-muted/50">
+            <Upload className="size-6 text-muted-foreground" />
+            <span className="text-sm">
+              <span className="font-medium text-foreground">Klicken zum Auswählen</span>
+              <span className="text-muted-foreground"> oder Datei hier ablegen</span>
+            </span>
+            <span className="text-xs text-muted-foreground">.sql · max. 50 MB</span>
+            <input
+              type="file"
+              accept=".sql,text/plain"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="hidden"
+            />
+          </label>
+          {file ? (
+            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm">
+              <span className="font-medium">{file.name}</span>
+              <span className="text-muted-foreground tabular-nums">
+                {(file.size / 1024 / 1024).toFixed(1)} MB
+              </span>
+            </div>
+          ) : null}
+          <div className="flex items-center gap-3">
             <Button onClick={() => upload.mutate()} disabled={!file || upload.isPending}>
-              <Upload className="size-4" />
+              {upload.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Upload className="size-4" />
+              )}
               {upload.isPending ? "Wird verarbeitet..." : "Importieren"}
             </Button>
-            {file ? (
-              <span className="text-sm text-muted-foreground">
-                {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)
-              </span>
-            ) : null}
           </div>
         </CardContent>
       </Card>
 
       {upload.isError ? (
-        <Card>
-          <CardContent className="p-4 text-sm text-destructive">
-            Fehler: {(upload.error as Error).message}
-          </CardContent>
-        </Card>
+        <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm shadow-soft">
+          <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+          <span>Fehler: {(upload.error as Error).message}</span>
+        </div>
       ) : null}
 
       {upload.data ? (
         <Card>
           <CardHeader>
-            <CardTitle>Import abgeschlossen</CardTitle>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="size-5 text-success" />
+              <CardTitle>Import abgeschlossen</CardTitle>
+            </div>
+            <CardDescription>
+              Batch-ID: <span className="font-mono tabular-nums">{upload.data.batchId}</span>
+            </CardDescription>
           </CardHeader>
-          <CardContent className="text-sm">
-            <ul className="flex flex-col gap-1">
-              <li>Batch-ID: <span className="tabular-nums">{upload.data.batchId}</span></li>
-              <li>Mitglieder geschrieben: {upload.data.membersWritten} (neu: {upload.data.membersCreated}, geändert: {upload.data.membersUpdated})</li>
-              <li>Beitragsarten: {upload.data.feeTypesWritten}</li>
-              <li>Verträge: {upload.data.contractsWritten}</li>
-              <li>SEPA-Mandate: {upload.data.sepaWritten}</li>
-              <li>Abteilungs-Mitgliedschaften: {upload.data.abteilungenLinked}</li>
+          <CardContent>
+            <ul className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+              <li>
+                Mitglieder geschrieben:{" "}
+                <span className="font-medium tabular-nums">{upload.data.membersWritten}</span>{" "}
+                <span className="text-muted-foreground">
+                  (neu: {upload.data.membersCreated}, geändert: {upload.data.membersUpdated})
+                </span>
+              </li>
+              <li>
+                Beitragsarten:{" "}
+                <span className="font-medium tabular-nums">{upload.data.feeTypesWritten}</span>
+              </li>
+              <li>
+                Verträge:{" "}
+                <span className="font-medium tabular-nums">{upload.data.contractsWritten}</span>
+              </li>
+              <li>
+                SEPA-Mandate:{" "}
+                <span className="font-medium tabular-nums">{upload.data.sepaWritten}</span>
+              </li>
+              <li>
+                Abteilungs-Mitgliedschaften:{" "}
+                <span className="font-medium tabular-nums">{upload.data.abteilungenLinked}</span>
+              </li>
             </ul>
             {upload.data.errors.length > 0 ? (
-              <details className="mt-2">
-                <summary className="cursor-pointer text-amber-600">
+              <details className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
+                <summary className="cursor-pointer text-sm text-warning">
                   {upload.data.errors.length} Warnungen
                 </summary>
-                <ul className="mt-1 list-disc pl-5">
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
                   {upload.data.errors.slice(0, 25).map((err, idx) => (
-                    <li key={idx} className="text-xs">
+                    <li key={idx}>
                       [{err.table}] {err.message}
                     </li>
                   ))}

@@ -3,6 +3,7 @@ import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "~/components/ui/button";
 import { Sidebar } from "~/components/layout/Sidebar";
+import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { signOut } from "~/lib/auth-client";
 
 export function AppShell({
@@ -15,31 +16,41 @@ export function AppShell({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-background">
       <Sidebar role={role} />
       <main className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-14 items-center justify-between gap-4 border-b bg-card px-4">
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-border glass px-4 md:px-6">
           <div className="flex items-center gap-3 md:hidden">
-            <img src="/favicon.svg" alt="SV Untereuerheim" className="size-7" />
-            <Link to="/app" className="font-semibold tracking-tight">
+            <div className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-border">
+              <img src="/logo.png" alt="SV Untereuerheim" className="size-7 object-contain" />
+            </div>
+            <Link to="/app" className="text-sm font-semibold tracking-tight">
               SVUWV
             </Link>
           </div>
           <div className="flex flex-1 justify-end items-center gap-3">
-            <span className="text-sm text-muted-foreground">
-              {userEmail} <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{role}</span>
-            </span>
+            <ThemeToggle className="hidden sm:inline-flex" />
+            <div className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1 shadow-soft sm:flex">
+              <span className="size-2 rounded-full bg-success" aria-hidden />
+              <span className="text-xs text-muted-foreground">{userEmail}</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground">
+                {role}
+              </span>
+            </div>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => signOut().then(() => window.location.assign("/login"))}
             >
-              <LogOut className="size-4" /> Abmelden
+              <LogOut className="size-4" />
+              <span className="hidden sm:inline">Abmelden</span>
             </Button>
           </div>
         </header>
-        <div className="flex-1 overflow-auto p-6">{children ?? <Outlet />}</div>
+        <div className="flex-1 overflow-auto scrollbar-thin">
+          <div className="mx-auto w-full max-w-7xl p-4 md:p-8">{children ?? <Outlet />}</div>
+        </div>
       </main>
     </div>
   );

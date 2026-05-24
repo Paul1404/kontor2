@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -19,34 +21,41 @@ function AuditPage() {
   });
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Audit Log</h1>
-      <Card>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Audit Log</h1>
+        <p className="text-sm text-muted-foreground">
+          Lückenlose Aufzeichnung aller Schreibvorgänge.
+        </p>
+      </div>
+      <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-left">
+            <thead className="bg-muted/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-2">Zeitpunkt</th>
-                <th className="px-4 py-2">Benutzer</th>
-                <th className="px-4 py-2">Aktion</th>
-                <th className="px-4 py-2">Quelle</th>
-                <th className="px-4 py-2">Entität</th>
-                <th className="px-4 py-2">Änderungen</th>
+                <th className="px-4 py-3 font-medium">Zeitpunkt</th>
+                <th className="px-4 py-3 font-medium">Benutzer</th>
+                <th className="px-4 py-3 font-medium">Aktion</th>
+                <th className="px-4 py-3 font-medium">Quelle</th>
+                <th className="px-4 py-3 font-medium">Entität</th>
+                <th className="px-4 py-3 font-medium">Änderungen</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {list.data?.rows.map((r) => (
-                <tr key={r.id} className="border-t align-top">
-                  <td className="px-4 py-2 whitespace-nowrap text-muted-foreground">
+                <tr key={r.id} className="align-top transition-colors hover:bg-muted/30">
+                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                     {formatDateTime(r.createdAt)}
                   </td>
-                  <td className="px-4 py-2 text-muted-foreground">{r.actorEmail ?? "system"}</td>
-                  <td className="px-4 py-2"><Badge variant="outline">{r.action}</Badge></td>
-                  <td className="px-4 py-2 text-muted-foreground">{r.source}</td>
-                  <td className="px-4 py-2 font-mono text-xs">
+                  <td className="px-4 py-3 text-foreground">{r.actorEmail ?? "system"}</td>
+                  <td className="px-4 py-3">
+                    <Badge variant="outline">{r.action}</Badge>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{r.source}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                     {r.entityType}:{r.entityId.slice(0, 8)}
                   </td>
-                  <td className="px-4 py-2 text-xs text-muted-foreground">
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
                     {Object.keys(r.changes ?? {}).slice(0, 8).join(", ")}
                   </td>
                 </tr>
@@ -54,26 +63,28 @@ function AuditPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between border-t p-3 text-sm">
+        <div className="flex items-center justify-between border-t border-border bg-card px-4 py-3 text-sm">
           <span className="text-muted-foreground">{list.data?.total ?? 0} Einträge</span>
-          <div className="flex gap-2">
-            <button
+          <div className="flex items-center gap-2">
+            <Button
               type="button"
-              className="rounded-md border px-3 py-1 disabled:opacity-50"
+              variant="outline"
+              size="sm"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
-              Zurück
-            </button>
-            <span>Seite {page}</span>
-            <button
+              <ChevronLeft className="size-3.5" /> Zurück
+            </Button>
+            <span className="text-muted-foreground">Seite {page}</span>
+            <Button
               type="button"
-              className="rounded-md border px-3 py-1 disabled:opacity-50"
+              variant="outline"
+              size="sm"
               disabled={(list.data?.rows.length ?? 0) < pageSize}
               onClick={() => setPage((p) => p + 1)}
             >
-              Weiter
-            </button>
+              Weiter <ChevronRight className="size-3.5" />
+            </Button>
           </div>
         </div>
       </Card>

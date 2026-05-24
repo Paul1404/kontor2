@@ -1,9 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Loader2, LogIn } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { signIn } from "~/lib/auth-client";
 
 export const Route = createFileRoute("/login")({
@@ -31,16 +39,27 @@ function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <img src="/favicon.svg" alt="SV Untereuerheim" className="size-10" />
-            <div>
-              <CardTitle>SVUWV</CardTitle>
-              <CardDescription>SV Untereuerheim Vereinsverwaltung</CardDescription>
-            </div>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-32 left-1/2 size-[44rem] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-40 right-1/3 size-[32rem] rounded-full bg-primary/10 blur-3xl"
+      />
+
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
+
+      <Card className="relative w-full max-w-sm shadow-elevated">
+        <CardHeader className="items-center text-center">
+          <div className="mb-2 flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-border shadow-card">
+            <img src="/logo.png" alt="SV Untereuerheim" className="size-14 object-contain" />
           </div>
+          <CardTitle className="text-xl">SV Untereuerheim</CardTitle>
+          <CardDescription>Vereinsverwaltung. Bitte anmelden.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -66,13 +85,22 @@ function LoginPage() {
                 required
               />
             </div>
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            <Button type="submit" disabled={busy}>
+            {error ? (
+              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {error}
+              </p>
+            ) : null}
+            <Button type="submit" disabled={busy} className="w-full">
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
               {busy ? "Anmelden..." : "Anmelden"}
             </Button>
           </form>
         </CardContent>
       </Card>
+
+      <p className="absolute bottom-4 text-xs text-muted-foreground">
+        SV Untereuerheim 1945 e.V.
+      </p>
     </div>
   );
 }

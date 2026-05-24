@@ -1,16 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Mail, Save } from "lucide-react";
+import { CheckCircle2, Loader2, Mail, Save, ShieldAlert, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { Switch } from "~/components/ui/switch";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/einstellungen/smtp")({
   component: SmtpPage,
 });
+
+type Msg = { kind: "ok" | "error" | "info"; text: string };
 
 function SmtpPage() {
   const qc = useQueryClient();
@@ -19,14 +28,16 @@ function SmtpPage() {
   const [form, setForm] = useState({
     host: "",
     port: 587,
-    secure: true,
+    secure: false,
+    requireTls: true,
+    allowInvalidCerts: false,
     username: "",
     password: "",
     fromAddress: "",
     fromName: "",
   });
   const [testTo, setTestTo] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<Msg | null>(null);
 
   useEffect(() => {
     if (cfg.data) {
@@ -34,6 +45,8 @@ function SmtpPage() {
         host: cfg.data.host,
         port: cfg.data.port,
         secure: cfg.data.secure,
+        requireTls: cfg.data.requireTls ?? true,
+        allowInvalidCerts: cfg.data.allowInvalidCerts ?? false,
         username: cfg.data.username ?? "",
         password: "",
         fromAddress: cfg.data.fromAddress,
@@ -48,83 +61,141 @@ function SmtpPage() {
         host: form.host,
         port: form.port,
         secure: form.secure,
+        requireTls: form.requireTls,
+        allowInvalidCerts: form.allowInvalidCerts,
         username: form.username || null,
         password: form.password || null,
         fromAddress: form.fromAddress,
         fromName: form.fromName || null,
       }),
     onSuccess: () => {
-      setMsg("Gespeichert.");
+      setMsg({ kind: "ok", text: "Konfiguration gespeichert." });
       qc.invalidateQueries({ queryKey: ["smtp"] });
     },
-    onError: (err) => setMsg(`Fehler: ${(err as Error).message}`),
+    onError: (err) => setMsg({ kind: "error", text: (err as Error).message }),
   });
 
   const test = useMutation({
     mutationFn: () => orpc.settings.sendTestMail({ to: testTo }),
-    onSuccess: () => setMsg(`Test-Mail an ${testTo} versendet.`),
-    onError: (err) => setMsg(`Fehler: ${(err as Error).message}`),
+    onSuccess: () => setMsg({ kind: "ok", text: `Test-Mail an ${testTo} versendet.` }),
+    onError: (err) => setMsg({ kind: "error", text: (err as Error).message }),
   });
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight">SMTP-Konfiguration</h1>
+      <PageHeader
+        title="SMTP-Konfiguration"
+        description="Mail-Transport-Agent für Einladungen und Systemnachrichten."
+      />
+
+      {msg ? <MessageBanner msg={msg} onDismiss={() => setMsg(null)} /> : null}
+
       <Card>
         <CardHeader>
-          <CardTitle>MTA Zugangsdaten</CardTitle>
+          <CardTitle>Server</CardTitle>
+          <CardDescription>Verbindungsparameter und Anmeldedaten des MTA.</CardDescription>
         </CardHeader>
         <CardContent>
           <form
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+            className="grid grid-cols-1 gap-5 sm:grid-cols-2"
             onSubmit={(e) => {
               e.preventDefault();
               save.mutate();
             }}
           >
-            <Labeled label="Host">
-              <Input value={form.host} onChange={(e) => setForm({ ...form, host: e.target.value })} required />
-            </Labeled>
-            <Labeled label="Port">
+            <Field label="Host" hint="z. B. smtp.example.de">
+              <Input
+                value={form.host}
+                onChange={(e) => setForm({ ...form, host: e.target.value })}
+                placeholder="smtp.example.de"
+                required
+              />
+            </Field>
+            <Field label="Port" hint="587 STARTTLS · 465 SMTPS · 25 unverschlüsselt">
               <Input
                 type="number"
                 value={form.port}
                 onChange={(e) => setForm({ ...form, port: Number(e.target.value) })}
                 required
               />
-            </Labeled>
-            <Labeled label="Benutzername">
-              <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
-            </Labeled>
-            <Labeled label="Passwort (leer lassen für unverändert)">
+            </Field>
+            <Field label="Benutzername" hint="Login für die SMTP-Authentifizierung">
+              <Input
+                value={form.username}
+                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                placeholder="postmaster@example.de"
+              />
+            </Field>
+            <Field label="Passwort" hint="Leer lassen, um den aktuellen Wert beizubehalten">
               <Input
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder={cfg.data?.passwordSet ? "Vorhanden" : "Nicht gesetzt"}
+                placeholder={cfg.data?.passwordSet ? "•••••••• (vorhanden)" : "Nicht gesetzt"}
               />
-            </Labeled>
-            <Labeled label="Absenderadresse">
+            </Field>
+            <Field label="Absenderadresse" hint="From-Header der gesendeten Nachrichten">
               <Input
                 type="email"
                 value={form.fromAddress}
                 onChange={(e) => setForm({ ...form, fromAddress: e.target.value })}
+                placeholder="info@sv-untereuerheim.de"
                 required
               />
-            </Labeled>
-            <Labeled label="Absendername">
-              <Input value={form.fromName} onChange={(e) => setForm({ ...form, fromName: e.target.value })} />
-            </Labeled>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input
-                type="checkbox"
-                checked={form.secure}
-                onChange={(e) => setForm({ ...form, secure: e.target.checked })}
+            </Field>
+            <Field label="Absendername" hint="Klartextname vor der Absenderadresse">
+              <Input
+                value={form.fromName}
+                onChange={(e) => setForm({ ...form, fromName: e.target.value })}
+                placeholder="SV Untereuerheim"
               />
-              TLS (SSL/STARTTLS)
-            </label>
+            </Field>
+
             <div className="sm:col-span-2">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Transportsicherheit
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <Switch
+                  id="smtp-secure"
+                  label="Implizites TLS (SMTPS)"
+                  description="Direkter TLS-Tunnel ab Verbindung (Port 465)."
+                  checked={form.secure}
+                  onChange={(e) => setForm({ ...form, secure: e.target.checked })}
+                />
+                <Switch
+                  id="smtp-require-tls"
+                  label="STARTTLS erzwingen"
+                  description="Bei Port 587: TLS vor dem Auth-Handshake verlangen."
+                  checked={form.requireTls}
+                  onChange={(e) => setForm({ ...form, requireTls: e.target.checked })}
+                />
+                <Switch
+                  id="smtp-allow-invalid"
+                  label="Zertifikatsprüfung deaktivieren"
+                  description="Erforderlich bei self-signed oder Hostname-Mismatch im MTA-Zertifikat."
+                  checked={form.allowInvalidCerts}
+                  onChange={(e) => setForm({ ...form, allowInvalidCerts: e.target.checked })}
+                />
+              </div>
+              {form.allowInvalidCerts ? (
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-foreground">
+                  <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+                  <span>
+                    Die TLS-Zertifikatsprüfung ist abgeschaltet. Verbindung bleibt verschlüsselt, aber der Server wird nicht authentifiziert. Nur in vertrauenswürdigen Netzwerken aktivieren.
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="sm:col-span-2 flex flex-wrap items-center justify-end gap-3 border-t border-border pt-5">
               <Button type="submit" disabled={save.isPending}>
-                <Save className="size-4" /> Speichern
+                {save.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
+                )}
+                Speichern
               </Button>
             </div>
           </form>
@@ -133,32 +204,98 @@ function SmtpPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Test-Mail versenden</CardTitle>
+          <CardTitle>Test-Mail</CardTitle>
+          <CardDescription>
+            Sendet eine Probemail über die gespeicherte Konfiguration.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-3">
-          <Labeled label="Empfänger">
-            <Input
-              type="email"
-              value={testTo}
-              onChange={(e) => setTestTo(e.target.value)}
-              className="w-72"
-            />
-          </Labeled>
-          <Button onClick={() => test.mutate()} disabled={!testTo || test.isPending}>
-            <Mail className="size-4" /> Senden
-          </Button>
-          {msg ? <span className="text-sm text-muted-foreground">{msg}</span> : null}
+        <CardContent>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <Field label="Empfänger" hint="Adresse, an die die Testmail gehen soll" className="sm:flex-1 sm:max-w-sm">
+              <Input
+                type="email"
+                value={testTo}
+                onChange={(e) => setTestTo(e.target.value)}
+                placeholder="empfang@example.de"
+              />
+            </Field>
+            <Button
+              onClick={() => test.mutate()}
+              disabled={!testTo || test.isPending}
+              variant="outline"
+              className="sm:mb-0"
+            >
+              {test.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Mail className="size-4" />
+              )}
+              Senden
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+function PageHeader({ title, description }: { title: string; description?: string }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
+      {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  className,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`flex flex-col gap-1.5 ${className ?? ""}`}>
       <Label>{label}</Label>
       {children}
+      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
+    </div>
+  );
+}
+
+function MessageBanner({ msg, onDismiss }: { msg: Msg; onDismiss: () => void }) {
+  const styles =
+    msg.kind === "ok"
+      ? "border-success/30 bg-success/10 text-foreground"
+      : msg.kind === "error"
+        ? "border-destructive/30 bg-destructive/10 text-foreground"
+        : "border-border bg-muted text-foreground";
+  const Icon = msg.kind === "ok" ? CheckCircle2 : msg.kind === "error" ? XCircle : Mail;
+  const iconColor =
+    msg.kind === "ok"
+      ? "text-success"
+      : msg.kind === "error"
+        ? "text-destructive"
+        : "text-muted-foreground";
+  return (
+    <div
+      className={`flex items-start gap-3 rounded-xl border p-4 text-sm shadow-soft ${styles}`}
+      role="status"
+    >
+      <Icon className={`mt-0.5 size-4 shrink-0 ${iconColor}`} />
+      <span className="flex-1 break-words">{msg.text}</span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="text-xs text-muted-foreground hover:text-foreground"
+      >
+        schließen
+      </button>
     </div>
   );
 }
