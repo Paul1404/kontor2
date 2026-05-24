@@ -14,10 +14,13 @@ export const Route = createFileRoute("/app/einstellungen/abteilungen")({
 function AbteilungenSettingsPage() {
   const qc = useQueryClient();
   const list = useQuery({
-    queryKey: ["abteilungen.list"],
+    queryKey: ["abteilungen", "list"],
     queryFn: () => orpc.abteilungen.list(),
   });
-  const refresh = () => qc.invalidateQueries({ queryKey: ["abteilungen.list"] });
+  // Prefix-match invalidation covers the settings list, the member-filter
+  // dropdown (`["abteilungen", "members"]`), and the reports dropdown
+  // (`["abteilungen", "reports"]`) so renames/deletes propagate everywhere.
+  const refresh = () => qc.invalidateQueries({ queryKey: ["abteilungen"] });
 
   const [newName, setNewName] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);

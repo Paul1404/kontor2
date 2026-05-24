@@ -29,6 +29,13 @@
       "when": 1779619945467,
       "tag": "0003_fee_runs_and_org_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779631243542,
+      "tag": "0004_omniscient_yellowjacket",
+      "breakpoints": true
     }
   ]
 }

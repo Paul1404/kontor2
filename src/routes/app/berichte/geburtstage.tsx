@@ -35,7 +35,7 @@ function GeburtstagePage() {
   const [abteilungId, setAbteilungId] = useState<string | null>(null);
 
   const abteilungen = useQuery({
-    queryKey: ["reports.abteilungenList"],
+    queryKey: ["abteilungen", "reports"],
     queryFn: () => orpc.reports.abteilungenList(),
   });
 

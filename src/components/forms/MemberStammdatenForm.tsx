@@ -92,7 +92,10 @@ export function buildInitialValues(
     eintritt: toDateInput(member.eintritt as string | Date | null),
     austritt: toDateInput(member.austritt as string | Date | null),
     verstorbenAm: toDateInput(member.verstorbenAm as string | Date | null),
-    aktivPasiv: ((member.aktivPasiv as string) === "P" ? "P" : "A") as "A" | "P" | "",
+    aktivPasiv: (member.aktivPasiv === "A" ? "A" : member.aktivPasiv === "P" ? "P" : "") as
+      | "A"
+      | "P"
+      | "",
     bank1: (member.bank1 as string) ?? "",
     bic1: (member.bic1 as string) ?? "",
     iban1: "",
@@ -128,7 +131,12 @@ export function buildPatch(values: StammdatenValues): Record<string, string | nu
   out.eintritt = nullable(values.eintritt);
   out.austritt = nullable(values.austritt);
   out.verstorbenAm = nullable(values.verstorbenAm);
-  out.aktivPasiv = values.aktivPasiv === "P" ? "P" : values.aktivPasiv === "A" ? "A" : null;
+  // Only emit aktivPasiv when the user actually picked a value. Sending
+  // null here would overwrite an existing value to null; the server's
+  // patch helper only touches keys present in the object.
+  if (values.aktivPasiv === "A" || values.aktivPasiv === "P") {
+    out.aktivPasiv = values.aktivPasiv;
+  }
   out.bank1 = nullable(values.bank1);
   out.bic1 = nullable(values.bic1);
   out.abwKontoInh = nullable(values.abwKontoInh);
@@ -246,10 +254,11 @@ export function MemberStammdatenForm({
             </FormField>
             <FormField label="Status">
               <select
-                value={values.aktivPasiv === "" ? "A" : values.aktivPasiv}
-                onChange={(e) => update("aktivPasiv", e.target.value as "A" | "P")}
+                value={values.aktivPasiv}
+                onChange={(e) => update("aktivPasiv", e.target.value as "A" | "P" | "")}
                 className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
               >
+                <option value="">Unbekannt</option>
                 <option value="A">Aktiv</option>
                 <option value="P">Passiv</option>
               </select>

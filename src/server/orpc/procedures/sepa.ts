@@ -4,12 +4,17 @@ import * as v from "valibot";
 import { vorstandProc } from "~/server/orpc/base";
 import { membersTable } from "~/server/db/schema/members";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
-import { appendAudit } from "~/server/audit/log";
+import { appendAudit, diff } from "~/server/audit/log";
 
-function toDateOrNull(value: string | null | undefined): Date | null {
+function toDateOrNull(value: string | null | undefined, field: string): Date | null {
   if (!value) return null;
   const d = new Date(value);
-  return Number.isFinite(d.getTime()) ? d : null;
+  if (!Number.isFinite(d.getTime())) {
+    throw new ORPCError("VALIDATION_FAILED", {
+      message: `Ungültiges Datum im Feld "${field}": ${value}`,
+    });
+  }
+  return d;
 }
 
 const CreateInput = v.object({
@@ -35,32 +40,32 @@ const UpdateInput = v.object({
 
 export const sepaRouter = {
   create: vorstandProc.input(CreateInput).handler(async ({ context, input }) => {
-    const [member] = await context.db
-      .select({ id: membersTable.id, adrNr: membersTable.adrNr })
-      .from(membersTable)
-      .where(eq(membersTable.id, input.memberId))
-      .limit(1);
-    if (!member) {
-      throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
-    }
+    return await context.db.transaction(async (tx) => {
+      const [member] = await tx
+        .select({ id: membersTable.id, adrNr: membersTable.adrNr })
+        .from(membersTable)
+        .where(eq(membersTable.id, input.memberId))
+        .limit(1);
+      if (!member) {
+        throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+      }
 
-    let mandatsNr = input.mandatsNr?.trim();
-    if (!mandatsNr) {
-      // Generate `M{seq}` where seq is the next integer suffix not yet used
-      // for this member. Keeps the format short and predictable, and avoids
-      // collisions with the Linear-imported numeric mandate refs.
-      const [maxRow] = await context.db
-        .select({
-          maxSeq: sql<number>`coalesce(max(nullif(regexp_replace(${sepaMandatesTable.mandatsNr}, '\\D', '', 'g'), '')::int), 0)::int`,
-        })
-        .from(sepaMandatesTable)
-        .where(eq(sepaMandatesTable.memberId, member.id));
-      mandatsNr = `M${(maxRow?.maxSeq ?? 0) + 1}`;
-    }
+      let mandatsNr = input.mandatsNr?.trim();
+      if (!mandatsNr) {
+        // Generate `M{seq}` where seq is the next integer suffix not yet
+        // used for this member. Keeps the format short and predictable,
+        // and avoids collisions with the Linear-imported numeric mandate
+        // refs.
+        const [maxRow] = await tx
+          .select({
+            maxSeq: sql<number>`coalesce(max(nullif(regexp_replace(${sepaMandatesTable.mandatsNr}, '\\D', '', 'g'), '')::int), 0)::int`,
+          })
+          .from(sepaMandatesTable)
+          .where(eq(sepaMandatesTable.memberId, member.id));
+        mandatsNr = `M${(maxRow?.maxSeq ?? 0) + 1}`;
+      }
 
-    const [row] = await context.db
-      .insert(sepaMandatesTable)
-      .values({
+      const values = {
         memberId: member.id,
         adrNr: member.adrNr,
         mandatsNr,
@@ -68,71 +73,86 @@ export const sepaRouter = {
         typ: input.typ ?? null,
         status: input.status ?? null,
         angelegtAm: new Date(),
-        unterschriftDatum: toDateOrNull(input.unterschriftDatum),
-        gueltigAb: toDateOrNull(input.gueltigAb),
-        gultigBis: toDateOrNull(input.gultigBis),
-      } as never)
-      .returning({ id: sepaMandatesTable.id });
-    if (!row) {
-      throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
-    }
+        unterschriftDatum: toDateOrNull(input.unterschriftDatum, "Unterschriftsdatum"),
+        gueltigAb: toDateOrNull(input.gueltigAb, "Gültig ab"),
+        gultigBis: toDateOrNull(input.gultigBis, "Gültig bis"),
+      };
 
-    await appendAudit(context.db, {
-      entityType: "sepa_mandate",
-      entityId: row.id,
-      action: "create",
-      source: "ui",
-      actorId: context.session!.user.id,
-      actorEmail: context.session!.user.email,
-      changes: {
-        mandatsNr: { before: null, after: mandatsNr },
-        memberId: { before: null, after: member.id },
-      },
-      requestId: context.requestId ?? null,
+      const [row] = await tx
+        .insert(sepaMandatesTable)
+        .values(values as never)
+        .returning({ id: sepaMandatesTable.id });
+      if (!row) {
+        throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
+      }
+
+      await appendAudit(tx, {
+        entityType: "sepa_mandate",
+        entityId: row.id,
+        action: "create",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: diff(null, values as Record<string, unknown>),
+        requestId: context.requestId ?? null,
+      });
+
+      return { id: row.id, mandatsNr };
     });
-
-    return { id: row.id, mandatsNr };
   }),
 
   update: vorstandProc
     .input(v.object({ id: v.string(), patch: UpdateInput }))
     .handler(async ({ context, input }) => {
-      const [existing] = await context.db
-        .select()
-        .from(sepaMandatesTable)
-        .where(eq(sepaMandatesTable.id, input.id))
-        .limit(1);
-      if (!existing) {
-        throw new ORPCError("NOT_FOUND", { message: "Mandat nicht gefunden." });
-      }
-      const patch: Record<string, unknown> = { updatedAt: new Date() };
-      if ("status" in input.patch) patch.status = input.patch.status ?? null;
-      if ("lastschriftart" in input.patch)
-        patch.lastschriftart = input.patch.lastschriftart ?? null;
-      if ("typ" in input.patch) patch.typ = input.patch.typ ?? null;
-      if ("unterschriftDatum" in input.patch)
-        patch.unterschriftDatum = toDateOrNull(input.patch.unterschriftDatum);
-      if ("gueltigAb" in input.patch) patch.gueltigAb = toDateOrNull(input.patch.gueltigAb);
-      if ("gultigBis" in input.patch) patch.gultigBis = toDateOrNull(input.patch.gultigBis);
-      if ("widerrufenAm" in input.patch)
-        patch.widerrufenAm = toDateOrNull(input.patch.widerrufenAm);
+      await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(sepaMandatesTable)
+          .where(eq(sepaMandatesTable.id, input.id))
+          .limit(1);
+        if (!existing) {
+          throw new ORPCError("NOT_FOUND", { message: "Mandat nicht gefunden." });
+        }
+        const patch: Record<string, unknown> = { updatedAt: new Date() };
+        if ("status" in input.patch) patch.status = input.patch.status ?? null;
+        if ("lastschriftart" in input.patch)
+          patch.lastschriftart = input.patch.lastschriftart ?? null;
+        if ("typ" in input.patch) patch.typ = input.patch.typ ?? null;
+        if ("unterschriftDatum" in input.patch)
+          patch.unterschriftDatum = toDateOrNull(
+            input.patch.unterschriftDatum,
+            "Unterschriftsdatum",
+          );
+        if ("gueltigAb" in input.patch)
+          patch.gueltigAb = toDateOrNull(input.patch.gueltigAb, "Gültig ab");
+        if ("gultigBis" in input.patch)
+          patch.gultigBis = toDateOrNull(input.patch.gultigBis, "Gültig bis");
+        if ("widerrufenAm" in input.patch)
+          patch.widerrufenAm = toDateOrNull(input.patch.widerrufenAm, "Widerrufen am");
 
-      await context.db
-        .update(sepaMandatesTable)
-        .set(patch as never)
-        .where(eq(sepaMandatesTable.id, input.id));
+        const projected: Record<string, unknown> = {
+          ...(existing as Record<string, unknown>),
+          ...patch,
+        };
 
-      await appendAudit(context.db, {
-        entityType: "sepa_mandate",
-        entityId: input.id,
-        action: "update",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: {
-          status: { before: existing.status, after: input.patch.status ?? existing.status },
-        },
-        requestId: context.requestId ?? null,
+        await tx
+          .update(sepaMandatesTable)
+          .set(patch as never)
+          .where(eq(sepaMandatesTable.id, input.id));
+
+        const changes = diff(existing as unknown as Record<string, unknown>, projected);
+        if (Object.keys(changes).length > 0) {
+          await appendAudit(tx, {
+            entityType: "sepa_mandate",
+            entityId: input.id,
+            action: "update",
+            source: "ui",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            changes,
+            requestId: context.requestId ?? null,
+          });
+        }
       });
 
       return { ok: true };
@@ -145,33 +165,36 @@ export const sepaRouter = {
    * used for a Lastschrift it must remain referenceable for SEPA returns.
    */
   revoke: vorstandProc.input(v.object({ id: v.string() })).handler(async ({ context, input }) => {
-    const [existing] = await context.db
-      .select()
-      .from(sepaMandatesTable)
-      .where(eq(sepaMandatesTable.id, input.id))
-      .limit(1);
-    if (!existing) {
-      throw new ORPCError("NOT_FOUND", { message: "Mandat nicht gefunden." });
-    }
-    const now = new Date();
-    await context.db
-      .update(sepaMandatesTable)
-      .set({ widerrufenAm: now, isDeleted: true, updatedAt: now } as never)
-      .where(eq(sepaMandatesTable.id, input.id));
-    await appendAudit(context.db, {
-      entityType: "sepa_mandate",
-      entityId: input.id,
-      action: "update",
-      source: "ui",
-      actorId: context.session!.user.id,
-      actorEmail: context.session!.user.email,
-      changes: {
-        widerrufenAm: {
-          before: existing.widerrufenAm?.toISOString() ?? null,
-          after: now.toISOString(),
+    await context.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(sepaMandatesTable)
+        .where(eq(sepaMandatesTable.id, input.id))
+        .limit(1);
+      if (!existing) {
+        throw new ORPCError("NOT_FOUND", { message: "Mandat nicht gefunden." });
+      }
+      const now = new Date();
+      await tx
+        .update(sepaMandatesTable)
+        .set({ widerrufenAm: now, isDeleted: true, updatedAt: now } as never)
+        .where(eq(sepaMandatesTable.id, input.id));
+      await appendAudit(tx, {
+        entityType: "sepa_mandate",
+        entityId: input.id,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: {
+          widerrufenAm: {
+            before: existing.widerrufenAm?.toISOString() ?? null,
+            after: now.toISOString(),
+          },
+          isDeleted: { before: existing.isDeleted ?? false, after: true },
         },
-      },
-      requestId: context.requestId ?? null,
+        requestId: context.requestId ?? null,
+      });
     });
     return { ok: true };
   }),

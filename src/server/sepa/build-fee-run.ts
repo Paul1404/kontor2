@@ -7,7 +7,6 @@ import type { Member } from "~/server/db/schema/members";
 import { membersTable } from "~/server/db/schema/members";
 import type { SepaMandate } from "~/server/db/schema/sepa";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
-import { safeDecrypt } from "~/server/crypto/encrypt";
 import { selectMandate, sequenceTypeFor } from "~/server/sepa/select-mandate";
 
 export type MandateSummary = {
@@ -178,7 +177,9 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
       continue;
     }
 
-    const iban = safeDecrypt(member.iban1 as unknown as Buffer | null);
+    // `iban1` is transparently decrypted by the `encryptedText` Drizzle
+    // custom type — it arrives as a plain string already.
+    const iban = member.iban1;
     if (!iban) {
       excluded.push({
         memberId: member.id,

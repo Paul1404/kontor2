@@ -100,13 +100,13 @@ export function* parseValues(payload: string): IterableIterator<Row> {
         i += 4;
         continue;
       }
-      // _binary 'x' literal for bit(N) columns
+      // _binary 'x' literal for bit(N) columns. True iff any byte is non-zero.
       if (c === "_" && payload.substr(i, 8).toLowerCase() === "_binary ") {
         let j = i + 8;
         while (j < n && isWhitespace(payload[j])) j += 1;
         if (j < n && payload[j] === "'") {
           const r = parseString(payload, j);
-          row.push(r.value.length > 0 && r.value !== "\x00");
+          row.push([...r.value].some((ch) => ch.charCodeAt(0) !== 0));
           i = r.next;
           continue;
         }
@@ -356,6 +356,11 @@ const DATE_FORMATS = [
   /^(\d{4})-(\d{2})-(\d{2})$/,
 ];
 
+// MySQL TIME columns (e.g. `And_Zeit`) dump as bare 'HH:MM:SS'. We
+// anchor them to the Unix epoch so the time-of-day part survives,
+// instead of being silently nulled by the date regexes above.
+const TIME_FORMAT = /^(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/;
+
 export function coerceDate(value: Cell | Date): Date | null {
   if (value === null || value === undefined) return null;
   if (typeof value === "object" && value !== null && "getTime" in (value as object)) {
@@ -373,6 +378,12 @@ export function coerceDate(value: Cell | Date): Date | null {
       );
       return Number.isFinite(dt.getTime()) ? dt : null;
     }
+  }
+  const tm = TIME_FORMAT.exec(s);
+  if (tm) {
+    const [, hh, mm, ss] = tm;
+    const dt = new Date(Date.UTC(1970, 0, 1, Number(hh), Number(mm), Number(ss)));
+    return Number.isFinite(dt.getTime()) ? dt : null;
   }
   return null;
 }

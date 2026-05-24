@@ -35,9 +35,16 @@ export function ContractsCard({
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
 
+  // Track which specific row is being deleted so the spinner / disabled
+  // state only applies to that one row, not every Trash icon in the table.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const remove = useMutation({
     mutationFn: (id: string) => orpc.contracts.remove({ id }),
-    onSuccess: refresh,
+    onSuccess: async () => {
+      setPendingDeleteId(null);
+      await refresh();
+    },
+    onError: () => setPendingDeleteId(null),
   });
 
   return (
@@ -76,31 +83,47 @@ export function ContractsCard({
               </tr>
             </thead>
             <tbody>
-              {vertraege.map((v) => (
-                <tr key={v.id} className="border-t">
-                  <td className="py-1 pr-3 tabular-nums">{v.vertragNr}</td>
-                  <td className="py-1 pr-3">{v.artName ?? v.art}</td>
-                  <td className="py-1 pr-3 text-right tabular-nums">{formatCurrency(v.betrag)}</td>
-                  <td className="py-1 pl-3 text-muted-foreground">{formatDate(v.vertragBegin)}</td>
-                  {canEdit ? (
-                    <td className="py-1 text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => remove.mutate(v.id)}
-                        disabled={remove.isPending}
-                        title="Vertrag löschen"
-                      >
-                        {remove.isPending ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="size-4 text-destructive" />
-                        )}
-                      </Button>
+              {vertraege.map((v) => {
+                const isDeleting = pendingDeleteId === v.id;
+                return (
+                  <tr key={v.id} className="border-t">
+                    <td className="py-1 pr-3 tabular-nums">{v.vertragNr}</td>
+                    <td className="py-1 pr-3">{v.artName ?? v.art}</td>
+                    <td className="py-1 pr-3 text-right tabular-nums">
+                      {formatCurrency(v.betrag)}
                     </td>
-                  ) : null}
-                </tr>
-              ))}
+                    <td className="py-1 pl-3 text-muted-foreground">
+                      {formatDate(v.vertragBegin)}
+                    </td>
+                    {canEdit ? (
+                      <td className="py-1 text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Vertrag ${v.vertragNr} (${v.artName ?? v.art}) löschen?`,
+                              )
+                            ) {
+                              setPendingDeleteId(v.id);
+                              remove.mutate(v.id);
+                            }
+                          }}
+                          disabled={isDeleting}
+                          title="Vertrag löschen"
+                        >
+                          {isDeleting ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="size-4 text-destructive" />
+                          )}
+                        </Button>
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

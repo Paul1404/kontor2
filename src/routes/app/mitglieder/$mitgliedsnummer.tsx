@@ -82,7 +82,7 @@ function MemberDetailPage() {
                   ) : (
                     <Trash2 className="size-4" />
                   )}
-                  Endgültig löschen
+                  Wirklich löschen
                 </Button>
                 <Button
                   variant="ghost"

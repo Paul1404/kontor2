@@ -33,104 +33,112 @@ export const abteilungenRouter = {
     if (!slug) {
       throw new ORPCError("VALIDATION_FAILED", { message: "Name ergibt keinen gültigen Slug." });
     }
-    const [dupe] = await context.db
-      .select({ id: abteilungenTable.id })
-      .from(abteilungenTable)
-      .where(eq(abteilungenTable.name, input.name))
-      .limit(1);
-    if (dupe) {
-      throw new ORPCError("CONFLICT", { message: `Abteilung "${input.name}" existiert bereits.` });
-    }
-    const [inserted] = await context.db
-      .insert(abteilungenTable)
-      .values({ name: input.name, slug })
-      .returning({ id: abteilungenTable.id, name: abteilungenTable.name });
-    if (!inserted) {
-      throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
-    }
-    await appendAudit(context.db, {
-      entityType: "abteilung",
-      entityId: inserted.id,
-      action: "create",
-      source: "ui",
-      actorId: context.session!.user.id,
-      actorEmail: context.session!.user.email,
-      changes: diff(null, { name: input.name, slug }),
-      requestId: context.requestId ?? null,
+    return await context.db.transaction(async (tx) => {
+      const [dupe] = await tx
+        .select({ id: abteilungenTable.id })
+        .from(abteilungenTable)
+        .where(eq(abteilungenTable.name, input.name))
+        .limit(1);
+      if (dupe) {
+        throw new ORPCError("CONFLICT", {
+          message: `Abteilung "${input.name}" existiert bereits.`,
+        });
+      }
+      const [inserted] = await tx
+        .insert(abteilungenTable)
+        .values({ name: input.name, slug })
+        .returning({ id: abteilungenTable.id, name: abteilungenTable.name });
+      if (!inserted) {
+        throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
+      }
+      await appendAudit(tx, {
+        entityType: "abteilung",
+        entityId: inserted.id,
+        action: "create",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: diff(null, { name: input.name, slug }),
+        requestId: context.requestId ?? null,
+      });
+      return inserted;
     });
-    return inserted;
   }),
 
   rename: adminProc
     .input(v.object({ id: v.string(), name: NameInput }))
     .handler(async ({ context, input }) => {
-      const [existing] = await context.db
+      return await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(abteilungenTable)
+          .where(eq(abteilungenTable.id, input.id))
+          .limit(1);
+        if (!existing) throw new ORPCError("NOT_FOUND", { message: "Abteilung nicht gefunden." });
+        if (existing.name === input.name) return { ok: true };
+
+        const slug = slugify(input.name);
+        const [dupe] = await tx
+          .select({ id: abteilungenTable.id })
+          .from(abteilungenTable)
+          .where(eq(abteilungenTable.name, input.name))
+          .limit(1);
+        if (dupe && dupe.id !== input.id) {
+          throw new ORPCError("CONFLICT", {
+            message: `Eine andere Abteilung trägt bereits den Namen "${input.name}".`,
+          });
+        }
+
+        await tx
+          .update(abteilungenTable)
+          .set({ name: input.name, slug })
+          .where(eq(abteilungenTable.id, input.id));
+
+        await appendAudit(tx, {
+          entityType: "abteilung",
+          entityId: input.id,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: diff({ name: existing.name, slug: existing.slug }, { name: input.name, slug }),
+          requestId: context.requestId ?? null,
+        });
+        return { ok: true };
+      });
+    }),
+
+  delete: adminProc.input(v.object({ id: v.string() })).handler(async ({ context, input }) => {
+    await context.db.transaction(async (tx) => {
+      const [existing] = await tx
         .select()
         .from(abteilungenTable)
         .where(eq(abteilungenTable.id, input.id))
         .limit(1);
       if (!existing) throw new ORPCError("NOT_FOUND", { message: "Abteilung nicht gefunden." });
-      if (existing.name === input.name) return { ok: true };
 
-      const slug = slugify(input.name);
-      const [dupe] = await context.db
-        .select({ id: abteilungenTable.id })
-        .from(abteilungenTable)
-        .where(eq(abteilungenTable.name, input.name))
-        .limit(1);
-      if (dupe && dupe.id !== input.id) {
+      const [usage] = await tx
+        .select({ c: count() })
+        .from(memberAbteilungenTable)
+        .where(eq(memberAbteilungenTable.abteilungId, input.id));
+      if ((usage?.c ?? 0) > 0) {
         throw new ORPCError("CONFLICT", {
-          message: `Eine andere Abteilung trägt bereits den Namen "${input.name}".`,
+          message: `Abteilung hat noch ${usage?.c} Mitgliedschaft(en). Erst alle Zuordnungen entfernen.`,
         });
       }
 
-      await context.db
-        .update(abteilungenTable)
-        .set({ name: input.name, slug })
-        .where(eq(abteilungenTable.id, input.id));
+      await tx.delete(abteilungenTable).where(eq(abteilungenTable.id, input.id));
 
-      await appendAudit(context.db, {
+      await appendAudit(tx, {
         entityType: "abteilung",
         entityId: input.id,
-        action: "update",
+        action: "delete",
         source: "ui",
         actorId: context.session!.user.id,
         actorEmail: context.session!.user.email,
-        changes: diff({ name: existing.name, slug: existing.slug }, { name: input.name, slug }),
+        changes: diff({ name: existing.name, slug: existing.slug }, {}),
         requestId: context.requestId ?? null,
       });
-      return { ok: true };
-    }),
-
-  delete: adminProc.input(v.object({ id: v.string() })).handler(async ({ context, input }) => {
-    const [existing] = await context.db
-      .select()
-      .from(abteilungenTable)
-      .where(eq(abteilungenTable.id, input.id))
-      .limit(1);
-    if (!existing) throw new ORPCError("NOT_FOUND", { message: "Abteilung nicht gefunden." });
-
-    const [usage] = await context.db
-      .select({ c: count() })
-      .from(memberAbteilungenTable)
-      .where(eq(memberAbteilungenTable.abteilungId, input.id));
-    if ((usage?.c ?? 0) > 0) {
-      throw new ORPCError("CONFLICT", {
-        message: `Abteilung hat noch ${usage?.c} Mitgliedschaft(en). Erst alle Zuordnungen entfernen.`,
-      });
-    }
-
-    await context.db.delete(abteilungenTable).where(eq(abteilungenTable.id, input.id));
-
-    await appendAudit(context.db, {
-      entityType: "abteilung",
-      entityId: input.id,
-      action: "delete",
-      source: "ui",
-      actorId: context.session!.user.id,
-      actorEmail: context.session!.user.email,
-      changes: diff({ name: existing.name, slug: existing.slug }, {}),
-      requestId: context.requestId ?? null,
     });
     return { ok: true };
   }),
@@ -144,47 +152,49 @@ export const abteilungenRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      const [member] = await context.db
-        .select({ id: membersTable.id })
-        .from(membersTable)
-        .where(eq(membersTable.id, input.memberId))
-        .limit(1);
-      if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+      await context.db.transaction(async (tx) => {
+        const [member] = await tx
+          .select({ id: membersTable.id })
+          .from(membersTable)
+          .where(eq(membersTable.id, input.memberId))
+          .limit(1);
+        if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
 
-      const [abteilung] = await context.db
-        .select({ id: abteilungenTable.id, name: abteilungenTable.name })
-        .from(abteilungenTable)
-        .where(eq(abteilungenTable.id, input.abteilungId))
-        .limit(1);
-      if (!abteilung) throw new ORPCError("NOT_FOUND", { message: "Abteilung nicht gefunden." });
+        const [abteilung] = await tx
+          .select({ id: abteilungenTable.id, name: abteilungenTable.name })
+          .from(abteilungenTable)
+          .where(eq(abteilungenTable.id, input.abteilungId))
+          .limit(1);
+        if (!abteilung) throw new ORPCError("NOT_FOUND", { message: "Abteilung nicht gefunden." });
 
-      try {
-        await context.db.insert(memberAbteilungenTable).values({
-          memberId: input.memberId,
-          abteilungId: input.abteilungId,
-          eintrittsdatum: input.eintrittsdatum,
-        });
-      } catch (e) {
-        throw new ORPCError("CONFLICT", {
-          message: "Diese Abteilungs-Mitgliedschaft existiert bereits.",
-          cause: e,
-        });
-      }
+        try {
+          await tx.insert(memberAbteilungenTable).values({
+            memberId: input.memberId,
+            abteilungId: input.abteilungId,
+            eintrittsdatum: input.eintrittsdatum,
+          });
+        } catch (e) {
+          throw new ORPCError("CONFLICT", {
+            message: "Diese Abteilungs-Mitgliedschaft existiert bereits.",
+            cause: e,
+          });
+        }
 
-      await appendAudit(context.db, {
-        entityType: "member",
-        entityId: input.memberId,
-        action: "update",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: {
-          [`abteilung:${abteilung.name}`]: {
-            before: null,
-            after: { eintrittsdatum: input.eintrittsdatum },
+        await appendAudit(tx, {
+          entityType: "member",
+          entityId: input.memberId,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            [`abteilung:${abteilung.name}`]: {
+              before: null,
+              after: { eintrittsdatum: input.eintrittsdatum },
+            },
           },
-        },
-        requestId: context.requestId ?? null,
+          requestId: context.requestId ?? null,
+        });
       });
       await invalidateMemberCaches();
       return { ok: true };
@@ -200,41 +210,43 @@ export const abteilungenRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      const [existing] = await context.db
-        .select({ austrittsdatum: memberAbteilungenTable.austrittsdatum })
-        .from(memberAbteilungenTable)
-        .where(
-          and(
-            eq(memberAbteilungenTable.memberId, input.memberId),
-            eq(memberAbteilungenTable.abteilungId, input.abteilungId),
-            eq(memberAbteilungenTable.eintrittsdatum, input.eintrittsdatum),
-          ),
-        )
-        .limit(1);
-      if (!existing) {
-        throw new ORPCError("NOT_FOUND", { message: "Mitgliedschaft nicht gefunden." });
-      }
-      await context.db
-        .update(memberAbteilungenTable)
-        .set({ austrittsdatum: input.austrittsdatum })
-        .where(
-          and(
-            eq(memberAbteilungenTable.memberId, input.memberId),
-            eq(memberAbteilungenTable.abteilungId, input.abteilungId),
-            eq(memberAbteilungenTable.eintrittsdatum, input.eintrittsdatum),
-          ),
-        );
-      await appendAudit(context.db, {
-        entityType: "member",
-        entityId: input.memberId,
-        action: "update",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: {
-          austrittsdatum: { before: existing.austrittsdatum, after: input.austrittsdatum },
-        },
-        requestId: context.requestId ?? null,
+      await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select({ austrittsdatum: memberAbteilungenTable.austrittsdatum })
+          .from(memberAbteilungenTable)
+          .where(
+            and(
+              eq(memberAbteilungenTable.memberId, input.memberId),
+              eq(memberAbteilungenTable.abteilungId, input.abteilungId),
+              eq(memberAbteilungenTable.eintrittsdatum, input.eintrittsdatum),
+            ),
+          )
+          .limit(1);
+        if (!existing) {
+          throw new ORPCError("NOT_FOUND", { message: "Mitgliedschaft nicht gefunden." });
+        }
+        await tx
+          .update(memberAbteilungenTable)
+          .set({ austrittsdatum: input.austrittsdatum })
+          .where(
+            and(
+              eq(memberAbteilungenTable.memberId, input.memberId),
+              eq(memberAbteilungenTable.abteilungId, input.abteilungId),
+              eq(memberAbteilungenTable.eintrittsdatum, input.eintrittsdatum),
+            ),
+          );
+        await appendAudit(tx, {
+          entityType: "member",
+          entityId: input.memberId,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            austrittsdatum: { before: existing.austrittsdatum, after: input.austrittsdatum },
+          },
+          requestId: context.requestId ?? null,
+        });
       });
       await invalidateMemberCaches();
       return { ok: true };
@@ -249,32 +261,33 @@ export const abteilungenRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      const result = await context.db
-        .delete(memberAbteilungenTable)
-        .where(
-          and(
-            eq(memberAbteilungenTable.memberId, input.memberId),
-            eq(memberAbteilungenTable.abteilungId, input.abteilungId),
-            eq(memberAbteilungenTable.eintrittsdatum, input.eintrittsdatum),
-          ),
-        );
-      await appendAudit(context.db, {
-        entityType: "member",
-        entityId: input.memberId,
-        action: "delete",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: {
-          [`abteilungId:${input.abteilungId}`]: {
-            before: { eintrittsdatum: input.eintrittsdatum },
-            after: null,
+      await context.db.transaction(async (tx) => {
+        await tx
+          .delete(memberAbteilungenTable)
+          .where(
+            and(
+              eq(memberAbteilungenTable.memberId, input.memberId),
+              eq(memberAbteilungenTable.abteilungId, input.abteilungId),
+              eq(memberAbteilungenTable.eintrittsdatum, input.eintrittsdatum),
+            ),
+          );
+        await appendAudit(tx, {
+          entityType: "member",
+          entityId: input.memberId,
+          action: "delete",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            [`abteilungId:${input.abteilungId}`]: {
+              before: { eintrittsdatum: input.eintrittsdatum },
+              after: null,
+            },
           },
-        },
-        requestId: context.requestId ?? null,
+          requestId: context.requestId ?? null,
+        });
       });
       await invalidateMemberCaches();
-      void result;
       return { ok: true };
     }),
 };

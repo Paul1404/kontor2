@@ -3,7 +3,7 @@ import * as v from "valibot";
 import { adminProc, authedProc } from "~/server/orpc/base";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { appendAudit, diff } from "~/server/audit/log";
-import { lastFour, safeDecrypt } from "~/server/crypto/encrypt";
+import { lastFour } from "~/server/crypto/encrypt";
 import { normalizeIban, validateIban } from "~/server/sepa/iban";
 
 const UpdateInput = v.object({
@@ -67,12 +67,9 @@ export const organizationSettingsRouter = {
       await context.db.update(organizationSettingsTable).set(next as never);
     }
 
-    const beforeForAudit = existing
-      ? {
-          ...existing,
-          vereinsIban: safeDecrypt(existing.vereinsIban as unknown as Buffer | null),
-        }
-      : null;
+    // `vereinsIban` is transparently decrypted by the `encryptedText` Drizzle
+    // custom type, so `existing.vereinsIban` is already the plaintext IBAN.
+    const beforeForAudit = existing ?? null;
 
     await appendAudit(context.db, {
       entityType: "organization_settings",

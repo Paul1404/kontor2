@@ -36,9 +36,16 @@ export function SepaCard({
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
 
+  // Per-row pending state so revoking one mandate doesn't spin the icon
+  // on every other row in the list.
+  const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
   const revoke = useMutation({
     mutationFn: (id: string) => orpc.sepa.revoke({ id }),
-    onSuccess: refresh,
+    onSuccess: async () => {
+      setPendingRevokeId(null);
+      await refresh();
+    },
+    onError: () => setPendingRevokeId(null),
   });
 
   return (
@@ -84,11 +91,20 @@ export function SepaCard({
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => revoke.mutate(s.id)}
-                      disabled={revoke.isPending}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `SEPA-Mandat ${s.mandatsNr} widerrufen? Es kann danach nicht mehr für Lastschriften verwendet werden.`,
+                          )
+                        ) {
+                          setPendingRevokeId(s.id);
+                          revoke.mutate(s.id);
+                        }
+                      }}
+                      disabled={pendingRevokeId === s.id}
                       title="Mandat widerrufen"
                     >
-                      {revoke.isPending ? (
+                      {pendingRevokeId === s.id ? (
                         <Loader2 className="size-4 animate-spin" />
                       ) : (
                         <Ban className="size-4 text-destructive" />

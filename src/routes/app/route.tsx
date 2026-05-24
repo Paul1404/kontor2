@@ -4,31 +4,34 @@ import { AppShell } from "~/components/layout/AppShell";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app")({
+  // Gate auth at the router layer so unauth'd users never even start
+  // rendering the shell. SPA redirect — no full page reload.
   beforeLoad: async () => {
-    // Initial cookie-based session check: we rely on the server to redirect
-    // unauth'd users via the rpc 401. The actual gate is the me() query below.
-    return {};
+    try {
+      const me = await orpc.auth.me();
+      return { me };
+    } catch {
+      throw redirect({ to: "/login" });
+    }
   },
   component: AppLayout,
 });
 
 function AppLayout() {
+  // beforeLoad guarantees the cookie is valid; this query keeps role/email
+  // in sync after sign-in and survives invalidations elsewhere.
   const me = useQuery({
     queryKey: ["me"],
     queryFn: () => orpc.auth.me(),
     retry: false,
   });
 
-  if (me.isLoading) {
+  if (me.isLoading || !me.data) {
     return (
       <div className="flex h-screen items-center justify-center text-muted-foreground">
         Wird geladen...
       </div>
     );
-  }
-  if (me.isError || !me.data) {
-    if (typeof window !== "undefined") window.location.assign("/login");
-    throw redirect({ to: "/login" });
   }
 
   return (
