@@ -6,6 +6,7 @@ import { AbteilungenCard } from "~/components/forms/AbteilungenCard";
 import { AttachmentsCard } from "~/components/forms/AttachmentsCard";
 import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
+import { DsgvoCard } from "~/components/forms/DsgvoCard";
 import { SepaCard } from "~/components/forms/SepaCard";
 import { SnapshotsTab } from "~/components/snapshots/SnapshotsTab";
 import { Badge } from "~/components/ui/badge";
@@ -313,6 +314,13 @@ function MemberDetailPage() {
       />
 
       <SnapshotsTab memberId={member.id} mitgliedsnummer={mitgliedsnummer} canRestore={canEdit} />
+
+      <DsgvoCard
+        memberId={member.id}
+        memberSlug={mitgliedsnummer}
+        canManage={canEdit}
+        isAdmin={me.data?.role === "admin"}
+      />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

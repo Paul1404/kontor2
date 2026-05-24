@@ -4,6 +4,7 @@ import {
   Clock,
   Coins,
   FileBarChart,
+  FileLock2,
   FileSpreadsheet,
   History,
   Layers,
@@ -50,6 +51,12 @@ const SECTIONS: NavSection[] = [
         vorstandOnly: true,
       },
       { to: "/app/audit", label: "Audit Log", icon: <ScrollText className="size-[18px]" /> },
+      {
+        to: "/app/dsgvo",
+        label: "Datenschutz",
+        icon: <FileLock2 className="size-[18px]" />,
+        vorstandOnly: true,
+      },
     ],
   },
   {

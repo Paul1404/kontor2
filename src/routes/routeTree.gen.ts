@@ -18,6 +18,7 @@ import { Route as AppImportRouteImport } from './app/import'
 import { Route as AppAuditRouteImport } from './app/audit'
 import { Route as ApiHealthRouteImport } from './api/health'
 import { Route as AppMitgliederIndexRouteImport } from './app/mitglieder/index'
+import { Route as AppDsgvoIndexRouteImport } from './app/dsgvo/index'
 import { Route as AppBerichteIndexRouteImport } from './app/berichte/index'
 import { Route as AppBeitragIndexRouteImport } from './app/beitrag/index'
 import { Route as AppMitgliederNeuRouteImport } from './app/mitglieder/neu'
@@ -27,9 +28,11 @@ import { Route as AppEinstellungenSmtpRouteImport } from './app/einstellungen/sm
 import { Route as AppEinstellungenBenutzerRouteImport } from './app/einstellungen/benutzer'
 import { Route as AppEinstellungenBeitragsartenRouteImport } from './app/einstellungen/beitragsarten'
 import { Route as AppEinstellungenAbteilungenRouteImport } from './app/einstellungen/abteilungen'
+import { Route as AppDsgvoIdRouteImport } from './app/dsgvo/$id'
 import { Route as AppBerichteGeburtstageRouteImport } from './app/berichte/geburtstage'
 import { Route as AppBerichteFinanzenRouteImport } from './app/berichte/finanzen'
 import { Route as AppBerichteEhrungenRouteImport } from './app/berichte/ehrungen'
+import { Route as AppBerichteBestandserhebungRouteImport } from './app/berichte/bestandserhebung'
 import { Route as AppBerichteAbteilungsStatistikRouteImport } from './app/berichte/abteilungs-statistik'
 import { Route as AppBeitragNeuRouteImport } from './app/beitrag/neu'
 import { Route as AppBeitragIdRouteImport } from './app/beitrag/$id'
@@ -86,6 +89,11 @@ const AppMitgliederIndexRoute = AppMitgliederIndexRouteImport.update({
   path: '/mitglieder/',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppDsgvoIndexRoute = AppDsgvoIndexRouteImport.update({
+  id: '/dsgvo/',
+  path: '/dsgvo/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppBerichteIndexRoute = AppBerichteIndexRouteImport.update({
   id: '/berichte/',
   path: '/berichte/',
@@ -135,6 +143,11 @@ const AppEinstellungenAbteilungenRoute =
     path: '/einstellungen/abteilungen',
     getParentRoute: () => AppRouteRoute,
   } as any)
+const AppDsgvoIdRoute = AppDsgvoIdRouteImport.update({
+  id: '/dsgvo/$id',
+  path: '/dsgvo/$id',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppBerichteGeburtstageRoute = AppBerichteGeburtstageRouteImport.update({
   id: '/berichte/geburtstage',
   path: '/berichte/geburtstage',
@@ -150,6 +163,12 @@ const AppBerichteEhrungenRoute = AppBerichteEhrungenRouteImport.update({
   path: '/berichte/ehrungen',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppBerichteBestandserhebungRoute =
+  AppBerichteBestandserhebungRouteImport.update({
+    id: '/berichte/bestandserhebung',
+    path: '/berichte/bestandserhebung',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 const AppBerichteAbteilungsStatistikRoute =
   AppBerichteAbteilungsStatistikRouteImport.update({
     id: '/berichte/abteilungs-statistik',
@@ -221,9 +240,11 @@ export interface FileRoutesByFullPath {
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
+  '/app/berichte/bestandserhebung': typeof AppBerichteBestandserhebungRoute
   '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
   '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
   '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
+  '/app/dsgvo/$id': typeof AppDsgvoIdRoute
   '/app/einstellungen/abteilungen': typeof AppEinstellungenAbteilungenRoute
   '/app/einstellungen/beitragsarten': typeof AppEinstellungenBeitragsartenRoute
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
@@ -233,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
   '/app/beitrag/': typeof AppBeitragIndexRoute
   '/app/berichte/': typeof AppBerichteIndexRoute
+  '/app/dsgvo/': typeof AppDsgvoIndexRoute
   '/app/mitglieder/': typeof AppMitgliederIndexRoute
   '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
@@ -253,9 +275,11 @@ export interface FileRoutesByTo {
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
+  '/app/berichte/bestandserhebung': typeof AppBerichteBestandserhebungRoute
   '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
   '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
   '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
+  '/app/dsgvo/$id': typeof AppDsgvoIdRoute
   '/app/einstellungen/abteilungen': typeof AppEinstellungenAbteilungenRoute
   '/app/einstellungen/beitragsarten': typeof AppEinstellungenBeitragsartenRoute
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
@@ -265,6 +289,7 @@ export interface FileRoutesByTo {
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
   '/app/beitrag': typeof AppBeitragIndexRoute
   '/app/berichte': typeof AppBerichteIndexRoute
+  '/app/dsgvo': typeof AppDsgvoIndexRoute
   '/app/mitglieder': typeof AppMitgliederIndexRoute
   '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
@@ -287,9 +312,11 @@ export interface FileRoutesById {
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
+  '/app/berichte/bestandserhebung': typeof AppBerichteBestandserhebungRoute
   '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
   '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
   '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
+  '/app/dsgvo/$id': typeof AppDsgvoIdRoute
   '/app/einstellungen/abteilungen': typeof AppEinstellungenAbteilungenRoute
   '/app/einstellungen/beitragsarten': typeof AppEinstellungenBeitragsartenRoute
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
@@ -299,6 +326,7 @@ export interface FileRoutesById {
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
   '/app/beitrag/': typeof AppBeitragIndexRoute
   '/app/berichte/': typeof AppBerichteIndexRoute
+  '/app/dsgvo/': typeof AppDsgvoIndexRoute
   '/app/mitglieder/': typeof AppMitgliederIndexRoute
   '/app/mitglieder/$mitgliedsnummer_/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
@@ -322,9 +350,11 @@ export interface FileRouteTypes {
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
     | '/app/berichte/abteilungs-statistik'
+    | '/app/berichte/bestandserhebung'
     | '/app/berichte/ehrungen'
     | '/app/berichte/finanzen'
     | '/app/berichte/geburtstage'
+    | '/app/dsgvo/$id'
     | '/app/einstellungen/abteilungen'
     | '/app/einstellungen/beitragsarten'
     | '/app/einstellungen/benutzer'
@@ -334,6 +364,7 @@ export interface FileRouteTypes {
     | '/app/mitglieder/neu'
     | '/app/beitrag/'
     | '/app/berichte/'
+    | '/app/dsgvo/'
     | '/app/mitglieder/'
     | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
   fileRoutesByTo: FileRoutesByTo
@@ -354,9 +385,11 @@ export interface FileRouteTypes {
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
     | '/app/berichte/abteilungs-statistik'
+    | '/app/berichte/bestandserhebung'
     | '/app/berichte/ehrungen'
     | '/app/berichte/finanzen'
     | '/app/berichte/geburtstage'
+    | '/app/dsgvo/$id'
     | '/app/einstellungen/abteilungen'
     | '/app/einstellungen/beitragsarten'
     | '/app/einstellungen/benutzer'
@@ -366,6 +399,7 @@ export interface FileRouteTypes {
     | '/app/mitglieder/neu'
     | '/app/beitrag'
     | '/app/berichte'
+    | '/app/dsgvo'
     | '/app/mitglieder'
     | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
   id:
@@ -387,9 +421,11 @@ export interface FileRouteTypes {
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
     | '/app/berichte/abteilungs-statistik'
+    | '/app/berichte/bestandserhebung'
     | '/app/berichte/ehrungen'
     | '/app/berichte/finanzen'
     | '/app/berichte/geburtstage'
+    | '/app/dsgvo/$id'
     | '/app/einstellungen/abteilungen'
     | '/app/einstellungen/beitragsarten'
     | '/app/einstellungen/benutzer'
@@ -399,6 +435,7 @@ export interface FileRouteTypes {
     | '/app/mitglieder/neu'
     | '/app/beitrag/'
     | '/app/berichte/'
+    | '/app/dsgvo/'
     | '/app/mitglieder/'
     | '/app/mitglieder/$mitgliedsnummer_/bearbeiten'
   fileRoutesById: FileRoutesById
@@ -481,6 +518,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMitgliederIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/dsgvo/': {
+      id: '/app/dsgvo/'
+      path: '/dsgvo'
+      fullPath: '/app/dsgvo/'
+      preLoaderRoute: typeof AppDsgvoIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/berichte/': {
       id: '/app/berichte/'
       path: '/berichte'
@@ -544,6 +588,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppEinstellungenAbteilungenRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/dsgvo/$id': {
+      id: '/app/dsgvo/$id'
+      path: '/dsgvo/$id'
+      fullPath: '/app/dsgvo/$id'
+      preLoaderRoute: typeof AppDsgvoIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/berichte/geburtstage': {
       id: '/app/berichte/geburtstage'
       path: '/berichte/geburtstage'
@@ -563,6 +614,13 @@ declare module '@tanstack/react-router' {
       path: '/berichte/ehrungen'
       fullPath: '/app/berichte/ehrungen'
       preLoaderRoute: typeof AppBerichteEhrungenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/bestandserhebung': {
+      id: '/app/berichte/bestandserhebung'
+      path: '/berichte/bestandserhebung'
+      fullPath: '/app/berichte/bestandserhebung'
+      preLoaderRoute: typeof AppBerichteBestandserhebungRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/berichte/abteilungs-statistik': {
@@ -646,9 +704,11 @@ interface AppRouteRouteChildren {
   AppBeitragIdRoute: typeof AppBeitragIdRoute
   AppBeitragNeuRoute: typeof AppBeitragNeuRoute
   AppBerichteAbteilungsStatistikRoute: typeof AppBerichteAbteilungsStatistikRoute
+  AppBerichteBestandserhebungRoute: typeof AppBerichteBestandserhebungRoute
   AppBerichteEhrungenRoute: typeof AppBerichteEhrungenRoute
   AppBerichteFinanzenRoute: typeof AppBerichteFinanzenRoute
   AppBerichteGeburtstageRoute: typeof AppBerichteGeburtstageRoute
+  AppDsgvoIdRoute: typeof AppDsgvoIdRoute
   AppEinstellungenAbteilungenRoute: typeof AppEinstellungenAbteilungenRoute
   AppEinstellungenBeitragsartenRoute: typeof AppEinstellungenBeitragsartenRoute
   AppEinstellungenBenutzerRoute: typeof AppEinstellungenBenutzerRoute
@@ -658,6 +718,7 @@ interface AppRouteRouteChildren {
   AppMitgliederNeuRoute: typeof AppMitgliederNeuRoute
   AppBeitragIndexRoute: typeof AppBeitragIndexRoute
   AppBerichteIndexRoute: typeof AppBerichteIndexRoute
+  AppDsgvoIndexRoute: typeof AppDsgvoIndexRoute
   AppMitgliederIndexRoute: typeof AppMitgliederIndexRoute
   AppMitgliederMitgliedsnummerBearbeitenRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
@@ -670,9 +731,11 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppBeitragIdRoute: AppBeitragIdRoute,
   AppBeitragNeuRoute: AppBeitragNeuRoute,
   AppBerichteAbteilungsStatistikRoute: AppBerichteAbteilungsStatistikRoute,
+  AppBerichteBestandserhebungRoute: AppBerichteBestandserhebungRoute,
   AppBerichteEhrungenRoute: AppBerichteEhrungenRoute,
   AppBerichteFinanzenRoute: AppBerichteFinanzenRoute,
   AppBerichteGeburtstageRoute: AppBerichteGeburtstageRoute,
+  AppDsgvoIdRoute: AppDsgvoIdRoute,
   AppEinstellungenAbteilungenRoute: AppEinstellungenAbteilungenRoute,
   AppEinstellungenBeitragsartenRoute: AppEinstellungenBeitragsartenRoute,
   AppEinstellungenBenutzerRoute: AppEinstellungenBenutzerRoute,
@@ -682,6 +745,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppMitgliederNeuRoute: AppMitgliederNeuRoute,
   AppBeitragIndexRoute: AppBeitragIndexRoute,
   AppBerichteIndexRoute: AppBerichteIndexRoute,
+  AppDsgvoIndexRoute: AppDsgvoIndexRoute,
   AppMitgliederIndexRoute: AppMitgliederIndexRoute,
   AppMitgliederMitgliedsnummerBearbeitenRoute:
     AppMitgliederMitgliedsnummerBearbeitenRoute,

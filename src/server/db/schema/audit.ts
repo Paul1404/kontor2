@@ -1,9 +1,23 @@
 import { index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
 
-export const auditActionEnum = pgEnum("audit_action", ["create", "update", "delete", "restore"]);
+export const auditActionEnum = pgEnum("audit_action", [
+  "create",
+  "update",
+  "delete",
+  "restore",
+  "dsgvo_export",
+  "dsgvo_erasure",
+  "dsgvo_consent_change",
+]);
 
-export const auditSourceEnum = pgEnum("audit_source", ["ui", "import", "svums_push", "system"]);
+export const auditSourceEnum = pgEnum("audit_source", [
+  "ui",
+  "import",
+  "svums_push",
+  "system",
+  "dsgvo",
+]);
 
 export const auditLogTable = pgTable(
   "audit_log",
@@ -29,3 +43,5 @@ export const auditLogTable = pgTable(
 
 export type AuditEntry = typeof auditLogTable.$inferSelect;
 export type NewAuditEntry = typeof auditLogTable.$inferInsert;
+export type AuditAction = (typeof auditActionEnum.enumValues)[number];
+export type AuditSource = (typeof auditSourceEnum.enumValues)[number];

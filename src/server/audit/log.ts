@@ -1,6 +1,10 @@
 import { lastFour } from "~/server/crypto/encrypt";
 import type { DBOrTx } from "~/server/db/client";
-import { auditLogTable } from "~/server/db/schema/audit";
+import {
+  type AuditAction,
+  auditLogTable,
+  type AuditSource,
+} from "~/server/db/schema/audit";
 
 /**
  * Columns whose plaintext values should NEVER appear in the audit log.
@@ -49,8 +53,8 @@ function eq(a: unknown, b: unknown): boolean {
 export type LogEntry = {
   entityType: string;
   entityId: string;
-  action: "create" | "update" | "delete" | "restore";
-  source: "ui" | "import" | "svums_push" | "system";
+  action: AuditAction;
+  source: AuditSource;
   actorId?: string | null;
   actorEmail?: string | null;
   changes: Changes;

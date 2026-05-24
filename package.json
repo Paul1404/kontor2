@@ -26,6 +26,7 @@
     "@orpc/openapi": "^1.14.3",
     "@orpc/server": "^1.14.3",
     "@orpc/tanstack-query": "^1.14.3",
+    "@react-pdf/renderer": "4.5.1",
     "@tanstack/react-form": "^1.32.0",
     "@tanstack/react-query": "^5.100.14",
     "@tanstack/react-router": "^1.170.8",

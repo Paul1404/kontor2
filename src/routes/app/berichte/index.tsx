@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BarChart3, Cake, Coins, FileBarChart, Trophy } from "lucide-react";
+import { BarChart3, Building2, Cake, Coins, FileBarChart, Trophy } from "lucide-react";
 import type { ReactNode } from "react";
 import { Card, CardContent } from "~/components/ui/card";
 import { orpc } from "~/lib/orpc";
@@ -43,6 +43,14 @@ const CARDS: ReportCard[] = [
     description:
       "Soll, Bezahlt und Offen je Beitragsjahr, aufgeschlüsselt nach Abteilung und Beitragsart.",
     icon: <Coins className="size-6" />,
+    vorstandOnly: true,
+  },
+  {
+    to: "/app/berichte/bestandserhebung",
+    title: "Bestandserhebung",
+    description:
+      "Mitgliederzahlen je Abteilung, Geschlecht und Altersgruppe zum Stichtag. Für die Verbandsmeldung an den Landessportbund.",
+    icon: <Building2 className="size-6" />,
     vorstandOnly: true,
   },
 ];
