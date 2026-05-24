@@ -1,4 +1,4 @@
-import type { DB } from "~/server/db/client";
+import type { DBOrTx } from "~/server/db/client";
 import { auditLogTable } from "~/server/db/schema/audit";
 import { lastFour } from "~/server/crypto/encrypt";
 
@@ -6,7 +6,13 @@ import { lastFour } from "~/server/crypto/encrypt";
  * Columns whose plaintext values should NEVER appear in the audit log.
  * We diff their `lastFour()` projection instead.
  */
-const SECRET_COLUMNS = new Set(["iban1", "iban2", "iban3", "passwordEncrypted"]);
+const SECRET_COLUMNS = new Set([
+  "iban1",
+  "iban2",
+  "iban3",
+  "passwordEncrypted",
+  "vereinsIban",
+]);
 
 export type Changes = Record<string, { before: unknown; after: unknown }>;
 
@@ -57,7 +63,7 @@ export type LogEntry = {
   requestId?: string | null;
 };
 
-export async function appendAudit(db: DB, entry: LogEntry): Promise<void> {
+export async function appendAudit(db: DBOrTx, entry: LogEntry): Promise<void> {
   if (Object.keys(entry.changes).length === 0 && entry.action === "update") return;
   await db.insert(auditLogTable).values({
     entityType: entry.entityType,

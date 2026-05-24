@@ -9,3 +9,5 @@ export * from "./attachments";
 export * from "./audit";
 export * from "./import-batches";
 export * from "./settings";
+export * from "./organization-settings";
+export * from "./fee-runs";

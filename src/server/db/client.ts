@@ -26,3 +26,10 @@ export function db() {
 }
 
 export type DB = ReturnType<typeof db>;
+
+/**
+ * Either the top-level DB handle or a transaction. Use for functions that
+ * write to the audit log from inside a `db.transaction(async tx => ...)`
+ * block, where passing `tx` should be type-safe.
+ */
+export type DBOrTx = DB | Parameters<Parameters<DB["transaction"]>[0]>[0];
