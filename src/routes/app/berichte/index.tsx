@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { BarChart3, Cake, Coins, FileBarChart, Trophy } from "lucide-react";
 import type { ReactNode } from "react";
 import { Card, CardContent } from "~/components/ui/card";

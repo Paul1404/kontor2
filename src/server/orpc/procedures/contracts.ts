@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
+import { eq } from "drizzle-orm";
 import * as v from "valibot";
-import { vorstandProc } from "~/server/orpc/base";
+import { appendAudit, diff } from "~/server/audit/log";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { membersTable } from "~/server/db/schema/members";
-import { appendAudit, diff } from "~/server/audit/log";
+import { vorstandProc } from "~/server/orpc/base";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 function toDateOrNull(value: string | null | undefined, field: string): Date | null {
   if (!value) return null;
@@ -89,7 +90,7 @@ export const contractsRouter = {
         if (!row) {
           throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
         }
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "contract",
           entityId: row.id,
           action: "create",
@@ -98,6 +99,12 @@ export const contractsRouter = {
           actorEmail: context.session!.user.email,
           changes: diff(null, { ...patch, memberId: member.id }),
           requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, member.id, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
         });
         return { id: row.id };
       });
@@ -126,7 +133,7 @@ export const contractsRouter = {
           .where(eq(contractsTable.id, input.id));
         const changes = diff(existing as unknown as Record<string, unknown>, projected);
         if (Object.keys(changes).length > 0) {
-          await appendAudit(tx, {
+          const auditId = await appendAudit(tx, {
             entityType: "contract",
             entityId: input.id,
             action: "update",
@@ -135,6 +142,12 @@ export const contractsRouter = {
             actorEmail: context.session!.user.email,
             changes,
             requestId: context.requestId ?? null,
+          });
+          await takeMemberSnapshot(tx, existing.memberId, {
+            trigger: "mutation",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            auditId,
           });
         }
       });
@@ -152,7 +165,7 @@ export const contractsRouter = {
         throw new ORPCError("NOT_FOUND", { message: "Vertrag nicht gefunden." });
       }
       await tx.delete(contractsTable).where(eq(contractsTable.id, input.id));
-      await appendAudit(tx, {
+      const auditId = await appendAudit(tx, {
         entityType: "contract",
         entityId: input.id,
         action: "delete",
@@ -161,6 +174,12 @@ export const contractsRouter = {
         actorEmail: context.session!.user.email,
         changes: diff(existing as unknown as Record<string, unknown>, {}),
         requestId: context.requestId ?? null,
+      });
+      await takeMemberSnapshot(tx, existing.memberId, {
+        trigger: "mutation",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        auditId,
       });
     });
     return { ok: true };

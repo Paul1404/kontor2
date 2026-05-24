@@ -1,10 +1,13 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { LogOut } from "lucide-react";
+import { Keyboard, LogOut, Search } from "lucide-react";
 import type { ReactNode } from "react";
-import { Button } from "~/components/ui/button";
 import { Sidebar } from "~/components/layout/Sidebar";
+import { Button } from "~/components/ui/button";
+import { CommandPalette } from "~/components/ui/command-palette";
+import { KeyboardCheatsheet } from "~/components/ui/keyboard-cheatsheet";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { signOut } from "~/lib/auth-client";
+import { useGlobalShortcuts } from "~/lib/use-global-shortcuts";
 
 export function AppShell({
   role,
@@ -15,6 +18,7 @@ export function AppShell({
   userEmail: string;
   children?: ReactNode;
 }) {
+  const { cheatsheetOpen, setCheatsheetOpen } = useGlobalShortcuts({ role });
   return (
     <div className="flex h-screen bg-background print:h-auto print:block">
       <Sidebar role={role} />
@@ -29,6 +33,30 @@ export function AppShell({
             </Link>
           </div>
           <div className="flex flex-1 justify-end items-center gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))
+              }
+              className="hidden items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground shadow-soft hover:bg-accent hover:text-accent-foreground sm:flex"
+              aria-label="Befehlspalette öffnen"
+              title="Befehlspalette (⌘K)"
+            >
+              <Search className="size-3.5" />
+              <span>Suchen</span>
+              <kbd className="rounded border border-border bg-muted px-1 py-0.5 text-[10px]">
+                ⌘K
+              </kbd>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCheatsheetOpen(true)}
+              className="hidden h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground sm:inline-flex"
+              aria-label="Tastaturkürzel anzeigen"
+              title="Tastaturkürzel (?)"
+            >
+              <Keyboard className="size-4" />
+            </button>
             <ThemeToggle className="hidden sm:inline-flex" />
             <div className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1 shadow-soft sm:flex">
               <span className="size-2 rounded-full bg-success" aria-hidden />
@@ -54,6 +82,12 @@ export function AppShell({
           </div>
         </div>
       </main>
+      <CommandPalette role={role} />
+      <KeyboardCheatsheet
+        open={cheatsheetOpen}
+        onOpenChange={setCheatsheetOpen}
+        role={role}
+      />
     </div>
   );
 }

@@ -3,8 +3,8 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "~/server/db/client";
-import { env } from "~/server/env";
 import * as schema from "~/server/db/schema";
+import { env } from "~/server/env";
 import { redis } from "~/server/redis/client";
 
 function buildAuth() {

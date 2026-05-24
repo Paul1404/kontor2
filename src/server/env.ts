@@ -26,6 +26,11 @@ const EnvSchema = v.object({
 
   SVUWV_BOOTSTRAP_ADMIN_EMAIL: v.optional(v.string()),
   SVUWV_BOOTSTRAP_ADMIN_PASSWORD: v.optional(v.string()),
+
+  // Disable the in-process nightly snapshot scheduler. Useful for local
+  // dev or when triggering the run externally (e.g. via Railway Cron and
+  // the HMAC-protected `/api/cron/snapshots` route).
+  SNAPSHOT_CRON_DISABLED: v.optional(v.picklist(["0", "1"]), "0"),
 });
 
 type RawEnv = v.InferOutput<typeof EnvSchema>;

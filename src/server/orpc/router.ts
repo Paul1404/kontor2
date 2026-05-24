@@ -1,7 +1,7 @@
 import { abteilungenRouter } from "~/server/orpc/procedures/abteilungen";
-import { authRouter } from "~/server/orpc/procedures/auth";
-import { auditRouter } from "~/server/orpc/procedures/audit";
 import { attachmentsRouter } from "~/server/orpc/procedures/attachments";
+import { auditRouter } from "~/server/orpc/procedures/audit";
+import { authRouter } from "~/server/orpc/procedures/auth";
 import { banksRouter } from "~/server/orpc/procedures/banks";
 import { contractsRouter } from "~/server/orpc/procedures/contracts";
 import { dashboardRouter } from "~/server/orpc/procedures/dashboard";
@@ -14,6 +14,7 @@ import { relationshipsRouter } from "~/server/orpc/procedures/relationships";
 import { reportsRouter } from "~/server/orpc/procedures/reports";
 import { sepaRouter } from "~/server/orpc/procedures/sepa";
 import { settingsRouter } from "~/server/orpc/procedures/settings";
+import { snapshotsRouter } from "~/server/orpc/procedures/snapshots";
 
 export const appRouter = {
   auth: authRouter,
@@ -32,6 +33,7 @@ export const appRouter = {
   feeRuns: feeRunsRouter,
   import: importRouter,
   reports: reportsRouter,
+  snapshots: snapshotsRouter,
 };
 
 export type AppRouter = typeof appRouter;

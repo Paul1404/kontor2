@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Cake, Loader2, UserCheck, UserMinus, UserPlus, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { formatDate } from "~/lib/format";
@@ -140,7 +140,9 @@ function DashboardPage() {
         </CardHeader>
         <CardContent>
           {data.birthdays.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Keine Geburtstage in den nächsten Tagen.</p>
+            <p className="text-sm text-muted-foreground">
+              Keine Geburtstage in den nächsten Tagen.
+            </p>
           ) : (
             <ul className="flex flex-col divide-y text-sm">
               {data.birthdays.map((b) => (

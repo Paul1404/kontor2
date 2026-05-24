@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { env } from "~/server/env";
 import * as schema from "~/server/db/schema";
+import { env } from "~/server/env";
 
 let sqlInstance: postgres.Sql | undefined;
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | undefined;

@@ -1,17 +1,33 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Download, Loader2, Plus, Search } from "lucide-react";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Loader2,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { PageSizeSelect, usePersistentPageSize } from "~/components/ui/page-size-select";
+import { toast } from "~/components/ui/toaster";
 import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
+import { usePageShortcut } from "~/lib/use-global-shortcuts";
 
 type Status = "aktiv" | "passiv" | "ausgetreten" | "verstorben" | "alle";
+type SortBy = "nachname" | "mitglnr" | "ort" | "email" | "eintritt";
+type SortDir = "asc" | "desc";
+
 type MemberRow = {
   id: string;
   adrNr: number;
@@ -27,17 +43,77 @@ type MemberRow = {
   aktivPasiv: string | null;
 };
 
+type MembersSearch = {
+  q: string;
+  status: Status;
+  abteilungId: string | null;
+  includeAusgetretene: boolean;
+  page: number;
+  sortBy: SortBy;
+  sortDir: SortDir;
+};
+
+const STATUS_VALUES: Status[] = ["aktiv", "passiv", "ausgetreten", "verstorben", "alle"];
+const SORT_VALUES: SortBy[] = ["nachname", "mitglnr", "ort", "email", "eintritt"];
+
+const EMPTY_SEARCH: MembersSearch = {
+  q: "",
+  status: "aktiv",
+  abteilungId: null,
+  includeAusgetretene: false,
+  page: 1,
+  sortBy: "nachname",
+  sortDir: "asc",
+};
+
 export const Route = createFileRoute("/app/mitglieder/")({
   component: MembersListPage,
+  // Filter / paging / sort all live in the URL so a view is bookmarkable
+  // and survives reloads. `validateSearch` coerces arbitrary input to a
+  // safe shape (the URL is user-controlled).
+  validateSearch: (s: Record<string, unknown>): MembersSearch => {
+    const status = STATUS_VALUES.includes(s.status as Status) ? (s.status as Status) : "aktiv";
+    const sortBy = SORT_VALUES.includes(s.sortBy as SortBy)
+      ? (s.sortBy as SortBy)
+      : "nachname";
+    const sortDir = s.sortDir === "desc" ? "desc" : "asc";
+    const pageNum = Number(s.page);
+    return {
+      q: typeof s.q === "string" ? s.q : "",
+      status,
+      abteilungId: typeof s.abteilungId === "string" && s.abteilungId ? s.abteilungId : null,
+      includeAusgetretene: s.includeAusgetretene === true || s.includeAusgetretene === "true",
+      page: Number.isFinite(pageNum) && pageNum >= 1 ? Math.floor(pageNum) : 1,
+      sortBy,
+      sortDir,
+    };
+  },
 });
 
 function MembersListPage() {
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState<Status>("aktiv");
-  const [abteilungId, setAbteilungId] = useState<string | null>(null);
-  const [includeAusgetretene, setIncludeAusgetretene] = useState(false);
-  const [page, setPage] = useState(1);
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [pageSize, setPageSize] = usePersistentPageSize("members.pageSize", 50);
+  // Free-text search is local-state so typing doesn't shove a URL update
+  // on every keystroke; debounced into the URL below.
+  const [qDraft, setQDraft] = useState(search.q);
+
+  // Keep qDraft in sync if the URL changes externally (browser back, etc.).
+  useEffect(() => {
+    setQDraft(search.q);
+  }, [search.q]);
+
+  // Debounce the search input → URL.
+  useEffect(() => {
+    if (qDraft === search.q) return;
+    const t = window.setTimeout(() => {
+      navigate({
+        search: (prev) => ({ ...prev, q: qDraft, page: 1 }),
+        replace: true,
+      });
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [qDraft, search.q, navigate]);
 
   const abteilungen = useQuery({
     queryKey: ["abteilungen", "members"],
@@ -48,30 +124,65 @@ function MembersListPage() {
   const canEdit = me.data?.role === "vorstand" || me.data?.role === "admin";
 
   const list = useQuery({
-    queryKey: ["members.list", { q, status, abteilungId, includeAusgetretene, page, pageSize }],
-    queryFn: () =>
-      orpc.members.list({ q, status, abteilungId, includeAusgetretene, page, pageSize }),
+    queryKey: ["members.list", { ...search, pageSize }],
+    queryFn: () => orpc.members.list({ ...search, pageSize }),
   });
+
+  function updateSearch(patch: Partial<MembersSearch>, resetPage = true) {
+    navigate({
+      search: (prev) => ({ ...prev, ...patch, ...(resetPage ? { page: 1 } : {}) }),
+      replace: true,
+    });
+  }
+
+  function toggleSort(col: SortBy) {
+    if (search.sortBy === col) {
+      updateSearch({ sortDir: search.sortDir === "asc" ? "desc" : "asc" }, false);
+    } else {
+      updateSearch({ sortBy: col, sortDir: "asc" }, false);
+    }
+  }
+
+  usePageShortcut("n", canEdit ? () => navigate({ to: "/app/mitglieder/neu" }) : null);
+
+  const hasFilter =
+    !!search.q ||
+    search.status !== "aktiv" ||
+    !!search.abteilungId ||
+    search.includeAusgetretene;
+
+  const abteilungName = search.abteilungId
+    ? abteilungen.data?.find((a) => a.id === search.abteilungId)?.name
+    : null;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">Mitglieder</h1>
-          <p className="text-sm text-muted-foreground">Suchen, filtern und Profile öffnen.</p>
+          <p className="text-sm text-muted-foreground">
+            Suchen, filtern und Profile öffnen. Tipp: <kbd className="rounded border border-border bg-muted px-1 text-[10px]">n</kbd> für neu, <kbd className="rounded border border-border bg-muted px-1 text-[10px]">⌘K</kbd> für Suche.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             type="button"
             variant="outline"
             onClick={async () => {
-              const res = await orpc.reports.membersExport({
-                q,
-                status,
-                abteilungId,
-                includeAusgetretene,
-              });
-              triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+              try {
+                const res = await orpc.reports.membersExport({
+                  q: search.q,
+                  status: search.status,
+                  abteilungId: search.abteilungId,
+                  includeAusgetretene: search.includeAusgetretene,
+                });
+                triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+                toast.success("CSV heruntergeladen");
+              } catch (err) {
+                toast.error("Export fehlgeschlagen", {
+                  description: err instanceof Error ? err.message : String(err),
+                });
+              }
             }}
           >
             <Download className="size-4" /> Als CSV
@@ -93,19 +204,13 @@ function MembersListPage() {
             <Input
               className="pl-9"
               placeholder="Name, Mitgliedsnummer, E-Mail, Ort"
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                setPage(1);
-              }}
+              value={qDraft}
+              onChange={(e) => setQDraft(e.target.value)}
             />
           </div>
           <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value as Status);
-              setPage(1);
-            }}
+            value={search.status}
+            onChange={(e) => updateSearch({ status: e.target.value as Status })}
             className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
           >
             <option value="aktiv">Aktiv</option>
@@ -115,11 +220,8 @@ function MembersListPage() {
             <option value="alle">Alle</option>
           </select>
           <select
-            value={abteilungId ?? ""}
-            onChange={(e) => {
-              setAbteilungId(e.target.value || null);
-              setPage(1);
-            }}
+            value={search.abteilungId ?? ""}
+            onChange={(e) => updateSearch({ abteilungId: e.target.value || null })}
             className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
           >
             <option value="">Alle Abteilungen</option>
@@ -132,8 +234,8 @@ function MembersListPage() {
           <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm shadow-soft">
             <input
               type="checkbox"
-              checked={includeAusgetretene}
-              onChange={(e) => setIncludeAusgetretene(e.target.checked)}
+              checked={search.includeAusgetretene}
+              onChange={(e) => updateSearch({ includeAusgetretene: e.target.checked })}
               className="size-4 accent-primary"
             />
             <span className="text-muted-foreground">Ausgetretene anzeigen</span>
@@ -141,16 +243,89 @@ function MembersListPage() {
         </CardContent>
       </Card>
 
+      {hasFilter ? (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Aktive Filter:</span>
+          {search.q ? (
+            <FilterChip
+              label={`Suche: "${search.q}"`}
+              onRemove={() => {
+                setQDraft("");
+                updateSearch({ q: "" });
+              }}
+            />
+          ) : null}
+          {search.status !== "aktiv" ? (
+            <FilterChip
+              label={`Status: ${search.status}`}
+              onRemove={() => updateSearch({ status: "aktiv" })}
+            />
+          ) : null}
+          {abteilungName ? (
+            <FilterChip
+              label={`Abteilung: ${abteilungName}`}
+              onRemove={() => updateSearch({ abteilungId: null })}
+            />
+          ) : null}
+          {search.includeAusgetretene ? (
+            <FilterChip
+              label="inkl. Ausgetretene"
+              onRemove={() => updateSearch({ includeAusgetretene: false })}
+            />
+          ) : null}
+          <button
+            type="button"
+            onClick={() => {
+              setQDraft("");
+              navigate({ search: () => EMPTY_SEARCH, replace: true });
+            }}
+            className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            alle zurücksetzen
+          </button>
+        </div>
+      ) : null}
+
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-3 font-medium">Mitgl.-Nr.</th>
-                <th className="px-4 py-3 font-medium">Name</th>
-                <th className="px-4 py-3 font-medium">Ort</th>
-                <th className="px-4 py-3 font-medium">E-Mail</th>
-                <th className="px-4 py-3 font-medium">Eintritt</th>
+                <SortHeader
+                  label="Mitgl.-Nr."
+                  col="mitglnr"
+                  active={search.sortBy}
+                  dir={search.sortDir}
+                  onToggle={toggleSort}
+                />
+                <SortHeader
+                  label="Name"
+                  col="nachname"
+                  active={search.sortBy}
+                  dir={search.sortDir}
+                  onToggle={toggleSort}
+                />
+                <SortHeader
+                  label="Ort"
+                  col="ort"
+                  active={search.sortBy}
+                  dir={search.sortDir}
+                  onToggle={toggleSort}
+                />
+                <SortHeader
+                  label="E-Mail"
+                  col="email"
+                  active={search.sortBy}
+                  dir={search.sortDir}
+                  onToggle={toggleSort}
+                />
+                <SortHeader
+                  label="Eintritt"
+                  col="eintritt"
+                  active={search.sortBy}
+                  dir={search.sortDir}
+                  onToggle={toggleSort}
+                />
                 <th className="px-4 py-3 font-medium">Status</th>
               </tr>
             </thead>
@@ -206,7 +381,7 @@ function MembersListPage() {
               value={pageSize}
               onChange={(n) => {
                 setPageSize(n);
-                setPage(1);
+                updateSearch({});
               }}
             />
             <div className="flex items-center gap-2">
@@ -214,18 +389,18 @@ function MembersListPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={search.page <= 1}
+                onClick={() => updateSearch({ page: Math.max(1, search.page - 1) }, false)}
               >
                 <ChevronLeft className="size-3.5" /> Zurück
               </Button>
-              <span className="text-muted-foreground">Seite {page}</span>
+              <span className="text-muted-foreground">Seite {search.page}</span>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 disabled={(list.data?.rows.length ?? 0) < pageSize}
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => updateSearch({ page: search.page + 1 }, false)}
               >
                 Weiter <ChevronRight className="size-3.5" />
               </Button>
@@ -234,6 +409,53 @@ function MembersListPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+function SortHeader({
+  label,
+  col,
+  active,
+  dir,
+  onToggle,
+}: {
+  label: string;
+  col: SortBy;
+  active: SortBy;
+  dir: SortDir;
+  onToggle: (col: SortBy) => void;
+}) {
+  const isActive = active === col;
+  const Icon = !isActive ? ArrowUpDown : dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th className="px-4 py-3 font-medium">
+      <button
+        type="button"
+        onClick={() => onToggle(col)}
+        className="-mx-1 flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted hover:text-foreground"
+      >
+        {label}
+        <Icon
+          className={`size-3 ${isActive ? "text-foreground" : "text-muted-foreground/60"}`}
+        />
+      </button>
+    </th>
+  );
+}
+
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-foreground">
+      {label}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="rounded-full p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+        aria-label={`Filter "${label}" entfernen`}
+      >
+        <X className="size-3" />
+      </button>
+    </span>
   );
 }
 

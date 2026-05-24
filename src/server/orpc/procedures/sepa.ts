@@ -1,10 +1,11 @@
-import { eq, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
+import { eq, sql } from "drizzle-orm";
 import * as v from "valibot";
-import { vorstandProc } from "~/server/orpc/base";
+import { appendAudit, diff } from "~/server/audit/log";
 import { membersTable } from "~/server/db/schema/members";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
-import { appendAudit, diff } from "~/server/audit/log";
+import { vorstandProc } from "~/server/orpc/base";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 function toDateOrNull(value: string | null | undefined, field: string): Date | null {
   if (!value) return null;
@@ -86,7 +87,7 @@ export const sepaRouter = {
         throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
       }
 
-      await appendAudit(tx, {
+      const auditId = await appendAudit(tx, {
         entityType: "sepa_mandate",
         entityId: row.id,
         action: "create",
@@ -95,6 +96,12 @@ export const sepaRouter = {
         actorEmail: context.session!.user.email,
         changes: diff(null, values as Record<string, unknown>),
         requestId: context.requestId ?? null,
+      });
+      await takeMemberSnapshot(tx, member.id, {
+        trigger: "mutation",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        auditId,
       });
 
       return { id: row.id, mandatsNr };
@@ -142,7 +149,7 @@ export const sepaRouter = {
 
         const changes = diff(existing as unknown as Record<string, unknown>, projected);
         if (Object.keys(changes).length > 0) {
-          await appendAudit(tx, {
+          const auditId = await appendAudit(tx, {
             entityType: "sepa_mandate",
             entityId: input.id,
             action: "update",
@@ -151,6 +158,12 @@ export const sepaRouter = {
             actorEmail: context.session!.user.email,
             changes,
             requestId: context.requestId ?? null,
+          });
+          await takeMemberSnapshot(tx, existing.memberId, {
+            trigger: "mutation",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            auditId,
           });
         }
       });
@@ -179,7 +192,7 @@ export const sepaRouter = {
         .update(sepaMandatesTable)
         .set({ widerrufenAm: now, isDeleted: true, updatedAt: now } as never)
         .where(eq(sepaMandatesTable.id, input.id));
-      await appendAudit(tx, {
+      const auditId = await appendAudit(tx, {
         entityType: "sepa_mandate",
         entityId: input.id,
         action: "update",
@@ -194,6 +207,12 @@ export const sepaRouter = {
           isDeleted: { before: existing.isDeleted ?? false, after: true },
         },
         requestId: context.requestId ?? null,
+      });
+      await takeMemberSnapshot(tx, existing.memberId, {
+        trigger: "mutation",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        auditId,
       });
     });
     return { ok: true };

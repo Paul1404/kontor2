@@ -1,17 +1,17 @@
-import { and, eq, lt } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
+import { and, eq, lt } from "drizzle-orm";
 import * as v from "valibot";
-import { authedProc, vorstandProc } from "~/server/orpc/base";
+import { appendAudit } from "~/server/audit/log";
 import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
 import { membersTable } from "~/server/db/schema/members";
+import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { deleteObject, presignDownload, presignUpload } from "~/server/s3/client";
-import { appendAudit } from "~/server/audit/log";
 
 const ALLOWED_MIME = new Set(["application/pdf", "image/png", "image/jpeg"]);
 const MAX_BYTES = 10 * 1024 * 1024;
 
 function safeFilename(name: string): string {
-  return name.replace(/[^\w.\-]+/g, "_").slice(0, 120);
+  return name.replace(/[^\w.-]+/g, "_").slice(0, 120);
 }
 
 const UPLOAD_TTL_SECONDS = 600;

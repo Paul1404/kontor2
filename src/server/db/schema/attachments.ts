@@ -1,6 +1,6 @@
 import { bigint, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { membersTable } from "~/server/db/schema/members";
 import { users } from "~/server/db/schema/auth";
+import { membersTable } from "~/server/db/schema/members";
 
 export const attachmentsTable = pgTable(
   "attachments",

@@ -1,5 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { Toaster } from "~/components/ui/toaster";
 import { ThemeProvider, themeInitScript } from "~/lib/theme";
 import appCss from "~/styles/globals.css?url";
 
@@ -39,6 +40,7 @@ function RootDocument(): ReactNode {
       <body className="h-full bg-background text-foreground antialiased">
         <ThemeProvider>
           <Outlet />
+          <Toaster />
         </ThemeProvider>
         <Scripts />
       </body>

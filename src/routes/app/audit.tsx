@@ -1,13 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ExternalLink,
-  Search,
-  X,
-} from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Search, X } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -51,7 +44,7 @@ export const Route = createFileRoute("/app/audit")({
   validateSearch: (s: Record<string, unknown>): AuditSearch => ({
     q: typeof s.q === "string" ? s.q : "",
     actorEmail: typeof s.actorEmail === "string" ? s.actorEmail : "",
-    action: ((typeof s.action === "string" ? s.action : "") as Action | ""),
+    action: (typeof s.action === "string" ? s.action : "") as Action | "",
     entityType: typeof s.entityType === "string" ? s.entityType : "",
     entityId: typeof s.entityId === "string" ? s.entityId : "",
     from: typeof s.from === "string" ? s.from : "",

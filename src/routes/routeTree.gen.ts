@@ -33,9 +33,11 @@ import { Route as AppBerichteEhrungenRouteImport } from './app/berichte/ehrungen
 import { Route as AppBerichteAbteilungsStatistikRouteImport } from './app/berichte/abteilungs-statistik'
 import { Route as AppBeitragNeuRouteImport } from './app/beitrag/neu'
 import { Route as AppBeitragIdRouteImport } from './app/beitrag/$id'
+import { Route as AppAdminSnapshotsRouteImport } from './app/admin/snapshots'
 import { Route as ApiRpcSplatRouteImport } from './api/rpc.$'
 import { Route as ApiIngestSvumsRouteImport } from './api/ingest.svums'
 import { Route as ApiFilesIdRouteImport } from './api/files.$id'
+import { Route as ApiCronSnapshotsRouteImport } from './api/cron.snapshots'
 import { Route as ApiAuthSplatRouteImport } from './api/auth.$'
 import { Route as AppMitgliederMitgliedsnummerBearbeitenRouteImport } from './app/mitglieder/$mitgliedsnummer_.bearbeiten'
 
@@ -164,6 +166,11 @@ const AppBeitragIdRoute = AppBeitragIdRouteImport.update({
   path: '/beitrag/$id',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppAdminSnapshotsRoute = AppAdminSnapshotsRouteImport.update({
+  id: '/admin/snapshots',
+  path: '/admin/snapshots',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
   id: '/api/rpc/$',
   path: '/api/rpc/$',
@@ -177,6 +184,11 @@ const ApiIngestSvumsRoute = ApiIngestSvumsRouteImport.update({
 const ApiFilesIdRoute = ApiFilesIdRouteImport.update({
   id: '/api/files/$id',
   path: '/api/files/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCronSnapshotsRoute = ApiCronSnapshotsRouteImport.update({
+  id: '/api/cron/snapshots',
+  path: '/api/cron/snapshots',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -201,9 +213,11 @@ export interface FileRoutesByFullPath {
   '/invite/$token': typeof InviteTokenRoute
   '/app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/ingest/svums': typeof ApiIngestSvumsRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
@@ -231,9 +245,11 @@ export interface FileRoutesByTo {
   '/invite/$token': typeof InviteTokenRoute
   '/app': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/ingest/svums': typeof ApiIngestSvumsRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
@@ -263,9 +279,11 @@ export interface FileRoutesById {
   '/invite/$token': typeof InviteTokenRoute
   '/app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/ingest/svums': typeof ApiIngestSvumsRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
@@ -296,9 +314,11 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/app/'
     | '/api/auth/$'
+    | '/api/cron/snapshots'
     | '/api/files/$id'
     | '/api/ingest/svums'
     | '/api/rpc/$'
+    | '/app/admin/snapshots'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
     | '/app/berichte/abteilungs-statistik'
@@ -326,9 +346,11 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/app'
     | '/api/auth/$'
+    | '/api/cron/snapshots'
     | '/api/files/$id'
     | '/api/ingest/svums'
     | '/api/rpc/$'
+    | '/app/admin/snapshots'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
     | '/app/berichte/abteilungs-statistik'
@@ -357,9 +379,11 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/app/'
     | '/api/auth/$'
+    | '/api/cron/snapshots'
     | '/api/files/$id'
     | '/api/ingest/svums'
     | '/api/rpc/$'
+    | '/app/admin/snapshots'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
     | '/app/berichte/abteilungs-statistik'
@@ -386,6 +410,7 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   InviteTokenRoute: typeof InviteTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiCronSnapshotsRoute: typeof ApiCronSnapshotsRoute
   ApiFilesIdRoute: typeof ApiFilesIdRoute
   ApiIngestSvumsRoute: typeof ApiIngestSvumsRoute
   ApiRpcSplatRoute: typeof ApiRpcSplatRoute
@@ -561,6 +586,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBeitragIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/admin/snapshots': {
+      id: '/app/admin/snapshots'
+      path: '/admin/snapshots'
+      fullPath: '/app/admin/snapshots'
+      preLoaderRoute: typeof AppAdminSnapshotsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/api/rpc/$': {
       id: '/api/rpc/$'
       path: '/api/rpc/$'
@@ -580,6 +612,13 @@ declare module '@tanstack/react-router' {
       path: '/api/files/$id'
       fullPath: '/api/files/$id'
       preLoaderRoute: typeof ApiFilesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cron/snapshots': {
+      id: '/api/cron/snapshots'
+      path: '/api/cron/snapshots'
+      fullPath: '/api/cron/snapshots'
+      preLoaderRoute: typeof ApiCronSnapshotsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -603,6 +642,7 @@ interface AppRouteRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppImportRoute: typeof AppImportRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppAdminSnapshotsRoute: typeof AppAdminSnapshotsRoute
   AppBeitragIdRoute: typeof AppBeitragIdRoute
   AppBeitragNeuRoute: typeof AppBeitragNeuRoute
   AppBerichteAbteilungsStatistikRoute: typeof AppBerichteAbteilungsStatistikRoute
@@ -626,6 +666,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppImportRoute: AppImportRoute,
   AppIndexRoute: AppIndexRoute,
+  AppAdminSnapshotsRoute: AppAdminSnapshotsRoute,
   AppBeitragIdRoute: AppBeitragIdRoute,
   AppBeitragNeuRoute: AppBeitragNeuRoute,
   AppBerichteAbteilungsStatistikRoute: AppBerichteAbteilungsStatistikRoute,
@@ -657,6 +698,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   InviteTokenRoute: InviteTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiCronSnapshotsRoute: ApiCronSnapshotsRoute,
   ApiFilesIdRoute: ApiFilesIdRoute,
   ApiIngestSvumsRoute: ApiIngestSvumsRoute,
   ApiRpcSplatRoute: ApiRpcSplatRoute,

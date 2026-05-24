@@ -1,6 +1,6 @@
+import { lastFour } from "~/server/crypto/encrypt";
 import type { DBOrTx } from "~/server/db/client";
 import { auditLogTable } from "~/server/db/schema/audit";
-import { lastFour } from "~/server/crypto/encrypt";
 
 /**
  * Columns whose plaintext values should NEVER appear in the audit log.
@@ -57,16 +57,24 @@ export type LogEntry = {
   requestId?: string | null;
 };
 
-export async function appendAudit(db: DBOrTx, entry: LogEntry): Promise<void> {
-  if (Object.keys(entry.changes).length === 0 && entry.action === "update") return;
-  await db.insert(auditLogTable).values({
-    entityType: entry.entityType,
-    entityId: entry.entityId,
-    action: entry.action,
-    source: entry.source,
-    actorId: entry.actorId ?? null,
-    actorEmail: entry.actorEmail ?? null,
-    changes: entry.changes,
-    requestId: entry.requestId ?? null,
-  });
+/**
+ * Append one audit row and return its id (or `null` when the entry was
+ * skipped — currently only happens for empty-diff updates).
+ */
+export async function appendAudit(db: DBOrTx, entry: LogEntry): Promise<string | null> {
+  if (Object.keys(entry.changes).length === 0 && entry.action === "update") return null;
+  const [row] = await db
+    .insert(auditLogTable)
+    .values({
+      entityType: entry.entityType,
+      entityId: entry.entityId,
+      action: entry.action,
+      source: entry.source,
+      actorId: entry.actorId ?? null,
+      actorEmail: entry.actorEmail ?? null,
+      changes: entry.changes,
+      requestId: entry.requestId ?? null,
+    })
+    .returning({ id: auditLogTable.id });
+  return row?.id ?? null;
 }
