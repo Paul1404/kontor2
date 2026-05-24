@@ -6,6 +6,7 @@ import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abt
 import { auditLogTable } from "~/server/db/schema/audit";
 import { attachmentsTable } from "~/server/db/schema/attachments";
 import { contractsTable } from "~/server/db/schema/contracts";
+import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
@@ -45,14 +46,22 @@ const StammdatenInput = v.object({
   geburtsname: v.optional(v.nullable(v.string())),
   geburtsdatum: v.optional(v.nullable(v.string())),
   geburtsort: v.optional(v.nullable(v.string())),
+  geschlecht: v.optional(v.nullable(v.picklist(["m", "w", "d", "unbekannt"]))),
   strasse: v.optional(v.nullable(v.string())),
   hausnummer: v.optional(v.nullable(v.string())),
+  adresszusatz: v.optional(v.nullable(v.string())),
   plz: v.optional(v.nullable(v.string())),
   ort: v.optional(v.nullable(v.string())),
   land: v.optional(v.nullable(v.string())),
   telefon1: v.optional(v.nullable(v.string())),
   telefon2: v.optional(v.nullable(v.string())),
   eMailName: v.optional(v.nullable(v.pipe(v.string(), v.email()))),
+  www: v.optional(v.nullable(v.string())),
+  firma1: v.optional(v.nullable(v.string())),
+  funktion: v.optional(v.nullable(v.string())),
+  spender: v.optional(v.nullable(v.string())),
+  freeText1: v.optional(v.nullable(v.string())),
+  freeText2: v.optional(v.nullable(v.string())),
   eintritt: v.optional(v.nullable(v.string())),
   austritt: v.optional(v.nullable(v.string())),
   verstorbenAm: v.optional(v.nullable(v.string())),
@@ -108,14 +117,22 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   setIfPresent("geborene");
   setIfPresent("geburtsname");
   setIfPresent("geburtsort");
+  setIfPresent("geschlecht");
   setIfPresent("strasse");
   setIfPresent("hausnummer");
+  setIfPresent("adresszusatz");
   setIfPresent("plz");
   setIfPresent("ort");
   setIfPresent("land");
   setIfPresent("telefon1");
   setIfPresent("telefon2");
   setIfPresent("eMailName");
+  setIfPresent("www");
+  setIfPresent("firma1");
+  setIfPresent("funktion");
+  setIfPresent("spender");
+  setIfPresent("freeText1");
+  setIfPresent("freeText2");
   setIfPresent("aktivPasiv");
   setIfPresent("bank1");
   setIfPresent("bic1");
@@ -253,11 +270,16 @@ export const membersRouter = {
       const m = rows[0];
       if (!m) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
 
-      const [abteilungen, vertraege, sepa, anhaenge, audit, beziehungen] = await Promise.all([
+      const [abteilungen, vertraege, sepa, anhaenge, audit, beziehungen, sollstellungen] =
+        await Promise.all([
         context.db
           .select({
             id: abteilungenTable.id,
             name: abteilungenTable.name,
+            sportart: abteilungenTable.sportart,
+            verbandName: abteilungenTable.verbandName,
+            verbandNr: abteilungenTable.verbandNr,
+            inaktiv: abteilungenTable.inaktiv,
             eintrittsdatum: memberAbteilungenTable.eintrittsdatum,
             austrittsdatum: memberAbteilungenTable.austrittsdatum,
           })
@@ -344,6 +366,26 @@ export const membersRouter = {
           .leftJoin(membersTable, eq(membersTable.id, relationshipsTable.toMemberId))
           .where(eq(relationshipsTable.fromMemberId, m.id))
           .orderBy(asc(relationshipsTable.beziehung), asc(relationshipsTable.toAdrNr)),
+        // Sollstellung (Linear `mgsolln`): per-year posting for every
+        // contract. Joined to contracts so the UI can show Bezeichnung
+        // without a second roundtrip.
+        context.db
+          .select({
+            id: sollStellungenTable.id,
+            contractId: sollStellungenTable.contractId,
+            vertragNr: contractsTable.vertragNr,
+            artName: contractsTable.artName,
+            billingYear: sollStellungenTable.billingYear,
+            falligkeitsdatum: sollStellungenTable.falligkeitsdatum,
+            amount: sollStellungenTable.amount,
+            paidAmount: sollStellungenTable.paidAmount,
+            openAmount: sollStellungenTable.openAmount,
+            status: sollStellungenTable.status,
+          })
+          .from(sollStellungenTable)
+          .innerJoin(contractsTable, eq(contractsTable.id, sollStellungenTable.contractId))
+          .where(eq(sollStellungenTable.memberId, m.id))
+          .orderBy(desc(sollStellungenTable.billingYear), asc(contractsTable.vertragNr)),
       ]);
 
       // The IBAN columns are AES-256-GCM ciphertext at rest but our custom
@@ -373,6 +415,7 @@ export const membersRouter = {
         })),
         audit: visibleAudit,
         beziehungen,
+        sollstellungen,
       };
     }),
 

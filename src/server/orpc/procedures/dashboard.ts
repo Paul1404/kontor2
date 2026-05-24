@@ -64,14 +64,15 @@ export const dashboardRouter = {
         group by bucket
         order by bucket
       `),
-      // Gender inferred from the German "Anrede". Linear has no enum so we
-      // pattern-match the salutation: Herr → m, Frau → w, anything else
-      // (or null) → unbekannt. Good enough for a high-level statistic.
+      // Gender from the explicit `geschlecht` enum column. Members whose
+      // column is NULL (shouldn't happen post-backfill, but defensive)
+      // fall into "unbekannt".
       context.db.execute<{ gender: string; c: number }>(sql`
         select gender, count(*)::int as c from (
-          select case
-            when lower(trim(${membersTable.anrede})) = 'herr' then 'männlich'
-            when lower(trim(${membersTable.anrede})) = 'frau' then 'weiblich'
+          select case ${membersTable.geschlecht}::text
+            when 'm' then 'männlich'
+            when 'w' then 'weiblich'
+            when 'd' then 'divers'
             else 'unbekannt'
           end as gender
           from ${membersTable}
@@ -80,7 +81,12 @@ export const dashboardRouter = {
             and ${membersTable.verstorbenAm} is null
         ) t
         group by gender
-        order by case gender when 'männlich' then 1 when 'weiblich' then 2 else 3 end
+        order by case gender
+          when 'männlich' then 1
+          when 'weiblich' then 2
+          when 'divers' then 3
+          else 4
+        end
       `),
       // Birthdays in the next 30 days. We compute on the next anniversary
       // (year +1 if it has already passed this year) so the list wraps

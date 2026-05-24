@@ -24,6 +24,18 @@ const FIELD_LABELS: Record<string, string> = {
   telefon1: "Telefon",
   telefon2: "Mobil",
   eMailName: "E-Mail",
+  www: "Website",
+  firma1: "Firma",
+  funktion: "Funktion",
+  spender: "Spender",
+  freeText1: "Freifeld 1",
+  freeText2: "Freifeld 2",
+  adresszusatz: "Adresszusatz",
+  geschlecht: "Geschlecht",
+  sportart: "Sportart",
+  verbandName: "Verband",
+  verbandNr: "Verband-Nr.",
+  inaktiv: "Inaktiv",
   eintritt: "Eintritt",
   austritt: "Austritt",
   verstorbenAm: "Verstorben am",
@@ -111,6 +123,18 @@ export function formatAuditValue(field: string, value: unknown): string {
   if (field === "aktivPasiv") {
     return value === "A" ? "Aktiv" : value === "P" ? "Passiv" : String(value);
   }
+  if (field === "geschlecht") {
+    return value === "m"
+      ? "Männlich"
+      : value === "w"
+        ? "Weiblich"
+        : value === "d"
+          ? "Divers"
+          : value === "unbekannt"
+            ? "Unbekannt"
+            : String(value);
+  }
+  if (field === "spender") return value === "J" ? "Ja" : "Nein";
   return typeof value === "object" ? JSON.stringify(value) : String(value);
 }
 

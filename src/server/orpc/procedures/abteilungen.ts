@@ -21,6 +21,10 @@ export const abteilungenRouter = {
         id: abteilungenTable.id,
         name: abteilungenTable.name,
         slug: abteilungenTable.slug,
+        sportart: abteilungenTable.sportart,
+        verbandName: abteilungenTable.verbandName,
+        verbandNr: abteilungenTable.verbandNr,
+        inaktiv: abteilungenTable.inaktiv,
         memberCount: sql<number>`(select count(*)::int from member_abteilungen ma where ma.abteilung_id = abteilungen.id and ma.austrittsdatum is null)`,
         totalCount: sql<number>`(select count(*)::int from member_abteilungen ma where ma.abteilung_id = abteilungen.id)`,
       })
@@ -106,6 +110,50 @@ export const abteilungenRouter = {
         });
         return { ok: true };
       });
+    }),
+
+  update: adminProc
+    .input(
+      v.object({
+        id: v.string(),
+        sportart: v.optional(v.nullable(v.string())),
+        verbandName: v.optional(v.nullable(v.string())),
+        verbandNr: v.optional(v.nullable(v.string())),
+        inaktiv: v.optional(v.boolean()),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(abteilungenTable)
+          .where(eq(abteilungenTable.id, input.id))
+          .limit(1);
+        if (!existing) throw new ORPCError("NOT_FOUND", { message: "Abteilung nicht gefunden." });
+        const patch: Record<string, unknown> = {};
+        if ("sportart" in input) patch.sportart = input.sportart ?? null;
+        if ("verbandName" in input) patch.verbandName = input.verbandName ?? null;
+        if ("verbandNr" in input) patch.verbandNr = input.verbandNr ?? null;
+        if ("inaktiv" in input) patch.inaktiv = input.inaktiv ?? false;
+        if (Object.keys(patch).length === 0) return;
+
+        await tx.update(abteilungenTable).set(patch as never).where(eq(abteilungenTable.id, input.id));
+
+        await appendAudit(tx, {
+          entityType: "abteilung",
+          entityId: input.id,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: diff(existing as unknown as Record<string, unknown>, {
+            ...(existing as unknown as Record<string, unknown>),
+            ...patch,
+          }),
+          requestId: context.requestId ?? null,
+        });
+      });
+      return { ok: true };
     }),
 
   delete: adminProc.input(v.object({ id: v.string() })).handler(async ({ context, input }) => {

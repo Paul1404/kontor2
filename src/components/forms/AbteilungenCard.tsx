@@ -9,6 +9,10 @@ import { orpc } from "~/lib/orpc";
 export type MemberAbteilung = {
   id: string;
   name: string;
+  sportart?: string | null;
+  verbandName?: string | null;
+  verbandNr?: string | null;
+  inaktiv?: boolean | null;
   eintrittsdatum: string | Date;
   austrittsdatum: string | Date | null;
 };
@@ -117,7 +121,18 @@ function Row({
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
       <div className="flex flex-col">
-        <span className="font-medium">{row.name}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium">{row.name}</span>
+          {row.sportart ? (
+            <span className="text-xs text-muted-foreground">· {row.sportart}</span>
+          ) : null}
+        </div>
+        {row.verbandName ? (
+          <span className="text-xs text-muted-foreground">
+            {row.verbandName}
+            {row.verbandNr ? ` (Verband-Nr. ${row.verbandNr})` : ""}
+          </span>
+        ) : null}
         <span className="text-xs text-muted-foreground">
           Eintritt {formatDate(row.eintrittsdatum)}
           {row.austrittsdatum ? ` · Austritt ${formatDate(row.austrittsdatum)}` : ""}

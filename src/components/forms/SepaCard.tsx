@@ -17,6 +17,7 @@ type Mandate = {
   lastschriftart: string | null;
   gueltigAb: string | Date | null;
   widerrufenAm: string | Date | null;
+  letzteVerwendung?: string | Date | null;
   isDeleted: boolean | null;
 };
 
@@ -84,12 +85,19 @@ export function SepaCard({
                   <span className="text-xs text-muted-foreground">
                     {s.lastschriftart ?? ""} {s.typ ? `· ${s.typ}` : ""}
                   </span>
+                  {s.letzteVerwendung ? (
+                    <span className="text-xs text-muted-foreground">
+                      Letzte Verwendung {formatDate(s.letzteVerwendung)}
+                    </span>
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={s.widerrufenAm || s.isDeleted ? "warning" : "outline"}>
                     {s.widerrufenAm || s.isDeleted ? "Widerrufen" : (s.status ?? "?")}
                   </Badge>
-                  <span className="text-xs text-muted-foreground">{formatDate(s.gueltigAb)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    gültig ab {formatDate(s.gueltigAb)}
+                  </span>
                   {canEdit && !s.widerrufenAm && !s.isDeleted ? (
                     <Button
                       size="sm"

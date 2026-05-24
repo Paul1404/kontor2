@@ -17,7 +17,7 @@ import {
   isHiddenField,
 } from "~/lib/audit-labels";
 import { formatLand } from "~/lib/country";
-import { formatDate, formatDateTime } from "~/lib/format";
+import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/mitglieder/$mitgliedsnummer")({
@@ -55,7 +55,16 @@ function MemberDetailPage() {
     return <p className="text-destructive">Mitglied nicht gefunden.</p>;
   }
 
-  const { member, abteilungen, vertraege, sepa, anhaenge, audit, beziehungen } = detail.data;
+  const {
+    member,
+    abteilungen,
+    vertraege,
+    sepa,
+    anhaenge,
+    audit,
+    beziehungen,
+    sollstellungen,
+  } = detail.data;
   const canEdit = me.data?.role === "vorstand" || me.data?.role === "admin";
 
   // Prefer the IBAN-derived bank name/BIC over the stored values — those
@@ -128,17 +137,33 @@ function MemberDetailPage() {
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <Field label="Anrede" value={member.anrede} />
-            <Field label="Geburtsdatum" value={formatDate(member.geburtsdatum)} />
+            <Field
+              label="Geburtsdatum & Alter"
+              value={formatBirthdayWithAge(member.geburtsdatum)}
+            />
+            <Field label="Geschlecht" value={formatGeschlecht(member.geschlecht)} />
+            <Field label="Funktion" value={member.funktion} />
+            <Field label="Firma" value={member.firma1} />
             <Field
               label="Adresse"
-              value={`${member.strasse ?? ""} ${member.hausnummer ?? ""}\n${member.plz ?? ""} ${member.ort ?? ""}`.trim()}
+              value={[
+                `${member.strasse ?? ""} ${member.hausnummer ?? ""}`.trim(),
+                member.adresszusatz ?? "",
+                `${member.plz ?? ""} ${member.ort ?? ""}`.trim(),
+              ]
+                .filter(Boolean)
+                .join("\n")}
             />
             <Field label="Land" value={formatLand(member.land)} />
             <Field label="Telefon" value={member.telefon1} />
             <Field label="Mobil" value={member.telefon2} />
             <Field label="E-Mail" value={member.eMailName} />
+            <Field label="Website" value={member.www} />
             <Field label="Eintritt" value={formatDate(member.eintritt)} />
             <Field label="Austritt" value={formatDate(member.austritt)} />
+            <Field label="Spender" value={member.spender === "J" ? "Ja" : "Nein"} />
+            {member.freeText1 ? <Field label="Freifeld 1" value={member.freeText1} /> : null}
+            {member.freeText2 ? <Field label="Freifeld 2" value={member.freeText2} /> : null}
           </CardContent>
         </Card>
 
@@ -200,6 +225,8 @@ function MemberDetailPage() {
         />
       </div>
 
+      <SollstellungenCard rows={sollstellungen as never} />
+
       <AttachmentsCard
         memberId={member.id}
         mitgliedsnummer={mitgliedsnummer}
@@ -247,6 +274,124 @@ function formatIbanGrouped(iban: string | null | undefined): string {
     .toUpperCase()
     .replace(/(.{4})/g, "$1 ")
     .trim();
+}
+
+function formatBirthdayWithAge(value: string | Date | null | undefined): string {
+  if (!value) return "";
+  const formatted = formatDate(value);
+  if (!formatted) return "";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (!Number.isFinite(d.getTime())) return formatted;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const beforeBirthday =
+    now.getMonth() < d.getMonth() ||
+    (now.getMonth() === d.getMonth() && now.getDate() < d.getDate());
+  if (beforeBirthday) age -= 1;
+  return `${formatted} · ${age} Jahre`;
+}
+
+function formatGeschlecht(value: string | null | undefined): string {
+  switch (value) {
+    case "m":
+      return "Männlich";
+    case "w":
+      return "Weiblich";
+    case "d":
+      return "Divers";
+    case "unbekannt":
+      return "Unbekannt";
+    default:
+      return "";
+  }
+}
+
+type SollstellungRow = {
+  id: string;
+  vertragNr: string;
+  artName: string | null;
+  billingYear: number;
+  falligkeitsdatum: string | Date;
+  amount: string;
+  paidAmount: string;
+  openAmount: string;
+  status: string;
+};
+
+function SollstellungenCard({ rows }: { rows: SollstellungRow[] }) {
+  if (!rows || rows.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Sollstellung</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Keine Sollstellungen vorhanden. Werden beim nächsten Beitragslauf erzeugt.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Sollstellung</CardTitle>
+      </CardHeader>
+      <CardContent className="overflow-x-auto p-0">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-4 py-2 font-medium">Jahr</th>
+              <th className="px-4 py-2 font-medium">Vertrag</th>
+              <th className="px-4 py-2 font-medium">Art</th>
+              <th className="px-4 py-2 font-medium">Fällig</th>
+              <th className="px-4 py-2 text-right font-medium">Betrag</th>
+              <th className="px-4 py-2 text-right font-medium">Offen</th>
+              <th className="px-4 py-2 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {rows.map((r) => (
+              <tr key={r.id} className="hover:bg-muted/30">
+                <td className="px-4 py-2 tabular-nums">{r.billingYear}</td>
+                <td className="px-4 py-2 tabular-nums text-muted-foreground">{r.vertragNr}</td>
+                <td className="px-4 py-2">{r.artName ?? "—"}</td>
+                <td className="px-4 py-2 tabular-nums text-muted-foreground">
+                  {formatDate(r.falligkeitsdatum)}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {formatCurrency(r.amount)}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {formatCurrency(r.openAmount)}
+                </td>
+                <td className="px-4 py-2">
+                  <SollstellungStatusBadge status={r.status} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SollstellungStatusBadge({ status }: { status: string }) {
+  const variant: "outline" | "success" | "warning" | "secondary" =
+    status === "paid" ? "success" : status === "open" ? "warning" : "secondary";
+  const label =
+    status === "paid"
+      ? "Bezahlt"
+      : status === "open"
+        ? "Offen"
+        : status === "returned"
+          ? "Rückläufer"
+          : status === "cancelled"
+            ? "Storniert"
+            : status;
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
 function Field({ label, value, mono }: { label: string; value: unknown; mono?: boolean }) {

@@ -79,7 +79,8 @@ export function ContractsCard({
                 <th className="py-1 pr-3">Vertrag</th>
                 <th className="py-1 pr-3">Art</th>
                 <th className="py-1 pr-3 text-right">Betrag</th>
-                <th className="py-1 pl-3">Beginn</th>
+                <th className="py-1 px-3">Beginn</th>
+                <th className="py-1 px-3">Ende</th>
                 {canEdit ? <th className="py-1 w-10" /> : null}
               </tr>
             </thead>
@@ -93,8 +94,12 @@ export function ContractsCard({
                     <td className="py-1 pr-3 text-right tabular-nums">
                       {formatCurrency(v.betrag)}
                     </td>
-                    <td className="py-1 pl-3 text-muted-foreground">
+                    <td className="py-1 px-3 text-muted-foreground tabular-nums">
                       {formatDate(v.vertragBegin)}
+                    </td>
+                    <td className="py-1 px-3 text-muted-foreground tabular-nums">
+                      {formatDate(v.vertragEnde) ||
+                        (v.gekuendAm ? formatDate(v.gekuendAm) : "")}
                     </td>
                     {canEdit ? (
                       <td className="py-1 text-right">
