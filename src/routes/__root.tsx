@@ -1,5 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { ThemeProvider, themeInitScript } from "~/lib/theme";
 import appCss from "~/styles/globals.css?url";
 
 export const Route = createRootRoute({
@@ -9,6 +10,7 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "SVUWV - Vereinsverwaltung" },
       { name: "color-scheme", content: "light dark" },
+      { name: "theme-color", content: "#dc2626" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -28,9 +30,16 @@ function RootDocument(): ReactNode {
     <html lang="de" className="h-full">
       <head>
         <HeadContent />
+        <script
+          // Set theme class on <html> before React hydrates to avoid FOUC.
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted constant
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+        />
       </head>
       <body className="h-full bg-background text-foreground antialiased">
-        <Outlet />
+        <ThemeProvider>
+          <Outlet />
+        </ThemeProvider>
         <Scripts />
       </body>
     </html>
