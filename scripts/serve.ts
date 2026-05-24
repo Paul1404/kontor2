@@ -8,6 +8,7 @@
 import { statSync } from "node:fs";
 import { join, normalize, resolve } from "node:path";
 import server from "../dist/server/server.js";
+import { preflight } from "./preflight";
 
 const port = Number(process.env.PORT ?? 3000);
 const CLIENT_DIR = resolve(import.meta.dir, "..", "dist", "client");
@@ -60,6 +61,13 @@ async function handle(request: Request): Promise<Response> {
     });
   }
   return handler.fetch(request);
+}
+
+try {
+  await preflight();
+} catch (err) {
+  console.error(`[svuwv] startup aborted: ${(err as Error).message}`);
+  process.exit(1);
 }
 
 const s = Bun.serve({ port, fetch: handle });

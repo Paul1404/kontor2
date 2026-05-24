@@ -19,7 +19,7 @@ async function handle({ request }: { request: Request }): Promise<Response> {
   }
   const raw = await request.text();
   const verify = verifySignature({
-    secret: env().SVUMS_PUSH_SECRET,
+    secret: env().svumsPushSecret,
     timestampHeader: request.headers.get("x-svums-timestamp"),
     signatureHeader: request.headers.get("x-svums-signature"),
     rawBody: raw,

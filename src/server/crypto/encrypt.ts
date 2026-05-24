@@ -7,7 +7,7 @@ const TAG_LEN = 16;
 const VERSION = 1;
 
 function key(): Buffer {
-  return Buffer.from(env().DATA_ENCRYPTION_KEY, "hex");
+  return env().dataEncryptionKey;
 }
 
 export function encryptString(plain: string): Buffer {
