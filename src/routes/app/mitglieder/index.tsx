@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { formatDate } from "~/lib/format";
@@ -48,17 +49,21 @@ function MembersListPage() {
   });
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Mitglieder</h1>
+        <p className="text-sm text-muted-foreground">
+          Suchen, filtern und Profile öffnen.
+        </p>
       </div>
+
       <Card>
         <CardContent className="flex flex-wrap items-center gap-3 p-4">
-          <div className="relative flex-1 min-w-60">
-            <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+          <div className="relative min-w-60 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="pl-8"
-              placeholder="Suche nach Name, Mitgliedsnummer, E-Mail, Ort"
+              className="pl-9"
+              placeholder="Name, Mitgliedsnummer, E-Mail, Ort"
               value={q}
               onChange={(e) => {
                 setQ(e.target.value);
@@ -72,7 +77,7 @@ function MembersListPage() {
               setStatus(e.target.value as Status);
               setPage(1);
             }}
-            className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
           >
             <option value="aktiv">Aktiv</option>
             <option value="passiv">Passiv</option>
@@ -86,7 +91,7 @@ function MembersListPage() {
               setAbteilungId(e.target.value || null);
               setPage(1);
             }}
-            className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
           >
             <option value="">Alle Abteilungen</option>
             {abteilungen.data?.map((a) => (
@@ -95,40 +100,43 @@ function MembersListPage() {
               </option>
             ))}
           </select>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm shadow-soft">
             <input
               type="checkbox"
               checked={includeAusgetretene}
               onChange={(e) => setIncludeAusgetretene(e.target.checked)}
+              className="size-4 accent-primary"
             />
-            Ausgetretene anzeigen
+            <span className="text-muted-foreground">Ausgetretene anzeigen</span>
           </label>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-left">
+            <thead className="bg-muted/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-2 font-medium">Mitgl.-Nr.</th>
-                <th className="px-4 py-2 font-medium">Name</th>
-                <th className="px-4 py-2 font-medium">Ort</th>
-                <th className="px-4 py-2 font-medium">E-Mail</th>
-                <th className="px-4 py-2 font-medium">Eintritt</th>
-                <th className="px-4 py-2 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Mitgl.-Nr.</th>
+                <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Ort</th>
+                <th className="px-4 py-3 font-medium">E-Mail</th>
+                <th className="px-4 py-3 font-medium">Eintritt</th>
+                <th className="px-4 py-3 font-medium">Status</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {list.isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
-                    Wird geladen...
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="size-4 animate-spin" /> Wird geladen…
+                    </span>
                   </td>
                 </tr>
               ) : list.data?.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                     Keine Mitglieder gefunden.
                   </td>
                 </tr>
@@ -136,21 +144,25 @@ function MembersListPage() {
                 (list.data?.rows ?? []).map((row) => {
                   const m = row as MemberRow;
                   return (
-                    <tr key={m.id} className="border-t hover:bg-accent/50">
-                      <td className="px-4 py-2 tabular-nums">{m.mitglnr ?? "-"}</td>
-                      <td className="px-4 py-2">
+                    <tr key={m.id} className="transition-colors hover:bg-muted/30">
+                      <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                        {m.mitglnr ?? "-"}
+                      </td>
+                      <td className="px-4 py-3">
                         <Link
                           to="/app/mitglieder/$mitgliedsnummer"
                           params={{ mitgliedsnummer: m.mitglnr ?? String(m.adrNr) }}
-                          className="text-primary hover:underline"
+                          className="font-medium text-primary hover:underline"
                         >
                           {[m.nachname, m.vorname].filter(Boolean).join(", ")}
                         </Link>
                       </td>
-                      <td className="px-4 py-2">{[m.plz, m.ort].filter(Boolean).join(" ")}</td>
-                      <td className="px-4 py-2 text-muted-foreground">{m.email ?? ""}</td>
-                      <td className="px-4 py-2 text-muted-foreground">{formatDate(m.eintritt)}</td>
-                      <td className="px-4 py-2">
+                      <td className="px-4 py-3">{[m.plz, m.ort].filter(Boolean).join(" ")}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{m.email ?? ""}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {formatDate(m.eintritt)}
+                      </td>
+                      <td className="px-4 py-3">
                         <StatusBadge member={m} />
                       </td>
                     </tr>
@@ -160,26 +172,28 @@ function MembersListPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between border-t p-3 text-sm text-muted-foreground">
-          <span>{list.data?.total ?? 0} Einträge</span>
-          <div className="flex gap-2">
-            <button
+        <div className="flex items-center justify-between border-t border-border bg-card px-4 py-3 text-sm">
+          <span className="text-muted-foreground">{list.data?.total ?? 0} Einträge</span>
+          <div className="flex items-center gap-2">
+            <Button
               type="button"
-              className="rounded-md border px-3 py-1 disabled:opacity-50"
+              variant="outline"
+              size="sm"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
-              Zurück
-            </button>
-            <span>Seite {page}</span>
-            <button
+              <ChevronLeft className="size-3.5" /> Zurück
+            </Button>
+            <span className="text-muted-foreground">Seite {page}</span>
+            <Button
               type="button"
-              className="rounded-md border px-3 py-1 disabled:opacity-50"
+              variant="outline"
+              size="sm"
               disabled={(list.data?.rows.length ?? 0) < pageSize}
               onClick={() => setPage((p) => p + 1)}
             >
-              Weiter
-            </button>
+              Weiter <ChevronRight className="size-3.5" />
+            </Button>
           </div>
         </div>
       </Card>
