@@ -1,6 +1,7 @@
 export * from "./auth";
 export * from "./members";
 export * from "./abteilungen";
+export * from "./relationships";
 export * from "./fee-types";
 export * from "./contracts";
 export * from "./sepa";

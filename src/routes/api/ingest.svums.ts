@@ -44,6 +44,7 @@ async function handle({ request }: { request: Request }): Promise<Response> {
     feeTypes?: Array<Record<string, unknown>>;
     contracts?: Array<Record<string, unknown>>;
     sepaMandates?: Array<Record<string, unknown>>;
+    relationships?: Array<Record<string, unknown>>;
   };
   try {
     payload = JSON.parse(raw) as typeof payload;
@@ -62,6 +63,7 @@ async function handle({ request }: { request: Request }): Promise<Response> {
     feeTypes: payload.feeTypes as never,
     contracts: payload.contracts as never,
     sepa: payload.sepaMandates as never,
+    relationships: payload.relationships as never,
     requestId: request.headers.get("x-request-id"),
   });
 
@@ -74,6 +76,7 @@ async function handle({ request }: { request: Request }): Promise<Response> {
     feeTypesWritten: result.feeTypesWritten,
     contractsWritten: result.contractsWritten,
     sepaWritten: result.sepaWritten,
+    relationshipsWritten: result.relationshipsWritten,
     errors: result.errors,
   });
 }

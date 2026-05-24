@@ -1,10 +1,11 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray, or, sql } from "drizzle-orm";
 import type { DB } from "~/server/db/client";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { importBatchesTable } from "~/server/db/schema/import-batches";
 import { membersTable } from "~/server/db/schema/members";
+import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { appendAudit, diff } from "~/server/audit/log";
 import { invalidateMemberCaches } from "~/server/search/cache";
@@ -14,6 +15,7 @@ import {
   mapFeeTypeRow,
   mapMemberRow,
   mapSepaRow,
+  mapVerknRow,
   type LinearRow,
 } from "~/server/importer/linear-mapper";
 
@@ -27,6 +29,7 @@ export type IngestInput = {
   feeTypes?: LinearRow[];
   contracts?: LinearRow[];
   sepa?: LinearRow[];
+  relationships?: LinearRow[];
   requestId?: string | null;
 };
 
@@ -38,6 +41,7 @@ export type IngestResult = {
   feeTypesWritten: number;
   contractsWritten: number;
   sepaWritten: number;
+  relationshipsWritten: number;
   abteilungenLinked: number;
   errors: Array<{ table: string; message: string }>;
 };
@@ -227,6 +231,52 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
     }
   }
 
+  // 5. Relationships (verkn): replace rows touching any imported AdrNr on
+  // either side, then upsert. Linear keeps reciprocal pairs as separate
+  // rows, so we preserve direction.
+  let relationshipsWritten = 0;
+  if ((input.relationships?.length ?? 0) > 0 && adrNrs.length > 0) {
+    await db
+      .delete(relationshipsTable)
+      .where(
+        or(
+          inArray(relationshipsTable.fromAdrNr, adrNrs),
+          inArray(relationshipsTable.toAdrNr, adrNrs),
+        ),
+      );
+    for (const raw of input.relationships ?? []) {
+      try {
+        const row = mapVerknRow(raw);
+        if (!row) continue;
+        const fromMemberId = adrNrToMemberId.get(row.fromAdrNr as number);
+        if (!fromMemberId) continue;
+        const toMemberId = adrNrToMemberId.get(row.toAdrNr as number) ?? null;
+        await db
+          .insert(relationshipsTable)
+          .values({
+            ...row,
+            fromMemberId,
+            toMemberId,
+            importBatchId: batch.id,
+            updatedAt: new Date(),
+          } as never)
+          .onConflictDoUpdate({
+            target: [relationshipsTable.fromAdrNr, relationshipsTable.toAdrNr],
+            set: {
+              ...row,
+              fromMemberId,
+              toMemberId,
+              importBatchId: batch.id,
+              updatedAt: new Date(),
+            } as never,
+          });
+        relationshipsWritten += 1;
+      } catch (e) {
+        errors.push({ table: "verkn", message: (e as Error).message });
+      }
+    }
+  }
+
   // Count abteilung links once (post-insert).
   const [abtCount] = await db
     .select({ c: sql<number>`count(*)::int` })
@@ -242,6 +292,7 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
       contractsWritten,
       feeTypesWritten,
       sepaWritten,
+      relationshipsWritten,
       errors: errors.length > 0 ? errors : null,
       finishedAt: new Date(),
     })
@@ -257,6 +308,7 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
     feeTypesWritten,
     contractsWritten,
     sepaWritten,
+    relationshipsWritten,
     abteilungenLinked,
     errors,
   };
