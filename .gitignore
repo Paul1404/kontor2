@@ -27,3 +27,7 @@ bun-debug.log*
 coverage
 .vitest
 tsconfig.tsbuildinfo
+
+# stray TanStack routeTree artifact generated at the wrong path during build;
+# the real one lives at src/routes/routeTree.gen.ts.
+/src/routeTree.gen.ts

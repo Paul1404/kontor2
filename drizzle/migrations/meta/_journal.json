@@ -36,6 +36,13 @@
       "when": 1779631243542,
       "tag": "0004_omniscient_yellowjacket",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779654863626,
+      "tag": "0005_huge_strong_guy",
+      "breakpoints": true
     }
   ]
 }

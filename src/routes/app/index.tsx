@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, UserCheck, UserMinus, UserPlus, Users } from "lucide-react";
+import { Cake, Loader2, UserCheck, UserMinus, UserPlus, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/")({
@@ -66,27 +67,93 @@ function DashboardPage() {
         ))}
       </div>
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Altersstruktur</CardTitle>
+            <CardDescription>Aktive Mitglieder nach Altersgruppe.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BarList rows={data.ageBuckets.map((b) => ({ label: b.bucket, value: b.c }))} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Geschlecht</CardTitle>
+            <CardDescription>
+              Anhand der Anrede ermittelt (Herr / Frau / unbekannt).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BarList rows={data.gender.map((g) => ({ label: g.gender, value: g.c }))} />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Mitglieder je Abteilung</CardTitle>
+            <CardDescription>Verteilung der aktiven Mitglieder über Sparten.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {data.perAbteilung.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Keine Abteilungen vorhanden.</p>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {data.perAbteilung.map((p) => (
+                  <li key={p.name} className="flex items-center gap-4">
+                    <span className="w-44 truncate text-sm font-medium">{p.name}</span>
+                    <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary transition-[width] duration-500"
+                        style={{ width: `${(p.c / maxPerAbt) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-10 text-right text-sm tabular-nums text-muted-foreground">
+                      {p.c}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Mitgliedsdauer</CardTitle>
+            <CardDescription>Wie lange sind die aktiven Mitglieder schon dabei.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BarList rows={data.tenure.map((t) => ({ label: t.bucket, value: t.c }))} />
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>Mitglieder je Abteilung</CardTitle>
-          <CardDescription>Verteilung der aktiven Mitglieder über Sparten.</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Cake className="size-5 text-brand" /> Geburtstage in den nächsten 30 Tagen
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {data.perAbteilung.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Keine Abteilungen vorhanden.</p>
+          {data.birthdays.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Keine Geburtstage in den nächsten Tagen.</p>
           ) : (
-            <ul className="flex flex-col gap-3">
-              {data.perAbteilung.map((p) => (
-                <li key={p.name} className="flex items-center gap-4">
-                  <span className="w-44 truncate text-sm font-medium">{p.name}</span>
-                  <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary transition-[width] duration-500"
-                      style={{ width: `${(p.c / maxPerAbt) * 100}%` }}
-                    />
-                  </div>
-                  <span className="w-10 text-right text-sm tabular-nums text-muted-foreground">
-                    {p.c}
+            <ul className="flex flex-col divide-y text-sm">
+              {data.birthdays.map((b) => (
+                <li key={b.id} className="flex items-center justify-between py-2">
+                  <Link
+                    to="/app/mitglieder/$mitgliedsnummer"
+                    params={{ mitgliedsnummer: b.mitglnr ?? "" }}
+                    className="hover:underline"
+                  >
+                    {[b.vorname, b.nachname].filter(Boolean).join(" ") || `#${b.mitglnr ?? "?"}`}
+                  </Link>
+                  <span className="text-muted-foreground tabular-nums">
+                    {formatDate(b.nextBirthday)} · wird {b.turns}
                   </span>
                 </li>
               ))}
@@ -95,6 +162,31 @@ function DashboardPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function BarList({ rows }: { rows: Array<{ label: string; value: number }> }) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-muted-foreground">Keine Daten.</p>;
+  }
+  const max = Math.max(1, ...rows.map((r) => r.value));
+  return (
+    <ul className="flex flex-col gap-3">
+      {rows.map((r) => (
+        <li key={r.label} className="flex items-center gap-4">
+          <span className="w-28 truncate text-sm font-medium capitalize">{r.label}</span>
+          <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary/80 transition-[width] duration-500"
+              style={{ width: `${(r.value / max) * 100}%` }}
+            />
+          </div>
+          <span className="w-10 text-right text-sm tabular-nums text-muted-foreground">
+            {r.value}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

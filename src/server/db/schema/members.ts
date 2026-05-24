@@ -3,6 +3,7 @@ import {
   index,
   integer,
   numeric,
+  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -10,6 +11,13 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { encryptedText } from "~/server/db/types";
+
+/**
+ * Explicit gender column (independent of Anrede). Linear's UI uses a similar
+ * picklist; storing it separately means we don't lose people whose Anrede is
+ * a title ("Dr.", "Prof.") or non-binary form.
+ */
+export const geschlechtEnum = pgEnum("geschlecht", ["m", "w", "d", "unbekannt"]);
 
 /**
  * Lossless mirror of the Linear Webverein `adresse` table (247 columns).
@@ -28,6 +36,7 @@ export const membersTable = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     notes: text("notes"),
+    geschlecht: geschlechtEnum("geschlecht"),
     lastImportedAt: timestamp("last_imported_at", { withTimezone: true }),
     importBatchId: uuid("import_batch_id"),
     adrNr: integer("adr_nr").notNull(),

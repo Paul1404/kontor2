@@ -15,7 +15,16 @@ export const dashboardRouter = {
     // All four counts must exclude soft-deleted members or the dashboard
     // drifts from the member list as soon as the first soft-delete happens.
     const notDeleted = isNull(membersTable.deletedAt);
-    const [[total], [aktiv], [newThisMonth], [austritteThisMonth]] = await Promise.all([
+    const [
+      [total],
+      [aktiv],
+      [newThisMonth],
+      [austritteThisMonth],
+      ageBuckets,
+      genderRows,
+      birthdaysSoon,
+      tenureBuckets,
+    ] = await Promise.all([
       context.db.select({ c: count() }).from(membersTable).where(notDeleted),
       context.db
         .select({ c: count() })
@@ -33,6 +42,110 @@ export const dashboardRouter = {
         .where(
           and(notDeleted, isNotNull(membersTable.austritt), gte(membersTable.austritt, since)),
         ),
+      // Age buckets, computed over current active members. Anyone without a
+      // birthday gets bucketed into "unbekannt" so we can show the data
+      // gap; useful for nudging the office to backfill records.
+      context.db.execute<{ bucket: string; c: number }>(sql`
+        select bucket, count(*)::int as c from (
+          select case
+            when ${membersTable.geburtsdatum} is null then 'unbekannt'
+            when extract(year from age(${membersTable.geburtsdatum})) < 18 then '0-17'
+            when extract(year from age(${membersTable.geburtsdatum})) < 30 then '18-29'
+            when extract(year from age(${membersTable.geburtsdatum})) < 45 then '30-44'
+            when extract(year from age(${membersTable.geburtsdatum})) < 60 then '45-59'
+            when extract(year from age(${membersTable.geburtsdatum})) < 75 then '60-74'
+            else '75+'
+          end as bucket
+          from ${membersTable}
+          where ${membersTable.deletedAt} is null
+            and ${membersTable.austritt} is null
+            and ${membersTable.verstorbenAm} is null
+        ) t
+        group by bucket
+        order by bucket
+      `),
+      // Gender from the explicit `geschlecht` enum column. Members whose
+      // column is NULL (shouldn't happen post-backfill, but defensive)
+      // fall into "unbekannt".
+      context.db.execute<{ gender: string; c: number }>(sql`
+        select gender, count(*)::int as c from (
+          select case ${membersTable.geschlecht}::text
+            when 'm' then 'männlich'
+            when 'w' then 'weiblich'
+            when 'd' then 'divers'
+            else 'unbekannt'
+          end as gender
+          from ${membersTable}
+          where ${membersTable.deletedAt} is null
+            and ${membersTable.austritt} is null
+            and ${membersTable.verstorbenAm} is null
+        ) t
+        group by gender
+        order by case gender
+          when 'männlich' then 1
+          when 'weiblich' then 2
+          when 'divers' then 3
+          else 4
+        end
+      `),
+      // Birthdays in the next 30 days. We compute on the next anniversary
+      // (year +1 if it has already passed this year) so the list wraps
+      // around December → January cleanly.
+      context.db.execute<{
+        id: string;
+        mitglnr: string | null;
+        vorname: string | null;
+        nachname: string | null;
+        geburtsdatum: Date;
+        next_birthday: Date;
+        turns: number;
+      }>(sql`
+        select id, mitglnr, vorname, nachname, geburtsdatum, next_birthday,
+               extract(year from age(next_birthday, geburtsdatum))::int as turns
+        from (
+          select id, mitglnr, vorname, nachname, geburtsdatum,
+            case
+              when make_date(extract(year from current_date)::int,
+                             extract(month from ${membersTable.geburtsdatum})::int,
+                             extract(day from ${membersTable.geburtsdatum})::int)
+                   >= current_date
+              then make_date(extract(year from current_date)::int,
+                             extract(month from ${membersTable.geburtsdatum})::int,
+                             extract(day from ${membersTable.geburtsdatum})::int)
+              else make_date((extract(year from current_date)+1)::int,
+                             extract(month from ${membersTable.geburtsdatum})::int,
+                             extract(day from ${membersTable.geburtsdatum})::int)
+            end as next_birthday
+          from ${membersTable}
+          where ${membersTable.deletedAt} is null
+            and ${membersTable.austritt} is null
+            and ${membersTable.verstorbenAm} is null
+            and ${membersTable.geburtsdatum} is not null
+        ) t
+        where next_birthday <= current_date + interval '30 days'
+        order by next_birthday asc
+        limit 12
+      `),
+      // Mitgliedsdauer (Tenure) buckets for active members. Anyone without
+      // an Eintritt date is grouped separately.
+      context.db.execute<{ bucket: string; c: number }>(sql`
+        select bucket, count(*)::int as c from (
+          select case
+            when ${membersTable.eintritt} is null then 'unbekannt'
+            when extract(year from age(${membersTable.eintritt})) < 1 then '< 1 Jahr'
+            when extract(year from age(${membersTable.eintritt})) < 5 then '1-4 Jahre'
+            when extract(year from age(${membersTable.eintritt})) < 10 then '5-9 Jahre'
+            when extract(year from age(${membersTable.eintritt})) < 25 then '10-24 Jahre'
+            else '25+ Jahre'
+          end as bucket
+          from ${membersTable}
+          where ${membersTable.deletedAt} is null
+            and ${membersTable.austritt} is null
+            and ${membersTable.verstorbenAm} is null
+        ) t
+        group by bucket
+        order by bucket
+      `),
     ]);
 
     const perAbteilung = await context.db
@@ -47,12 +160,29 @@ export const dashboardRouter = {
       .groupBy(abteilungenTable.name)
       .orderBy(sql`count(*) desc`);
 
+    // postgres-js returns the result array directly from db.execute.
+    const ageBucketsArr = ageBuckets as unknown as Array<{ bucket: string; c: number }>;
+    const genderArr = genderRows as unknown as Array<{ gender: string; c: number }>;
+    const birthdaysArr = birthdaysSoon as unknown as Array<Record<string, unknown>>;
+    const tenureArr = tenureBuckets as unknown as Array<{ bucket: string; c: number }>;
+
     return {
       total: total?.c ?? 0,
       aktiv: aktiv?.c ?? 0,
       newThisMonth: newThisMonth?.c ?? 0,
       austritteThisMonth: austritteThisMonth?.c ?? 0,
       perAbteilung,
+      ageBuckets: ageBucketsArr,
+      gender: genderArr,
+      birthdays: birthdaysArr.map((b) => ({
+        id: String(b.id),
+        mitglnr: (b.mitglnr as string | null) ?? null,
+        vorname: (b.vorname as string | null) ?? null,
+        nachname: (b.nachname as string | null) ?? null,
+        nextBirthday: b.next_birthday as string | Date,
+        turns: Number(b.turns),
+      })),
+      tenure: tenureArr,
     };
   }),
 };

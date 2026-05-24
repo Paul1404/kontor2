@@ -1,10 +1,26 @@
-import { date, index, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  date,
+  index,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { membersTable } from "~/server/db/schema/members";
 
 export const abteilungenTable = pgTable("abteilungen", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull().unique(),
   slug: text("slug").notNull().unique(),
+  // Sportart + Verbandsname mirror the Linear "Abteilung/Sparte" table
+  // (e.g. Sportart "Fußball", Verband "Bayerischer Fußball-Verband e.V.").
+  // Both are optional because not every Abteilung is sportlich (Förderkreis etc.).
+  sportart: text("sportart"),
+  verbandName: text("verband_name"),
+  verbandNr: text("verband_nr"),
+  inaktiv: boolean("inaktiv").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

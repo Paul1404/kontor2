@@ -1,15 +1,23 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, Pencil, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, ChevronDown, Loader2, Pencil, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { AbteilungenCard } from "~/components/forms/AbteilungenCard";
+import { AttachmentsCard } from "~/components/forms/AttachmentsCard";
 import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
 import { SepaCard } from "~/components/forms/SepaCard";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { formatDate, formatDateTime, formatIbanMask } from "~/lib/format";
+import {
+  actionLabel,
+  fieldLabel,
+  formatAuditValue,
+  isHiddenField,
+} from "~/lib/audit-labels";
+import { formatLand } from "~/lib/country";
+import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/mitglieder/$mitgliedsnummer")({
@@ -36,13 +44,33 @@ function MemberDetailPage() {
     },
   });
 
+  // Pull the IBAN before the early-return so the hook is called in the
+  // same order on every render (rules-of-hooks).
+  const memberIban = ((detail.data?.member as Record<string, unknown> | undefined)?.iban1 ??
+    null) as string | null;
+  const ibanInfo = useIbanBank(memberIban);
+
   if (detail.isLoading) return <p className="text-muted-foreground">Wird geladen...</p>;
   if (detail.isError || !detail.data) {
     return <p className="text-destructive">Mitglied nicht gefunden.</p>;
   }
 
-  const { member, abteilungen, vertraege, sepa, anhaenge, audit, beziehungen } = detail.data;
+  const {
+    member,
+    abteilungen,
+    vertraege,
+    sepa,
+    anhaenge,
+    audit,
+    beziehungen,
+    sollstellungen,
+  } = detail.data;
   const canEdit = me.data?.role === "vorstand" || me.data?.role === "admin";
+
+  // Prefer the IBAN-derived bank name/BIC over the stored values — those
+  // were free-text in Linear and don't always match the actual BLZ.
+  const bankDisplay = ibanInfo?.name ?? member.bank1;
+  const bicDisplay = ibanInfo?.bic ?? member.bic1;
 
   return (
     <div className="flex flex-col gap-6">
@@ -109,20 +137,31 @@ function MemberDetailPage() {
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <Field label="Anrede" value={member.anrede} />
-            <Field label="Geburtsdatum" value={formatDate(member.geburtsdatum)} />
-            <Field label="Geburtsort" value={member.geburtsort} />
-            <Field label="Geburtsname" value={member.geborene ?? member.geburtsname} />
+            <Field
+              label="Geburtsdatum & Alter"
+              value={formatBirthdayWithAge(member.geburtsdatum)}
+            />
+            <Field label="Geschlecht" value={formatGeschlecht(member.geschlecht)} />
+            <Field label="Funktion" value={member.funktion} />
+            <Field label="Firma" value={member.firma1} />
             <Field
               label="Adresse"
-              value={`${member.strasse ?? ""} ${member.hausnummer ?? ""}\n${member.plz ?? ""} ${member.ort ?? ""}`.trim()}
+              value={[
+                `${member.strasse ?? ""} ${member.hausnummer ?? ""}`.trim(),
+                member.adresszusatz ?? "",
+                `${member.plz ?? ""} ${member.ort ?? ""}`.trim(),
+              ]
+                .filter(Boolean)
+                .join("\n")}
             />
-            <Field label="Land" value={member.land} />
+            <Field label="Land" value={formatLand(member.land)} />
             <Field label="Telefon" value={member.telefon1} />
             <Field label="Mobil" value={member.telefon2} />
             <Field label="E-Mail" value={member.eMailName} />
+            <Field label="Website" value={member.www} />
             <Field label="Eintritt" value={formatDate(member.eintritt)} />
             <Field label="Austritt" value={formatDate(member.austritt)} />
-            <Field label="Verstorben" value={formatDate(member.verstorbenAm)} />
+            <Field label="Spender" value={member.spender === "J" ? "Ja" : "Nein"} />
           </CardContent>
         </Card>
 
@@ -131,14 +170,29 @@ function MemberDetailPage() {
             <CardTitle>Bankverbindung</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 text-sm">
-            <Field label="Bank" value={member.bank1} />
-            <Field label="IBAN" value={formatIbanMask(member.iban1Last4)} />
-            <Field label="BIC" value={member.bic1} />
-            <Field label="Mandatsreferenz" value={member.mandatsrefenz} />
+            <Field label="IBAN" value={formatIbanGrouped(member.iban1)} mono />
+            <Field label="Bank" value={bankDisplay} />
+            <Field label="BIC" value={bicDisplay} mono />
             <Field label="Kontoinhaber" value={member.abwKontoInh} />
+            {ibanInfo ? (
+              <p className="text-xs text-muted-foreground">
+                Bank und BIC werden aus der IBAN abgeleitet (Quelle: Bundesbank BLZ-Verzeichnis).
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       </div>
+
+      {member.notes ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Notizen</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="whitespace-pre-line text-sm text-foreground">{member.notes}</p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <AbteilungenCard
         memberId={member.id}
@@ -169,33 +223,33 @@ function MemberDetailPage() {
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Anhänge</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {anhaenge.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Keine Anhänge.</p>
-          ) : (
-            <ul className="flex flex-col divide-y">
-              {anhaenge.map((a) => (
-                <li key={a.id} className="flex items-center justify-between py-2 text-sm">
-                  <a href={`/api/files/${a.id}`} className="text-primary hover:underline">
-                    {a.filename}
-                  </a>
-                  <span className="text-muted-foreground">
-                    {(a.sizeBytes / 1024).toFixed(0)} KB · {formatDate(a.uploadedAt)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <SollstellungenCard rows={sollstellungen as never} />
+
+      <AttachmentsCard
+        memberId={member.id}
+        mitgliedsnummer={mitgliedsnummer}
+        anhaenge={anhaenge}
+        canEdit={canEdit}
+      />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Audit Log</CardTitle>
+          <Link
+            to="/app/audit"
+            search={{
+              q: "",
+              actorEmail: "",
+              action: "",
+              entityType: "member",
+              entityId: member.id,
+              from: "",
+              to: "",
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Vollständige Historie →
+          </Link>
         </CardHeader>
         <CardContent>
           {audit.length === 0 ? (
@@ -203,23 +257,7 @@ function MemberDetailPage() {
           ) : (
             <ul className="flex flex-col divide-y text-sm">
               {audit.map((entry) => (
-                <li key={entry.id} className="py-2">
-                  <div className="flex items-center justify-between">
-                    <span>
-                      <Badge variant="outline" className="mr-2">
-                        {entry.action}
-                      </Badge>
-                      <span className="text-muted-foreground">{entry.source}</span>
-                    </span>
-                    <span className="text-muted-foreground">{formatDateTime(entry.createdAt)}</span>
-                  </div>
-                  {entry.actorEmail ? (
-                    <p className="text-xs text-muted-foreground">{entry.actorEmail}</p>
-                  ) : null}
-                  <pre className="mt-1 whitespace-pre-wrap break-words rounded bg-muted/50 p-2 text-xs">
-                    {Object.keys(entry.changes ?? {}).join(", ")}
-                  </pre>
-                </li>
+                <AuditEntry key={entry.id} entry={entry} />
               ))}
             </ul>
           )}
@@ -229,11 +267,151 @@ function MemberDetailPage() {
   );
 }
 
-function Field({ label, value }: { label: string; value: unknown }) {
+function useIbanBank(iban: string | null | undefined): { name: string; bic: string } | null {
+  const cleaned = useMemo(() => (iban ? iban.replace(/\s+/g, "").toUpperCase() : ""), [iban]);
+  const enabled = cleaned.length >= 12 && cleaned.startsWith("DE");
+  const query = useQuery({
+    queryKey: ["banks.lookupByIban", cleaned],
+    queryFn: () => orpc.banks.lookupByIban({ iban: cleaned }),
+    enabled,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  if (!query.data?.found) return null;
+  return { name: query.data.name, bic: query.data.bic };
+}
+
+function formatIbanGrouped(iban: string | null | undefined): string {
+  if (!iban) return "";
+  return iban
+    .replace(/\s+/g, "")
+    .toUpperCase()
+    .replace(/(.{4})/g, "$1 ")
+    .trim();
+}
+
+function formatBirthdayWithAge(value: string | Date | null | undefined): string {
+  if (!value) return "";
+  const formatted = formatDate(value);
+  if (!formatted) return "";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (!Number.isFinite(d.getTime())) return formatted;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const beforeBirthday =
+    now.getMonth() < d.getMonth() ||
+    (now.getMonth() === d.getMonth() && now.getDate() < d.getDate());
+  if (beforeBirthday) age -= 1;
+  return `${formatted} · ${age} Jahre`;
+}
+
+function formatGeschlecht(value: string | null | undefined): string {
+  switch (value) {
+    case "m":
+      return "Männlich";
+    case "w":
+      return "Weiblich";
+    case "d":
+      return "Divers";
+    case "unbekannt":
+      return "Unbekannt";
+    default:
+      return "";
+  }
+}
+
+type SollstellungRow = {
+  id: string;
+  vertragNr: string;
+  artName: string | null;
+  billingYear: number;
+  falligkeitsdatum: string | Date;
+  amount: string;
+  paidAmount: string;
+  openAmount: string;
+  status: string;
+};
+
+function SollstellungenCard({ rows }: { rows: SollstellungRow[] }) {
+  if (!rows || rows.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Sollstellung</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Keine Sollstellungen vorhanden. Werden beim nächsten Beitragslauf erzeugt.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Sollstellung</CardTitle>
+      </CardHeader>
+      <CardContent className="overflow-x-auto p-0">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-4 py-2 font-medium">Jahr</th>
+              <th className="px-4 py-2 font-medium">Vertrag</th>
+              <th className="px-4 py-2 font-medium">Art</th>
+              <th className="px-4 py-2 font-medium">Fällig</th>
+              <th className="px-4 py-2 text-right font-medium">Betrag</th>
+              <th className="px-4 py-2 text-right font-medium">Offen</th>
+              <th className="px-4 py-2 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {rows.map((r) => (
+              <tr key={r.id} className="hover:bg-muted/30">
+                <td className="px-4 py-2 tabular-nums">{r.billingYear}</td>
+                <td className="px-4 py-2 tabular-nums text-muted-foreground">{r.vertragNr}</td>
+                <td className="px-4 py-2">{r.artName ?? "—"}</td>
+                <td className="px-4 py-2 tabular-nums text-muted-foreground">
+                  {formatDate(r.falligkeitsdatum)}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {formatCurrency(r.amount)}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {formatCurrency(r.openAmount)}
+                </td>
+                <td className="px-4 py-2">
+                  <SollstellungStatusBadge status={r.status} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SollstellungStatusBadge({ status }: { status: string }) {
+  const variant: "outline" | "success" | "warning" | "secondary" =
+    status === "paid" ? "success" : status === "open" ? "warning" : "secondary";
+  const label =
+    status === "paid"
+      ? "Bezahlt"
+      : status === "open"
+        ? "Offen"
+        : status === "returned"
+          ? "Rückläufer"
+          : status === "cancelled"
+            ? "Storniert"
+            : status;
+  return <Badge variant={variant}>{label}</Badge>;
+}
+
+function Field({ label, value, mono }: { label: string; value: unknown; mono?: boolean }) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-xs uppercase text-muted-foreground tracking-wide">{label}</span>
-      <span className="whitespace-pre-line">
+      <span className={`whitespace-pre-line ${mono ? "font-mono tabular-nums" : ""}`}>
         {value == null || value === "" ? (
           <span className="text-muted-foreground">k.A.</span>
         ) : (
@@ -241,5 +419,78 @@ function Field({ label, value }: { label: string; value: unknown }) {
         )}
       </span>
     </div>
+  );
+}
+
+type AuditEntryRow = {
+  id: string;
+  action: string;
+  source: string;
+  actorEmail: string | null;
+  changes: Record<string, { before: unknown; after: unknown }> | null;
+  createdAt: string | Date;
+};
+
+function AuditEntry({ entry }: { entry: AuditEntryRow }) {
+  const [open, setOpen] = useState(false);
+  const visibleChanges = Object.entries(entry.changes ?? {}).filter(([k]) => !isHiddenField(k));
+  const summary = visibleChanges
+    .slice(0, 3)
+    .map(([k]) => fieldLabel(k))
+    .join(", ");
+  return (
+    <li className="py-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-start justify-between gap-3 text-left hover:bg-muted/30 -mx-2 px-2 py-1 rounded"
+      >
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">{actionLabel(entry.action)}</Badge>
+            <span className="text-sm">
+              {visibleChanges.length === 0
+                ? "Keine sichtbaren Felder geändert"
+                : `${visibleChanges.length} Feld${visibleChanges.length === 1 ? "" : "er"}: ${summary}${visibleChanges.length > 3 ? "…" : ""}`}
+            </span>
+          </div>
+          {entry.actorEmail ? (
+            <span className="text-xs text-muted-foreground">{entry.actorEmail}</span>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {formatDateTime(entry.createdAt)}
+          </span>
+          <ChevronDown
+            className={`size-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </div>
+      </button>
+      {open && visibleChanges.length > 0 ? (
+        <div className="mt-2 overflow-hidden rounded border border-border bg-muted/30">
+          <table className="w-full text-xs">
+            <thead className="text-left text-muted-foreground">
+              <tr>
+                <th className="px-3 py-1.5 font-medium">Feld</th>
+                <th className="px-3 py-1.5 font-medium">Vorher</th>
+                <th className="px-3 py-1.5 font-medium">Nachher</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleChanges.map(([k, change]) => (
+                <tr key={k} className="border-t border-border/60">
+                  <td className="px-3 py-1.5 font-medium">{fieldLabel(k)}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground">
+                    {formatAuditValue(k, change.before)}
+                  </td>
+                  <td className="px-3 py-1.5">{formatAuditValue(k, change.after)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </li>
   );
 }

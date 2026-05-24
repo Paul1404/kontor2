@@ -1,15 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Layers, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Layers, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/einstellungen/abteilungen")({
   component: AbteilungenSettingsPage,
 });
+
+type AbtRow = {
+  id: string;
+  name: string;
+  slug: string;
+  sportart: string | null;
+  verbandName: string | null;
+  verbandNr: string | null;
+  inaktiv: boolean;
+  memberCount: number;
+  totalCount: number;
+};
 
 function AbteilungenSettingsPage() {
   const qc = useQueryClient();
@@ -17,15 +31,13 @@ function AbteilungenSettingsPage() {
     queryKey: ["abteilungen", "list"],
     queryFn: () => orpc.abteilungen.list(),
   });
-  // Prefix-match invalidation covers the settings list, the member-filter
-  // dropdown (`["abteilungen", "members"]`), and the reports dropdown
-  // (`["abteilungen", "reports"]`) so renames/deletes propagate everywhere.
   const refresh = () => qc.invalidateQueries({ queryKey: ["abteilungen"] });
 
   const [newName, setNewName] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const create = useMutation({
@@ -83,12 +95,7 @@ function AbteilungenSettingsPage() {
             }}
           >
             <div className="flex min-w-60 flex-1 flex-col gap-1.5">
-              <label
-                htmlFor="abt-name"
-                className="text-xs uppercase tracking-wide text-muted-foreground"
-              >
-                Name
-              </label>
+              <Label htmlFor="abt-name">Name</Label>
               <Input
                 id="abt-name"
                 value={newName}
@@ -119,117 +126,199 @@ function AbteilungenSettingsPage() {
             {actionError}
           </div>
         ) : null}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 font-medium">Name</th>
-                <th className="px-4 py-3 font-medium">Slug</th>
-                <th className="px-4 py-3 text-right font-medium">Aktiv</th>
-                <th className="px-4 py-3 text-right font-medium">Gesamt</th>
-                <th className="px-4 py-3 text-right font-medium" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {list.isLoading ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="size-4 animate-spin" /> Wird geladen…
+        <ul className="divide-y divide-border">
+          {list.isLoading ? (
+            <li className="px-4 py-8 text-center text-muted-foreground">
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="size-4 animate-spin" /> Wird geladen…
+              </span>
+            </li>
+          ) : !list.data || list.data.length === 0 ? (
+            <li className="px-4 py-8 text-center text-muted-foreground">
+              Noch keine Abteilungen.
+            </li>
+          ) : (
+            (list.data as AbtRow[]).map((a) => {
+              const isEditing = editingId === a.id;
+              const isExpanded = expandedId === a.id;
+              const canDelete = a.totalCount === 0;
+              return (
+                <li key={a.id} className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId((cur) => (cur === a.id ? null : a.id))}
+                      className="flex flex-1 items-center gap-2 text-left hover:text-foreground"
+                    >
+                      <ChevronDown
+                        className={`size-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                      />
+                      {isEditing ? (
+                        <Input
+                          value={editDraft}
+                          onChange={(e) => setEditDraft(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          maxLength={80}
+                          className="max-w-xs"
+                        />
+                      ) : (
+                        <span className="font-medium">{a.name}</span>
+                      )}
+                      {a.sportart ? (
+                        <span className="text-xs text-muted-foreground">· {a.sportart}</span>
+                      ) : null}
+                      {a.inaktiv ? (
+                        <Badge variant="secondary" className="text-xs">
+                          Inaktiv
+                        </Badge>
+                      ) : (
+                        <Badge variant="success" className="text-xs">
+                          Aktiv
+                        </Badge>
+                      )}
+                    </button>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {a.memberCount} aktiv · {a.totalCount} gesamt
                     </span>
-                  </td>
-                </tr>
-              ) : !list.data || list.data.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                    Noch keine Abteilungen.
-                  </td>
-                </tr>
-              ) : (
-                list.data.map((a) => {
-                  const isEditing = editingId === a.id;
-                  const canDelete = a.totalCount === 0;
-                  return (
-                    <tr key={a.id} className="transition-colors hover:bg-muted/30">
-                      <td className="px-4 py-3 font-medium">
-                        {isEditing ? (
-                          <Input
-                            value={editDraft}
-                            onChange={(e) => setEditDraft(e.target.value)}
-                            maxLength={80}
-                          />
-                        ) : (
-                          a.name
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
-                        {a.slug}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">{a.memberCount}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{a.totalCount}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          {isEditing ? (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => rename.mutate({ id: a.id, name: editDraft })}
-                                disabled={!editDraft.trim() || rename.isPending}
-                              >
-                                {rename.isPending ? (
-                                  <Loader2 className="size-4 animate-spin" />
-                                ) : (
-                                  <Check className="size-4" />
-                                )}
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                                <X className="size-4" />
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingId(a.id);
-                                  setEditDraft(a.name);
-                                  setActionError(null);
-                                }}
-                                title="Umbenennen"
-                              >
-                                <Pencil className="size-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  if (window.confirm(`Abteilung "${a.name}" löschen?`)) {
-                                    remove.mutate(a.id);
-                                  }
-                                }}
-                                disabled={!canDelete || remove.isPending}
-                                title={
-                                  canDelete ? "Löschen" : "Erst alle Mitgliedschaften entfernen"
-                                }
-                              >
-                                <Trash2
-                                  className={`size-4 ${canDelete ? "text-destructive" : "text-muted-foreground"}`}
-                                />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                    <div className="flex items-center gap-1">
+                      {isEditing ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => rename.mutate({ id: a.id, name: editDraft })}
+                            disabled={!editDraft.trim() || rename.isPending}
+                          >
+                            {rename.isPending ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Check className="size-4" />
+                            )}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                            <X className="size-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingId(a.id);
+                              setEditDraft(a.name);
+                              setActionError(null);
+                            }}
+                            title="Umbenennen"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              if (window.confirm(`Abteilung "${a.name}" löschen?`)) {
+                                remove.mutate(a.id);
+                              }
+                            }}
+                            disabled={!canDelete || remove.isPending}
+                            title={canDelete ? "Löschen" : "Erst alle Mitgliedschaften entfernen"}
+                          >
+                            <Trash2
+                              className={`size-4 ${canDelete ? "text-destructive" : "text-muted-foreground"}`}
+                            />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {isExpanded ? (
+                    <AbteilungDetailsForm
+                      row={a}
+                      onSaved={async () => {
+                        await refresh();
+                      }}
+                    />
+                  ) : null}
+                </li>
+              );
+            })
+          )}
+        </ul>
       </Card>
+    </div>
+  );
+}
+
+function AbteilungDetailsForm({
+  row,
+  onSaved,
+}: {
+  row: AbtRow;
+  onSaved: () => Promise<void> | void;
+}) {
+  const [sportart, setSportart] = useState(row.sportart ?? "");
+  const [verbandName, setVerbandName] = useState(row.verbandName ?? "");
+  const [verbandNr, setVerbandNr] = useState(row.verbandNr ?? "");
+  const [inaktiv, setInaktiv] = useState(row.inaktiv);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = useMutation({
+    mutationFn: () =>
+      orpc.abteilungen.update({
+        id: row.id,
+        sportart: sportart.trim() || null,
+        verbandName: verbandName.trim() || null,
+        verbandNr: verbandNr.trim() || null,
+        inaktiv,
+      }),
+    onSuccess: () => {
+      setError(null);
+      return onSaved();
+    },
+    onError: (e: unknown) => setError(e instanceof Error ? e.message : "Speichern fehlgeschlagen."),
+  });
+
+  return (
+    <div className="mt-3 grid grid-cols-1 gap-3 rounded-lg border border-border bg-muted/30 p-3 md:grid-cols-2">
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Sportart</Label>
+        <Input
+          value={sportart}
+          onChange={(e) => setSportart(e.target.value)}
+          placeholder="z. B. Fußball"
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Verband</Label>
+        <Input
+          value={verbandName}
+          onChange={(e) => setVerbandName(e.target.value)}
+          placeholder="z. B. Bayerischer Fußball-Verband e.V."
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          Verband-Nr.
+        </Label>
+        <Input value={verbandNr} onChange={(e) => setVerbandNr(e.target.value)} />
+      </div>
+      <label className="flex items-center gap-2 self-end text-sm">
+        <input
+          type="checkbox"
+          checked={inaktiv}
+          onChange={(e) => setInaktiv(e.target.checked)}
+          className="size-4 accent-primary"
+        />
+        <span>Inaktiv (nicht mehr aktive Abteilung)</span>
+      </label>
+      <div className="flex items-center justify-end gap-2 md:col-span-2">
+        {error ? <span className="mr-auto text-sm text-destructive">{error}</span> : null}
+        <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
+          {save.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+          Speichern
+        </Button>
+      </div>
     </div>
   );
 }
