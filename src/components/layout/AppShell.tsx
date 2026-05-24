@@ -1,11 +1,13 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { LogOut, Search } from "lucide-react";
+import { Keyboard, LogOut, Search } from "lucide-react";
 import type { ReactNode } from "react";
 import { Sidebar } from "~/components/layout/Sidebar";
 import { Button } from "~/components/ui/button";
 import { CommandPalette } from "~/components/ui/command-palette";
+import { KeyboardCheatsheet } from "~/components/ui/keyboard-cheatsheet";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { signOut } from "~/lib/auth-client";
+import { useGlobalShortcuts } from "~/lib/use-global-shortcuts";
 
 export function AppShell({
   role,
@@ -16,6 +18,7 @@ export function AppShell({
   userEmail: string;
   children?: ReactNode;
 }) {
+  const { cheatsheetOpen, setCheatsheetOpen } = useGlobalShortcuts({ role });
   return (
     <div className="flex h-screen bg-background print:h-auto print:block">
       <Sidebar role={role} />
@@ -45,6 +48,15 @@ export function AppShell({
                 ⌘K
               </kbd>
             </button>
+            <button
+              type="button"
+              onClick={() => setCheatsheetOpen(true)}
+              className="hidden h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground sm:inline-flex"
+              aria-label="Tastaturkürzel anzeigen"
+              title="Tastaturkürzel (?)"
+            >
+              <Keyboard className="size-4" />
+            </button>
             <ThemeToggle className="hidden sm:inline-flex" />
             <div className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1 shadow-soft sm:flex">
               <span className="size-2 rounded-full bg-success" aria-hidden />
@@ -71,6 +83,11 @@ export function AppShell({
         </div>
       </main>
       <CommandPalette role={role} />
+      <KeyboardCheatsheet
+        open={cheatsheetOpen}
+        onOpenChange={setCheatsheetOpen}
+        role={role}
+      />
     </div>
   );
 }

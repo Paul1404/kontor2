@@ -23,6 +23,9 @@ import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 const StatusSchema = v.picklist(["aktiv", "passiv", "ausgetreten", "verstorben", "alle"]);
 
+const SortBySchema = v.picklist(["nachname", "mitglnr", "ort", "email", "eintritt"]);
+const SortDirSchema = v.picklist(["asc", "desc"]);
+
 const ListInput = v.object({
   q: v.optional(v.string(), ""),
   status: v.optional(StatusSchema, "aktiv"),
@@ -30,6 +33,8 @@ const ListInput = v.object({
   includeAusgetretene: v.optional(v.boolean(), false),
   page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
   pageSize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
+  sortBy: v.optional(SortBySchema, "nachname"),
+  sortDir: v.optional(SortDirSchema, "asc"),
 });
 
 /**
@@ -221,6 +226,24 @@ export const membersRouter = {
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
+    // Map the validated `sortBy` to its DB column so the UI can sort by
+    // logical names without exposing column identifiers in the API.
+    const sortColumn = {
+      nachname: membersTable.nachname,
+      mitglnr: membersTable.mitglnr,
+      ort: membersTable.ort,
+      email: membersTable.eMailName,
+      eintritt: membersTable.eintritt,
+    }[input.sortBy];
+    const direction = input.sortDir === "desc" ? desc : asc;
+    // Always tie-break on (nachname, vorname) so paging is stable when
+    // the primary sort key is null/duplicated.
+    const orderBy = [
+      direction(sortColumn),
+      asc(membersTable.nachname),
+      asc(membersTable.vorname),
+    ];
+
     const offset = (input.page - 1) * input.pageSize;
     const [rows, [totalRow]] = await Promise.all([
       context.db
@@ -245,7 +268,7 @@ export const membersRouter = {
         })
         .from(membersTable)
         .where(where)
-        .orderBy(asc(membersTable.nachname), asc(membersTable.vorname))
+        .orderBy(...orderBy)
         .limit(input.pageSize)
         .offset(offset),
       context.db.select({ c: count() }).from(membersTable).where(where),

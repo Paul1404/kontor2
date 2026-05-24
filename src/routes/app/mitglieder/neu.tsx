@@ -43,6 +43,7 @@ function NewMemberPage() {
       <div>
         <Link
           to="/app/mitglieder"
+          search={() => ({}) as never}
           className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" /> Zurück zur Liste
@@ -59,7 +60,7 @@ function NewMemberPage() {
         errorMessage={errorMessage}
         submitLabel="Anlegen"
         mitglnrInput={{ value: mitglnr, onChange: setMitglnr }}
-        onCancel={() => navigate({ to: "/app/mitglieder" })}
+        onCancel={() => navigate({ to: "/app/mitglieder", search: () => ({}) as never })}
         onSubmit={(values) => {
           setErrorMessage(null);
           mut.mutate(values);
