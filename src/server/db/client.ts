@@ -1,0 +1,28 @@
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { env } from "~/server/env";
+import * as schema from "~/server/db/schema";
+
+let sqlInstance: postgres.Sql | undefined;
+let dbInstance: ReturnType<typeof drizzle<typeof schema>> | undefined;
+
+export function sql(): postgres.Sql {
+  if (!sqlInstance) {
+    sqlInstance = postgres(env().DATABASE_URL, {
+      max: env().NODE_ENV === "production" ? 10 : 4,
+      // Suppress harmless NOTICEs (table exists, etc.) from startup logs.
+      onnotice: () => {},
+      prepare: false,
+    });
+  }
+  return sqlInstance;
+}
+
+export function db() {
+  if (!dbInstance) {
+    dbInstance = drizzle(sql(), { schema, casing: "snake_case" });
+  }
+  return dbInstance;
+}
+
+export type DB = ReturnType<typeof db>;
