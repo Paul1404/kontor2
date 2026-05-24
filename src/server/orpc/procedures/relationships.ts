@@ -1,10 +1,10 @@
-import { and, eq, or, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
+import { and, eq, or, sql } from "drizzle-orm";
 import * as v from "valibot";
-import { vorstandProc } from "~/server/orpc/base";
+import { appendAudit } from "~/server/audit/log";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
-import { appendAudit } from "~/server/audit/log";
+import { vorstandProc } from "~/server/orpc/base";
 
 function toDateOrNull(value: string | null | undefined, field: string): Date | null {
   if (!value) return null;

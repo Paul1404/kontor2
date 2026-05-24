@@ -1,24 +1,25 @@
-import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import * as v from "valibot";
-import { authedProc, vorstandProc } from "~/server/orpc/base";
+import { appendAudit, diff } from "~/server/audit/log";
+import { lastFour } from "~/server/crypto/encrypt";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
-import { auditLogTable } from "~/server/db/schema/audit";
 import { attachmentsTable } from "~/server/db/schema/attachments";
+import { auditLogTable } from "~/server/db/schema/audit";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
-import { appendAudit, diff } from "~/server/audit/log";
-import { lastFour } from "~/server/crypto/encrypt";
-import { validateIban } from "~/server/sepa/iban";
+import { authedProc, vorstandProc } from "~/server/orpc/base";
 import {
-  invalidateMemberCaches,
   getCached,
+  invalidateMemberCaches,
   searchCacheKey,
   setCached,
 } from "~/server/search/cache";
+import { validateIban } from "~/server/sepa/iban";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 const StatusSchema = v.picklist(["aktiv", "passiv", "ausgetreten", "verstorben", "alle"]);
 
@@ -268,121 +269,124 @@ export const membersRouter = {
 
       const [abteilungen, vertraege, sepa, anhaenge, audit, beziehungen, sollstellungen] =
         await Promise.all([
-        context.db
-          .select({
-            id: abteilungenTable.id,
-            name: abteilungenTable.name,
-            sportart: abteilungenTable.sportart,
-            verbandName: abteilungenTable.verbandName,
-            verbandNr: abteilungenTable.verbandNr,
-            inaktiv: abteilungenTable.inaktiv,
-            eintrittsdatum: memberAbteilungenTable.eintrittsdatum,
-            austrittsdatum: memberAbteilungenTable.austrittsdatum,
-          })
-          .from(memberAbteilungenTable)
-          .innerJoin(abteilungenTable, eq(abteilungenTable.id, memberAbteilungenTable.abteilungId))
-          .where(eq(memberAbteilungenTable.memberId, m.id))
-          .orderBy(asc(abteilungenTable.name)),
-        // Project only UI-needed columns. Notably, do NOT return the
-        // `*_V` bank fields (kontoV/blzV/bankV/ktoInhV) which would leak
-        // banking data to readonly users.
-        context.db
-          .select({
-            id: contractsTable.id,
-            vertragNr: contractsTable.vertragNr,
-            art: contractsTable.art,
-            artName: contractsTable.artName,
-            betrag: contractsTable.betrag,
-            aufnahmegeb: contractsTable.aufnahmegeb,
-            sollstellung: contractsTable.sollstellung,
-            vertragBegin: contractsTable.vertragBegin,
-            vertragEnde: contractsTable.vertragEnde,
-            gekuendAm: contractsTable.gekuendAm,
-            gekuendZum: contractsTable.gekuendZum,
-            lastschrift: contractsTable.lastschrift,
-            abwKontoInh: contractsTable.abwKontoInh,
-          })
-          .from(contractsTable)
-          .where(eq(contractsTable.memberId, m.id))
-          .orderBy(desc(contractsTable.vertragBegin)),
-        context.db
-          .select({
-            id: sepaMandatesTable.id,
-            mandatsNr: sepaMandatesTable.mandatsNr,
-            lastschriftart: sepaMandatesTable.lastschriftart,
-            typ: sepaMandatesTable.typ,
-            status: sepaMandatesTable.status,
-            angelegtAm: sepaMandatesTable.angelegtAm,
-            gultigBis: sepaMandatesTable.gultigBis,
-            unterschriftDatum: sepaMandatesTable.unterschriftDatum,
-            ersteVerwendung: sepaMandatesTable.ersteVerwendung,
-            letzteVerwendung: sepaMandatesTable.letzteVerwendung,
-            widerrufenAm: sepaMandatesTable.widerrufenAm,
-            gueltigAb: sepaMandatesTable.gueltigAb,
-            isDeleted: sepaMandatesTable.isDeleted,
-          })
-          .from(sepaMandatesTable)
-          .where(eq(sepaMandatesTable.memberId, m.id))
-          .orderBy(desc(sepaMandatesTable.angelegtAm)),
-        context.db
-          .select()
-          .from(attachmentsTable)
-          .where(eq(attachmentsTable.memberId, m.id))
-          .orderBy(desc(attachmentsTable.uploadedAt)),
-        // Audit history is sensitive: project only what the UI renders,
-        // and gate the full feed to vorstand+ via the role check below.
-        context.db
-          .select({
-            id: auditLogTable.id,
-            action: auditLogTable.action,
-            source: auditLogTable.source,
-            actorEmail: auditLogTable.actorEmail,
-            changes: auditLogTable.changes,
-            createdAt: auditLogTable.createdAt,
-          })
-          .from(auditLogTable)
-          .where(and(eq(auditLogTable.entityType, "member"), eq(auditLogTable.entityId, m.id)))
-          .orderBy(desc(auditLogTable.createdAt))
-          .limit(50),
-        context.db
-          .select({
-            id: relationshipsTable.id,
-            beziehung: relationshipsTable.beziehung,
-            notiz: relationshipsTable.notiz,
-            datVon: relationshipsTable.datVon,
-            datBis: relationshipsTable.datBis,
-            toMemberId: relationshipsTable.toMemberId,
-            toAdrNr: relationshipsTable.toAdrNr,
-            fallbackName: relationshipsTable.name,
-            toMitglnr: membersTable.mitglnr,
-            toVorname: membersTable.vorname,
-            toNachname: membersTable.nachname,
-          })
-          .from(relationshipsTable)
-          .leftJoin(membersTable, eq(membersTable.id, relationshipsTable.toMemberId))
-          .where(eq(relationshipsTable.fromMemberId, m.id))
-          .orderBy(asc(relationshipsTable.beziehung), asc(relationshipsTable.toAdrNr)),
-        // Sollstellung (Linear `mgsolln`): per-year posting for every
-        // contract. Joined to contracts so the UI can show Bezeichnung
-        // without a second roundtrip.
-        context.db
-          .select({
-            id: sollStellungenTable.id,
-            contractId: sollStellungenTable.contractId,
-            vertragNr: contractsTable.vertragNr,
-            artName: contractsTable.artName,
-            billingYear: sollStellungenTable.billingYear,
-            falligkeitsdatum: sollStellungenTable.falligkeitsdatum,
-            amount: sollStellungenTable.amount,
-            paidAmount: sollStellungenTable.paidAmount,
-            openAmount: sollStellungenTable.openAmount,
-            status: sollStellungenTable.status,
-          })
-          .from(sollStellungenTable)
-          .innerJoin(contractsTable, eq(contractsTable.id, sollStellungenTable.contractId))
-          .where(eq(sollStellungenTable.memberId, m.id))
-          .orderBy(desc(sollStellungenTable.billingYear), asc(contractsTable.vertragNr)),
-      ]);
+          context.db
+            .select({
+              id: abteilungenTable.id,
+              name: abteilungenTable.name,
+              sportart: abteilungenTable.sportart,
+              verbandName: abteilungenTable.verbandName,
+              verbandNr: abteilungenTable.verbandNr,
+              inaktiv: abteilungenTable.inaktiv,
+              eintrittsdatum: memberAbteilungenTable.eintrittsdatum,
+              austrittsdatum: memberAbteilungenTable.austrittsdatum,
+            })
+            .from(memberAbteilungenTable)
+            .innerJoin(
+              abteilungenTable,
+              eq(abteilungenTable.id, memberAbteilungenTable.abteilungId),
+            )
+            .where(eq(memberAbteilungenTable.memberId, m.id))
+            .orderBy(asc(abteilungenTable.name)),
+          // Project only UI-needed columns. Notably, do NOT return the
+          // `*_V` bank fields (kontoV/blzV/bankV/ktoInhV) which would leak
+          // banking data to readonly users.
+          context.db
+            .select({
+              id: contractsTable.id,
+              vertragNr: contractsTable.vertragNr,
+              art: contractsTable.art,
+              artName: contractsTable.artName,
+              betrag: contractsTable.betrag,
+              aufnahmegeb: contractsTable.aufnahmegeb,
+              sollstellung: contractsTable.sollstellung,
+              vertragBegin: contractsTable.vertragBegin,
+              vertragEnde: contractsTable.vertragEnde,
+              gekuendAm: contractsTable.gekuendAm,
+              gekuendZum: contractsTable.gekuendZum,
+              lastschrift: contractsTable.lastschrift,
+              abwKontoInh: contractsTable.abwKontoInh,
+            })
+            .from(contractsTable)
+            .where(eq(contractsTable.memberId, m.id))
+            .orderBy(desc(contractsTable.vertragBegin)),
+          context.db
+            .select({
+              id: sepaMandatesTable.id,
+              mandatsNr: sepaMandatesTable.mandatsNr,
+              lastschriftart: sepaMandatesTable.lastschriftart,
+              typ: sepaMandatesTable.typ,
+              status: sepaMandatesTable.status,
+              angelegtAm: sepaMandatesTable.angelegtAm,
+              gultigBis: sepaMandatesTable.gultigBis,
+              unterschriftDatum: sepaMandatesTable.unterschriftDatum,
+              ersteVerwendung: sepaMandatesTable.ersteVerwendung,
+              letzteVerwendung: sepaMandatesTable.letzteVerwendung,
+              widerrufenAm: sepaMandatesTable.widerrufenAm,
+              gueltigAb: sepaMandatesTable.gueltigAb,
+              isDeleted: sepaMandatesTable.isDeleted,
+            })
+            .from(sepaMandatesTable)
+            .where(eq(sepaMandatesTable.memberId, m.id))
+            .orderBy(desc(sepaMandatesTable.angelegtAm)),
+          context.db
+            .select()
+            .from(attachmentsTable)
+            .where(eq(attachmentsTable.memberId, m.id))
+            .orderBy(desc(attachmentsTable.uploadedAt)),
+          // Audit history is sensitive: project only what the UI renders,
+          // and gate the full feed to vorstand+ via the role check below.
+          context.db
+            .select({
+              id: auditLogTable.id,
+              action: auditLogTable.action,
+              source: auditLogTable.source,
+              actorEmail: auditLogTable.actorEmail,
+              changes: auditLogTable.changes,
+              createdAt: auditLogTable.createdAt,
+            })
+            .from(auditLogTable)
+            .where(and(eq(auditLogTable.entityType, "member"), eq(auditLogTable.entityId, m.id)))
+            .orderBy(desc(auditLogTable.createdAt))
+            .limit(50),
+          context.db
+            .select({
+              id: relationshipsTable.id,
+              beziehung: relationshipsTable.beziehung,
+              notiz: relationshipsTable.notiz,
+              datVon: relationshipsTable.datVon,
+              datBis: relationshipsTable.datBis,
+              toMemberId: relationshipsTable.toMemberId,
+              toAdrNr: relationshipsTable.toAdrNr,
+              fallbackName: relationshipsTable.name,
+              toMitglnr: membersTable.mitglnr,
+              toVorname: membersTable.vorname,
+              toNachname: membersTable.nachname,
+            })
+            .from(relationshipsTable)
+            .leftJoin(membersTable, eq(membersTable.id, relationshipsTable.toMemberId))
+            .where(eq(relationshipsTable.fromMemberId, m.id))
+            .orderBy(asc(relationshipsTable.beziehung), asc(relationshipsTable.toAdrNr)),
+          // Sollstellung (Linear `mgsolln`): per-year posting for every
+          // contract. Joined to contracts so the UI can show Bezeichnung
+          // without a second roundtrip.
+          context.db
+            .select({
+              id: sollStellungenTable.id,
+              contractId: sollStellungenTable.contractId,
+              vertragNr: contractsTable.vertragNr,
+              artName: contractsTable.artName,
+              billingYear: sollStellungenTable.billingYear,
+              falligkeitsdatum: sollStellungenTable.falligkeitsdatum,
+              amount: sollStellungenTable.amount,
+              paidAmount: sollStellungenTable.paidAmount,
+              openAmount: sollStellungenTable.openAmount,
+              status: sollStellungenTable.status,
+            })
+            .from(sollStellungenTable)
+            .innerJoin(contractsTable, eq(contractsTable.id, sollStellungenTable.contractId))
+            .where(eq(sollStellungenTable.memberId, m.id))
+            .orderBy(desc(sollStellungenTable.billingYear), asc(contractsTable.vertragNr)),
+        ]);
 
       // The IBAN columns are AES-256-GCM ciphertext at rest but our custom
       // drizzle type decrypts on read. We expose iban1 in clear (the page
@@ -458,8 +462,9 @@ export const membersRouter = {
           .where(eq(membersTable.id, input.memberId));
 
         const changes = diff(existing as unknown as Record<string, unknown>, projected);
+        let auditId: string | null = null;
         if (Object.keys(changes).length > 0) {
-          await appendAudit(tx, {
+          auditId = await appendAudit(tx, {
             entityType: "member",
             entityId: input.memberId,
             action: "update",
@@ -468,6 +473,12 @@ export const membersRouter = {
             actorEmail: context.session!.user.email,
             changes,
             requestId: context.requestId ?? null,
+          });
+          await takeMemberSnapshot(tx, input.memberId, {
+            trigger: "mutation",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            auditId,
           });
         }
 
@@ -543,7 +554,7 @@ export const membersRouter = {
               });
             }
 
-            await appendAudit(tx, {
+            const auditId = await appendAudit(tx, {
               entityType: "member",
               entityId: inserted.id,
               action: "create",
@@ -552,6 +563,12 @@ export const membersRouter = {
               actorEmail: context.session!.user.email,
               changes: diff(null, { ...patch, adrNr: nextAdrNr, mitglnr: nextMitglnr }),
               requestId: context.requestId ?? null,
+            });
+            await takeMemberSnapshot(tx, inserted.id, {
+              trigger: "mutation",
+              actorId: context.session!.user.id,
+              actorEmail: context.session!.user.email,
+              auditId,
             });
 
             return {
@@ -601,7 +618,7 @@ export const membersRouter = {
           .set({ deletedAt: now, updatedAt: now } as never)
           .where(eq(membersTable.id, input.memberId));
 
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "member",
           entityId: input.memberId,
           action: "delete",
@@ -610,6 +627,12 @@ export const membersRouter = {
           actorEmail: context.session!.user.email,
           changes: { deletedAt: { before: null, after: now.toISOString() } },
           requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, input.memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
         });
       });
 
@@ -637,7 +660,7 @@ export const membersRouter = {
           .set({ deletedAt: null, updatedAt: new Date() } as never)
           .where(eq(membersTable.id, input.memberId));
 
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "member",
           entityId: input.memberId,
           action: "restore",
@@ -647,9 +670,53 @@ export const membersRouter = {
           changes: { deletedAt: { before: before?.toISOString() ?? null, after: null } },
           requestId: context.requestId ?? null,
         });
+        await takeMemberSnapshot(tx, input.memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
+        });
       });
 
       await invalidateMemberCaches();
       return { ok: true };
+    }),
+
+  /**
+   * Lightweight typeahead used by the Cmd+K command palette. Returns only
+   * the columns needed to render a result row + a link.
+   */
+  quickSearch: authedProc
+    .input(
+      v.object({
+        q: v.pipe(v.string(), v.minLength(1)),
+        limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(20)), 10),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const like = `%${input.q.trim()}%`;
+      const rows = await context.db
+        .select({
+          id: membersTable.id,
+          mitglnr: membersTable.mitglnr,
+          vorname: membersTable.vorname,
+          nachname: membersTable.nachname,
+          ort: membersTable.ort,
+        })
+        .from(membersTable)
+        .where(
+          and(
+            isNull(membersTable.deletedAt),
+            or(
+              ilike(membersTable.nachname, like),
+              ilike(membersTable.vorname, like),
+              ilike(membersTable.mitglnr, like),
+              ilike(membersTable.eMailName, like),
+            ),
+          ),
+        )
+        .orderBy(asc(membersTable.nachname), asc(membersTable.vorname))
+        .limit(input.limit);
+      return { rows };
     }),
 };

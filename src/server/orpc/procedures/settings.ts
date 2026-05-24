@@ -1,9 +1,9 @@
-import * as v from "valibot";
 import { ORPCError } from "@orpc/server";
-import { adminProc } from "~/server/orpc/base";
-import { smtpConfigTable } from "~/server/db/schema/settings";
-import { sendTestMail } from "~/server/auth/send-invite";
+import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
+import { sendTestMail } from "~/server/auth/send-invite";
+import { smtpConfigTable } from "~/server/db/schema/settings";
+import { adminProc } from "~/server/orpc/base";
 
 const SmtpInput = v.object({
   host: v.pipe(v.string(), v.minLength(1)),

@@ -1,4 +1,5 @@
 import { eq, inArray, or, sql } from "drizzle-orm";
+import { appendAudit, diff } from "~/server/audit/log";
 import type { DB } from "~/server/db/client";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { contractsTable } from "~/server/db/schema/contracts";
@@ -7,19 +8,18 @@ import { importBatchesTable } from "~/server/db/schema/import-batches";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
-import { appendAudit, diff } from "~/server/audit/log";
-import { invalidateMemberCaches } from "~/server/search/cache";
-import { splitAbteilung, slugify } from "~/server/importer/abteilung-splitter";
+import { slugify, splitAbteilung } from "~/server/importer/abteilung-splitter";
 import {
+  type LinearRow,
   mapContractRow,
   mapFeeTypeRow,
-  mapInterRow,
   mapInteresRow,
+  mapInterRow,
   mapMemberRow,
   mapSepaRow,
   mapVerknRow,
-  type LinearRow,
 } from "~/server/importer/linear-mapper";
+import { invalidateMemberCaches } from "~/server/search/cache";
 
 export type IngestInput = {
   source: "sql_upload" | "svums_push";

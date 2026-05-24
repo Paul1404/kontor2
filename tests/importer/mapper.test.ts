@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   mapContractRow,
-  mapInterRow,
   mapInteresRow,
+  mapInterRow,
   mapMemberRow,
   mapSepaRow,
   mapVerknRow,

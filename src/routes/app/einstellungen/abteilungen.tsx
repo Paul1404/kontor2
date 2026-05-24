@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
 import { Check, ChevronDown, Layers, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
@@ -134,9 +134,7 @@ function AbteilungenSettingsPage() {
               </span>
             </li>
           ) : !list.data || list.data.length === 0 ? (
-            <li className="px-4 py-8 text-center text-muted-foreground">
-              Noch keine Abteilungen.
-            </li>
+            <li className="px-4 py-8 text-center text-muted-foreground">Noch keine Abteilungen.</li>
           ) : (
             (list.data as AbtRow[]).map((a) => {
               const isEditing = editingId === a.id;
@@ -298,9 +296,7 @@ function AbteilungDetailsForm({
         />
       </div>
       <div className="flex flex-col gap-1.5">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-          Verband-Nr.
-        </Label>
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Verband-Nr.</Label>
         <Input value={verbandNr} onChange={(e) => setVerbandNr(e.target.value)} />
       </div>
       <label className="flex items-center gap-2 self-end text-sm">

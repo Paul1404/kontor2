@@ -1,9 +1,9 @@
 import { ORPCError } from "@orpc/server";
 import * as v from "valibot";
-import { adminProc, authedProc } from "~/server/orpc/base";
-import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
+import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
+import { adminProc, authedProc } from "~/server/orpc/base";
 import { normalizeIban, validateIban } from "~/server/sepa/iban";
 
 const UpdateInput = v.object({

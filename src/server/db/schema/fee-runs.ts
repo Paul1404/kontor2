@@ -23,12 +23,7 @@ export const feeRunStatusEnum = pgEnum("fee_run_status", [
   "cancelled",
 ]);
 
-export const sepaSequenceTypeEnum = pgEnum("sepa_sequence_type", [
-  "FRST",
-  "RCUR",
-  "OOFF",
-  "FNAL",
-]);
+export const sepaSequenceTypeEnum = pgEnum("sepa_sequence_type", ["FRST", "RCUR", "OOFF", "FNAL"]);
 
 export const sollStellungStatusEnum = pgEnum("soll_stellung_status", [
   "open",

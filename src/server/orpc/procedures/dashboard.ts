@@ -1,8 +1,8 @@
 import { and, count, eq, gte, isNotNull, isNull, sql } from "drizzle-orm";
 import * as v from "valibot";
-import { authedProc } from "~/server/orpc/base";
-import { membersTable } from "~/server/db/schema/members";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
+import { membersTable } from "~/server/db/schema/members";
+import { authedProc } from "~/server/orpc/base";
 
 function startOfMonth(): Date {
   const d = new Date();

@@ -98,8 +98,7 @@ export function ContractsCard({
                       {formatDate(v.vertragBegin)}
                     </td>
                     <td className="py-1 px-3 text-muted-foreground tabular-nums">
-                      {formatDate(v.vertragEnde) ||
-                        (v.gekuendAm ? formatDate(v.gekuendAm) : "")}
+                      {formatDate(v.vertragEnde) || (v.gekuendAm ? formatDate(v.gekuendAm) : "")}
                     </td>
                     {canEdit ? (
                       <td className="py-1 text-right">

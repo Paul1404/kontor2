@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { RPCHandler } from "@orpc/server/fetch";
-import { appRouter } from "~/server/orpc/router";
+import { createFileRoute } from "@tanstack/react-router";
 import { createContext } from "~/server/orpc/context";
+import { appRouter } from "~/server/orpc/router";
 
 const handler = new RPCHandler(appRouter);
 

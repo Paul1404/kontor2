@@ -1,11 +1,11 @@
 import { and, asc, between, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import * as v from "valibot";
-import { vorstandProc } from "~/server/orpc/base";
 import { attachmentsTable } from "~/server/db/schema/attachments";
 import { auditLogTable } from "~/server/db/schema/audit";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { membersTable } from "~/server/db/schema/members";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { vorstandProc } from "~/server/orpc/base";
 
 const ActionEnum = v.picklist(["create", "update", "delete", "restore"]);
 
@@ -45,11 +45,9 @@ export const auditRouter = {
   list: vorstandProc.input(ListInput).handler(async ({ context, input }) => {
     const conditions: ReturnType<typeof eq>[] = [];
     if (input.action) conditions.push(eq(auditLogTable.action, input.action) as never);
-    if (input.entityType)
-      conditions.push(eq(auditLogTable.entityType, input.entityType) as never);
+    if (input.entityType) conditions.push(eq(auditLogTable.entityType, input.entityType) as never);
     if (input.entityId) conditions.push(eq(auditLogTable.entityId, input.entityId) as never);
-    if (input.actorEmail)
-      conditions.push(eq(auditLogTable.actorEmail, input.actorEmail) as never);
+    if (input.actorEmail) conditions.push(eq(auditLogTable.actorEmail, input.actorEmail) as never);
     const from = toStartOfDay(input.from);
     const to = toEndOfDay(input.to);
     if (from && to) conditions.push(between(auditLogTable.createdAt, from, to) as never);
@@ -96,7 +94,12 @@ export const auditRouter = {
       else if (r.entityType === "member_attachment") attachmentIds.add(r.entityId);
     }
 
-    type MemberLite = { id: string; mitglnr: string | null; vorname: string | null; nachname: string | null };
+    type MemberLite = {
+      id: string;
+      mitglnr: string | null;
+      vorname: string | null;
+      nachname: string | null;
+    };
     const memberById = new Map<string, MemberLite>();
     const recordToMember = new Map<string, string>();
 
@@ -134,14 +137,7 @@ export const auditRouter = {
     ]);
 
     await loadMembers(
-      Array.from(
-        new Set([
-          ...memberIds,
-          ...contractMemberIds,
-          ...sepaMemberIds,
-          ...attMemberIds,
-        ]),
-      ),
+      Array.from(new Set([...memberIds, ...contractMemberIds, ...sepaMemberIds, ...attMemberIds])),
     );
 
     const resolved = rows.map((r) => {

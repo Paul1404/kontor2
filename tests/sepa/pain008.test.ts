@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPain008, formatAmount, __test } from "~/server/sepa/pain008";
+import { __test, buildPain008, formatAmount } from "~/server/sepa/pain008";
 
 const creditor = {
   name: "SV Untereuerheim 1945 e.V.",
@@ -22,9 +22,7 @@ describe("formatAmount", () => {
 
 describe("XML escaping", () => {
   it("escapes XML metacharacters", () => {
-    expect(__test.esc("Müller & Söhne <GmbH>")).toBe(
-      "Müller &amp; Söhne &lt;GmbH&gt;",
-    );
+    expect(__test.esc("Müller & Söhne <GmbH>")).toBe("Müller &amp; Söhne &lt;GmbH&gt;");
   });
 });
 
@@ -63,9 +61,7 @@ describe("buildPain008", () => {
 
   it("contains the pain.008.001.02 namespace", () => {
     const xml = buildPain008(baseInput);
-    expect(xml).toContain(
-      'xmlns="urn:iso:std:iso:20022:tech:xsd:pain.008.001.02"',
-    );
+    expect(xml).toContain('xmlns="urn:iso:std:iso:20022:tech:xsd:pain.008.001.02"');
   });
 
   it("emits group-level NbOfTxs and CtrlSum across all items", () => {
@@ -110,12 +106,14 @@ describe("buildPain008", () => {
     // FRST item in fixture is the 96.00 Familienbeitrag, RCUR is 54.00.
     // Regex used the [^]*? form to make the SeqTp match non-greedy across blocks.
     const frst =
-      xml.match(/<PmtInf>(?:(?!<\/PmtInf>)[\s\S])*?<SeqTp>FRST<\/SeqTp>(?:(?!<\/PmtInf>)[\s\S])*?<\/PmtInf>/)
-        ?.[0] ?? "";
+      xml.match(
+        /<PmtInf>(?:(?!<\/PmtInf>)[\s\S])*?<SeqTp>FRST<\/SeqTp>(?:(?!<\/PmtInf>)[\s\S])*?<\/PmtInf>/,
+      )?.[0] ?? "";
     expect(frst.match(/<CtrlSum>(\d+\.\d{2})<\/CtrlSum>/)?.[1]).toBe("96.00");
     const rcur =
-      xml.match(/<PmtInf>(?:(?!<\/PmtInf>)[\s\S])*?<SeqTp>RCUR<\/SeqTp>(?:(?!<\/PmtInf>)[\s\S])*?<\/PmtInf>/)
-        ?.[0] ?? "";
+      xml.match(
+        /<PmtInf>(?:(?!<\/PmtInf>)[\s\S])*?<SeqTp>RCUR<\/SeqTp>(?:(?!<\/PmtInf>)[\s\S])*?<\/PmtInf>/,
+      )?.[0] ?? "";
     expect(rcur.match(/<CtrlSum>(\d+\.\d{2})<\/CtrlSum>/)?.[1]).toBe("54.00");
   });
 

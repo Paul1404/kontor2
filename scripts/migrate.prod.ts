@@ -1,11 +1,11 @@
 #!/usr/bin/env node --experimental-strip-types
+import { drizzle } from "drizzle-orm/postgres-js";
 /**
  * Production-safe Drizzle migrator. Uses the runtime migrator only (no
  * drizzle-kit), so this script can be run inside the slim container where
  * dev dependencies are absent.
  */
 import { migrate } from "drizzle-orm/postgres-js/migrator";
-import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 async function main() {

@@ -1,11 +1,11 @@
-import { and, asc, count, eq, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
+import { and, asc, count, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
-import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
+import { appendAudit, diff } from "~/server/audit/log";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
 import { slugify } from "~/server/importer/abteilung-splitter";
-import { appendAudit, diff } from "~/server/audit/log";
+import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import { invalidateMemberCaches } from "~/server/search/cache";
 
 const NameInput = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80));
@@ -137,7 +137,10 @@ export const abteilungenRouter = {
         if ("inaktiv" in input) patch.inaktiv = input.inaktiv ?? false;
         if (Object.keys(patch).length === 0) return;
 
-        await tx.update(abteilungenTable).set(patch as never).where(eq(abteilungenTable.id, input.id));
+        await tx
+          .update(abteilungenTable)
+          .set(patch as never)
+          .where(eq(abteilungenTable.id, input.id));
 
         await appendAudit(tx, {
           entityType: "abteilung",

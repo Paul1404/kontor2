@@ -1,6 +1,6 @@
+import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import { envOnlyMacros } from "vite-env-only";
 

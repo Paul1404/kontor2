@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Save, X } from "lucide-react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -90,7 +90,9 @@ export function buildInitialValues(
   if (!member) return EMPTY_STAMM;
   const geschlechtRaw = member.geschlecht as string | null | undefined;
   const geschlecht: StammdatenValues["geschlecht"] =
-    geschlechtRaw === "m" || geschlechtRaw === "w" || geschlechtRaw === "d" ||
+    geschlechtRaw === "m" ||
+    geschlechtRaw === "w" ||
+    geschlechtRaw === "d" ||
     geschlechtRaw === "unbekannt"
       ? geschlechtRaw
       : "";
@@ -120,9 +122,7 @@ export function buildInitialValues(
       | "A"
       | "P"
       | "",
-    iban1: ((member.iban1 as string | null | undefined) ?? "")
-      .replace(/\s+/g, "")
-      .toUpperCase(),
+    iban1: ((member.iban1 as string | null | undefined) ?? "").replace(/\s+/g, "").toUpperCase(),
     abwKontoInh: (member.abwKontoInh as string) ?? "",
     notes: (member.notes as string) ?? "",
   };
@@ -207,10 +207,7 @@ export function MemberStammdatenForm({
     void onSubmit(values);
   }
 
-  const cleanedIban = useMemo(
-    () => values.iban1.replace(/\s+/g, "").toUpperCase(),
-    [values.iban1],
-  );
+  const cleanedIban = useMemo(() => values.iban1.replace(/\s+/g, "").toUpperCase(), [values.iban1]);
   const ibanLookup = useQuery({
     queryKey: ["banks.lookupByIban", cleanedIban],
     queryFn: () => orpc.banks.lookupByIban({ iban: cleanedIban }),
@@ -256,7 +253,9 @@ export function MemberStammdatenForm({
                 required
               />
             </FormField>
-            <FormField label={`Geburtsdatum${values.geburtsdatum ? ` · ${calcAge(values.geburtsdatum)}` : ""}`}>
+            <FormField
+              label={`Geburtsdatum${values.geburtsdatum ? ` · ${calcAge(values.geburtsdatum)}` : ""}`}
+            >
               <Input
                 type="date"
                 value={values.geburtsdatum}

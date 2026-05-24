@@ -1,9 +1,11 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Building2,
+  Clock,
   Coins,
   FileBarChart,
   FileSpreadsheet,
+  History,
   Layers,
   LayoutDashboard,
   Mail,
@@ -14,6 +16,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "~/lib/cn";
+import { useRecentMembers } from "~/lib/use-recent-members";
 
 type NavItem = {
   to: string;
@@ -88,12 +91,19 @@ const SECTIONS: NavSection[] = [
         icon: <Mail className="size-[18px]" />,
         adminOnly: true,
       },
+      {
+        to: "/app/admin/snapshots",
+        label: "Snapshots",
+        icon: <History className="size-[18px]" />,
+        adminOnly: true,
+      },
     ],
   },
 ];
 
 export function Sidebar({ role }: { role: string }) {
   const { location } = useRouterState();
+  const { recent } = useRecentMembers();
   return (
     <aside className="hidden h-full w-64 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground print:hidden md:flex md:flex-col">
       <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
@@ -161,6 +171,28 @@ export function Sidebar({ role }: { role: string }) {
             </div>
           );
         })}
+        {recent.length > 0 ? (
+          <div className="flex flex-col gap-1">
+            <div className="mb-1 flex items-center gap-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-muted">
+              <Clock className="size-3" />
+              Zuletzt angesehen
+            </div>
+            {recent.slice(0, 5).map((r) => (
+              <Link
+                key={r.mitglnr}
+                to="/app/mitglieder/$mitgliedsnummer"
+                params={{ mitgliedsnummer: r.mitglnr }}
+                className="group flex items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+                title={r.name}
+              >
+                <span className="truncate">{r.name || `#${r.mitglnr}`}</span>
+                <span className="ml-auto shrink-0 text-[10px] tabular-nums text-sidebar-muted">
+                  #{r.mitglnr}
+                </span>
+              </Link>
+            ))}
+          </div>
+        ) : null}
       </nav>
       <div className="border-t border-sidebar-border p-3">
         <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent/50 px-3 py-2 text-[11px] text-sidebar-muted">

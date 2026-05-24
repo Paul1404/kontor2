@@ -1,24 +1,23 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ChevronDown, Loader2, Pencil, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AbteilungenCard } from "~/components/forms/AbteilungenCard";
 import { AttachmentsCard } from "~/components/forms/AttachmentsCard";
 import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
 import { SepaCard } from "~/components/forms/SepaCard";
+import { SnapshotsTab } from "~/components/snapshots/SnapshotsTab";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import {
-  actionLabel,
-  fieldLabel,
-  formatAuditValue,
-  isHiddenField,
-} from "~/lib/audit-labels";
+import { CopyButton } from "~/components/ui/copy-button";
+import { toast } from "~/components/ui/toaster";
+import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/audit-labels";
 import { formatLand } from "~/lib/country";
 import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
+import { useRecentMembers } from "~/lib/use-recent-members";
 
 export const Route = createFileRoute("/app/mitglieder/$mitgliedsnummer")({
   component: MemberDetailPage,
@@ -39,10 +38,17 @@ function MemberDetailPage() {
   const softDelete = useMutation({
     mutationFn: (memberId: string) => orpc.members.softDelete({ memberId }),
     onSuccess: async () => {
+      toast.success("Mitglied gelöscht");
       await qc.invalidateQueries({ queryKey: ["members.list"] });
       navigate({ to: "/app/mitglieder" });
     },
+    onError: (err) =>
+      toast.error("Löschen fehlgeschlagen", {
+        description: err instanceof Error ? err.message : String(err),
+      }),
   });
+
+  const { push: pushRecent } = useRecentMembers();
 
   // Pull the IBAN before the early-return so the hook is called in the
   // same order on every render (rules-of-hooks).
@@ -50,21 +56,24 @@ function MemberDetailPage() {
     null) as string | null;
   const ibanInfo = useIbanBank(memberIban);
 
+  const memberDisplayName = useMemo(() => {
+    const m = detail.data?.member;
+    if (!m) return "";
+    return [m.titel1, m.vorname, m.nachname].filter(Boolean).join(" ");
+  }, [detail.data?.member]);
+
+  useEffect(() => {
+    if (!detail.data?.member?.mitglnr) return;
+    pushRecent({ mitglnr: detail.data.member.mitglnr, name: memberDisplayName });
+  }, [detail.data?.member?.mitglnr, memberDisplayName, pushRecent]);
+
   if (detail.isLoading) return <p className="text-muted-foreground">Wird geladen...</p>;
   if (detail.isError || !detail.data) {
     return <p className="text-destructive">Mitglied nicht gefunden.</p>;
   }
 
-  const {
-    member,
-    abteilungen,
-    vertraege,
-    sepa,
-    anhaenge,
-    audit,
-    beziehungen,
-    sollstellungen,
-  } = detail.data;
+  const { member, abteilungen, vertraege, sepa, anhaenge, audit, beziehungen, sollstellungen } =
+    detail.data;
   const canEdit = me.data?.role === "vorstand" || me.data?.role === "admin";
 
   // Prefer the IBAN-derived bank name/BIC over the stored values — those
@@ -85,9 +94,11 @@ function MemberDetailPage() {
           <h1 className="text-2xl font-semibold tracking-tight">
             {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Mitgliedsnummer: <span className="tabular-nums">{member.mitglnr}</span> · AdrNr{" "}
-            {member.adrNr}
+          <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+            Mitgliedsnummer: <span className="tabular-nums">{member.mitglnr}</span>
+            <CopyButton value={member.mitglnr} label="Mitgliedsnummer" />
+            <span className="text-muted-foreground/50">·</span>
+            <span>AdrNr {member.adrNr}</span>
           </p>
         </div>
         {canEdit ? (
@@ -155,9 +166,9 @@ function MemberDetailPage() {
                 .join("\n")}
             />
             <Field label="Land" value={formatLand(member.land)} />
-            <Field label="Telefon" value={member.telefon1} />
-            <Field label="Mobil" value={member.telefon2} />
-            <Field label="E-Mail" value={member.eMailName} />
+            <Field label="Telefon" value={member.telefon1} copyValue={member.telefon1} />
+            <Field label="Mobil" value={member.telefon2} copyValue={member.telefon2} />
+            <Field label="E-Mail" value={member.eMailName} copyValue={member.eMailName} />
             <Field label="Website" value={member.www} />
             <Field label="Eintritt" value={formatDate(member.eintritt)} />
             <Field label="Austritt" value={formatDate(member.austritt)} />
@@ -170,9 +181,14 @@ function MemberDetailPage() {
             <CardTitle>Bankverbindung</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 text-sm">
-            <Field label="IBAN" value={formatIbanGrouped(member.iban1)} mono />
+            <Field
+              label="IBAN"
+              value={formatIbanGrouped(member.iban1)}
+              copyValue={member.iban1 ? (member.iban1 as string).replace(/\s+/g, "") : null}
+              mono
+            />
             <Field label="Bank" value={bankDisplay} />
-            <Field label="BIC" value={bicDisplay} mono />
+            <Field label="BIC" value={bicDisplay} copyValue={bicDisplay} mono />
             <Field label="Kontoinhaber" value={member.abwKontoInh} />
             {ibanInfo ? (
               <p className="text-xs text-muted-foreground">
@@ -231,6 +247,8 @@ function MemberDetailPage() {
         anhaenge={anhaenge}
         canEdit={canEdit}
       />
+
+      <SnapshotsTab memberId={member.id} mitgliedsnummer={mitgliedsnummer} canRestore={canEdit} />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -373,9 +391,7 @@ function SollstellungenCard({ rows }: { rows: SollstellungRow[] }) {
                 <td className="px-4 py-2 tabular-nums text-muted-foreground">
                   {formatDate(r.falligkeitsdatum)}
                 </td>
-                <td className="px-4 py-2 text-right tabular-nums">
-                  {formatCurrency(r.amount)}
-                </td>
+                <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(r.amount)}</td>
                 <td className="px-4 py-2 text-right tabular-nums">
                   {formatCurrency(r.openAmount)}
                 </td>
@@ -407,16 +423,30 @@ function SollstellungStatusBadge({ status }: { status: string }) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
-function Field({ label, value, mono }: { label: string; value: unknown; mono?: boolean }) {
+function Field({
+  label,
+  value,
+  mono,
+  copyValue,
+}: {
+  label: string;
+  value: unknown;
+  mono?: boolean;
+  copyValue?: string | null;
+}) {
+  const isEmpty = value == null || value === "";
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-xs uppercase text-muted-foreground tracking-wide">{label}</span>
-      <span className={`whitespace-pre-line ${mono ? "font-mono tabular-nums" : ""}`}>
-        {value == null || value === "" ? (
+      <span
+        className={`flex items-center gap-1 whitespace-pre-line ${mono ? "font-mono tabular-nums" : ""}`}
+      >
+        {isEmpty ? (
           <span className="text-muted-foreground">k.A.</span>
         ) : (
-          String(value)
+          <span>{String(value)}</span>
         )}
+        {!isEmpty && copyValue ? <CopyButton value={copyValue} label={label} /> : null}
       </span>
     </div>
   );
