@@ -46,6 +46,11 @@ function buildPatch(input: v.InferOutput<typeof FeeTypePatch>): Record<string, u
 
 export const feeTypesRouter = {
   list: authedProc.input(v.void()).handler(async ({ context }) => {
+    // Aliased subquery is intentional: Drizzle elides table qualifiers for
+    // column refs inside `sql` templates when used in a top-level select(),
+    // so `${contractsTable.art} = ${feeTypesTable.art}` would compile to
+    // `"art" = "art"` (always true) and return the total row count for
+    // every fee type. Using an alias on the inner table sidesteps that.
     return context.db
       .select({
         art: feeTypesTable.art,
@@ -56,7 +61,7 @@ export const feeTypesRouter = {
         kontoname: feeTypesTable.kontoname,
         valuta: feeTypesTable.valuta,
         nichAktiv: feeTypesTable.nichAktiv,
-        contractCount: sql<number>`(select count(*) from ${contractsTable} where ${contractsTable.art} = ${feeTypesTable.art})::int`,
+        contractCount: sql<number>`(select count(*)::int from contracts c where c.art = fee_types.art)`,
       })
       .from(feeTypesTable)
       .orderBy(asc(feeTypesTable.art));

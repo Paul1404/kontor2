@@ -13,13 +13,16 @@ const DateStringInput = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
 
 export const abteilungenRouter = {
   list: authedProc.input(v.void()).handler(async ({ context }) => {
+    // Use raw qualified table names in the correlated subquery. Drizzle's
+    // `sql` template elides column qualifiers inside .select(), so passing
+    // `${table.column}` here yields `"id" = "id"` (always true).
     return context.db
       .select({
         id: abteilungenTable.id,
         name: abteilungenTable.name,
         slug: abteilungenTable.slug,
-        memberCount: sql<number>`(select count(*) from ${memberAbteilungenTable} where ${memberAbteilungenTable.abteilungId} = ${abteilungenTable.id} and ${memberAbteilungenTable.austrittsdatum} is null)::int`,
-        totalCount: sql<number>`(select count(*) from ${memberAbteilungenTable} where ${memberAbteilungenTable.abteilungId} = ${abteilungenTable.id})::int`,
+        memberCount: sql<number>`(select count(*)::int from member_abteilungen ma where ma.abteilung_id = abteilungen.id and ma.austrittsdatum is null)`,
+        totalCount: sql<number>`(select count(*)::int from member_abteilungen ma where ma.abteilung_id = abteilungen.id)`,
       })
       .from(abteilungenTable)
       .orderBy(asc(abteilungenTable.name));

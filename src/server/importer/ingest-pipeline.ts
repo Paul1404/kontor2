@@ -13,6 +13,8 @@ import { splitAbteilung, slugify } from "~/server/importer/abteilung-splitter";
 import {
   mapContractRow,
   mapFeeTypeRow,
+  mapInterRow,
+  mapInteresRow,
   mapMemberRow,
   mapSepaRow,
   mapVerknRow,
@@ -30,6 +32,10 @@ export type IngestInput = {
   contracts?: LinearRow[];
   sepa?: LinearRow[];
   relationships?: LinearRow[];
+  /** Linear `inter` lookup table (Nr → Interesse/Abteilung name). */
+  inter?: LinearRow[];
+  /** Linear `interes` table — per-member Abteilungs-Mitgliedschaft. */
+  interes?: LinearRow[];
   requestId?: string | null;
   /**
    * When true, member→Abteilung links are wiped for the AdrNrs in this batch
@@ -301,6 +307,71 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
         relationshipsWritten += 1;
       } catch (e) {
         errors.push({ table: "verkn", message: (e as Error).message });
+      }
+    }
+  }
+
+  // 6. Per-member Abteilungs-Mitgliedschaften from Linear's `interes` table.
+  // Linear stores them as numeric FKs into `inter` (and *also* sometimes
+  // duplicates the name into `adresse.Abteilung` as a comma-separated list,
+  // handled at step 2b above). Most exports carry only one of the two; we
+  // merge both so the result is correct regardless.
+  //
+  // Convention: `inter` Nr that resolves to the name "Keine-Abteilung" is a
+  // Linear marker for "this member explicitly has no abteilung" — we skip
+  // those rather than create an "Keine-Abteilung" abteilung in the UI.
+  if ((input.interes?.length ?? 0) > 0 && adrNrToMemberId.size > 0) {
+    const interNrToName = new Map<number, string>();
+    for (const raw of input.inter ?? []) {
+      const m = mapInterRow(raw);
+      if (!m) continue;
+      interNrToName.set(m.nr, m.name);
+    }
+
+    for (const raw of input.interes ?? []) {
+      try {
+        const mapped = mapInteresRow(raw);
+        if (!mapped) continue;
+        const memberId = adrNrToMemberId.get(mapped.adrNr);
+        if (!memberId) continue;
+        const name = interNrToName.get(mapped.interesNr);
+        if (!name) continue;
+        // Linear's "no abteilung" sentinel.
+        if (/keine[-\s]?abteilung/i.test(name)) continue;
+
+        let aid = abteilungByName.get(name.toLowerCase());
+        if (!aid) {
+          const [created] = await db
+            .insert(abteilungenTable)
+            .values({ name, slug: slugify(name) })
+            .onConflictDoNothing({ target: abteilungenTable.name })
+            .returning({ id: abteilungenTable.id });
+          if (created) aid = created.id;
+          else {
+            const [existing2] = await db
+              .select({ id: abteilungenTable.id })
+              .from(abteilungenTable)
+              .where(eq(abteilungenTable.name, name))
+              .limit(1);
+            aid = existing2?.id;
+          }
+          if (aid) abteilungByName.set(name.toLowerCase(), aid);
+        }
+        if (!aid) continue;
+
+        const dateStr = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+        const eintrittsdatum = dateStr(mapped.eintritt) ?? "1900-01-01";
+        await db
+          .insert(memberAbteilungenTable)
+          .values({
+            memberId,
+            abteilungId: aid,
+            eintrittsdatum,
+            austrittsdatum: dateStr(mapped.austritt),
+          })
+          .onConflictDoNothing();
+      } catch (e) {
+        errors.push({ table: "interes", message: (e as Error).message });
       }
     }
   }

@@ -8,7 +8,15 @@
 export type Cell = string | number | boolean | null;
 export type Row = Cell[];
 
-export const SUPPORTED_TABLES = new Set(["adresse", "mgart", "mgvert", "adrsepa", "verkn"]);
+export const SUPPORTED_TABLES = new Set([
+  "adresse",
+  "mgart",
+  "mgvert",
+  "adrsepa",
+  "verkn",
+  "inter",
+  "interes",
+]);
 
 const ESCAPES: Record<string, string> = {
   n: "\n",

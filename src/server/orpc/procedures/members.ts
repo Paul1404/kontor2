@@ -316,7 +316,7 @@ export const membersRouter = {
         id: abteilungenTable.id,
         name: abteilungenTable.name,
         slug: abteilungenTable.slug,
-        count: sql<number>`(select count(*) from ${memberAbteilungenTable} where ${memberAbteilungenTable.abteilungId} = ${abteilungenTable.id})::int`,
+        count: sql<number>`(select count(*)::int from member_abteilungen ma where ma.abteilung_id = abteilungen.id)`,
       })
       .from(abteilungenTable)
       .orderBy(asc(abteilungenTable.name));

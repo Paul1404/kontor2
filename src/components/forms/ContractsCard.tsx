@@ -68,20 +68,20 @@ export function ContractsCard({
           <table className="w-full text-sm">
             <thead className="text-left text-muted-foreground">
               <tr>
-                <th className="py-1">Vertrag</th>
-                <th className="py-1">Art</th>
-                <th className="py-1 text-right">Betrag</th>
-                <th className="py-1">Beginn</th>
+                <th className="py-1 pr-3">Vertrag</th>
+                <th className="py-1 pr-3">Art</th>
+                <th className="py-1 pr-3 text-right">Betrag</th>
+                <th className="py-1 pl-3">Beginn</th>
                 {canEdit ? <th className="py-1 w-10" /> : null}
               </tr>
             </thead>
             <tbody>
               {vertraege.map((v) => (
                 <tr key={v.id} className="border-t">
-                  <td className="py-1 tabular-nums">{v.vertragNr}</td>
-                  <td className="py-1">{v.artName ?? v.art}</td>
-                  <td className="py-1 text-right tabular-nums">{formatCurrency(v.betrag)}</td>
-                  <td className="py-1 text-muted-foreground">{formatDate(v.vertragBegin)}</td>
+                  <td className="py-1 pr-3 tabular-nums">{v.vertragNr}</td>
+                  <td className="py-1 pr-3">{v.artName ?? v.art}</td>
+                  <td className="py-1 pr-3 text-right tabular-nums">{formatCurrency(v.betrag)}</td>
+                  <td className="py-1 pl-3 text-muted-foreground">{formatDate(v.vertragBegin)}</td>
                   {canEdit ? (
                     <td className="py-1 text-right">
                       <Button

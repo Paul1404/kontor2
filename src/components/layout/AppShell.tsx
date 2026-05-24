@@ -17,9 +17,7 @@ export function AppShell({
 }) {
   return (
     <div className="flex h-screen bg-background print:h-auto print:block">
-      <div className="print:hidden">
-        <Sidebar role={role} />
-      </div>
+      <Sidebar role={role} />
       <main className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
         <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-border glass px-4 md:px-6 print:hidden">
           <div className="flex items-center gap-3 md:hidden">
