@@ -17,12 +17,19 @@ import { Route as AppImportRouteImport } from './routes/app/import'
 import { Route as AppAuditRouteImport } from './routes/app/audit'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppMitgliederIndexRouteImport } from './routes/app/mitglieder/index'
+import { Route as AppBerichteIndexRouteImport } from './routes/app/berichte/index'
 import { Route as AppBeitragIndexRouteImport } from './routes/app/beitrag/index'
 import { Route as AppMitgliederNeuRouteImport } from './routes/app/mitglieder/neu'
 import { Route as AppMitgliederMitgliedsnummerRouteImport } from './routes/app/mitglieder/$mitgliedsnummer'
 import { Route as AppEinstellungenVereinRouteImport } from './routes/app/einstellungen/verein'
 import { Route as AppEinstellungenSmtpRouteImport } from './routes/app/einstellungen/smtp'
 import { Route as AppEinstellungenBenutzerRouteImport } from './routes/app/einstellungen/benutzer'
+import { Route as AppEinstellungenBeitragsartenRouteImport } from './routes/app/einstellungen/beitragsarten'
+import { Route as AppEinstellungenAbteilungenRouteImport } from './routes/app/einstellungen/abteilungen'
+import { Route as AppBerichteGeburtstageRouteImport } from './routes/app/berichte/geburtstage'
+import { Route as AppBerichteFinanzenRouteImport } from './routes/app/berichte/finanzen'
+import { Route as AppBerichteEhrungenRouteImport } from './routes/app/berichte/ehrungen'
+import { Route as AppBerichteAbteilungsStatistikRouteImport } from './routes/app/berichte/abteilungs-statistik'
 import { Route as AppBeitragNeuRouteImport } from './routes/app/beitrag/neu'
 import { Route as AppBeitragIdRouteImport } from './routes/app/beitrag/$id'
 import { Route as ApiRpcSplatRouteImport } from './routes/api/rpc.$'
@@ -71,6 +78,11 @@ const AppMitgliederIndexRoute = AppMitgliederIndexRouteImport.update({
   path: '/mitglieder/',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppBerichteIndexRoute = AppBerichteIndexRouteImport.update({
+  id: '/berichte/',
+  path: '/berichte/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppBeitragIndexRoute = AppBeitragIndexRouteImport.update({
   id: '/beitrag/',
   path: '/beitrag/',
@@ -101,6 +113,39 @@ const AppEinstellungenBenutzerRoute =
   AppEinstellungenBenutzerRouteImport.update({
     id: '/einstellungen/benutzer',
     path: '/einstellungen/benutzer',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppEinstellungenBeitragsartenRoute =
+  AppEinstellungenBeitragsartenRouteImport.update({
+    id: '/einstellungen/beitragsarten',
+    path: '/einstellungen/beitragsarten',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppEinstellungenAbteilungenRoute =
+  AppEinstellungenAbteilungenRouteImport.update({
+    id: '/einstellungen/abteilungen',
+    path: '/einstellungen/abteilungen',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppBerichteGeburtstageRoute = AppBerichteGeburtstageRouteImport.update({
+  id: '/berichte/geburtstage',
+  path: '/berichte/geburtstage',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBerichteFinanzenRoute = AppBerichteFinanzenRouteImport.update({
+  id: '/berichte/finanzen',
+  path: '/berichte/finanzen',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBerichteEhrungenRoute = AppBerichteEhrungenRouteImport.update({
+  id: '/berichte/ehrungen',
+  path: '/berichte/ehrungen',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBerichteAbteilungsStatistikRoute =
+  AppBerichteAbteilungsStatistikRouteImport.update({
+    id: '/berichte/abteilungs-statistik',
+    path: '/berichte/abteilungs-statistik',
     getParentRoute: () => AppRouteRoute,
   } as any)
 const AppBeitragNeuRoute = AppBeitragNeuRouteImport.update({
@@ -154,12 +199,19 @@ export interface FileRoutesByFullPath {
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
+  '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
+  '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
+  '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
+  '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
+  '/app/einstellungen/abteilungen': typeof AppEinstellungenAbteilungenRoute
+  '/app/einstellungen/beitragsarten': typeof AppEinstellungenBeitragsartenRoute
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
   '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRouteWithChildren
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
   '/app/beitrag/': typeof AppBeitragIndexRoute
+  '/app/berichte/': typeof AppBerichteIndexRoute
   '/app/mitglieder/': typeof AppMitgliederIndexRoute
   '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
@@ -176,12 +228,19 @@ export interface FileRoutesByTo {
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
+  '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
+  '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
+  '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
+  '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
+  '/app/einstellungen/abteilungen': typeof AppEinstellungenAbteilungenRoute
+  '/app/einstellungen/beitragsarten': typeof AppEinstellungenBeitragsartenRoute
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
   '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRouteWithChildren
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
   '/app/beitrag': typeof AppBeitragIndexRoute
+  '/app/berichte': typeof AppBerichteIndexRoute
   '/app/mitglieder': typeof AppMitgliederIndexRoute
   '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
@@ -200,12 +259,19 @@ export interface FileRoutesById {
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
+  '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
+  '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
+  '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
+  '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
+  '/app/einstellungen/abteilungen': typeof AppEinstellungenAbteilungenRoute
+  '/app/einstellungen/beitragsarten': typeof AppEinstellungenBeitragsartenRoute
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
   '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRouteWithChildren
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
   '/app/beitrag/': typeof AppBeitragIndexRoute
+  '/app/berichte/': typeof AppBerichteIndexRoute
   '/app/mitglieder/': typeof AppMitgliederIndexRoute
   '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
@@ -225,12 +291,19 @@ export interface FileRouteTypes {
     | '/api/rpc/$'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
+    | '/app/berichte/abteilungs-statistik'
+    | '/app/berichte/ehrungen'
+    | '/app/berichte/finanzen'
+    | '/app/berichte/geburtstage'
+    | '/app/einstellungen/abteilungen'
+    | '/app/einstellungen/beitragsarten'
     | '/app/einstellungen/benutzer'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
     | '/app/mitglieder/$mitgliedsnummer'
     | '/app/mitglieder/neu'
     | '/app/beitrag/'
+    | '/app/berichte/'
     | '/app/mitglieder/'
     | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
   fileRoutesByTo: FileRoutesByTo
@@ -247,12 +320,19 @@ export interface FileRouteTypes {
     | '/api/rpc/$'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
+    | '/app/berichte/abteilungs-statistik'
+    | '/app/berichte/ehrungen'
+    | '/app/berichte/finanzen'
+    | '/app/berichte/geburtstage'
+    | '/app/einstellungen/abteilungen'
+    | '/app/einstellungen/beitragsarten'
     | '/app/einstellungen/benutzer'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
     | '/app/mitglieder/$mitgliedsnummer'
     | '/app/mitglieder/neu'
     | '/app/beitrag'
+    | '/app/berichte'
     | '/app/mitglieder'
     | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
   id:
@@ -270,12 +350,19 @@ export interface FileRouteTypes {
     | '/api/rpc/$'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
+    | '/app/berichte/abteilungs-statistik'
+    | '/app/berichte/ehrungen'
+    | '/app/berichte/finanzen'
+    | '/app/berichte/geburtstage'
+    | '/app/einstellungen/abteilungen'
+    | '/app/einstellungen/beitragsarten'
     | '/app/einstellungen/benutzer'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
     | '/app/mitglieder/$mitgliedsnummer'
     | '/app/mitglieder/neu'
     | '/app/beitrag/'
+    | '/app/berichte/'
     | '/app/mitglieder/'
     | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
   fileRoutesById: FileRoutesById
@@ -349,6 +436,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMitgliederIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/berichte/': {
+      id: '/app/berichte/'
+      path: '/berichte'
+      fullPath: '/app/berichte/'
+      preLoaderRoute: typeof AppBerichteIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/beitrag/': {
       id: '/app/beitrag/'
       path: '/beitrag'
@@ -389,6 +483,48 @@ declare module '@tanstack/react-router' {
       path: '/einstellungen/benutzer'
       fullPath: '/app/einstellungen/benutzer'
       preLoaderRoute: typeof AppEinstellungenBenutzerRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/beitragsarten': {
+      id: '/app/einstellungen/beitragsarten'
+      path: '/einstellungen/beitragsarten'
+      fullPath: '/app/einstellungen/beitragsarten'
+      preLoaderRoute: typeof AppEinstellungenBeitragsartenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/abteilungen': {
+      id: '/app/einstellungen/abteilungen'
+      path: '/einstellungen/abteilungen'
+      fullPath: '/app/einstellungen/abteilungen'
+      preLoaderRoute: typeof AppEinstellungenAbteilungenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/geburtstage': {
+      id: '/app/berichte/geburtstage'
+      path: '/berichte/geburtstage'
+      fullPath: '/app/berichte/geburtstage'
+      preLoaderRoute: typeof AppBerichteGeburtstageRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/finanzen': {
+      id: '/app/berichte/finanzen'
+      path: '/berichte/finanzen'
+      fullPath: '/app/berichte/finanzen'
+      preLoaderRoute: typeof AppBerichteFinanzenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/ehrungen': {
+      id: '/app/berichte/ehrungen'
+      path: '/berichte/ehrungen'
+      fullPath: '/app/berichte/ehrungen'
+      preLoaderRoute: typeof AppBerichteEhrungenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/abteilungs-statistik': {
+      id: '/app/berichte/abteilungs-statistik'
+      path: '/berichte/abteilungs-statistik'
+      fullPath: '/app/berichte/abteilungs-statistik'
+      preLoaderRoute: typeof AppBerichteAbteilungsStatistikRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/beitrag/neu': {
@@ -464,12 +600,19 @@ interface AppRouteRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppBeitragIdRoute: typeof AppBeitragIdRoute
   AppBeitragNeuRoute: typeof AppBeitragNeuRoute
+  AppBerichteAbteilungsStatistikRoute: typeof AppBerichteAbteilungsStatistikRoute
+  AppBerichteEhrungenRoute: typeof AppBerichteEhrungenRoute
+  AppBerichteFinanzenRoute: typeof AppBerichteFinanzenRoute
+  AppBerichteGeburtstageRoute: typeof AppBerichteGeburtstageRoute
+  AppEinstellungenAbteilungenRoute: typeof AppEinstellungenAbteilungenRoute
+  AppEinstellungenBeitragsartenRoute: typeof AppEinstellungenBeitragsartenRoute
   AppEinstellungenBenutzerRoute: typeof AppEinstellungenBenutzerRoute
   AppEinstellungenSmtpRoute: typeof AppEinstellungenSmtpRoute
   AppEinstellungenVereinRoute: typeof AppEinstellungenVereinRoute
   AppMitgliederMitgliedsnummerRoute: typeof AppMitgliederMitgliedsnummerRouteWithChildren
   AppMitgliederNeuRoute: typeof AppMitgliederNeuRoute
   AppBeitragIndexRoute: typeof AppBeitragIndexRoute
+  AppBerichteIndexRoute: typeof AppBerichteIndexRoute
   AppMitgliederIndexRoute: typeof AppMitgliederIndexRoute
 }
 
@@ -479,6 +622,12 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppBeitragIdRoute: AppBeitragIdRoute,
   AppBeitragNeuRoute: AppBeitragNeuRoute,
+  AppBerichteAbteilungsStatistikRoute: AppBerichteAbteilungsStatistikRoute,
+  AppBerichteEhrungenRoute: AppBerichteEhrungenRoute,
+  AppBerichteFinanzenRoute: AppBerichteFinanzenRoute,
+  AppBerichteGeburtstageRoute: AppBerichteGeburtstageRoute,
+  AppEinstellungenAbteilungenRoute: AppEinstellungenAbteilungenRoute,
+  AppEinstellungenBeitragsartenRoute: AppEinstellungenBeitragsartenRoute,
   AppEinstellungenBenutzerRoute: AppEinstellungenBenutzerRoute,
   AppEinstellungenSmtpRoute: AppEinstellungenSmtpRoute,
   AppEinstellungenVereinRoute: AppEinstellungenVereinRoute,
@@ -486,6 +635,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
     AppMitgliederMitgliedsnummerRouteWithChildren,
   AppMitgliederNeuRoute: AppMitgliederNeuRoute,
   AppBeitragIndexRoute: AppBeitragIndexRoute,
+  AppBerichteIndexRoute: AppBerichteIndexRoute,
   AppMitgliederIndexRoute: AppMitgliederIndexRoute,
 }
 

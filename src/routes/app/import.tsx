@@ -25,11 +25,16 @@ function fileToBase64(file: File): Promise<string> {
 
 function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [forceOverwriteAbteilungLinks, setForceOverwriteAbteilungLinks] = useState(false);
   const upload = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("Keine Datei ausgewählt.");
       const contentBase64 = await fileToBase64(file);
-      return orpc.import.uploadSqlDump({ filename: file.name, contentBase64 });
+      return orpc.import.uploadSqlDump({
+        filename: file.name,
+        contentBase64,
+        forceOverwriteAbteilungLinks,
+      });
     },
   });
 
@@ -72,6 +77,22 @@ function ImportPage() {
               </span>
             </div>
           ) : null}
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-input bg-card/50 p-3 text-sm">
+            <input
+              type="checkbox"
+              checked={forceOverwriteAbteilungLinks}
+              onChange={(e) => setForceOverwriteAbteilungLinks(e.target.checked)}
+              className="mt-0.5 size-4 accent-primary"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="font-medium">Abteilungs-Zuordnungen aus Linear überschreiben</span>
+              <span className="text-xs text-muted-foreground">
+                Vorhandene Abteilungs-Mitgliedschaften der importierten Mitglieder werden gelöscht
+                und exakt nach Linear neu angelegt. Manuell ergänzte Zuordnungen gehen verloren.
+                Stammdaten, Verträge und SEPA werden ohnehin immer überschrieben.
+              </span>
+            </span>
+          </label>
           <div className="flex items-center gap-3">
             <Button onClick={() => upload.mutate()} disabled={!file || upload.isPending}>
               {upload.isPending ? (

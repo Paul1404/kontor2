@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { AbteilungenCard } from "~/components/forms/AbteilungenCard";
 import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
 import { SepaCard } from "~/components/forms/SepaCard";
@@ -139,28 +140,12 @@ function MemberDetailPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Abteilungen</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {abteilungen.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Keine Abteilungszuordnung.</p>
-          ) : (
-            <ul className="flex flex-col divide-y">
-              {abteilungen.map((a) => (
-                <li key={a.id} className="flex items-center justify-between py-2 text-sm">
-                  <span>{a.name}</span>
-                  <span className="text-muted-foreground">
-                    Eintritt {formatDate(a.eintrittsdatum)}
-                    {a.austrittsdatum ? ` · Austritt ${formatDate(a.austrittsdatum)}` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <AbteilungenCard
+        memberId={member.id}
+        mitgliedsnummer={mitgliedsnummer}
+        abteilungen={abteilungen as never}
+        canEdit={canEdit}
+      />
 
       <BeziehungenCard
         memberId={member.id}

@@ -2,7 +2,9 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Building2,
   Coins,
+  FileBarChart,
   FileSpreadsheet,
+  Layers,
   LayoutDashboard,
   Mail,
   ScrollText,
@@ -38,6 +40,12 @@ const SECTIONS: NavSection[] = [
         icon: <Coins className="size-[18px]" />,
         vorstandOnly: true,
       },
+      {
+        to: "/app/berichte",
+        label: "Berichte",
+        icon: <FileBarChart className="size-[18px]" />,
+        vorstandOnly: true,
+      },
       { to: "/app/audit", label: "Audit Log", icon: <ScrollText className="size-[18px]" /> },
     ],
   },
@@ -54,6 +62,18 @@ const SECTIONS: NavSection[] = [
         to: "/app/einstellungen/verein",
         label: "Vereinsdaten",
         icon: <Building2 className="size-[18px]" />,
+        adminOnly: true,
+      },
+      {
+        to: "/app/einstellungen/abteilungen",
+        label: "Abteilungen",
+        icon: <Layers className="size-[18px]" />,
+        adminOnly: true,
+      },
+      {
+        to: "/app/einstellungen/beitragsarten",
+        label: "Beitragsarten",
+        icon: <Coins className="size-[18px]" />,
         adminOnly: true,
       },
       {

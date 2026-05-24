@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
-import { triggerDownload } from "~/routes/app/beitrag/index";
+import { triggerDownload } from "~/lib/download";
 
 export const Route = createFileRoute("/app/beitrag/$id")({
   component: FeeRunDetailPage,
@@ -28,8 +28,7 @@ function FeeRunDetailPage() {
   });
 
   const cancel = useMutation({
-    mutationFn: () =>
-      orpc.feeRuns.cancel({ id, reason: cancelReason.trim() || null }),
+    mutationFn: () => orpc.feeRuns.cancel({ id, reason: cancelReason.trim() || null }),
     onSuccess: () => {
       setCancelOpen(false);
       qc.invalidateQueries({ queryKey: ["feeRuns.get", id] });
@@ -76,7 +75,11 @@ function FeeRunDetailPage() {
               variant="outline"
               onClick={async () => {
                 const res = await orpc.feeRuns.downloadXml({ id });
-                triggerDownload(res.filename ?? r.xmlFilename ?? "lauf.xml", res.content);
+                triggerDownload(
+                  res.filename ?? r.xmlFilename ?? "lauf.xml",
+                  res.content,
+                  "application/xml",
+                );
               }}
             >
               <Download className="size-4" /> pain.008
@@ -125,9 +128,7 @@ function FeeRunDetailPage() {
                 </Button>
               </div>
               {cancel.error ? (
-                <div className="text-sm text-destructive">
-                  {(cancel.error as Error).message}
-                </div>
+                <div className="text-sm text-destructive">{(cancel.error as Error).message}</div>
               ) : null}
             </div>
           </CardContent>
@@ -140,11 +141,7 @@ function FeeRunDetailPage() {
           label="Bestätigt am"
           value={r.committedAt ? formatDateTime(r.committedAt) : "-"}
         />
-        <InfoTile
-          label="MsgId"
-          value={r.xmlMessageId ?? "-"}
-          mono
-        />
+        <InfoTile label="MsgId" value={r.xmlMessageId ?? "-"} mono />
       </div>
 
       {r.notes ? (
@@ -226,13 +223,12 @@ function FeeRunDetailPage() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> =
-    {
-      draft: { label: "Entwurf", variant: "secondary" },
-      committed: { label: "Erzeugt", variant: "default" },
-      submitted: { label: "Übermittelt", variant: "default" },
-      cancelled: { label: "Storniert", variant: "destructive" },
-    };
+  const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
+    draft: { label: "Entwurf", variant: "secondary" },
+    committed: { label: "Erzeugt", variant: "default" },
+    submitted: { label: "Übermittelt", variant: "default" },
+    cancelled: { label: "Storniert", variant: "destructive" },
+  };
   const cfg = map[status] ?? { label: status, variant: "secondary" as const };
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
 }

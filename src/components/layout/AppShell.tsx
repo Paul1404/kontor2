@@ -16,10 +16,12 @@ export function AppShell({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar role={role} />
-      <main className="flex flex-1 flex-col overflow-hidden">
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-border glass px-4 md:px-6">
+    <div className="flex h-screen bg-background print:h-auto print:block">
+      <div className="print:hidden">
+        <Sidebar role={role} />
+      </div>
+      <main className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-border glass px-4 md:px-6 print:hidden">
           <div className="flex items-center gap-3 md:hidden">
             <div className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-border">
               <img src="/logo.png" alt="SV Untereuerheim" className="size-7 object-contain" />
@@ -48,8 +50,10 @@ export function AppShell({
             </Button>
           </div>
         </header>
-        <div className="flex-1 overflow-auto scrollbar-thin">
-          <div className="mx-auto w-full max-w-7xl p-4 md:p-8">{children ?? <Outlet />}</div>
+        <div className="flex-1 overflow-auto scrollbar-thin print:overflow-visible">
+          <div className="mx-auto w-full max-w-7xl p-4 md:p-8 print:max-w-none print:p-0">
+            {children ?? <Outlet />}
+          </div>
         </div>
       </main>
     </div>

@@ -4,6 +4,7 @@ import { Coins, Download, Loader2, Plus } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { triggerDownload } from "~/lib/download";
 import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -143,22 +144,10 @@ function DownloadButton({ runId, filename }: { runId: string; filename: string }
       size="sm"
       onClick={async () => {
         const res = await orpc.feeRuns.downloadXml({ id: runId });
-        triggerDownload(res.filename ?? filename, res.content);
+        triggerDownload(res.filename ?? filename, res.content, "application/xml");
       }}
     >
       <Download className="size-4" /> XML
     </Button>
   );
-}
-
-export function triggerDownload(filename: string, content: string) {
-  const blob = new Blob([content], { type: "application/xml" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }

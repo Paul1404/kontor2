@@ -31,6 +31,13 @@ export type IngestInput = {
   sepa?: LinearRow[];
   relationships?: LinearRow[];
   requestId?: string | null;
+  /**
+   * When true, member→Abteilung links are wiped for the AdrNrs in this batch
+   * before re-creating them from the dump. This makes Linear the source of
+   * truth for the assignment, at the cost of losing any links added manually
+   * in the UI after the previous import.
+   */
+  forceOverwriteAbteilungLinks?: boolean;
 };
 
 export type IngestResult = {
@@ -89,6 +96,27 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
   // Preload existing Abteilungen so we don't insert duplicates per row.
   for (const a of await db.select().from(abteilungenTable)) {
     abteilungByName.set(a.name.toLowerCase(), a.id);
+  }
+
+  // Force-overwrite mode: wipe the existing Abteilungs-Mitgliedschaften for
+  // members that are in the incoming dump, so the upsert below re-creates them
+  // exactly as Linear has them now.
+  if (input.forceOverwriteAbteilungLinks) {
+    const incomingAdrNrs = (input.members ?? [])
+      .map((r) => Number(r.AdrNr ?? r.adr_nr ?? r.adrNr))
+      .filter((n) => Number.isFinite(n)) as number[];
+    if (incomingAdrNrs.length > 0) {
+      const existing = await db
+        .select({ id: membersTable.id })
+        .from(membersTable)
+        .where(inArray(membersTable.adrNr, incomingAdrNrs));
+      const ids = existing.map((r) => r.id);
+      if (ids.length > 0) {
+        await db
+          .delete(memberAbteilungenTable)
+          .where(inArray(memberAbteilungenTable.memberId, ids));
+      }
+    }
   }
 
   for (const raw of input.members ?? []) {

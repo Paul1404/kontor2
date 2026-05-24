@@ -12,6 +12,7 @@ export const importRouter = {
       v.object({
         filename: v.string(),
         contentBase64: v.pipe(v.string(), v.minLength(1)),
+        forceOverwriteAbteilungLinks: v.optional(v.boolean(), false),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -63,6 +64,7 @@ export const importRouter = {
         sepa,
         relationships,
         requestId: context.requestId,
+        forceOverwriteAbteilungLinks: input.forceOverwriteAbteilungLinks,
       });
       return result;
     }),
