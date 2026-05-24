@@ -6,6 +6,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
+import { PageSizeSelect, usePersistentPageSize } from "~/components/ui/page-size-select";
 import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -36,7 +37,7 @@ function MembersListPage() {
   const [abteilungId, setAbteilungId] = useState<string | null>(null);
   const [includeAusgetretene, setIncludeAusgetretene] = useState(false);
   const [page, setPage] = useState(1);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = usePersistentPageSize("members.pageSize", 50);
 
   const abteilungen = useQuery({
     queryKey: ["abteilungen", "members"],
@@ -47,7 +48,7 @@ function MembersListPage() {
   const canEdit = me.data?.role === "vorstand" || me.data?.role === "admin";
 
   const list = useQuery({
-    queryKey: ["members.list", { q, status, abteilungId, includeAusgetretene, page }],
+    queryKey: ["members.list", { q, status, abteilungId, includeAusgetretene, page, pageSize }],
     queryFn: () =>
       orpc.members.list({ q, status, abteilungId, includeAusgetretene, page, pageSize }),
   });
@@ -198,28 +199,37 @@ function MembersListPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between border-t border-border bg-card px-4 py-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-4 py-3 text-sm">
           <span className="text-muted-foreground">{list.data?.total ?? 0} Einträge</span>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="size-3.5" /> Zurück
-            </Button>
-            <span className="text-muted-foreground">Seite {page}</span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={(list.data?.rows.length ?? 0) < pageSize}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Weiter <ChevronRight className="size-3.5" />
-            </Button>
+          <div className="flex items-center gap-4">
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(n) => {
+                setPageSize(n);
+                setPage(1);
+              }}
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="size-3.5" /> Zurück
+              </Button>
+              <span className="text-muted-foreground">Seite {page}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={(list.data?.rows.length ?? 0) < pageSize}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Weiter <ChevronRight className="size-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
       </Card>

@@ -28,8 +28,6 @@ const FIELD_LABELS: Record<string, string> = {
   firma1: "Firma",
   funktion: "Funktion",
   spender: "Spender",
-  freeText1: "Freifeld 1",
-  freeText2: "Freifeld 2",
   adresszusatz: "Adresszusatz",
   geschlecht: "Geschlecht",
   sportart: "Sportart",

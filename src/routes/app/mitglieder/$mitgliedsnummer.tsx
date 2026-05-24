@@ -162,8 +162,6 @@ function MemberDetailPage() {
             <Field label="Eintritt" value={formatDate(member.eintritt)} />
             <Field label="Austritt" value={formatDate(member.austritt)} />
             <Field label="Spender" value={member.spender === "J" ? "Ja" : "Nein"} />
-            {member.freeText1 ? <Field label="Freifeld 1" value={member.freeText1} /> : null}
-            {member.freeText2 ? <Field label="Freifeld 2" value={member.freeText2} /> : null}
           </CardContent>
         </Card>
 
@@ -235,8 +233,23 @@ function MemberDetailPage() {
       />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Audit Log</CardTitle>
+          <Link
+            to="/app/audit"
+            search={{
+              q: "",
+              actorEmail: "",
+              action: "",
+              entityType: "member",
+              entityId: member.id,
+              from: "",
+              to: "",
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Vollständige Historie →
+          </Link>
         </CardHeader>
         <CardContent>
           {audit.length === 0 ? (

@@ -29,8 +29,6 @@ export type StammdatenValues = {
   www: string;
   funktion: string;
   spender: string;
-  freeText1: string;
-  freeText2: string;
   eintritt: string;
   austritt: string;
   aktivPasiv: "A" | "P" | "";
@@ -59,8 +57,6 @@ export const EMPTY_STAMM: StammdatenValues = {
   www: "",
   funktion: "",
   spender: "",
-  freeText1: "",
-  freeText2: "",
   eintritt: "",
   austritt: "",
   aktivPasiv: "",
@@ -118,8 +114,6 @@ export function buildInitialValues(
     www: (member.www as string) ?? "",
     funktion: (member.funktion as string) ?? "",
     spender: (member.spender as string) ?? "",
-    freeText1: (member.freeText1 as string) ?? "",
-    freeText2: (member.freeText2 as string) ?? "",
     eintritt: toDateInput(member.eintritt as string | Date | null),
     austritt: toDateInput(member.austritt as string | Date | null),
     aktivPasiv: (member.aktivPasiv === "A" ? "A" : member.aktivPasiv === "P" ? "P" : "") as
@@ -163,8 +157,6 @@ export function buildPatch(
   out.www = nullable(values.www);
   out.funktion = nullable(values.funktion);
   out.spender = nullable(values.spender);
-  out.freeText1 = nullable(values.freeText1);
-  out.freeText2 = nullable(values.freeText2);
   out.eintritt = nullable(values.eintritt);
   out.austritt = nullable(values.austritt);
   if (values.aktivPasiv === "A" || values.aktivPasiv === "P") {
@@ -384,18 +376,6 @@ export function MemberStammdatenForm({
                 type="date"
                 value={values.austritt}
                 onChange={(e) => update("austritt", e.target.value)}
-              />
-            </FormField>
-            <FormField label="Freifeld 1">
-              <Input
-                value={values.freeText1}
-                onChange={(e) => update("freeText1", e.target.value)}
-              />
-            </FormField>
-            <FormField label="Freifeld 2">
-              <Input
-                value={values.freeText2}
-                onChange={(e) => update("freeText2", e.target.value)}
               />
             </FormField>
             <FormField label="Notizen" full>

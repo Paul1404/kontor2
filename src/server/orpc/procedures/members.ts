@@ -60,8 +60,6 @@ const StammdatenInput = v.object({
   firma1: v.optional(v.nullable(v.string())),
   funktion: v.optional(v.nullable(v.string())),
   spender: v.optional(v.nullable(v.string())),
-  freeText1: v.optional(v.nullable(v.string())),
-  freeText2: v.optional(v.nullable(v.string())),
   eintritt: v.optional(v.nullable(v.string())),
   austritt: v.optional(v.nullable(v.string())),
   verstorbenAm: v.optional(v.nullable(v.string())),
@@ -131,8 +129,6 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   setIfPresent("firma1");
   setIfPresent("funktion");
   setIfPresent("spender");
-  setIfPresent("freeText1");
-  setIfPresent("freeText2");
   setIfPresent("aktivPasiv");
   setIfPresent("bank1");
   setIfPresent("bic1");
