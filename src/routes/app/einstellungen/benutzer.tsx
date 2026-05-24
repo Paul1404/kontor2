@@ -17,6 +17,7 @@ type Msg = { kind: "ok" | "error"; text: string };
 function UsersPage() {
   const qc = useQueryClient();
   const users = useQuery({ queryKey: ["users"], queryFn: () => orpc.auth.listUsers() });
+  const me = useQuery({ queryKey: ["me"], queryFn: () => orpc.auth.me() });
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "vorstand" | "readonly">("readonly");
   const [msg, setMsg] = useState<Msg | null>(null);
@@ -41,7 +42,11 @@ function UsersPage() {
   const setRoleMutation = useMutation({
     mutationFn: (input: { userId: string; role: "admin" | "vorstand" | "readonly" }) =>
       orpc.auth.setRole(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => {
+      setMsg(null);
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (err) => setMsg({ kind: "error", text: (err as Error).message }),
   });
 
   return (
@@ -137,28 +142,47 @@ function UsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {users.data?.map((u) => (
-                  <tr key={u.id} className="transition-colors hover:bg-muted/30">
-                    <td className="px-4 py-3">{u.email}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{u.name}</td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={u.role}
-                        onChange={(e) =>
-                          setRoleMutation.mutate({
-                            userId: u.id,
-                            role: e.target.value as "admin" | "vorstand" | "readonly",
-                          })
-                        }
-                        className="h-8 rounded-md border border-input bg-card px-2 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-                      >
-                        <option value="readonly">Readonly</option>
-                        <option value="vorstand">Vorstand</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
+                {users.data?.map((u) => {
+                  const isSelf = u.id === me.data?.id;
+                  return (
+                    <tr key={u.id} className="transition-colors hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        {u.email}
+                        {isSelf ? (
+                          <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Sie
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{u.name}</td>
+                      <td className="px-4 py-3">
+                        <select
+                          value={u.role}
+                          disabled={isSelf || setRoleMutation.isPending}
+                          title={isSelf ? "Eigene Rolle kann nicht geändert werden." : undefined}
+                          onChange={(e) => {
+                            const next = e.target.value as "admin" | "vorstand" | "readonly";
+                            if (
+                              u.role === "admin" &&
+                              next !== "admin" &&
+                              !window.confirm(
+                                `${u.email} wirklich von Administrator auf ${next} herabsetzen?`,
+                              )
+                            ) {
+                              return;
+                            }
+                            setRoleMutation.mutate({ userId: u.id, role: next });
+                          }}
+                          className="h-8 rounded-md border border-input bg-card px-2 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="readonly">Readonly</option>
+                          <option value="vorstand">Vorstand</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

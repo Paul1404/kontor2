@@ -53,9 +53,15 @@ export function BeziehungenCard({
       qc.invalidateQueries({ queryKey: ["members.get"] }),
     ]);
 
+  // Per-row pending state — see ContractsCard for the same pattern.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const remove = useMutation({
     mutationFn: (id: string) => orpc.relationships.remove({ id, removeReciprocal: true }),
-    onSuccess: refresh,
+    onSuccess: async () => {
+      setPendingDeleteId(null);
+      await refresh();
+    },
+    onError: () => setPendingDeleteId(null),
   });
 
   return (
@@ -123,11 +129,16 @@ export function BeziehungenCard({
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => remove.mutate(b.id)}
-                      disabled={remove.isPending}
+                      onClick={() => {
+                        if (window.confirm(`Beziehung zu ${name} entfernen?`)) {
+                          setPendingDeleteId(b.id);
+                          remove.mutate(b.id);
+                        }
+                      }}
+                      disabled={pendingDeleteId === b.id}
                       title="Beziehung entfernen"
                     >
-                      {remove.isPending ? (
+                      {pendingDeleteId === b.id ? (
                         <Loader2 className="size-4 animate-spin" />
                       ) : (
                         <Trash2 className="size-4 text-destructive" />

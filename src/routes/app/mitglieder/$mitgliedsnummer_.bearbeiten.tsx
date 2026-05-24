@@ -10,7 +10,7 @@ import {
 } from "~/components/forms/MemberStammdatenForm";
 import { orpc } from "~/lib/orpc";
 
-export const Route = createFileRoute("/app/mitglieder/$mitgliedsnummer/bearbeiten")({
+export const Route = createFileRoute("/app/mitglieder/$mitgliedsnummer_/bearbeiten")({
   component: EditMemberPage,
 });
 

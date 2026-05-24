@@ -45,6 +45,31 @@ describe("parseValues", () => {
   });
 });
 
+describe("coerceDate", () => {
+  it("parses datetime with microseconds", () => {
+    const d = coerceDate("2020-01-15 10:30:00.000000");
+    expect(d?.toISOString()).toBe("2020-01-15T10:30:00.000Z");
+  });
+
+  it("parses bare YYYY-MM-DD", () => {
+    const d = coerceDate("2020-01-15");
+    expect(d?.toISOString()).toBe("2020-01-15T00:00:00.000Z");
+  });
+
+  it("anchors bare HH:MM:SS times to the Unix epoch (TIME columns)", () => {
+    // Linear `And_Zeit` dumps as bare 'HH:MM:SS'. The importer previously
+    // nulled these silently; now they survive as 1970-01-01 + the time.
+    const d = coerceDate("14:30:45");
+    expect(d?.toISOString()).toBe("1970-01-01T14:30:45.000Z");
+  });
+
+  it("returns null for zero-date sentinels and garbage", () => {
+    expect(coerceDate("0000-00-00 00:00:00")).toBeNull();
+    expect(coerceDate("not a date")).toBeNull();
+    expect(coerceDate(null)).toBeNull();
+  });
+});
+
 describe("extractColumns", () => {
   it("extracts ordered column names and stops at PRIMARY KEY", () => {
     const ddl = `CREATE TABLE \`t\` (

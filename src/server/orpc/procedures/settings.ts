@@ -3,6 +3,7 @@ import { ORPCError } from "@orpc/server";
 import { adminProc } from "~/server/orpc/base";
 import { smtpConfigTable } from "~/server/db/schema/settings";
 import { sendTestMail } from "~/server/auth/send-invite";
+import { appendAudit, diff } from "~/server/audit/log";
 
 const SmtpInput = v.object({
   host: v.pipe(v.string(), v.minLength(1)),
@@ -27,25 +28,46 @@ export const settingsRouter = {
   }),
 
   updateSmtp: adminProc.input(SmtpInput).handler(async ({ context, input }) => {
-    const existing = await context.db.select().from(smtpConfigTable).limit(1);
-    const next = {
-      host: input.host,
-      port: input.port,
-      secure: input.secure,
-      requireTls: input.requireTls,
-      allowInvalidCerts: input.allowInvalidCerts,
-      username: input.username,
-      passwordEncrypted: input.password ? input.password : (existing[0]?.passwordEncrypted ?? null),
-      fromAddress: input.fromAddress,
-      fromName: input.fromName,
-      updatedAt: new Date(),
-      updatedBy: context.session!.user.id,
-    };
-    if (existing.length === 0) {
-      await context.db.insert(smtpConfigTable).values({ id: 1, ...next } as never);
-    } else {
-      await context.db.update(smtpConfigTable).set(next as never);
-    }
+    await context.db.transaction(async (tx) => {
+      const existing = await tx.select().from(smtpConfigTable).limit(1);
+      const next = {
+        host: input.host,
+        port: input.port,
+        secure: input.secure,
+        requireTls: input.requireTls,
+        allowInvalidCerts: input.allowInvalidCerts,
+        username: input.username,
+        // `passwordEncrypted` is transparently encrypted/decrypted by the
+        // Drizzle custom type, so `existing[0]?.passwordEncrypted` is
+        // already plaintext on read; assigning it back triggers a fresh
+        // encryption with a new IV on write.
+        passwordEncrypted: input.password
+          ? input.password
+          : (existing[0]?.passwordEncrypted ?? null),
+        fromAddress: input.fromAddress,
+        fromName: input.fromName,
+        updatedAt: new Date(),
+        updatedBy: context.session!.user.id,
+      };
+      if (existing.length === 0) {
+        await tx.insert(smtpConfigTable).values({ id: 1, ...next } as never);
+      } else {
+        await tx.update(smtpConfigTable).set(next as never);
+      }
+
+      // `passwordEncrypted` is in SECRET_COLUMNS in audit/log.ts so it
+      // gets masked automatically — no special handling needed here.
+      await appendAudit(tx, {
+        entityType: "smtp_config",
+        entityId: "1",
+        action: existing.length === 0 ? "create" : "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: diff(existing[0] ?? null, next),
+        requestId: context.requestId ?? null,
+      });
+    });
     return { ok: true };
   }),
 

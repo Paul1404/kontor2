@@ -434,6 +434,44 @@ export function mapVerknRow(d: LinearRow): Record<string, unknown> | null {
   };
 }
 
+/**
+ * Linear `inter` row → Nr → name lookup entry. Linear stores the list of
+ * available "Interessen" (= Abteilungen in our model) as a numbered table;
+ * `interes` rows reference these by number.
+ */
+export function mapInterRow(d: LinearRow): { nr: number; name: string } | null {
+  const nr = coerceInt(d.Nr ?? null);
+  const name = coerceStr(d.Interesse ?? null, 80);
+  if (nr === null || !name) return null;
+  return { nr, name };
+}
+
+/**
+ * Linear `interes` row → per-member Abteilungs-Mitgliedschaft. `Interesse`
+ * is a numeric foreign key into `inter`; resolution happens later in the
+ * ingest pipeline once the `inter` lookup is available.
+ */
+export type InteresMapped = {
+  adrNr: number;
+  interesNr: number;
+  eintritt: Date | null;
+  austritt: Date | null;
+};
+
+export function mapInteresRow(d: LinearRow): InteresMapped | null {
+  const adrNr = coerceInt(d.AdrNr ?? null);
+  // The `Interesse` column is declared `varchar(30)` but holds the numeric
+  // FK as a string in practice.
+  const interesNr = coerceInt(d.Interesse ?? null);
+  if (adrNr === null || interesNr === null) return null;
+  return {
+    adrNr,
+    interesNr,
+    eintritt: coerceDate(d.Eintritt ?? null),
+    austritt: coerceDate(d.Austritt ?? null),
+  };
+}
+
 export function mapSepaRow(d: LinearRow): Record<string, unknown> | null {
   const adrNr = coerceInt(d.AdrNr ?? null);
   const mandatsNr = coerceStr(d.MandatsNr ?? null, 50);

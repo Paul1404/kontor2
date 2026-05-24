@@ -1,8 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import * as v from "valibot";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
-import { attachmentsTable } from "~/server/db/schema/attachments";
+import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
 import { membersTable } from "~/server/db/schema/members";
 import { deleteObject, presignDownload, presignUpload } from "~/server/s3/client";
 import { appendAudit } from "~/server/audit/log";
@@ -13,6 +13,8 @@ const MAX_BYTES = 10 * 1024 * 1024;
 function safeFilename(name: string): string {
   return name.replace(/[^\w.\-]+/g, "_").slice(0, 120);
 }
+
+const UPLOAD_TTL_SECONDS = 600;
 
 export const attachmentsRouter = {
   requestUploadUrl: vorstandProc
@@ -36,59 +38,112 @@ export const attachmentsRouter = {
       if (exists.length === 0) {
         throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
       }
-      const id = crypto.randomUUID();
+
+      // Garbage-collect any of this user's expired tickets so the table
+      // stays bounded. Cheap and safe — no FK targets these rows.
+      await context.db
+        .delete(pendingUploadsTable)
+        .where(
+          and(
+            eq(pendingUploadsTable.requestedBy, context.session!.user.id),
+            lt(pendingUploadsTable.expiresAt, new Date()),
+          ),
+        );
+
       const safe = safeFilename(input.filename);
-      const key = `members/${input.memberId}/${id}/${safe}`;
+      // Generate a server-side UUID and corresponding key, then persist
+      // the ticket so finalize can verify the request matches what we
+      // actually presigned. Without this, a malicious client could call
+      // finalize with arbitrary memberId/key/sizeBytes.
+      const [ticket] = await context.db
+        .insert(pendingUploadsTable)
+        .values({
+          memberId: input.memberId,
+          filename: safe,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+          // s3Key is set immediately below; we need the row's id first.
+          s3Key: "pending",
+          requestedBy: context.session!.user.id,
+          expiresAt: new Date(Date.now() + UPLOAD_TTL_SECONDS * 1000),
+        })
+        .returning({ id: pendingUploadsTable.id });
+      if (!ticket) {
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Upload-Ticket konnte nicht angelegt werden.",
+        });
+      }
+      const key = `members/${input.memberId}/${ticket.id}/${safe}`;
+      await context.db
+        .update(pendingUploadsTable)
+        .set({ s3Key: key })
+        .where(eq(pendingUploadsTable.id, ticket.id));
+
       const url = await presignUpload({
         key,
         contentType: input.mimeType,
         contentLength: input.sizeBytes,
         expiresSeconds: 300,
       });
-      return { uploadId: id, key, url };
+      return { uploadId: ticket.id, key, url };
     }),
 
   finalize: vorstandProc
-    .input(
-      v.object({
-        uploadId: v.string(),
-        memberId: v.string(),
-        key: v.string(),
-        filename: v.string(),
-        mimeType: v.string(),
-        sizeBytes: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_BYTES)),
-      }),
-    )
+    .input(v.object({ uploadId: v.string() }))
     .handler(async ({ context, input }) => {
-      if (!ALLOWED_MIME.has(input.mimeType)) {
-        throw new ORPCError("BAD_REQUEST", { message: "Dateityp nicht erlaubt." });
-      }
-      const [row] = await context.db
-        .insert(attachmentsTable)
-        .values({
-          id: input.uploadId,
-          memberId: input.memberId,
-          filename: input.filename,
-          mimeType: input.mimeType,
-          sizeBytes: input.sizeBytes,
-          s3Key: input.key,
-          uploadedBy: context.session!.user.id,
-        })
-        .returning();
-      await appendAudit(context.db, {
-        entityType: "member_attachment",
-        entityId: row!.id,
-        action: "create",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: {
-          filename: { before: null, after: input.filename },
-          mimeType: { before: null, after: input.mimeType },
-          sizeBytes: { before: null, after: input.sizeBytes },
-        },
+      // Look up the ticket we issued at presign time and trust ONLY its
+      // server-stored fields. The client previously controlled all of
+      // memberId, key, mimeType, sizeBytes — those are now ignored.
+      return await context.db.transaction(async (tx) => {
+        const [ticket] = await tx
+          .select()
+          .from(pendingUploadsTable)
+          .where(eq(pendingUploadsTable.id, input.uploadId))
+          .limit(1);
+        if (!ticket) {
+          throw new ORPCError("NOT_FOUND", { message: "Upload-Ticket nicht gefunden." });
+        }
+        if (ticket.requestedBy !== context.session!.user.id) {
+          throw new ORPCError("FORBIDDEN", {
+            message: "Upload-Ticket gehört einem anderen Benutzer.",
+          });
+        }
+        if (ticket.expiresAt < new Date()) {
+          throw new ORPCError("BAD_REQUEST", { message: "Upload-Ticket abgelaufen." });
+        }
+
+        const [row] = await tx
+          .insert(attachmentsTable)
+          .values({
+            id: ticket.id,
+            memberId: ticket.memberId,
+            filename: ticket.filename,
+            mimeType: ticket.mimeType,
+            sizeBytes: ticket.sizeBytes,
+            s3Key: ticket.s3Key,
+            uploadedBy: context.session!.user.id,
+          })
+          .returning();
+
+        // Consume the ticket so it can't be replayed.
+        await tx.delete(pendingUploadsTable).where(eq(pendingUploadsTable.id, ticket.id));
+
+        await appendAudit(tx, {
+          entityType: "member_attachment",
+          entityId: row!.id,
+          action: "create",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            filename: { before: null, after: ticket.filename },
+            mimeType: { before: null, after: ticket.mimeType },
+            sizeBytes: { before: null, after: ticket.sizeBytes },
+          },
+          requestId: context.requestId ?? null,
+        });
+        return { id: row!.id };
       });
-      return { id: row!.id };
     }),
 
   remove: vorstandProc.input(v.object({ id: v.string() })).handler(async ({ context, input }) => {

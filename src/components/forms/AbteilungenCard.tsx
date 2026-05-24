@@ -177,7 +177,11 @@ function Row({
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => remove.mutate()}
+                onClick={() => {
+                  if (window.confirm(`Mitgliedschaft in "${row.name}" entfernen?`)) {
+                    remove.mutate();
+                  }
+                }}
                 disabled={remove.isPending}
                 title="Mitgliedschaft entfernen"
               >
@@ -207,7 +211,7 @@ function AddForm({
   onCreated: () => void | Promise<void>;
 }) {
   const abteilungenAll = useQuery({
-    queryKey: ["abteilungen.list"],
+    queryKey: ["abteilungen", "list"],
     queryFn: () => orpc.abteilungen.list(),
   });
 

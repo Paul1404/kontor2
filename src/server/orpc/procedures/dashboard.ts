@@ -12,20 +12,27 @@ function startOfMonth(): Date {
 export const dashboardRouter = {
   stats: authedProc.input(v.void()).handler(async ({ context }) => {
     const since = startOfMonth();
+    // All four counts must exclude soft-deleted members or the dashboard
+    // drifts from the member list as soon as the first soft-delete happens.
+    const notDeleted = isNull(membersTable.deletedAt);
     const [[total], [aktiv], [newThisMonth], [austritteThisMonth]] = await Promise.all([
-      context.db.select({ c: count() }).from(membersTable),
+      context.db.select({ c: count() }).from(membersTable).where(notDeleted),
       context.db
         .select({ c: count() })
         .from(membersTable)
-        .where(and(isNull(membersTable.austritt), isNull(membersTable.verstorbenAm))),
+        .where(and(notDeleted, isNull(membersTable.austritt), isNull(membersTable.verstorbenAm))),
       context.db
         .select({ c: count() })
         .from(membersTable)
-        .where(and(isNotNull(membersTable.eintritt), gte(membersTable.eintritt, since))),
+        .where(
+          and(notDeleted, isNotNull(membersTable.eintritt), gte(membersTable.eintritt, since)),
+        ),
       context.db
         .select({ c: count() })
         .from(membersTable)
-        .where(and(isNotNull(membersTable.austritt), gte(membersTable.austritt, since))),
+        .where(
+          and(notDeleted, isNotNull(membersTable.austritt), gte(membersTable.austritt, since)),
+        ),
     ]);
 
     const perAbteilung = await context.db
@@ -35,7 +42,8 @@ export const dashboardRouter = {
       })
       .from(memberAbteilungenTable)
       .innerJoin(abteilungenTable, eq(memberAbteilungenTable.abteilungId, abteilungenTable.id))
-      .where(isNull(memberAbteilungenTable.austrittsdatum))
+      .innerJoin(membersTable, eq(membersTable.id, memberAbteilungenTable.memberId))
+      .where(and(isNull(memberAbteilungenTable.austrittsdatum), isNull(membersTable.deletedAt)))
       .groupBy(abteilungenTable.name)
       .orderBy(sql`count(*) desc`);
 

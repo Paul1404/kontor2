@@ -46,6 +46,11 @@ function buildPatch(input: v.InferOutput<typeof FeeTypePatch>): Record<string, u
 
 export const feeTypesRouter = {
   list: authedProc.input(v.void()).handler(async ({ context }) => {
+    // Aliased subquery is intentional: Drizzle elides table qualifiers for
+    // column refs inside `sql` templates when used in a top-level select(),
+    // so `${contractsTable.art} = ${feeTypesTable.art}` would compile to
+    // `"art" = "art"` (always true) and return the total row count for
+    // every fee type. Using an alias on the inner table sidesteps that.
     return context.db
       .select({
         art: feeTypesTable.art,
@@ -56,7 +61,7 @@ export const feeTypesRouter = {
         kontoname: feeTypesTable.kontoname,
         valuta: feeTypesTable.valuta,
         nichAktiv: feeTypesTable.nichAktiv,
-        contractCount: sql<number>`(select count(*) from ${contractsTable} where ${contractsTable.art} = ${feeTypesTable.art})::int`,
+        contractCount: sql<number>`(select count(*)::int from contracts c where c.art = fee_types.art)`,
       })
       .from(feeTypesTable)
       .orderBy(asc(feeTypesTable.art));
@@ -70,39 +75,39 @@ export const feeTypesRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      let art = input.art ?? null;
-      if (art == null) {
-        const [row] = await context.db
-          .select({ max: sql<number>`coalesce(max(${feeTypesTable.art}), 0)::int` })
-          .from(feeTypesTable);
-        art = (row?.max ?? 0) + 1;
-      } else {
-        const [dupe] = await context.db
-          .select({ art: feeTypesTable.art })
-          .from(feeTypesTable)
-          .where(eq(feeTypesTable.art, art))
-          .limit(1);
-        if (dupe) {
-          throw new ORPCError("CONFLICT", {
-            message: `Beitragsart mit Nummer ${art} existiert bereits.`,
-          });
+      return await context.db.transaction(async (tx) => {
+        let art = input.art ?? null;
+        if (art == null) {
+          const [row] = await tx
+            .select({ max: sql<number>`coalesce(max(${feeTypesTable.art}), 0)::int` })
+            .from(feeTypesTable);
+          art = (row?.max ?? 0) + 1;
+        } else {
+          const [dupe] = await tx
+            .select({ art: feeTypesTable.art })
+            .from(feeTypesTable)
+            .where(eq(feeTypesTable.art, art))
+            .limit(1);
+          if (dupe) {
+            throw new ORPCError("CONFLICT", {
+              message: `Beitragsart mit Nummer ${art} existiert bereits.`,
+            });
+          }
         }
-      }
-      const patch = buildPatch(input.patch);
-      await context.db
-        .insert(feeTypesTable)
-        .values({ ...patch, art, updatedAt: new Date() } as never);
-      await appendAudit(context.db, {
-        entityType: "fee_type",
-        entityId: String(art),
-        action: "create",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: diff(null, { ...patch, art }),
-        requestId: context.requestId ?? null,
+        const patch = buildPatch(input.patch);
+        await tx.insert(feeTypesTable).values({ ...patch, art, updatedAt: new Date() } as never);
+        await appendAudit(tx, {
+          entityType: "fee_type",
+          entityId: String(art),
+          action: "create",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: diff(null, { ...patch, art }),
+          requestId: context.requestId ?? null,
+        });
+        return { art };
       });
-      return { art };
     }),
 
   update: adminProc
@@ -113,73 +118,77 @@ export const feeTypesRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      const [existing] = await context.db
-        .select()
-        .from(feeTypesTable)
-        .where(eq(feeTypesTable.art, input.art))
-        .limit(1);
-      if (!existing) {
-        throw new ORPCError("NOT_FOUND", { message: "Beitragsart nicht gefunden." });
-      }
-      const patch = buildPatch(input.patch);
-      if (Object.keys(patch).length === 0) return { ok: true };
+      await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(feeTypesTable)
+          .where(eq(feeTypesTable.art, input.art))
+          .limit(1);
+        if (!existing) {
+          throw new ORPCError("NOT_FOUND", { message: "Beitragsart nicht gefunden." });
+        }
+        const patch = buildPatch(input.patch);
+        if (Object.keys(patch).length === 0) return;
 
-      await context.db
-        .update(feeTypesTable)
-        .set({ ...patch, updatedAt: new Date() } as never)
-        .where(eq(feeTypesTable.art, input.art));
+        await tx
+          .update(feeTypesTable)
+          .set({ ...patch, updatedAt: new Date() } as never)
+          .where(eq(feeTypesTable.art, input.art));
 
-      const changes = diff(existing as unknown as Record<string, unknown>, {
-        ...(existing as unknown as Record<string, unknown>),
-        ...patch,
-      });
-      if (Object.keys(changes).length > 0) {
-        await appendAudit(context.db, {
-          entityType: "fee_type",
-          entityId: String(input.art),
-          action: "update",
-          source: "ui",
-          actorId: context.session!.user.id,
-          actorEmail: context.session!.user.email,
-          changes,
-          requestId: context.requestId ?? null,
+        const changes = diff(existing as unknown as Record<string, unknown>, {
+          ...(existing as unknown as Record<string, unknown>),
+          ...patch,
         });
-      }
+        if (Object.keys(changes).length > 0) {
+          await appendAudit(tx, {
+            entityType: "fee_type",
+            entityId: String(input.art),
+            action: "update",
+            source: "ui",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            changes,
+            requestId: context.requestId ?? null,
+          });
+        }
+      });
       return { ok: true };
     }),
 
   delete: adminProc
     .input(v.object({ art: v.pipe(v.number(), v.integer()) }))
     .handler(async ({ context, input }) => {
-      const [existing] = await context.db
-        .select()
-        .from(feeTypesTable)
-        .where(eq(feeTypesTable.art, input.art))
-        .limit(1);
-      if (!existing) {
-        throw new ORPCError("NOT_FOUND", { message: "Beitragsart nicht gefunden." });
-      }
+      await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(feeTypesTable)
+          .where(eq(feeTypesTable.art, input.art))
+          .limit(1);
+        if (!existing) {
+          throw new ORPCError("NOT_FOUND", { message: "Beitragsart nicht gefunden." });
+        }
 
-      const [usage] = await context.db
-        .select({ c: count() })
-        .from(contractsTable)
-        .where(eq(contractsTable.art, input.art));
-      if ((usage?.c ?? 0) > 0) {
-        throw new ORPCError("CONFLICT", {
-          message: `Beitragsart wird von ${usage?.c} Vertrag/Verträgen verwendet.`,
+        const [usage] = await tx
+          .select({ c: count() })
+          .from(contractsTable)
+          .where(eq(contractsTable.art, input.art));
+        if ((usage?.c ?? 0) > 0) {
+          throw new ORPCError("CONFLICT", {
+            message: `Beitragsart wird von ${usage?.c} Vertrag/Verträgen verwendet.`,
+          });
+        }
+
+        await tx.delete(feeTypesTable).where(eq(feeTypesTable.art, input.art));
+        await appendAudit(tx, {
+          entityType: "fee_type",
+          entityId: String(input.art),
+          action: "delete",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: diff(existing as unknown as Record<string, unknown>, {}),
+          requestId: context.requestId ?? null,
         });
-      }
-
-      await context.db.delete(feeTypesTable).where(eq(feeTypesTable.art, input.art));
-      await appendAudit(context.db, {
-        entityType: "fee_type",
-        entityId: String(input.art),
-        action: "delete",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: diff(existing as unknown as Record<string, unknown>, {}),
-        requestId: context.requestId ?? null,
       });
       return { ok: true };
     }),

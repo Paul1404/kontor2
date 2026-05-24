@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './login'
 import { Route as AppRouteRouteImport } from './app/route'
 import { Route as IndexRouteImport } from './index'
 import { Route as AppIndexRouteImport } from './app/index'
+import { Route as InviteTokenRouteImport } from './invite.$token'
 import { Route as AppImportRouteImport } from './app/import'
 import { Route as AppAuditRouteImport } from './app/audit'
 import { Route as ApiHealthRouteImport } from './api/health'
@@ -36,7 +37,7 @@ import { Route as ApiRpcSplatRouteImport } from './api/rpc.$'
 import { Route as ApiIngestSvumsRouteImport } from './api/ingest.svums'
 import { Route as ApiFilesIdRouteImport } from './api/files.$id'
 import { Route as ApiAuthSplatRouteImport } from './api/auth.$'
-import { Route as AppMitgliederMitgliedsnummerBearbeitenRouteImport } from './app/mitglieder/$mitgliedsnummer.bearbeiten'
+import { Route as AppMitgliederMitgliedsnummerBearbeitenRouteImport } from './app/mitglieder/$mitgliedsnummer_.bearbeiten'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -57,6 +58,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRouteRoute,
+} as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppImportRoute = AppImportRouteImport.update({
   id: '/import',
@@ -180,9 +186,9 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 } as any)
 const AppMitgliederMitgliedsnummerBearbeitenRoute =
   AppMitgliederMitgliedsnummerBearbeitenRouteImport.update({
-    id: '/bearbeiten',
-    path: '/bearbeiten',
-    getParentRoute: () => AppMitgliederMitgliedsnummerRoute,
+    id: '/mitglieder/$mitgliedsnummer_/bearbeiten',
+    path: '/mitglieder/$mitgliedsnummer/bearbeiten',
+    getParentRoute: () => AppRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -192,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
   '/app/import': typeof AppImportRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/$id': typeof ApiFilesIdRoute
@@ -208,7 +215,7 @@ export interface FileRoutesByFullPath {
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
-  '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRouteWithChildren
+  '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRoute
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
   '/app/beitrag/': typeof AppBeitragIndexRoute
   '/app/berichte/': typeof AppBerichteIndexRoute
@@ -221,6 +228,7 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
   '/app/import': typeof AppImportRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/app': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/$id': typeof ApiFilesIdRoute
@@ -237,7 +245,7 @@ export interface FileRoutesByTo {
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
-  '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRouteWithChildren
+  '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRoute
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
   '/app/beitrag': typeof AppBeitragIndexRoute
   '/app/berichte': typeof AppBerichteIndexRoute
@@ -252,6 +260,7 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
   '/app/import': typeof AppImportRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/$id': typeof ApiFilesIdRoute
@@ -268,12 +277,12 @@ export interface FileRoutesById {
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
-  '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRouteWithChildren
+  '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRoute
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
   '/app/beitrag/': typeof AppBeitragIndexRoute
   '/app/berichte/': typeof AppBerichteIndexRoute
   '/app/mitglieder/': typeof AppMitgliederIndexRoute
-  '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
+  '/app/mitglieder/$mitgliedsnummer_/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -284,6 +293,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/app/audit'
     | '/app/import'
+    | '/invite/$token'
     | '/app/'
     | '/api/auth/$'
     | '/api/files/$id'
@@ -313,6 +323,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/app/audit'
     | '/app/import'
+    | '/invite/$token'
     | '/app'
     | '/api/auth/$'
     | '/api/files/$id'
@@ -343,6 +354,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/app/audit'
     | '/app/import'
+    | '/invite/$token'
     | '/app/'
     | '/api/auth/$'
     | '/api/files/$id'
@@ -364,7 +376,7 @@ export interface FileRouteTypes {
     | '/app/beitrag/'
     | '/app/berichte/'
     | '/app/mitglieder/'
-    | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
+    | '/app/mitglieder/$mitgliedsnummer_/bearbeiten'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -372,6 +384,7 @@ export interface RootRouteChildren {
   AppRouteRoute: typeof AppRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  InviteTokenRoute: typeof InviteTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiFilesIdRoute: typeof ApiFilesIdRoute
   ApiIngestSvumsRoute: typeof ApiIngestSvumsRoute
@@ -407,6 +420,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/'
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRouteRoute
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/app/import': {
       id: '/app/import'
@@ -569,30 +589,15 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/app/mitglieder/$mitgliedsnummer/bearbeiten': {
-      id: '/app/mitglieder/$mitgliedsnummer/bearbeiten'
-      path: '/bearbeiten'
+    '/app/mitglieder/$mitgliedsnummer_/bearbeiten': {
+      id: '/app/mitglieder/$mitgliedsnummer_/bearbeiten'
+      path: '/mitglieder/$mitgliedsnummer/bearbeiten'
       fullPath: '/app/mitglieder/$mitgliedsnummer/bearbeiten'
       preLoaderRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRouteImport
-      parentRoute: typeof AppMitgliederMitgliedsnummerRoute
+      parentRoute: typeof AppRouteRoute
     }
   }
 }
-
-interface AppMitgliederMitgliedsnummerRouteChildren {
-  AppMitgliederMitgliedsnummerBearbeitenRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRoute
-}
-
-const AppMitgliederMitgliedsnummerRouteChildren: AppMitgliederMitgliedsnummerRouteChildren =
-  {
-    AppMitgliederMitgliedsnummerBearbeitenRoute:
-      AppMitgliederMitgliedsnummerBearbeitenRoute,
-  }
-
-const AppMitgliederMitgliedsnummerRouteWithChildren =
-  AppMitgliederMitgliedsnummerRoute._addFileChildren(
-    AppMitgliederMitgliedsnummerRouteChildren,
-  )
 
 interface AppRouteRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
@@ -609,11 +614,12 @@ interface AppRouteRouteChildren {
   AppEinstellungenBenutzerRoute: typeof AppEinstellungenBenutzerRoute
   AppEinstellungenSmtpRoute: typeof AppEinstellungenSmtpRoute
   AppEinstellungenVereinRoute: typeof AppEinstellungenVereinRoute
-  AppMitgliederMitgliedsnummerRoute: typeof AppMitgliederMitgliedsnummerRouteWithChildren
+  AppMitgliederMitgliedsnummerRoute: typeof AppMitgliederMitgliedsnummerRoute
   AppMitgliederNeuRoute: typeof AppMitgliederNeuRoute
   AppBeitragIndexRoute: typeof AppBeitragIndexRoute
   AppBerichteIndexRoute: typeof AppBerichteIndexRoute
   AppMitgliederIndexRoute: typeof AppMitgliederIndexRoute
+  AppMitgliederMitgliedsnummerBearbeitenRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
@@ -631,12 +637,13 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppEinstellungenBenutzerRoute: AppEinstellungenBenutzerRoute,
   AppEinstellungenSmtpRoute: AppEinstellungenSmtpRoute,
   AppEinstellungenVereinRoute: AppEinstellungenVereinRoute,
-  AppMitgliederMitgliedsnummerRoute:
-    AppMitgliederMitgliedsnummerRouteWithChildren,
+  AppMitgliederMitgliedsnummerRoute: AppMitgliederMitgliedsnummerRoute,
   AppMitgliederNeuRoute: AppMitgliederNeuRoute,
   AppBeitragIndexRoute: AppBeitragIndexRoute,
   AppBerichteIndexRoute: AppBerichteIndexRoute,
   AppMitgliederIndexRoute: AppMitgliederIndexRoute,
+  AppMitgliederMitgliedsnummerBearbeitenRoute:
+    AppMitgliederMitgliedsnummerBearbeitenRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
@@ -648,6 +655,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRouteRoute: AppRouteRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiHealthRoute: ApiHealthRoute,
+  InviteTokenRoute: InviteTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiFilesIdRoute: ApiFilesIdRoute,
   ApiIngestSvumsRoute: ApiIngestSvumsRoute,

@@ -95,7 +95,7 @@ const SECTIONS: NavSection[] = [
 export function Sidebar({ role }: { role: string }) {
   const { location } = useRouterState();
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex md:flex-col">
+    <aside className="hidden h-full w-64 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground print:hidden md:flex md:flex-col">
       <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
         <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-soft ring-1 ring-sidebar-border">
           <img src="/logo.png" alt="SV Untereuerheim" className="size-9 object-contain" />

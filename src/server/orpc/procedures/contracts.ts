@@ -4,12 +4,30 @@ import * as v from "valibot";
 import { vorstandProc } from "~/server/orpc/base";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { membersTable } from "~/server/db/schema/members";
-import { appendAudit } from "~/server/audit/log";
+import { appendAudit, diff } from "~/server/audit/log";
 
-function toDateOrNull(value: string | null | undefined): Date | null {
+function toDateOrNull(value: string | null | undefined, field: string): Date | null {
   if (!value) return null;
   const d = new Date(value);
-  return Number.isFinite(d.getTime()) ? d : null;
+  if (!Number.isFinite(d.getTime())) {
+    throw new ORPCError("VALIDATION_FAILED", {
+      message: `Ungültiges Datum im Feld "${field}": ${value}`,
+    });
+  }
+  return d;
+}
+
+function validateBetragString(value: string | null | undefined, field: string): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.replace(",", ".");
+  if (!/^-?\d+(\.\d+)?$/.test(normalized)) {
+    throw new ORPCError("VALIDATION_FAILED", {
+      message: `Ungültiger Betrag im Feld "${field}": ${value}`,
+    });
+  }
+  return normalized;
 }
 
 const ContractInput = v.object({
@@ -30,13 +48,13 @@ function buildPatch(input: v.InferOutput<typeof ContractInput>): Record<string, 
     vertragNr: input.vertragNr,
     art: input.art,
     artName: input.artName ?? null,
-    betrag: input.betrag ?? null,
-    aufnahmegeb: input.aufnahmegeb ?? null,
+    betrag: validateBetragString(input.betrag, "Betrag"),
+    aufnahmegeb: validateBetragString(input.aufnahmegeb, "Aufnahmegebühr"),
     sollstellung: input.sollstellung ?? null,
-    vertragBegin: toDateOrNull(input.vertragBegin),
-    vertragEnde: toDateOrNull(input.vertragEnde),
-    gekuendAm: toDateOrNull(input.gekuendAm),
-    gekuendZum: toDateOrNull(input.gekuendZum),
+    vertragBegin: toDateOrNull(input.vertragBegin, "Vertragsbeginn"),
+    vertragEnde: toDateOrNull(input.vertragEnde, "Vertragsende"),
+    gekuendAm: toDateOrNull(input.gekuendAm, "Gekündigt am"),
+    gekuendZum: toDateOrNull(input.gekuendZum, "Gekündigt zum"),
     updatedAt: new Date(),
   };
 }
@@ -45,48 +63,87 @@ export const contractsRouter = {
   create: vorstandProc
     .input(v.object({ memberId: v.string(), patch: ContractInput }))
     .handler(async ({ context, input }) => {
-      const [member] = await context.db
-        .select({ id: membersTable.id, adrNr: membersTable.adrNr, mitglnr: membersTable.mitglnr })
-        .from(membersTable)
-        .where(eq(membersTable.id, input.memberId))
-        .limit(1);
-      if (!member) {
-        throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
-      }
-      const patch = buildPatch(input.patch);
-      const [row] = await context.db
-        .insert(contractsTable)
-        .values({
-          ...(patch as Record<string, unknown>),
-          memberId: member.id,
-          adrNr: member.adrNr,
-          mitglNr: member.mitglnr ?? null,
-        } as never)
-        .returning({ id: contractsTable.id });
-      if (!row) {
-        throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
-      }
-      await appendAudit(context.db, {
-        entityType: "contract",
-        entityId: row.id,
-        action: "create",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: {
-          memberId: { before: null, after: member.id },
-          vertragNr: { before: null, after: input.patch.vertragNr },
-          art: { before: null, after: input.patch.art },
-        },
-        requestId: context.requestId ?? null,
+      return await context.db.transaction(async (tx) => {
+        const [member] = await tx
+          .select({
+            id: membersTable.id,
+            adrNr: membersTable.adrNr,
+            mitglnr: membersTable.mitglnr,
+          })
+          .from(membersTable)
+          .where(eq(membersTable.id, input.memberId))
+          .limit(1);
+        if (!member) {
+          throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        }
+        const patch = buildPatch(input.patch);
+        const [row] = await tx
+          .insert(contractsTable)
+          .values({
+            ...(patch as Record<string, unknown>),
+            memberId: member.id,
+            adrNr: member.adrNr,
+            mitglNr: member.mitglnr ?? null,
+          } as never)
+          .returning({ id: contractsTable.id });
+        if (!row) {
+          throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
+        }
+        await appendAudit(tx, {
+          entityType: "contract",
+          entityId: row.id,
+          action: "create",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: diff(null, { ...patch, memberId: member.id }),
+          requestId: context.requestId ?? null,
+        });
+        return { id: row.id };
       });
-      return { id: row.id };
     }),
 
   update: vorstandProc
     .input(v.object({ id: v.string(), patch: ContractInput }))
     .handler(async ({ context, input }) => {
-      const [existing] = await context.db
+      await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(contractsTable)
+          .where(eq(contractsTable.id, input.id))
+          .limit(1);
+        if (!existing) {
+          throw new ORPCError("NOT_FOUND", { message: "Vertrag nicht gefunden." });
+        }
+        const patch = buildPatch(input.patch);
+        const projected: Record<string, unknown> = {
+          ...(existing as Record<string, unknown>),
+          ...patch,
+        };
+        await tx
+          .update(contractsTable)
+          .set(patch as never)
+          .where(eq(contractsTable.id, input.id));
+        const changes = diff(existing as unknown as Record<string, unknown>, projected);
+        if (Object.keys(changes).length > 0) {
+          await appendAudit(tx, {
+            entityType: "contract",
+            entityId: input.id,
+            action: "update",
+            source: "ui",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            changes,
+            requestId: context.requestId ?? null,
+          });
+        }
+      });
+      return { ok: true };
+    }),
+
+  remove: vorstandProc.input(v.object({ id: v.string() })).handler(async ({ context, input }) => {
+    await context.db.transaction(async (tx) => {
+      const [existing] = await tx
         .select()
         .from(contractsTable)
         .where(eq(contractsTable.id, input.id))
@@ -94,47 +151,17 @@ export const contractsRouter = {
       if (!existing) {
         throw new ORPCError("NOT_FOUND", { message: "Vertrag nicht gefunden." });
       }
-      const patch = buildPatch(input.patch);
-      await context.db
-        .update(contractsTable)
-        .set(patch as never)
-        .where(eq(contractsTable.id, input.id));
-      await appendAudit(context.db, {
+      await tx.delete(contractsTable).where(eq(contractsTable.id, input.id));
+      await appendAudit(tx, {
         entityType: "contract",
         entityId: input.id,
-        action: "update",
+        action: "delete",
         source: "ui",
         actorId: context.session!.user.id,
         actorEmail: context.session!.user.email,
-        changes: {
-          betrag: { before: existing.betrag, after: input.patch.betrag ?? null },
-        },
+        changes: diff(existing as unknown as Record<string, unknown>, {}),
         requestId: context.requestId ?? null,
       });
-      return { ok: true };
-    }),
-
-  remove: vorstandProc.input(v.object({ id: v.string() })).handler(async ({ context, input }) => {
-    const [existing] = await context.db
-      .select()
-      .from(contractsTable)
-      .where(eq(contractsTable.id, input.id))
-      .limit(1);
-    if (!existing) {
-      throw new ORPCError("NOT_FOUND", { message: "Vertrag nicht gefunden." });
-    }
-    await context.db.delete(contractsTable).where(eq(contractsTable.id, input.id));
-    await appendAudit(context.db, {
-      entityType: "contract",
-      entityId: input.id,
-      action: "delete",
-      source: "ui",
-      actorId: context.session!.user.id,
-      actorEmail: context.session!.user.email,
-      changes: {
-        vertragNr: { before: existing.vertragNr, after: null },
-      },
-      requestId: context.requestId ?? null,
     });
     return { ok: true };
   }),

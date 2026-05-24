@@ -3,16 +3,11 @@ import { ORPCError } from "@orpc/server";
 import * as v from "valibot";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { contractsTable } from "~/server/db/schema/contracts";
-import {
-  feeRunItemsTable,
-  feeRunsTable,
-  sollStellungenTable,
-} from "~/server/db/schema/fee-runs";
+import { feeRunItemsTable, feeRunsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { appendAudit } from "~/server/audit/log";
-import { safeDecrypt } from "~/server/crypto/encrypt";
 import { buildFeeRunPreview } from "~/server/sepa/build-fee-run";
 import { buildPain008, type Pain008Item } from "~/server/sepa/pain008";
 
@@ -79,10 +74,7 @@ export const feeRunsRouter = {
       .select({ id: feeRunsTable.id })
       .from(feeRunsTable)
       .where(
-        and(
-          eq(feeRunsTable.billingYear, input.billingYear),
-          eq(feeRunsTable.status, "committed"),
-        ),
+        and(eq(feeRunsTable.billingYear, input.billingYear), eq(feeRunsTable.status, "committed")),
       )
       .limit(1);
     if (existing) {
@@ -125,18 +117,37 @@ export const feeRunsRouter = {
       })
       .from(membersTable)
       .where(inArray(membersTable.id, memberIds));
+    // `iban1` is transparently decrypted by the `encryptedText` Drizzle
+    // custom type — it arrives here as a plain string already.
     const ibanByMember = new Map<string, string>();
     for (const m of members) {
-      const iban = safeDecrypt(m.iban1 as unknown as Buffer | null);
-      if (iban) ibanByMember.set(m.id, iban);
+      if (m.iban1) ibanByMember.set(m.id, m.iban1);
     }
 
-    const orgIban = safeDecrypt(org.vereinsIban as unknown as Buffer | null);
+    const orgIban = org.vereinsIban;
     if (!orgIban) {
       throw new ORPCError("INTERNAL_SERVER_ERROR", {
-        message: "Vereins-IBAN konnte nicht entschlüsselt werden.",
+        message: "Vereins-IBAN ist nicht hinterlegt.",
       });
     }
+
+    // Bulk-load all mandate metadata up-front. With ~500 active debits,
+    // doing this once is dramatically faster than one select-per-candidate
+    // inside the transaction (which previously caused timeouts).
+    const mandateIds = Array.from(new Set(preview.candidates.map((c) => c.chosenMandateId)));
+    const mandates =
+      mandateIds.length === 0
+        ? []
+        : await context.db
+            .select({
+              id: sepaMandatesTable.id,
+              mandatsNr: sepaMandatesTable.mandatsNr,
+              unterschriftDatum: sepaMandatesTable.unterschriftDatum,
+              ersteVerwendung: sepaMandatesTable.ersteVerwendung,
+            })
+            .from(sepaMandatesTable)
+            .where(inArray(sepaMandatesTable.id, mandateIds));
+    const mandateById = new Map(mandates.map((m) => [m.id, m]));
 
     const result = await context.db.transaction(async (tx) => {
       // 1. Insert fee run header.
@@ -156,93 +167,76 @@ export const feeRunsRouter = {
         .returning({ id: feeRunsTable.id });
       if (!run) throw new Error("fee_runs insert returned no row");
 
-      // 2. Upsert soll_stellungen per (contract, year) -- one open posting
-      //    per contract per year. On re-commit (after a cancel), this just
-      //    refreshes the amount.
+      // 2. Bulk-upsert soll_stellungen — one statement instead of one per
+      //    candidate. .returning() gives us back the ids in input order,
+      //    so we can correlate them with the candidates below.
       const sollByContract = new Map<string, string>();
-      for (const c of preview.candidates) {
-        const [soll] = await tx
+      if (preview.candidates.length > 0) {
+        const sollValues = preview.candidates.map((c) => ({
+          memberId: c.memberId,
+          contractId: c.contractId,
+          billingYear: input.billingYear,
+          falligkeitsdatum: input.falligkeitsdatum,
+          amount: c.amount,
+          paidAmount: "0",
+          openAmount: c.amount,
+          status: "open" as const,
+        }));
+        const insertedSoll = await tx
           .insert(sollStellungenTable)
-          .values({
-            memberId: c.memberId,
-            contractId: c.contractId,
-            billingYear: input.billingYear,
-            falligkeitsdatum: input.falligkeitsdatum,
-            amount: c.amount,
-            paidAmount: "0",
-            openAmount: c.amount,
-            status: "open",
-          } as never)
+          .values(sollValues as never)
           .onConflictDoUpdate({
             target: [sollStellungenTable.contractId, sollStellungenTable.billingYear],
             set: {
-              amount: c.amount,
-              openAmount: c.amount,
+              amount: sql`excluded.amount`,
+              openAmount: sql`excluded.open_amount`,
               paidAmount: "0",
               status: "open",
               falligkeitsdatum: input.falligkeitsdatum,
               updatedAt: new Date(),
             },
           })
-          .returning({ id: sollStellungenTable.id });
-        if (soll) sollByContract.set(c.contractId, soll.id);
+          .returning({
+            id: sollStellungenTable.id,
+            contractId: sollStellungenTable.contractId,
+          });
+        for (const s of insertedSoll) sollByContract.set(s.contractId, s.id);
       }
 
-      // 3. Insert fee_run_items + collect pain.008 inputs.
+      // 3. Build fee_run_items in memory, then bulk-insert. Also collect
+      //    pain.008 inputs and the set of mandates actually used so the
+      //    XML body and the mandate-timestamp bump can happen outside the
+      //    per-candidate loop.
       const pain008Items: Pain008Item[] = [];
+      const itemValues: Array<Record<string, unknown>> = [];
+      const usedMandateIdSet = new Set<string>();
       for (const c of preview.candidates) {
         const iban = ibanByMember.get(c.memberId);
         if (!iban) continue; // Already excluded in preview, defensive.
-        const endToEndId = crypto.randomUUID().replace(/-/g, "").slice(0, 35);
-        const mandateRow = await tx
-          .select({
-            id: sepaMandatesTable.id,
-            mandatsNr: sepaMandatesTable.mandatsNr,
-            unterschriftDatum: sepaMandatesTable.unterschriftDatum,
-            ersteVerwendung: sepaMandatesTable.ersteVerwendung,
-          })
-          .from(sepaMandatesTable)
-          .where(eq(sepaMandatesTable.id, c.chosenMandateId))
-          .limit(1);
-        const mandate = mandateRow[0];
+        const mandate = mandateById.get(c.chosenMandateId);
         if (!mandate) continue;
 
+        const endToEndId = crypto.randomUUID().replace(/-/g, "").slice(0, 35);
         const signatureDate =
           mandate.unterschriftDatum?.toISOString().slice(0, 10) ?? input.falligkeitsdatum;
 
-        const [item] = await tx
-          .insert(feeRunItemsTable)
-          .values({
-            feeRunId: run.id,
-            memberId: c.memberId,
-            contractId: c.contractId,
-            sepaMandateId: c.chosenMandateId,
-            sollStellungId: sollByContract.get(c.contractId) ?? null,
-            amount: c.amount,
-            purpose: `Mitgliedsbeitrag ${input.billingYear}${c.includesAufnahmegebuhr ? " inkl. Aufnahmegebühr" : ""}`,
-            includesAufnahmegebuhr: c.includesAufnahmegebuhr,
-            endToEndId,
-            sequenceType: c.sequenceType,
-            mandateRef: mandate.mandatsNr,
-            mandateSignatureDate: signatureDate,
-            debtorName: c.debtorName,
-            debtorIbanLast4: c.debtorIbanLast4,
-            debtorBic: c.debtorBic,
-          } as never)
-          .returning({ id: feeRunItemsTable.id });
-        if (!item) continue;
-
-        // 4. Bump mandate timestamps: letzteVerwendung always, ersteVerwendung
-        //    only if previously null. This is what flips the next run from
-        //    FRST to RCUR for this mandate.
-        await tx
-          .update(sepaMandatesTable)
-          .set({
-            letzteVerwendung: falligkeitsdatum,
-            ersteVerwendung: sql`coalesce(${sepaMandatesTable.ersteVerwendung}, ${falligkeitsdatum})`,
-            updatedAt: new Date(),
-          })
-          .where(eq(sepaMandatesTable.id, c.chosenMandateId));
+        itemValues.push({
+          feeRunId: run.id,
+          memberId: c.memberId,
+          contractId: c.contractId,
+          sepaMandateId: c.chosenMandateId,
+          sollStellungId: sollByContract.get(c.contractId) ?? null,
+          amount: c.amount,
+          purpose: `Mitgliedsbeitrag ${input.billingYear}${c.includesAufnahmegebuhr ? " inkl. Aufnahmegebühr" : ""}`,
+          includesAufnahmegebuhr: c.includesAufnahmegebuhr,
+          endToEndId,
+          sequenceType: c.sequenceType,
+          mandateRef: mandate.mandatsNr,
+          mandateSignatureDate: signatureDate,
+          debtorName: c.debtorName,
+          debtorIbanLast4: c.debtorIbanLast4,
+          debtorBic: c.debtorBic,
+        });
 
         pain008Items.push({
           endToEndId,
@@ -255,6 +249,27 @@ export const feeRunsRouter = {
           purpose: `Mitgliedsbeitrag ${input.billingYear}${c.includesAufnahmegebuhr ? " inkl. Aufnahmegebuehr" : ""}`,
           sequenceType: c.sequenceType,
         });
+
+        usedMandateIdSet.add(c.chosenMandateId);
+      }
+
+      if (itemValues.length > 0) {
+        await tx.insert(feeRunItemsTable).values(itemValues as never);
+      }
+
+      // 4. Bump mandate timestamps in a single statement instead of one
+      //    update per candidate. `letzteVerwendung` is set unconditionally;
+      //    `ersteVerwendung` only fills if previously null — this is what
+      //    flips the NEXT run from FRST to RCUR for the same mandate.
+      if (usedMandateIdSet.size > 0) {
+        await tx
+          .update(sepaMandatesTable)
+          .set({
+            letzteVerwendung: falligkeitsdatum,
+            ersteVerwendung: sql`coalesce(${sepaMandatesTable.ersteVerwendung}, ${falligkeitsdatum})`,
+            updatedAt: new Date(),
+          })
+          .where(inArray(sepaMandatesTable.id, [...usedMandateIdSet]));
       }
 
       // 5. Generate XML, persist on the run.
@@ -450,9 +465,7 @@ export const feeRunsRouter = {
           .select({ sollStellungId: feeRunItemsTable.sollStellungId })
           .from(feeRunItemsTable)
           .where(eq(feeRunItemsTable.feeRunId, input.id));
-        const sollIds = items
-          .map((i) => i.sollStellungId)
-          .filter((id): id is string => id != null);
+        const sollIds = items.map((i) => i.sollStellungId).filter((id): id is string => id != null);
         if (sollIds.length > 0) {
           await tx
             .update(sollStellungenTable)

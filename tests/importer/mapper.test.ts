@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   mapContractRow,
+  mapInterRow,
+  mapInteresRow,
   mapMemberRow,
   mapSepaRow,
   mapVerknRow,
@@ -125,5 +127,44 @@ describe("mapVerknRow", () => {
     const row = mapVerknRow({ ADRNR: 13.0, VERKN: 742.0 });
     expect(row?.fromAdrNr).toBe(13);
     expect(row?.toAdrNr).toBe(742);
+  });
+});
+
+describe("mapInterRow", () => {
+  it("returns null without Nr or Interesse", () => {
+    expect(mapInterRow({})).toBeNull();
+    expect(mapInterRow({ Nr: 1 })).toBeNull();
+    expect(mapInterRow({ Interesse: "Fussball" })).toBeNull();
+  });
+
+  it("maps the Nr → Interesse lookup row", () => {
+    expect(mapInterRow({ Nr: 2, Interesse: "Fussball" })).toEqual({
+      nr: 2,
+      name: "Fussball",
+    });
+  });
+});
+
+describe("mapInteresRow", () => {
+  it("returns null without AdrNr or Interesse", () => {
+    expect(mapInteresRow({})).toBeNull();
+    expect(mapInteresRow({ AdrNr: 5 })).toBeNull();
+    expect(mapInteresRow({ Interesse: "2" })).toBeNull();
+  });
+
+  it("maps the per-member abteilung membership row", () => {
+    // Real shape from datesicherung.sql: Interesse comes through as a
+    // varchar that holds the numeric FK into `inter`.
+    const m = mapInteresRow({
+      AdrNr: 5,
+      Interesse: "5",
+      Eintritt: "1986-12-22 00:00:00.000000",
+      Austritt: null,
+    });
+    expect(m).not.toBeNull();
+    expect(m?.adrNr).toBe(5);
+    expect(m?.interesNr).toBe(5);
+    expect(m?.eintritt).toBeInstanceOf(Date);
+    expect(m?.austritt).toBeNull();
   });
 });

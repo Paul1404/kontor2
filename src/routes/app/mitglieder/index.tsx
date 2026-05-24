@@ -39,7 +39,7 @@ function MembersListPage() {
   const pageSize = 50;
 
   const abteilungen = useQuery({
-    queryKey: ["abteilungen"],
+    queryKey: ["abteilungen", "members"],
     queryFn: () => orpc.members.abteilungenList(),
   });
 

@@ -11,6 +11,7 @@ import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
+import { validateIban } from "~/server/sepa/iban";
 import {
   invalidateMemberCaches,
   getCached,
@@ -64,10 +65,21 @@ const StammdatenInput = v.object({
   notes: v.optional(v.nullable(v.string())),
 });
 
-function toDateOrNull(value: string | null | undefined): Date | null {
+/**
+ * Parse a `YYYY-MM-DD`(`THH:MM:SS...`) string to a Date, or null for
+ * an empty value. Rejects malformed input rather than silently returning
+ * null — a user typo like "2025-13-45" should surface as a validation
+ * error, not wipe the column to null.
+ */
+function toDateOrNull(value: string | null | undefined, field: string): Date | null {
   if (!value) return null;
   const d = new Date(value);
-  return Number.isFinite(d.getTime()) ? d : null;
+  if (!Number.isFinite(d.getTime())) {
+    throw new ORPCError("VALIDATION_FAILED", {
+      message: `Ungültiges Datum im Feld "${field}": ${value}`,
+    });
+  }
+  return d;
 }
 
 function normalizeIban(value: string | null | undefined): string | null {
@@ -111,13 +123,20 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   setIfPresent("mandatsrefenz");
   setIfPresent("notes");
 
-  if ("geburtsdatum" in input) patch.geburtsdatum = toDateOrNull(input.geburtsdatum);
-  if ("eintritt" in input) patch.eintritt = toDateOrNull(input.eintritt);
-  if ("austritt" in input) patch.austritt = toDateOrNull(input.austritt);
-  if ("verstorbenAm" in input) patch.verstorbenAm = toDateOrNull(input.verstorbenAm);
+  if ("geburtsdatum" in input)
+    patch.geburtsdatum = toDateOrNull(input.geburtsdatum, "Geburtsdatum");
+  if ("eintritt" in input) patch.eintritt = toDateOrNull(input.eintritt, "Eintritt");
+  if ("austritt" in input) patch.austritt = toDateOrNull(input.austritt, "Austritt");
+  if ("verstorbenAm" in input)
+    patch.verstorbenAm = toDateOrNull(input.verstorbenAm, "Verstorben am");
 
   if ("iban1" in input) {
     const norm = normalizeIban(input.iban1);
+    if (norm && !validateIban(norm)) {
+      throw new ORPCError("VALIDATION_FAILED", {
+        message: "IBAN ungültig (Prüfsumme fehlerhaft).",
+      });
+    }
     patch.iban1 = norm;
     patch.iban1Last4 = lastFour(norm);
   }
@@ -246,13 +265,44 @@ export const membersRouter = {
           .innerJoin(abteilungenTable, eq(abteilungenTable.id, memberAbteilungenTable.abteilungId))
           .where(eq(memberAbteilungenTable.memberId, m.id))
           .orderBy(asc(abteilungenTable.name)),
+        // Project only UI-needed columns. Notably, do NOT return the
+        // `*_V` bank fields (kontoV/blzV/bankV/ktoInhV) which would leak
+        // banking data to readonly users.
         context.db
-          .select()
+          .select({
+            id: contractsTable.id,
+            vertragNr: contractsTable.vertragNr,
+            art: contractsTable.art,
+            artName: contractsTable.artName,
+            betrag: contractsTable.betrag,
+            aufnahmegeb: contractsTable.aufnahmegeb,
+            sollstellung: contractsTable.sollstellung,
+            vertragBegin: contractsTable.vertragBegin,
+            vertragEnde: contractsTable.vertragEnde,
+            gekuendAm: contractsTable.gekuendAm,
+            gekuendZum: contractsTable.gekuendZum,
+            lastschrift: contractsTable.lastschrift,
+            abwKontoInh: contractsTable.abwKontoInh,
+          })
           .from(contractsTable)
           .where(eq(contractsTable.memberId, m.id))
           .orderBy(desc(contractsTable.vertragBegin)),
         context.db
-          .select()
+          .select({
+            id: sepaMandatesTable.id,
+            mandatsNr: sepaMandatesTable.mandatsNr,
+            lastschriftart: sepaMandatesTable.lastschriftart,
+            typ: sepaMandatesTable.typ,
+            status: sepaMandatesTable.status,
+            angelegtAm: sepaMandatesTable.angelegtAm,
+            gultigBis: sepaMandatesTable.gultigBis,
+            unterschriftDatum: sepaMandatesTable.unterschriftDatum,
+            ersteVerwendung: sepaMandatesTable.ersteVerwendung,
+            letzteVerwendung: sepaMandatesTable.letzteVerwendung,
+            widerrufenAm: sepaMandatesTable.widerrufenAm,
+            gueltigAb: sepaMandatesTable.gueltigAb,
+            isDeleted: sepaMandatesTable.isDeleted,
+          })
           .from(sepaMandatesTable)
           .where(eq(sepaMandatesTable.memberId, m.id))
           .orderBy(desc(sepaMandatesTable.angelegtAm)),
@@ -261,8 +311,17 @@ export const membersRouter = {
           .from(attachmentsTable)
           .where(eq(attachmentsTable.memberId, m.id))
           .orderBy(desc(attachmentsTable.uploadedAt)),
+        // Audit history is sensitive: project only what the UI renders,
+        // and gate the full feed to vorstand+ via the role check below.
         context.db
-          .select()
+          .select({
+            id: auditLogTable.id,
+            action: auditLogTable.action,
+            source: auditLogTable.source,
+            actorEmail: auditLogTable.actorEmail,
+            changes: auditLogTable.changes,
+            createdAt: auditLogTable.createdAt,
+          })
           .from(auditLogTable)
           .where(and(eq(auditLogTable.entityType, "member"), eq(auditLogTable.entityId, m.id)))
           .orderBy(desc(auditLogTable.createdAt))
@@ -293,6 +352,11 @@ export const membersRouter = {
       void iban2;
       void iban3;
 
+      // Hide the audit trail from readonly viewers: revealing who edited
+      // what when is operational metadata the vorstand owns.
+      const role = (context.session?.user.role as string | undefined) ?? "readonly";
+      const visibleAudit = role === "readonly" ? [] : audit;
+
       return {
         member: stamm,
         abteilungen,
@@ -305,7 +369,7 @@ export const membersRouter = {
           sizeBytes: a.sizeBytes,
           uploadedAt: a.uploadedAt,
         })),
-        audit,
+        audit: visibleAudit,
         beziehungen,
       };
     }),
@@ -316,7 +380,7 @@ export const membersRouter = {
         id: abteilungenTable.id,
         name: abteilungenTable.name,
         slug: abteilungenTable.slug,
-        count: sql<number>`(select count(*) from ${memberAbteilungenTable} where ${memberAbteilungenTable.abteilungId} = ${abteilungenTable.id})::int`,
+        count: sql<number>`(select count(*)::int from member_abteilungen ma where ma.abteilung_id = abteilungen.id)`,
       })
       .from(abteilungenTable)
       .orderBy(asc(abteilungenTable.name));
@@ -325,49 +389,52 @@ export const membersRouter = {
   update: vorstandProc
     .input(v.object({ memberId: v.string(), patch: StammdatenInput }))
     .handler(async ({ context, input }) => {
-      const [existing] = await context.db
-        .select()
-        .from(membersTable)
-        .where(eq(membersTable.id, input.memberId))
-        .limit(1);
-      if (!existing) {
-        throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
-      }
+      const result = await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(membersTable)
+          .where(eq(membersTable.id, input.memberId))
+          .limit(1);
+        if (!existing) {
+          throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        }
 
-      const patch = buildMemberPatch(input.patch);
-      if (Object.keys(patch).length === 0) {
-        return { ok: true, mitglnr: existing.mitglnr };
-      }
+        const patch = buildMemberPatch(input.patch);
+        if (Object.keys(patch).length === 0) {
+          return { mitglnr: existing.mitglnr };
+        }
 
-      // Build the projected next-state for the diff. We need to compare what
-      // *will* be in the row after the update so the audit log reflects the
-      // actual change, not the request shape.
-      const projected: Record<string, unknown> = {
-        ...(existing as Record<string, unknown>),
-        ...patch,
-      };
+        // Build the projected next-state for the diff so the audit log
+        // reflects the actual change, not the request shape.
+        const projected: Record<string, unknown> = {
+          ...(existing as Record<string, unknown>),
+          ...patch,
+        };
 
-      await context.db
-        .update(membersTable)
-        .set({ ...patch, updatedAt: new Date() } as never)
-        .where(eq(membersTable.id, input.memberId));
+        await tx
+          .update(membersTable)
+          .set({ ...patch, updatedAt: new Date() } as never)
+          .where(eq(membersTable.id, input.memberId));
 
-      const changes = diff(existing as unknown as Record<string, unknown>, projected);
-      if (Object.keys(changes).length > 0) {
-        await appendAudit(context.db, {
-          entityType: "member",
-          entityId: input.memberId,
-          action: "update",
-          source: "ui",
-          actorId: context.session!.user.id,
-          actorEmail: context.session!.user.email,
-          changes,
-          requestId: context.requestId ?? null,
-        });
-      }
+        const changes = diff(existing as unknown as Record<string, unknown>, projected);
+        if (Object.keys(changes).length > 0) {
+          await appendAudit(tx, {
+            entityType: "member",
+            entityId: input.memberId,
+            action: "update",
+            source: "ui",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            changes,
+            requestId: context.requestId ?? null,
+          });
+        }
+
+        return { mitglnr: existing.mitglnr };
+      });
 
       await invalidateMemberCaches();
-      return { ok: true, mitglnr: existing.mitglnr };
+      return { ok: true, mitglnr: result.mitglnr };
     }),
 
   create: vorstandProc
@@ -385,93 +452,124 @@ export const membersRouter = {
         });
       }
 
-      // Generate the next available AdrNr (Linear's primary identifier) and
-      // Mitgliedsnummer. Both columns are unique. AdrNr is required NOT NULL
-      // on the schema. We compute max(adr_nr)+1 in a single query.
-      const [maxRow] = await context.db
-        .select({
-          maxAdrNr: sql<number>`coalesce(max(${membersTable.adrNr}), 0)::int`,
-          maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitglnr}, '\\D', '', 'g'), '')::int), 0)::int`,
-        })
-        .from(membersTable);
-      const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
-      const nextMitglnr =
-        input.mitglnr && input.mitglnr.trim().length > 0
-          ? input.mitglnr.trim()
-          : String((maxRow?.maxMitglnrInt ?? 0) + 1);
+      // Single transaction: pick the next AdrNr/Mitgliedsnummer and insert
+      // atomically. Retry on serialization / unique-violation conflicts
+      // (two concurrent creates racing for the same AdrNr).
+      const MAX_RETRIES = 5;
+      let lastError: unknown = null;
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
+        try {
+          const result = await context.db.transaction(async (tx) => {
+            const [maxRow] = await tx
+              .select({
+                maxAdrNr: sql<number>`coalesce(max(${membersTable.adrNr}), 0)::int`,
+                maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitglnr}, '\\D', '', 'g'), '')::int), 0)::int`,
+              })
+              .from(membersTable);
+            const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
+            const nextMitglnr =
+              input.mitglnr && input.mitglnr.trim().length > 0
+                ? input.mitglnr.trim()
+                : String((maxRow?.maxMitglnrInt ?? 0) + 1);
 
-      // Enforce mitglnr uniqueness explicitly: not enforced by a DB constraint
-      // because some legacy rows in the import may share or lack mitglnr.
-      if (nextMitglnr) {
-        const [dupe] = await context.db
-          .select({ id: membersTable.id })
-          .from(membersTable)
-          .where(eq(membersTable.mitglnr, nextMitglnr))
-          .limit(1);
-        if (dupe) {
-          throw new ORPCError("CONFLICT", {
-            message: `Mitgliedsnummer ${nextMitglnr} ist bereits vergeben.`,
+            if (nextMitglnr) {
+              const [dupe] = await tx
+                .select({ id: membersTable.id })
+                .from(membersTable)
+                .where(eq(membersTable.mitglnr, nextMitglnr))
+                .limit(1);
+              if (dupe) {
+                throw new ORPCError("CONFLICT", {
+                  message: `Mitgliedsnummer ${nextMitglnr} ist bereits vergeben.`,
+                });
+              }
+            }
+
+            const now = new Date();
+            const [inserted] = await tx
+              .insert(membersTable)
+              .values({
+                ...(patch as Record<string, unknown>),
+                adrNr: nextAdrNr,
+                mitglnr: nextMitglnr,
+                createdAt: now,
+                updatedAt: now,
+              } as never)
+              .returning({ id: membersTable.id, mitglnr: membersTable.mitglnr });
+            if (!inserted) {
+              throw new ORPCError("INTERNAL_SERVER_ERROR", {
+                message: "Anlage fehlgeschlagen.",
+              });
+            }
+
+            await appendAudit(tx, {
+              entityType: "member",
+              entityId: inserted.id,
+              action: "create",
+              source: "ui",
+              actorId: context.session!.user.id,
+              actorEmail: context.session!.user.email,
+              changes: diff(null, { ...patch, adrNr: nextAdrNr, mitglnr: nextMitglnr }),
+              requestId: context.requestId ?? null,
+            });
+
+            return {
+              id: inserted.id,
+              mitglnr: inserted.mitglnr ?? nextMitglnr,
+              adrNr: nextAdrNr,
+            };
           });
+
+          await invalidateMemberCaches();
+          return result;
+        } catch (e) {
+          lastError = e;
+          // Postgres unique violation = 23505. Retry — the next iteration
+          // will see the concurrent row's max and pick the next available.
+          const code =
+            (e as { code?: string; cause?: { code?: string } }).code ??
+            (e as { code?: string; cause?: { code?: string } }).cause?.code;
+          if (code !== "23505") throw e;
         }
       }
-
-      const now = new Date();
-      const [inserted] = await context.db
-        .insert(membersTable)
-        .values({
-          ...(patch as Record<string, unknown>),
-          adrNr: nextAdrNr,
-          mitglnr: nextMitglnr,
-          createdAt: now,
-          updatedAt: now,
-        } as never)
-        .returning({ id: membersTable.id, mitglnr: membersTable.mitglnr });
-      if (!inserted) {
-        throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
-      }
-
-      await appendAudit(context.db, {
-        entityType: "member",
-        entityId: inserted.id,
-        action: "create",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: diff(null, { ...patch, adrNr: nextAdrNr, mitglnr: nextMitglnr }),
-        requestId: context.requestId ?? null,
-      });
-
-      await invalidateMemberCaches();
-      return { id: inserted.id, mitglnr: inserted.mitglnr ?? nextMitglnr, adrNr: nextAdrNr };
+      throw (
+        lastError ??
+        new ORPCError("CONFLICT", {
+          message: "Mitglied konnte wegen Konfliktes nicht angelegt werden.",
+        })
+      );
     }),
 
   softDelete: vorstandProc
     .input(v.object({ memberId: v.string() }))
     .handler(async ({ context, input }) => {
-      const [existing] = await context.db
-        .select()
-        .from(membersTable)
-        .where(eq(membersTable.id, input.memberId))
-        .limit(1);
-      if (!existing) {
-        throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
-      }
-      if (existing.deletedAt) return { ok: true };
+      await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(membersTable)
+          .where(eq(membersTable.id, input.memberId))
+          .limit(1);
+        if (!existing) {
+          throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        }
+        if (existing.deletedAt) return;
 
-      await context.db
-        .update(membersTable)
-        .set({ deletedAt: new Date(), updatedAt: new Date() } as never)
-        .where(eq(membersTable.id, input.memberId));
+        const now = new Date();
+        await tx
+          .update(membersTable)
+          .set({ deletedAt: now, updatedAt: now } as never)
+          .where(eq(membersTable.id, input.memberId));
 
-      await appendAudit(context.db, {
-        entityType: "member",
-        entityId: input.memberId,
-        action: "delete",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: { deletedAt: { before: null, after: new Date().toISOString() } },
-        requestId: context.requestId ?? null,
+        await appendAudit(tx, {
+          entityType: "member",
+          entityId: input.memberId,
+          action: "delete",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: { deletedAt: { before: null, after: now.toISOString() } },
+          requestId: context.requestId ?? null,
+        });
       });
 
       await invalidateMemberCaches();
@@ -481,31 +579,33 @@ export const membersRouter = {
   restore: vorstandProc
     .input(v.object({ memberId: v.string() }))
     .handler(async ({ context, input }) => {
-      const [existing] = await context.db
-        .select()
-        .from(membersTable)
-        .where(eq(membersTable.id, input.memberId))
-        .limit(1);
-      if (!existing) {
-        throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
-      }
-      if (!existing.deletedAt) return { ok: true };
+      await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(membersTable)
+          .where(eq(membersTable.id, input.memberId))
+          .limit(1);
+        if (!existing) {
+          throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        }
+        if (!existing.deletedAt) return;
 
-      const before = existing.deletedAt;
-      await context.db
-        .update(membersTable)
-        .set({ deletedAt: null, updatedAt: new Date() } as never)
-        .where(eq(membersTable.id, input.memberId));
+        const before = existing.deletedAt;
+        await tx
+          .update(membersTable)
+          .set({ deletedAt: null, updatedAt: new Date() } as never)
+          .where(eq(membersTable.id, input.memberId));
 
-      await appendAudit(context.db, {
-        entityType: "member",
-        entityId: input.memberId,
-        action: "restore",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: { deletedAt: { before: before?.toISOString() ?? null, after: null } },
-        requestId: context.requestId ?? null,
+        await appendAudit(tx, {
+          entityType: "member",
+          entityId: input.memberId,
+          action: "restore",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: { deletedAt: { before: before?.toISOString() ?? null, after: null } },
+          requestId: context.requestId ?? null,
+        });
       });
 
       await invalidateMemberCaches();

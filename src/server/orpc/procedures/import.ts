@@ -42,9 +42,18 @@ export const importRouter = {
       const relationships = (dump.rows.verkn ?? []).map((r) =>
         rowToDict(dump.columns.verkn ?? [], r),
       );
+      const inter = (dump.rows.inter ?? []).map((r) => rowToDict(dump.columns.inter ?? [], r));
+      const interes = (dump.rows.interes ?? []).map((r) =>
+        rowToDict(dump.columns.interes ?? [], r),
+      );
 
       if (
-        members.length + feeTypes.length + contracts.length + sepa.length + relationships.length ===
+        members.length +
+          feeTypes.length +
+          contracts.length +
+          sepa.length +
+          relationships.length +
+          interes.length ===
         0
       ) {
         throw new ORPCError("BAD_REQUEST", {
@@ -63,6 +72,8 @@ export const importRouter = {
         contracts,
         sepa,
         relationships,
+        inter,
+        interes,
         requestId: context.requestId,
         forceOverwriteAbteilungLinks: input.forceOverwriteAbteilungLinks,
       });
