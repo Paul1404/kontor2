@@ -10,19 +10,27 @@
 
 import { Route as rootRouteImport } from './__root'
 import { Route as LoginRouteImport } from './login'
+import { Route as PortalRouteRouteImport } from './portal/route'
 import { Route as AppRouteRouteImport } from './app/route'
 import { Route as IndexRouteImport } from './index'
+import { Route as PortalIndexRouteImport } from './portal/index'
 import { Route as AppIndexRouteImport } from './app/index'
+import { Route as PortalProfilRouteImport } from './portal/profil'
+import { Route as PortalAbgemeldetRouteImport } from './portal/abgemeldet'
+import { Route as PortalAbgelaufenRouteImport } from './portal/abgelaufen'
 import { Route as InviteTokenRouteImport } from './invite.$token'
+import { Route as AppPortalAnfragenRouteImport } from './app/portal-anfragen'
 import { Route as AppImportRouteImport } from './app/import'
 import { Route as AppAuditRouteImport } from './app/audit'
 import { Route as ApiHealthRouteImport } from './api/health'
 import { Route as AppMitgliederIndexRouteImport } from './app/mitglieder/index'
+import { Route as AppForderungenIndexRouteImport } from './app/forderungen/index'
 import { Route as AppDsgvoIndexRouteImport } from './app/dsgvo/index'
 import { Route as AppBerichteIndexRouteImport } from './app/berichte/index'
 import { Route as AppBeitragIndexRouteImport } from './app/beitrag/index'
 import { Route as AppMitgliederNeuRouteImport } from './app/mitglieder/neu'
 import { Route as AppMitgliederMitgliedsnummerRouteImport } from './app/mitglieder/$mitgliedsnummer'
+import { Route as AppForderungenRuecklaeuferRouteImport } from './app/forderungen/ruecklaeufer'
 import { Route as AppEinstellungenVereinRouteImport } from './app/einstellungen/verein'
 import { Route as AppEinstellungenSmtpRouteImport } from './app/einstellungen/smtp'
 import { Route as AppEinstellungenBenutzerRouteImport } from './app/einstellungen/benutzer'
@@ -39,15 +47,25 @@ import { Route as AppBeitragIdRouteImport } from './app/beitrag/$id'
 import { Route as AppAdminSnapshotsRouteImport } from './app/admin/snapshots'
 import { Route as AppAdminErweitertRouteImport } from './app/admin/erweitert'
 import { Route as ApiRpcSplatRouteImport } from './api/rpc.$'
+import { Route as ApiPortalLogoutRouteImport } from './api/portal.logout'
 import { Route as ApiIngestSvumsRouteImport } from './api/ingest.svums'
 import { Route as ApiFilesIdRouteImport } from './api/files.$id'
 import { Route as ApiCronSnapshotsRouteImport } from './api/cron.snapshots'
 import { Route as ApiAuthSplatRouteImport } from './api/auth.$'
+import { Route as AppForderungenMahnungenIndexRouteImport } from './app/forderungen/mahnungen/index'
 import { Route as AppMitgliederMitgliedsnummerBearbeitenRouteImport } from './app/mitglieder/$mitgliedsnummer_.bearbeiten'
+import { Route as AppForderungenMahnungenNeuRouteImport } from './app/forderungen/mahnungen/neu'
+import { Route as AppForderungenMahnungenIdRouteImport } from './app/forderungen/mahnungen/$id'
+import { Route as ApiPortalZugangTokenRouteImport } from './api/portal.zugang.$token'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalRouteRoute = PortalRouteRouteImport.update({
+  id: '/portal',
+  path: '/portal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRouteRoute = AppRouteRouteImport.update({
@@ -60,15 +78,40 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PortalIndexRoute = PortalIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PortalRouteRoute,
+} as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const PortalProfilRoute = PortalProfilRouteImport.update({
+  id: '/profil',
+  path: '/profil',
+  getParentRoute: () => PortalRouteRoute,
+} as any)
+const PortalAbgemeldetRoute = PortalAbgemeldetRouteImport.update({
+  id: '/abgemeldet',
+  path: '/abgemeldet',
+  getParentRoute: () => PortalRouteRoute,
+} as any)
+const PortalAbgelaufenRoute = PortalAbgelaufenRouteImport.update({
+  id: '/abgelaufen',
+  path: '/abgelaufen',
+  getParentRoute: () => PortalRouteRoute,
+} as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppPortalAnfragenRoute = AppPortalAnfragenRouteImport.update({
+  id: '/portal-anfragen',
+  path: '/portal-anfragen',
+  getParentRoute: () => AppRouteRoute,
 } as any)
 const AppImportRoute = AppImportRouteImport.update({
   id: '/import',
@@ -88,6 +131,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
 const AppMitgliederIndexRoute = AppMitgliederIndexRouteImport.update({
   id: '/mitglieder/',
   path: '/mitglieder/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppForderungenIndexRoute = AppForderungenIndexRouteImport.update({
+  id: '/forderungen/',
+  path: '/forderungen/',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppDsgvoIndexRoute = AppDsgvoIndexRouteImport.update({
@@ -114,6 +162,12 @@ const AppMitgliederMitgliedsnummerRoute =
   AppMitgliederMitgliedsnummerRouteImport.update({
     id: '/mitglieder/$mitgliedsnummer',
     path: '/mitglieder/$mitgliedsnummer',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppForderungenRuecklaeuferRoute =
+  AppForderungenRuecklaeuferRouteImport.update({
+    id: '/forderungen/ruecklaeufer',
+    path: '/forderungen/ruecklaeufer',
     getParentRoute: () => AppRouteRoute,
   } as any)
 const AppEinstellungenVereinRoute = AppEinstellungenVereinRouteImport.update({
@@ -201,6 +255,11 @@ const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
   path: '/api/rpc/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPortalLogoutRoute = ApiPortalLogoutRouteImport.update({
+  id: '/api/portal/logout',
+  path: '/api/portal/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiIngestSvumsRoute = ApiIngestSvumsRouteImport.update({
   id: '/api/ingest/svums',
   path: '/api/ingest/svums',
@@ -221,26 +280,56 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppForderungenMahnungenIndexRoute =
+  AppForderungenMahnungenIndexRouteImport.update({
+    id: '/forderungen/mahnungen/',
+    path: '/forderungen/mahnungen/',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 const AppMitgliederMitgliedsnummerBearbeitenRoute =
   AppMitgliederMitgliedsnummerBearbeitenRouteImport.update({
     id: '/mitglieder/$mitgliedsnummer_/bearbeiten',
     path: '/mitglieder/$mitgliedsnummer/bearbeiten',
     getParentRoute: () => AppRouteRoute,
   } as any)
+const AppForderungenMahnungenNeuRoute =
+  AppForderungenMahnungenNeuRouteImport.update({
+    id: '/forderungen/mahnungen/neu',
+    path: '/forderungen/mahnungen/neu',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppForderungenMahnungenIdRoute =
+  AppForderungenMahnungenIdRouteImport.update({
+    id: '/forderungen/mahnungen/$id',
+    path: '/forderungen/mahnungen/$id',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const ApiPortalZugangTokenRoute = ApiPortalZugangTokenRouteImport.update({
+  id: '/api/portal/zugang/$token',
+  path: '/api/portal/zugang/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
+  '/portal': typeof PortalRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
   '/app/import': typeof AppImportRoute
+  '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/portal/abgelaufen': typeof PortalAbgelaufenRoute
+  '/portal/abgemeldet': typeof PortalAbgemeldetRoute
+  '/portal/profil': typeof PortalProfilRoute
   '/app/': typeof AppIndexRoute
+  '/portal/': typeof PortalIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/ingest/svums': typeof ApiIngestSvumsRoute
+  '/api/portal/logout': typeof ApiPortalLogoutRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
@@ -257,13 +346,19 @@ export interface FileRoutesByFullPath {
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
+  '/app/forderungen/ruecklaeufer': typeof AppForderungenRuecklaeuferRoute
   '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRoute
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
   '/app/beitrag/': typeof AppBeitragIndexRoute
   '/app/berichte/': typeof AppBerichteIndexRoute
   '/app/dsgvo/': typeof AppDsgvoIndexRoute
+  '/app/forderungen/': typeof AppForderungenIndexRoute
   '/app/mitglieder/': typeof AppMitgliederIndexRoute
+  '/api/portal/zugang/$token': typeof ApiPortalZugangTokenRoute
+  '/app/forderungen/mahnungen/$id': typeof AppForderungenMahnungenIdRoute
+  '/app/forderungen/mahnungen/neu': typeof AppForderungenMahnungenNeuRoute
   '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
+  '/app/forderungen/mahnungen/': typeof AppForderungenMahnungenIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -271,12 +366,18 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
   '/app/import': typeof AppImportRoute
+  '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/portal/abgelaufen': typeof PortalAbgelaufenRoute
+  '/portal/abgemeldet': typeof PortalAbgemeldetRoute
+  '/portal/profil': typeof PortalProfilRoute
   '/app': typeof AppIndexRoute
+  '/portal': typeof PortalIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/ingest/svums': typeof ApiIngestSvumsRoute
+  '/api/portal/logout': typeof ApiPortalLogoutRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
@@ -293,28 +394,41 @@ export interface FileRoutesByTo {
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
+  '/app/forderungen/ruecklaeufer': typeof AppForderungenRuecklaeuferRoute
   '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRoute
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
   '/app/beitrag': typeof AppBeitragIndexRoute
   '/app/berichte': typeof AppBerichteIndexRoute
   '/app/dsgvo': typeof AppDsgvoIndexRoute
+  '/app/forderungen': typeof AppForderungenIndexRoute
   '/app/mitglieder': typeof AppMitgliederIndexRoute
+  '/api/portal/zugang/$token': typeof ApiPortalZugangTokenRoute
+  '/app/forderungen/mahnungen/$id': typeof AppForderungenMahnungenIdRoute
+  '/app/forderungen/mahnungen/neu': typeof AppForderungenMahnungenNeuRoute
   '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
+  '/app/forderungen/mahnungen': typeof AppForderungenMahnungenIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
+  '/portal': typeof PortalRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
   '/app/import': typeof AppImportRoute
+  '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/portal/abgelaufen': typeof PortalAbgelaufenRoute
+  '/portal/abgemeldet': typeof PortalAbgemeldetRoute
+  '/portal/profil': typeof PortalProfilRoute
   '/app/': typeof AppIndexRoute
+  '/portal/': typeof PortalIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/ingest/svums': typeof ApiIngestSvumsRoute
+  '/api/portal/logout': typeof ApiPortalLogoutRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
@@ -331,29 +445,42 @@ export interface FileRoutesById {
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
+  '/app/forderungen/ruecklaeufer': typeof AppForderungenRuecklaeuferRoute
   '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRoute
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
   '/app/beitrag/': typeof AppBeitragIndexRoute
   '/app/berichte/': typeof AppBerichteIndexRoute
   '/app/dsgvo/': typeof AppDsgvoIndexRoute
+  '/app/forderungen/': typeof AppForderungenIndexRoute
   '/app/mitglieder/': typeof AppMitgliederIndexRoute
+  '/api/portal/zugang/$token': typeof ApiPortalZugangTokenRoute
+  '/app/forderungen/mahnungen/$id': typeof AppForderungenMahnungenIdRoute
+  '/app/forderungen/mahnungen/neu': typeof AppForderungenMahnungenNeuRoute
   '/app/mitglieder/$mitgliedsnummer_/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
+  '/app/forderungen/mahnungen/': typeof AppForderungenMahnungenIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/app'
+    | '/portal'
     | '/login'
     | '/api/health'
     | '/app/audit'
     | '/app/import'
+    | '/app/portal-anfragen'
     | '/invite/$token'
+    | '/portal/abgelaufen'
+    | '/portal/abgemeldet'
+    | '/portal/profil'
     | '/app/'
+    | '/portal/'
     | '/api/auth/$'
     | '/api/cron/snapshots'
     | '/api/files/$id'
     | '/api/ingest/svums'
+    | '/api/portal/logout'
     | '/api/rpc/$'
     | '/app/admin/erweitert'
     | '/app/admin/snapshots'
@@ -370,13 +497,19 @@ export interface FileRouteTypes {
     | '/app/einstellungen/benutzer'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
+    | '/app/forderungen/ruecklaeufer'
     | '/app/mitglieder/$mitgliedsnummer'
     | '/app/mitglieder/neu'
     | '/app/beitrag/'
     | '/app/berichte/'
     | '/app/dsgvo/'
+    | '/app/forderungen/'
     | '/app/mitglieder/'
+    | '/api/portal/zugang/$token'
+    | '/app/forderungen/mahnungen/$id'
+    | '/app/forderungen/mahnungen/neu'
     | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
+    | '/app/forderungen/mahnungen/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -384,12 +517,18 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/app/audit'
     | '/app/import'
+    | '/app/portal-anfragen'
     | '/invite/$token'
+    | '/portal/abgelaufen'
+    | '/portal/abgemeldet'
+    | '/portal/profil'
     | '/app'
+    | '/portal'
     | '/api/auth/$'
     | '/api/cron/snapshots'
     | '/api/files/$id'
     | '/api/ingest/svums'
+    | '/api/portal/logout'
     | '/api/rpc/$'
     | '/app/admin/erweitert'
     | '/app/admin/snapshots'
@@ -406,27 +545,40 @@ export interface FileRouteTypes {
     | '/app/einstellungen/benutzer'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
+    | '/app/forderungen/ruecklaeufer'
     | '/app/mitglieder/$mitgliedsnummer'
     | '/app/mitglieder/neu'
     | '/app/beitrag'
     | '/app/berichte'
     | '/app/dsgvo'
+    | '/app/forderungen'
     | '/app/mitglieder'
+    | '/api/portal/zugang/$token'
+    | '/app/forderungen/mahnungen/$id'
+    | '/app/forderungen/mahnungen/neu'
     | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
+    | '/app/forderungen/mahnungen'
   id:
     | '__root__'
     | '/'
     | '/app'
+    | '/portal'
     | '/login'
     | '/api/health'
     | '/app/audit'
     | '/app/import'
+    | '/app/portal-anfragen'
     | '/invite/$token'
+    | '/portal/abgelaufen'
+    | '/portal/abgemeldet'
+    | '/portal/profil'
     | '/app/'
+    | '/portal/'
     | '/api/auth/$'
     | '/api/cron/snapshots'
     | '/api/files/$id'
     | '/api/ingest/svums'
+    | '/api/portal/logout'
     | '/api/rpc/$'
     | '/app/admin/erweitert'
     | '/app/admin/snapshots'
@@ -443,18 +595,25 @@ export interface FileRouteTypes {
     | '/app/einstellungen/benutzer'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
+    | '/app/forderungen/ruecklaeufer'
     | '/app/mitglieder/$mitgliedsnummer'
     | '/app/mitglieder/neu'
     | '/app/beitrag/'
     | '/app/berichte/'
     | '/app/dsgvo/'
+    | '/app/forderungen/'
     | '/app/mitglieder/'
+    | '/api/portal/zugang/$token'
+    | '/app/forderungen/mahnungen/$id'
+    | '/app/forderungen/mahnungen/neu'
     | '/app/mitglieder/$mitgliedsnummer_/bearbeiten'
+    | '/app/forderungen/mahnungen/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRouteRoute: typeof AppRouteRouteWithChildren
+  PortalRouteRoute: typeof PortalRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiHealthRoute: typeof ApiHealthRoute
   InviteTokenRoute: typeof InviteTokenRoute
@@ -462,7 +621,9 @@ export interface RootRouteChildren {
   ApiCronSnapshotsRoute: typeof ApiCronSnapshotsRoute
   ApiFilesIdRoute: typeof ApiFilesIdRoute
   ApiIngestSvumsRoute: typeof ApiIngestSvumsRoute
+  ApiPortalLogoutRoute: typeof ApiPortalLogoutRoute
   ApiRpcSplatRoute: typeof ApiRpcSplatRoute
+  ApiPortalZugangTokenRoute: typeof ApiPortalZugangTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -472,6 +633,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal': {
+      id: '/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof PortalRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app': {
@@ -488,6 +656,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/portal/': {
+      id: '/portal/'
+      path: '/'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof PortalIndexRouteImport
+      parentRoute: typeof PortalRouteRoute
+    }
     '/app/': {
       id: '/app/'
       path: '/'
@@ -495,12 +670,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/portal/profil': {
+      id: '/portal/profil'
+      path: '/profil'
+      fullPath: '/portal/profil'
+      preLoaderRoute: typeof PortalProfilRouteImport
+      parentRoute: typeof PortalRouteRoute
+    }
+    '/portal/abgemeldet': {
+      id: '/portal/abgemeldet'
+      path: '/abgemeldet'
+      fullPath: '/portal/abgemeldet'
+      preLoaderRoute: typeof PortalAbgemeldetRouteImport
+      parentRoute: typeof PortalRouteRoute
+    }
+    '/portal/abgelaufen': {
+      id: '/portal/abgelaufen'
+      path: '/abgelaufen'
+      fullPath: '/portal/abgelaufen'
+      preLoaderRoute: typeof PortalAbgelaufenRouteImport
+      parentRoute: typeof PortalRouteRoute
+    }
     '/invite/$token': {
       id: '/invite/$token'
       path: '/invite/$token'
       fullPath: '/invite/$token'
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/app/portal-anfragen': {
+      id: '/app/portal-anfragen'
+      path: '/portal-anfragen'
+      fullPath: '/app/portal-anfragen'
+      preLoaderRoute: typeof AppPortalAnfragenRouteImport
+      parentRoute: typeof AppRouteRoute
     }
     '/app/import': {
       id: '/app/import'
@@ -528,6 +731,13 @@ declare module '@tanstack/react-router' {
       path: '/mitglieder'
       fullPath: '/app/mitglieder/'
       preLoaderRoute: typeof AppMitgliederIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/forderungen/': {
+      id: '/app/forderungen/'
+      path: '/forderungen'
+      fullPath: '/app/forderungen/'
+      preLoaderRoute: typeof AppForderungenIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/dsgvo/': {
@@ -563,6 +773,13 @@ declare module '@tanstack/react-router' {
       path: '/mitglieder/$mitgliedsnummer'
       fullPath: '/app/mitglieder/$mitgliedsnummer'
       preLoaderRoute: typeof AppMitgliederMitgliedsnummerRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/forderungen/ruecklaeufer': {
+      id: '/app/forderungen/ruecklaeufer'
+      path: '/forderungen/ruecklaeufer'
+      fullPath: '/app/forderungen/ruecklaeufer'
+      preLoaderRoute: typeof AppForderungenRuecklaeuferRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/einstellungen/verein': {
@@ -677,6 +894,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiRpcSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/portal/logout': {
+      id: '/api/portal/logout'
+      path: '/api/portal/logout'
+      fullPath: '/api/portal/logout'
+      preLoaderRoute: typeof ApiPortalLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ingest/svums': {
       id: '/api/ingest/svums'
       path: '/api/ingest/svums'
@@ -705,6 +929,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/forderungen/mahnungen/': {
+      id: '/app/forderungen/mahnungen/'
+      path: '/forderungen/mahnungen'
+      fullPath: '/app/forderungen/mahnungen/'
+      preLoaderRoute: typeof AppForderungenMahnungenIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/mitglieder/$mitgliedsnummer_/bearbeiten': {
       id: '/app/mitglieder/$mitgliedsnummer_/bearbeiten'
       path: '/mitglieder/$mitgliedsnummer/bearbeiten'
@@ -712,12 +943,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/forderungen/mahnungen/neu': {
+      id: '/app/forderungen/mahnungen/neu'
+      path: '/forderungen/mahnungen/neu'
+      fullPath: '/app/forderungen/mahnungen/neu'
+      preLoaderRoute: typeof AppForderungenMahnungenNeuRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/forderungen/mahnungen/$id': {
+      id: '/app/forderungen/mahnungen/$id'
+      path: '/forderungen/mahnungen/$id'
+      fullPath: '/app/forderungen/mahnungen/$id'
+      preLoaderRoute: typeof AppForderungenMahnungenIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/api/portal/zugang/$token': {
+      id: '/api/portal/zugang/$token'
+      path: '/api/portal/zugang/$token'
+      fullPath: '/api/portal/zugang/$token'
+      preLoaderRoute: typeof ApiPortalZugangTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 interface AppRouteRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppImportRoute: typeof AppImportRoute
+  AppPortalAnfragenRoute: typeof AppPortalAnfragenRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAdminErweitertRoute: typeof AppAdminErweitertRoute
   AppAdminSnapshotsRoute: typeof AppAdminSnapshotsRoute
@@ -734,18 +987,24 @@ interface AppRouteRouteChildren {
   AppEinstellungenBenutzerRoute: typeof AppEinstellungenBenutzerRoute
   AppEinstellungenSmtpRoute: typeof AppEinstellungenSmtpRoute
   AppEinstellungenVereinRoute: typeof AppEinstellungenVereinRoute
+  AppForderungenRuecklaeuferRoute: typeof AppForderungenRuecklaeuferRoute
   AppMitgliederMitgliedsnummerRoute: typeof AppMitgliederMitgliedsnummerRoute
   AppMitgliederNeuRoute: typeof AppMitgliederNeuRoute
   AppBeitragIndexRoute: typeof AppBeitragIndexRoute
   AppBerichteIndexRoute: typeof AppBerichteIndexRoute
   AppDsgvoIndexRoute: typeof AppDsgvoIndexRoute
+  AppForderungenIndexRoute: typeof AppForderungenIndexRoute
   AppMitgliederIndexRoute: typeof AppMitgliederIndexRoute
+  AppForderungenMahnungenIdRoute: typeof AppForderungenMahnungenIdRoute
+  AppForderungenMahnungenNeuRoute: typeof AppForderungenMahnungenNeuRoute
   AppMitgliederMitgliedsnummerBearbeitenRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRoute
+  AppForderungenMahnungenIndexRoute: typeof AppForderungenMahnungenIndexRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppImportRoute: AppImportRoute,
+  AppPortalAnfragenRoute: AppPortalAnfragenRoute,
   AppIndexRoute: AppIndexRoute,
   AppAdminErweitertRoute: AppAdminErweitertRoute,
   AppAdminSnapshotsRoute: AppAdminSnapshotsRoute,
@@ -762,23 +1021,47 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppEinstellungenBenutzerRoute: AppEinstellungenBenutzerRoute,
   AppEinstellungenSmtpRoute: AppEinstellungenSmtpRoute,
   AppEinstellungenVereinRoute: AppEinstellungenVereinRoute,
+  AppForderungenRuecklaeuferRoute: AppForderungenRuecklaeuferRoute,
   AppMitgliederMitgliedsnummerRoute: AppMitgliederMitgliedsnummerRoute,
   AppMitgliederNeuRoute: AppMitgliederNeuRoute,
   AppBeitragIndexRoute: AppBeitragIndexRoute,
   AppBerichteIndexRoute: AppBerichteIndexRoute,
   AppDsgvoIndexRoute: AppDsgvoIndexRoute,
+  AppForderungenIndexRoute: AppForderungenIndexRoute,
   AppMitgliederIndexRoute: AppMitgliederIndexRoute,
+  AppForderungenMahnungenIdRoute: AppForderungenMahnungenIdRoute,
+  AppForderungenMahnungenNeuRoute: AppForderungenMahnungenNeuRoute,
   AppMitgliederMitgliedsnummerBearbeitenRoute:
     AppMitgliederMitgliedsnummerBearbeitenRoute,
+  AppForderungenMahnungenIndexRoute: AppForderungenMahnungenIndexRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
   AppRouteRouteChildren,
 )
 
+interface PortalRouteRouteChildren {
+  PortalAbgelaufenRoute: typeof PortalAbgelaufenRoute
+  PortalAbgemeldetRoute: typeof PortalAbgemeldetRoute
+  PortalProfilRoute: typeof PortalProfilRoute
+  PortalIndexRoute: typeof PortalIndexRoute
+}
+
+const PortalRouteRouteChildren: PortalRouteRouteChildren = {
+  PortalAbgelaufenRoute: PortalAbgelaufenRoute,
+  PortalAbgemeldetRoute: PortalAbgemeldetRoute,
+  PortalProfilRoute: PortalProfilRoute,
+  PortalIndexRoute: PortalIndexRoute,
+}
+
+const PortalRouteRouteWithChildren = PortalRouteRoute._addFileChildren(
+  PortalRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRouteRoute: AppRouteRouteWithChildren,
+  PortalRouteRoute: PortalRouteRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiHealthRoute: ApiHealthRoute,
   InviteTokenRoute: InviteTokenRoute,
@@ -786,7 +1069,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCronSnapshotsRoute: ApiCronSnapshotsRoute,
   ApiFilesIdRoute: ApiFilesIdRoute,
   ApiIngestSvumsRoute: ApiIngestSvumsRoute,
+  ApiPortalLogoutRoute: ApiPortalLogoutRoute,
   ApiRpcSplatRoute: ApiRpcSplatRoute,
+  ApiPortalZugangTokenRoute: ApiPortalZugangTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

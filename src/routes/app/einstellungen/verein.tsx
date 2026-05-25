@@ -32,6 +32,11 @@ function VereinsdatenPage() {
     vereinsBic: "",
     vereinsBankname: "",
     defaultFalligkeitTag: 15,
+    mahngebuhr1: "0",
+    mahngebuhr2: "5",
+    mahngebuhr3: "10",
+    sepaReturnFee: "0",
+    mahnFristTage: 14,
   });
   const [msg, setMsg] = useState<Msg | null>(null);
 
@@ -48,6 +53,11 @@ function VereinsdatenPage() {
         vereinsBic: cfg.data.vereinsBic,
         vereinsBankname: cfg.data.vereinsBankname ?? "",
         defaultFalligkeitTag: cfg.data.defaultFalligkeitTag,
+        mahngebuhr1: cfg.data.mahngebuhr1 ?? "0",
+        mahngebuhr2: cfg.data.mahngebuhr2 ?? "5",
+        mahngebuhr3: cfg.data.mahngebuhr3 ?? "10",
+        sepaReturnFee: cfg.data.sepaReturnFee ?? "0",
+        mahnFristTage: cfg.data.mahnFristTage ?? 14,
       });
     }
   }, [cfg.data]);
@@ -65,6 +75,11 @@ function VereinsdatenPage() {
         vereinsBic: form.vereinsBic,
         vereinsBankname: form.vereinsBankname || null,
         defaultFalligkeitTag: form.defaultFalligkeitTag,
+        mahngebuhr1: normalizeMoney(form.mahngebuhr1),
+        mahngebuhr2: normalizeMoney(form.mahngebuhr2),
+        mahngebuhr3: normalizeMoney(form.mahngebuhr3),
+        sepaReturnFee: normalizeMoney(form.sepaReturnFee),
+        mahnFristTage: form.mahnFristTage,
       }),
     onSuccess: () => {
       setMsg({ kind: "ok", text: "Vereinsdaten gespeichert." });
@@ -157,6 +172,64 @@ function VereinsdatenPage() {
             </Field>
             <div className="md:col-span-2">
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Mahnwesen
+              </h3>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <Field label="Mahngebühr Stufe 1 in €" hint="Wird zur Zahlungserinnerung addiert">
+                  <Input
+                    value={form.mahngebuhr1}
+                    onChange={(e) =>
+                      setForm({ ...form, mahngebuhr1: e.target.value.replace(",", ".") })
+                    }
+                    inputMode="decimal"
+                  />
+                </Field>
+                <Field label="Mahngebühr Stufe 2 in €" hint="Wird zur 1. Mahnung addiert">
+                  <Input
+                    value={form.mahngebuhr2}
+                    onChange={(e) =>
+                      setForm({ ...form, mahngebuhr2: e.target.value.replace(",", ".") })
+                    }
+                    inputMode="decimal"
+                  />
+                </Field>
+                <Field label="Mahngebühr Stufe 3 in €" hint="Wird zur 2. Mahnung addiert">
+                  <Input
+                    value={form.mahngebuhr3}
+                    onChange={(e) =>
+                      setForm({ ...form, mahngebuhr3: e.target.value.replace(",", ".") })
+                    }
+                    inputMode="decimal"
+                  />
+                </Field>
+                <Field
+                  label="Rücklastschriftgebühr in €"
+                  hint="Standardwert, wenn ein SEPA-Rückläufer erfasst wird"
+                >
+                  <Input
+                    value={form.sepaReturnFee}
+                    onChange={(e) =>
+                      setForm({ ...form, sepaReturnFee: e.target.value.replace(",", ".") })
+                    }
+                    inputMode="decimal"
+                  />
+                </Field>
+                <Field label="Zahlungsfrist in Tagen" hint="Wie viele Tage nach Mahndatum die Frist ist">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={form.mahnFristTage}
+                    onChange={(e) =>
+                      setForm({ ...form, mahnFristTage: Number(e.target.value) || 14 })
+                    }
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Anschrift
               </h3>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -205,6 +278,14 @@ function VereinsdatenPage() {
       </Card>
     </div>
   );
+}
+
+function normalizeMoney(raw: string): string {
+  const trimmed = raw.trim().replace(",", ".");
+  if (!trimmed) return "0";
+  const n = Number.parseFloat(trimmed);
+  if (!Number.isFinite(n)) return "0";
+  return n.toFixed(2);
 }
 
 function Field({

@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, ChevronDown, Contact, Pencil, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ChevronDown,
+  Contact,
+  Copy,
+  KeyRound,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AbteilungenCard } from "~/components/forms/AbteilungenCard";
 import { AttachmentsCard } from "~/components/forms/AttachmentsCard";
@@ -206,6 +215,9 @@ function MemberDetailPage() {
                 <Pencil className="size-4" /> Bearbeiten
               </Button>
             </Link>
+          ) : null}
+          {canEdit ? (
+            <PortalAccessButton memberId={detail.data!.member.id} email={member.eMailName} />
           ) : null}
           {canEdit ? (
             <Button variant="outline" size="sm" onClick={() => setConfirmDelete(true)}>
@@ -749,5 +761,135 @@ function AuditEntry({ entry }: { entry: AuditEntryRow }) {
         </div>
       ) : null}
     </li>
+  );
+}
+
+function PortalAccessButton({ memberId, email }: { memberId: string; email: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [result, setResult] = useState<
+    | { ok: true; url: string; mailSent: boolean; mailReason: string | null; expiresAt: string }
+    | { ok: false; message: string }
+    | null
+  >(null);
+  const [overrideEmail, setOverrideEmail] = useState(email ?? "");
+  const [ttlDays, setTtlDays] = useState(14);
+
+  const issue = useMutation({
+    mutationFn: (sendEmail: boolean) =>
+      orpc.portal.issueToken({
+        memberId,
+        ttlDays,
+        sendEmail,
+        overrideEmail: overrideEmail.trim() || null,
+      }),
+    onSuccess: (r) => {
+      setResult({
+        ok: true,
+        url: r.portalUrl,
+        mailSent: r.emailSent,
+        mailReason: r.emailReason,
+        expiresAt:
+          r.expiresAt instanceof Date ? r.expiresAt.toISOString() : (r.expiresAt as string),
+      });
+      if (r.emailSent) toast.success("Portal-Zugang per E-Mail versendet.");
+    },
+    onError: (e: Error) => setResult({ ok: false, message: e.message }),
+  });
+
+  return (
+    <>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        <KeyRound className="size-4" /> Portal-Zugang
+      </Button>
+      {open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border bg-card p-5 shadow-elevated">
+            <h2 className="text-lg font-semibold tracking-tight">Portal-Zugang erstellen</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Erzeugt einen einmaligen Einladungslink. Beim ersten Aufruf wird ein 30-Tage-Cookie
+              gesetzt.
+            </p>
+            <div className="mt-4 flex flex-col gap-3">
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                E-Mail
+                <input
+                  type="email"
+                  value={overrideEmail}
+                  onChange={(e) => setOverrideEmail(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm shadow-soft"
+                  placeholder="mitglied@example.de"
+                />
+              </label>
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Gültigkeit (Tage)
+                <input
+                  type="number"
+                  value={ttlDays}
+                  onChange={(e) => setTtlDays(Math.max(1, Number(e.target.value) || 14))}
+                  min={1}
+                  max={60}
+                  className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm shadow-soft"
+                />
+              </label>
+            </div>
+
+            {result?.ok ? (
+              <div className="mt-4 rounded-lg border bg-accent/40 p-3 text-xs">
+                <p className="font-semibold text-success">Link erstellt</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="flex-1 truncate rounded bg-background px-2 py-1.5 text-[11px]">
+                    {result.url}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(result.url);
+                        toast.success("Link kopiert.");
+                      } catch {
+                        toast.error("Kopieren fehlgeschlagen.");
+                      }
+                    }}
+                  >
+                    <Copy className="size-3.5" />
+                  </Button>
+                </div>
+                <p className="mt-2 text-muted-foreground">
+                  {result.mailSent
+                    ? "Per E-Mail versendet."
+                    : `Versand fehlgeschlagen oder ausgelassen: ${result.mailReason ?? "siehe SMTP-Konfiguration"}.`}
+                </p>
+              </div>
+            ) : null}
+            {result && !result.ok ? (
+              <p className="mt-4 text-xs text-destructive">{result.message}</p>
+            ) : null}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setOpen(false);
+                  setResult(null);
+                }}
+              >
+                Schließen
+              </Button>
+              <Button
+                variant="outline"
+                disabled={issue.isPending}
+                onClick={() => issue.mutate(false)}
+              >
+                Nur Link erzeugen
+              </Button>
+              <Button disabled={issue.isPending} onClick={() => issue.mutate(true)}>
+                Link senden
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
