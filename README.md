@@ -31,6 +31,30 @@ Webverein" desktop software. Internal admin tool, German UI.
   RCUR for the next cycle.
 - Per-Beitragsart amounts and Sollstellung view on member detail.
 
+### Forderungen, Mahnwesen, SEPA-Rückläufer
+- Forderungen-Dashboard. Open Sollstellungen grouped per member, filterable
+  by Mahnstufe, batch "mark as paid" for cash and Überweisung payments.
+- SEPA-Rückläufer erfassen. Pick a committed `fee_run_item`, attach an
+  R-Transaction reason code (AC04, AM04, MS03, ...) and optional
+  Rücklastschriftgebühr. Reopens the matching Sollstellung as `returned`.
+- Mahnläufe in three escalation levels (Erinnerung, 1. Mahnung, 2. Mahnung).
+  Wizard picks eligible members, computes Mahngebühren per Stufe (configurable
+  under Vereinsdaten), renders one PDF per member and bumps `mahnstufe` on
+  the touched Sollstellungen.
+- Mahnsperre auf Mitgliedsebene wird respektiert. Stornieren eines Mahnlaufs
+  rollt die Mahnstufe zurück.
+
+### Mitgliederportal (Self-Service)
+- Magic-link Login per Mitglied. Admin issues a single-use token from the
+  member detail page; the link is mailed via the existing SMTP config and
+  spawns a 30-day cookie session on first use.
+- Members see their Stammdaten (read-only) and can propose changes to
+  Anrede, Name, Anschrift, Telefon, E-Mail.
+- Changes land as `portal_change_requests` (status pending). Vorstand
+  reviews them under "Portal-Anfragen" and either applies the whole set,
+  picks individual fields, or rejects with notes. Applied changes write
+  through to `members` with a full audit entry.
+
 ### Reports (Berichte)
 - Geburtstagsliste with month and runden Geburtstag filters.
 - Ehrungen (10/25/40/50/60/70 Jahre Mitgliedschaft) with year selector.

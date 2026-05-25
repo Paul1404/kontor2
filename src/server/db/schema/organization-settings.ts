@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { integer, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
 import { encryptedText } from "~/server/db/types";
 
@@ -24,6 +24,14 @@ export const organizationSettingsTable = pgTable("organization_settings", {
   vereinsBic: text("vereins_bic").notNull(),
   vereinsBankname: text("vereins_bankname"),
   defaultFalligkeitTag: integer("default_falligkeit_tag").notNull().default(15),
+  /** Mahngebühren je Stufe in Euro. 0 = keine Gebühr. */
+  mahngebuhr1: numeric("mahngebuhr1", { precision: 19, scale: 2 }).notNull().default("0"),
+  mahngebuhr2: numeric("mahngebuhr2", { precision: 19, scale: 2 }).notNull().default("5"),
+  mahngebuhr3: numeric("mahngebuhr3", { precision: 19, scale: 2 }).notNull().default("10"),
+  /** Optionale Rücklastschriftgebühr für SEPA-Rückläufer. */
+  sepaReturnFee: numeric("sepa_return_fee", { precision: 19, scale: 2 }).notNull().default("0"),
+  /** Zahlungsfrist in Tagen ab Mahndatum. */
+  mahnFristTage: integer("mahn_frist_tage").notNull().default(14),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
 });
