@@ -518,6 +518,7 @@ export const snapshotsRouter = {
         byteSize: memberSnapshotsTable.byteSize,
         contentHash: memberSnapshotsTable.contentHash,
         mitglnr: membersTable.mitglnr,
+        adrNr: membersTable.adrNr,
         vorname: membersTable.vorname,
         nachname: membersTable.nachname,
       })

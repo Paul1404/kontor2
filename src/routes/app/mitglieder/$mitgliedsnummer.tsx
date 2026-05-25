@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ChevronDown, Contact, Loader2, Pencil, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, Contact, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AbteilungenCard } from "~/components/forms/AbteilungenCard";
 import { AttachmentsCard } from "~/components/forms/AttachmentsCard";
@@ -12,7 +12,9 @@ import { SnapshotsTab } from "~/components/snapshots/SnapshotsTab";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { CopyButton } from "~/components/ui/copy-button";
+import { Skeleton } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/audit-labels";
 import { triggerDownload } from "~/lib/download";
@@ -83,13 +85,46 @@ function MemberDetailPage() {
     pushRecent({ mitglnr: detail.data.member.mitglnr, name: memberDisplayName });
   }, [detail.data?.member?.mitglnr, memberDisplayName, pushRecent]);
 
-  if (detail.isLoading) return <p className="text-muted-foreground">Wird geladen...</p>;
+  if (detail.isLoading) return <MemberDetailSkeleton />;
   if (detail.isError || !detail.data) {
-    return <p className="text-destructive">Mitglied nicht gefunden.</p>;
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <Link
+          to="/app/mitglieder"
+          search={() => ({}) as never}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" /> Zurück zur Liste
+        </Link>
+        <Card className="w-full max-w-xl">
+          <CardContent className="flex flex-col gap-2 p-6">
+            <p className="font-medium text-foreground">Mitglied nicht gefunden</p>
+            <p className="text-sm text-muted-foreground">
+              Die Mitgliedsnummer existiert nicht oder wurde gelöscht.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
-  const { member, abteilungen, vertraege, sepa, anhaenge, audit, beziehungen, sollstellungen } =
-    detail.data;
+  const {
+    member,
+    abteilungen,
+    vertraege,
+    sepa,
+    anhaenge,
+    audit,
+    beziehungen,
+    incomingBeziehungenCount,
+    sollstellungen,
+  } = detail.data;
+  // Kontakt = no Mitgliedsnummer. The data-model rule is that every
+  // such row exists *because* something/someone references it. Zero
+  // relationships in either direction means this row is leftover from
+  // the Linear import and should either get linked up or deleted.
+  const isOrphanKontakt =
+    !member.mitglnr && beziehungen.length === 0 && incomingBeziehungenCount === 0;
 
   // Prefer the IBAN-derived bank name/BIC over the stored values — those
   // were free-text in Linear and don't always match the actual BLZ.
@@ -107,13 +142,27 @@ function MemberDetailPage() {
           >
             <ArrowLeft className="size-4" /> Zurück zur Liste
           </Link>
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+          <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
             {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")}
+            {!member.mitglnr ? (
+              <Badge variant="outline" title="Zahlt für ein Mitglied, ist aber selbst keines">
+                Kontakt
+              </Badge>
+            ) : null}
           </h1>
           <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-            Mitgliedsnummer: <span className="tabular-nums">{member.mitglnr}</span>
-            <CopyButton value={member.mitglnr} label="Mitgliedsnummer" />
-            <span className="text-muted-foreground/50">·</span>
+            {member.mitglnr ? (
+              <>
+                Mitgliedsnummer: <span className="tabular-nums">{member.mitglnr}</span>
+                <CopyButton value={member.mitglnr} label="Mitgliedsnummer" />
+                <span className="text-muted-foreground/50">·</span>
+              </>
+            ) : (
+              <>
+                Kein Mitglied – nur Zahler/Kontakt
+                <span className="text-muted-foreground/50">·</span>
+              </>
+            )}
             <span>AdrNr {member.adrNr}</span>
           </p>
         </div>
@@ -158,37 +207,50 @@ function MemberDetailPage() {
               </Button>
             </Link>
           ) : null}
-          {canEdit && confirmDelete ? (
-            <>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => softDelete.mutate(member.id)}
-                disabled={softDelete.isPending}
-              >
-                {softDelete.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Trash2 className="size-4" />
-                )}
-                Wirklich löschen
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setConfirmDelete(false)}
-                disabled={softDelete.isPending}
-              >
-                Abbrechen
-              </Button>
-            </>
-          ) : canEdit ? (
+          {canEdit ? (
             <Button variant="outline" size="sm" onClick={() => setConfirmDelete(true)}>
               <Trash2 className="size-4 text-destructive" /> Löschen
             </Button>
           ) : null}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={(v) => {
+          if (softDelete.isPending) return;
+          setConfirmDelete(v);
+        }}
+        title="Mitglied löschen?"
+        description={`Möchten Sie ${memberDisplayName || "dieses Mitglied"} wirklich löschen? Die Daten bleiben im Audit Log und können über Snapshots wiederhergestellt werden.`}
+        confirmLabel="Löschen"
+        cancelLabel="Abbrechen"
+        destructive
+        loading={softDelete.isPending}
+        onConfirm={() => softDelete.mutate(member.id)}
+      />
+
+      {isOrphanKontakt ? (
+        <div className="flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+          <div className="flex flex-col gap-1">
+            <p className="font-medium text-foreground">Verwaister Kontakt</p>
+            <p className="text-muted-foreground">
+              Dieser Eintrag hat keine Mitgliedsnummer und keine verknüpften Beziehungen. Kontakte
+              sollten immer einem Mitglied über eine Beziehung zugeordnet sein – sonst sind sie
+              vermutlich Altlasten aus dem Linear-Import.
+            </p>
+            {canEdit && me.data?.role === "admin" ? (
+              <Link
+                to="/app/admin/erweitert"
+                className="text-xs text-warning underline-offset-2 hover:underline"
+              >
+                Im Adminbereich aufräumen →
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -351,6 +413,53 @@ function MemberDetailPage() {
               ))}
             </ul>
           )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function MemberDetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-6" aria-busy="true" aria-live="polite">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-7 w-72" />
+        <Skeleton className="h-4 w-48" />
+      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <Skeleton className="h-5 w-32" />
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-y-3 gap-x-6 sm:grid-cols-2">
+            {Array.from({ length: 10 }).map((_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: pure visual placeholder
+              <div key={i} className="flex flex-col gap-1">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-4 w-full max-w-40" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-32" />
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: pure visual placeholder
+              <div key={i} className="flex flex-col gap-1">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-4 w-full max-w-48" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+      <Card>
+        <CardContent className="p-4">
+          <Skeleton className="h-32 w-full" />
         </CardContent>
       </Card>
     </div>

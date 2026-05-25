@@ -31,6 +31,7 @@ const ListInput = v.object({
   status: v.optional(StatusSchema, "aktiv"),
   abteilungId: v.optional(v.nullable(v.string()), null),
   includeAusgetretene: v.optional(v.boolean(), false),
+  orphanOnly: v.optional(v.boolean(), false),
   page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
   pageSize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
   sortBy: v.optional(SortBySchema, "nachname"),
@@ -196,6 +197,20 @@ export const membersRouter = {
     // Hide soft-deleted members from the normal list view.
     conditions.push(isNull(membersTable.deletedAt) as never);
 
+    // "Verwaiste Kontakte" filter: Kontakt (no mitglnr) AND no relationship
+    // pointing to or from this row. Used by admins to find Linear-import
+    // leftovers.
+    if (input.orphanOnly) {
+      conditions.push(isNull(membersTable.mitglnr) as never);
+      conditions.push(
+        sql`not exists (
+          select 1 from ${relationshipsTable}
+          where ${relationshipsTable.fromMemberId} = ${membersTable.id}
+             or ${relationshipsTable.toMemberId} = ${membersTable.id}
+        )` as never,
+      );
+    }
+
     if (input.q.trim()) {
       const like = `%${input.q.trim()}%`;
       conditions.push(
@@ -282,12 +297,29 @@ export const membersRouter = {
   get: authedProc
     .input(v.object({ mitgliedsnummer: v.string() }))
     .handler(async ({ context, input }) => {
+      // Look up by mitglnr first (the normal member case). Legacy Linear
+      // "Zahler-only" entries — people who pay for someone else's contract
+      // but aren't members themselves — have no mitglnr; the list links
+      // them by numeric adrNr instead. Fall back to that when the input
+      // parses as an integer and no mitglnr match exists, so those rows
+      // are still openable from the list and bookmarkable.
       const rows = await context.db
         .select()
         .from(membersTable)
         .where(eq(membersTable.mitglnr, input.mitgliedsnummer))
         .limit(1);
-      const m = rows[0];
+      let m = rows[0];
+      if (!m) {
+        const adrNrParsed = Number(input.mitgliedsnummer);
+        if (Number.isInteger(adrNrParsed) && adrNrParsed > 0) {
+          const fallback = await context.db
+            .select()
+            .from(membersTable)
+            .where(eq(membersTable.adrNr, adrNrParsed))
+            .limit(1);
+          m = fallback[0];
+        }
+      }
       if (!m) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
 
       const [abteilungen, vertraege, sepa, anhaenge, audit, beziehungen, sollstellungen] =
@@ -424,6 +456,14 @@ export const membersRouter = {
       const role = (context.session?.user.role as string | undefined) ?? "readonly";
       const visibleAudit = role === "readonly" ? [] : audit;
 
+      // Count of incoming relationships (others who point at this member)
+      // — needed alongside outgoing `beziehungen` to detect orphan
+      // Kontakts: a Kontakt without ANY relationship is dead data.
+      const [incoming] = await context.db
+        .select({ c: count() })
+        .from(relationshipsTable)
+        .where(eq(relationshipsTable.toMemberId, m.id));
+
       return {
         member: stamm,
         abteilungen,
@@ -438,6 +478,7 @@ export const membersRouter = {
         })),
         audit: visibleAudit,
         beziehungen,
+        incomingBeziehungenCount: incoming?.c ?? 0,
         sollstellungen,
       };
     }),
@@ -722,6 +763,7 @@ export const membersRouter = {
         .select({
           id: membersTable.id,
           mitglnr: membersTable.mitglnr,
+          adrNr: membersTable.adrNr,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,
           ort: membersTable.ort,

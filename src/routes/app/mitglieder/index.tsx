@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Loader2,
   Plus,
   Search,
   X,
@@ -18,6 +17,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { PageSizeSelect, usePersistentPageSize } from "~/components/ui/page-size-select";
+import { SkeletonTableRows } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
@@ -48,6 +48,7 @@ type MembersSearch = {
   status: Status;
   abteilungId: string | null;
   includeAusgetretene: boolean;
+  orphanOnly: boolean;
   page: number;
   sortBy: SortBy;
   sortDir: SortDir;
@@ -61,6 +62,7 @@ const EMPTY_SEARCH: MembersSearch = {
   status: "aktiv",
   abteilungId: null,
   includeAusgetretene: false,
+  orphanOnly: false,
   page: 1,
   sortBy: "nachname",
   sortDir: "asc",
@@ -81,6 +83,7 @@ export const Route = createFileRoute("/app/mitglieder/")({
       status,
       abteilungId: typeof s.abteilungId === "string" && s.abteilungId ? s.abteilungId : null,
       includeAusgetretene: s.includeAusgetretene === true || s.includeAusgetretene === "true",
+      orphanOnly: s.orphanOnly === true || s.orphanOnly === "true",
       page: Number.isFinite(pageNum) && pageNum >= 1 ? Math.floor(pageNum) : 1,
       sortBy,
       sortDir,
@@ -144,7 +147,11 @@ function MembersListPage() {
   usePageShortcut("n", canEdit ? () => navigate({ to: "/app/mitglieder/neu" }) : null);
 
   const hasFilter =
-    !!search.q || search.status !== "aktiv" || !!search.abteilungId || search.includeAusgetretene;
+    !!search.q ||
+    search.status !== "aktiv" ||
+    !!search.abteilungId ||
+    search.includeAusgetretene ||
+    search.orphanOnly;
 
   const abteilungName = search.abteilungId
     ? abteilungen.data?.find((a) => a.id === search.abteilungId)?.name
@@ -243,6 +250,20 @@ function MembersListPage() {
             />
             <span className="text-muted-foreground">Ausgetretene anzeigen</span>
           </label>
+          {me.data?.role === "admin" ? (
+            <label
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm shadow-soft"
+              title="Kontakte ohne Mitgliedsnummer und ohne jegliche Beziehung"
+            >
+              <input
+                type="checkbox"
+                checked={search.orphanOnly}
+                onChange={(e) => updateSearch({ orphanOnly: e.target.checked })}
+                className="size-4 accent-primary"
+              />
+              <span className="text-muted-foreground">Nur verwaiste Kontakte</span>
+            </label>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -274,6 +295,12 @@ function MembersListPage() {
             <FilterChip
               label="inkl. Ausgetretene"
               onRemove={() => updateSearch({ includeAusgetretene: false })}
+            />
+          ) : null}
+          {search.orphanOnly ? (
+            <FilterChip
+              label="Verwaiste Kontakte"
+              onRemove={() => updateSearch({ orphanOnly: false })}
             />
           ) : null}
           <button
@@ -334,13 +361,7 @@ function MembersListPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {list.isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="size-4 animate-spin" /> Wird geladen…
-                    </span>
-                  </td>
-                </tr>
+                <SkeletonTableRows rows={Math.min(pageSize, 10)} cols={6} />
               ) : list.data?.rows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
@@ -350,19 +371,37 @@ function MembersListPage() {
               ) : (
                 (list.data?.rows ?? []).map((row) => {
                   const m = row as MemberRow;
+                  const isKontakt = !m.mitglnr;
                   return (
                     <tr key={m.id} className="transition-colors hover:bg-muted/30">
                       <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                        {m.mitglnr ?? "-"}
+                        {m.mitglnr ?? (
+                          <span
+                            className="text-muted-foreground/60"
+                            title="Kein Mitglied – nur Zahler/Kontakt"
+                          >
+                            —
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
-                        <Link
-                          to="/app/mitglieder/$mitgliedsnummer"
-                          params={{ mitgliedsnummer: m.mitglnr ?? String(m.adrNr) }}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {[m.nachname, m.vorname].filter(Boolean).join(", ")}
-                        </Link>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            to="/app/mitglieder/$mitgliedsnummer"
+                            params={{ mitgliedsnummer: m.mitglnr ?? String(m.adrNr) }}
+                            className="font-medium text-primary hover:underline"
+                          >
+                            {[m.nachname, m.vorname].filter(Boolean).join(", ")}
+                          </Link>
+                          {isKontakt ? (
+                            <Badge
+                              variant="outline"
+                              title="Zahlt für ein Mitglied, ist aber selbst keines"
+                            >
+                              Kontakt
+                            </Badge>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-4 py-3">{[m.plz, m.ort].filter(Boolean).join(" ")}</td>
                       <td className="px-4 py-3 text-muted-foreground">{m.email ?? ""}</td>

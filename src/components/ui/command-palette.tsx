@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   Building2,
   Coins,
   FileBarChart,
@@ -89,6 +90,14 @@ const NAV_COMMANDS: NavCommand[] = [
   },
   {
     kind: "nav",
+    id: "danger-zone",
+    label: "Adminbereich (Gefahrenzone)",
+    icon: <AlertTriangle className="size-4" />,
+    path: "/app/admin/erweitert",
+    needs: ["admin"],
+  },
+  {
+    kind: "nav",
     id: "import",
     label: "Datenimport",
     icon: <FileSpreadsheet className="size-4" />,
@@ -131,7 +140,8 @@ const NAV_COMMANDS: NavCommand[] = [
 
 type MemberHit = {
   id: string;
-  mitglnr: string;
+  mitglnr: string | null;
+  adrNr: number;
   vorname: string | null;
   nachname: string | null;
   ort: string | null;
@@ -212,7 +222,7 @@ export function CommandPalette({ role }: { role: Role }) {
         setOpen(false);
         navigate({
           to: "/app/mitglieder/$mitgliedsnummer",
-          params: { mitgliedsnummer: hit.mitglnr },
+          params: { mitgliedsnummer: hit.mitglnr ?? String(hit.adrNr) },
         });
       }
       return;
@@ -249,7 +259,7 @@ export function CommandPalette({ role }: { role: Role }) {
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismisses on click; keyboard users dismiss via Escape handled by the global keydown listener above.
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[10vh]"
+      className="motion-fade-in fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[10vh]"
       onClick={(e) => {
         if (e.target === e.currentTarget) setOpen(false);
       }}
@@ -257,7 +267,7 @@ export function CommandPalette({ role }: { role: Role }) {
       aria-modal="true"
       aria-label="Befehlspalette"
     >
-      <div className="flex w-full max-w-xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card">
+      <div className="motion-zoom-in flex w-full max-w-xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card">
         <div className="flex items-center gap-2 border-b border-border px-3">
           <Search className="size-4 text-muted-foreground" />
           <input
@@ -307,7 +317,7 @@ export function CommandPalette({ role }: { role: Role }) {
                         key={hit.id}
                         icon={<Users className="size-4" />}
                         label={name}
-                        sublabel={`#${hit.mitglnr}${hit.ort ? ` · ${hit.ort}` : ""}`}
+                        sublabel={`${hit.mitglnr ? `#${hit.mitglnr}` : "Kontakt"}${hit.ort ? ` · ${hit.ort}` : ""}`}
                         active={i === highlight}
                         onMouseEnter={() => setHighlight(i)}
                         onClick={() => executeAt(i)}

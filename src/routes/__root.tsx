@@ -1,5 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { ErrorPanel, NotFoundPanel } from "~/components/layout/ErrorPanel";
 import { Toaster } from "~/components/ui/toaster";
 import { ThemeProvider, themeInitScript } from "~/lib/theme";
 import appCss from "~/styles/globals.css?url";
@@ -24,9 +25,23 @@ export const Route = createRootRoute({
     ],
   }),
   component: RootDocument,
+  // Last-resort safety net: any uncaught throw inside a route lands here
+  // instead of TanStack's bare-bones default screen, which looks broken.
+  errorComponent: ({ error, reset }) => (
+    <RootDocument>
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <ErrorPanel error={error} reset={reset} />
+      </div>
+    </RootDocument>
+  ),
+  notFoundComponent: () => (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <NotFoundPanel />
+    </div>
+  ),
 });
 
-function RootDocument(): ReactNode {
+function RootDocument({ children }: { children?: ReactNode }): ReactNode {
   return (
     <html lang="de" className="h-full">
       <head>
@@ -39,7 +54,7 @@ function RootDocument(): ReactNode {
       </head>
       <body className="h-full bg-background text-foreground antialiased">
         <ThemeProvider>
-          <Outlet />
+          {children ?? <Outlet />}
           <Toaster />
         </ThemeProvider>
         <Scripts />

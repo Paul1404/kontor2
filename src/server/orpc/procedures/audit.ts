@@ -97,6 +97,7 @@ export const auditRouter = {
     type MemberLite = {
       id: string;
       mitglnr: string | null;
+      adrNr: number;
       vorname: string | null;
       nachname: string | null;
     };
@@ -109,6 +110,7 @@ export const auditRouter = {
         .select({
           id: membersTable.id,
           mitglnr: membersTable.mitglnr,
+          adrNr: membersTable.adrNr,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,
         })
@@ -151,6 +153,7 @@ export const auditRouter = {
           ? {
               memberId: target.id,
               mitglnr: target.mitglnr,
+              adrNr: target.adrNr,
               vorname: target.vorname,
               nachname: target.nachname,
             }

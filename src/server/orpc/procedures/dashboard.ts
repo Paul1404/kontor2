@@ -94,16 +94,17 @@ export const dashboardRouter = {
       context.db.execute<{
         id: string;
         mitglnr: string | null;
+        adr_nr: number;
         vorname: string | null;
         nachname: string | null;
         geburtsdatum: Date;
         next_birthday: Date;
         turns: number;
       }>(sql`
-        select id, mitglnr, vorname, nachname, geburtsdatum, next_birthday,
+        select id, mitglnr, adr_nr, vorname, nachname, geburtsdatum, next_birthday,
                extract(year from age(next_birthday, geburtsdatum))::int as turns
         from (
-          select id, mitglnr, vorname, nachname, geburtsdatum,
+          select id, mitglnr, adr_nr, vorname, nachname, geburtsdatum,
             case
               when make_date(extract(year from current_date)::int,
                              extract(month from ${membersTable.geburtsdatum})::int,
@@ -177,6 +178,7 @@ export const dashboardRouter = {
       birthdays: birthdaysArr.map((b) => ({
         id: String(b.id),
         mitglnr: (b.mitglnr as string | null) ?? null,
+        adrNr: Number(b.adr_nr),
         vorname: (b.vorname as string | null) ?? null,
         nachname: (b.nachname as string | null) ?? null,
         nextBirthday: b.next_birthday as string | Date,

@@ -8,6 +8,8 @@ import {
   MemberStammdatenForm,
   type StammdatenValues,
 } from "~/components/forms/MemberStammdatenForm";
+import { Card, CardContent, CardHeader } from "~/components/ui/card";
+import { Skeleton } from "~/components/ui/skeleton";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/mitglieder/$mitgliedsnummer_/bearbeiten")({
@@ -47,9 +49,43 @@ function EditMemberPage() {
     },
   });
 
-  if (detail.isLoading) return <p className="text-muted-foreground">Wird geladen…</p>;
+  if (detail.isLoading) {
+    return (
+      <div className="flex flex-col gap-6" aria-busy="true" aria-live="polite">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-7 w-72" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {Array.from({ length: 10 }).map((_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: pure visual placeholder
+              <div key={i} className="flex flex-col gap-1.5">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   if (detail.isError || !detail.data) {
-    return <p className="text-destructive">Mitglied nicht gefunden.</p>;
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <Link
+          to="/app/mitglieder"
+          search={() => ({}) as never}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" /> Zurück zur Liste
+        </Link>
+        <p className="text-destructive">Mitglied nicht gefunden.</p>
+      </div>
+    );
   }
 
   const { member } = detail.data;

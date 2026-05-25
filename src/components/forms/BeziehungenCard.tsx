@@ -104,10 +104,10 @@ export function BeziehungenCard({
                 >
                   <div className="flex min-w-0 flex-1 flex-col">
                     <div className="flex items-center gap-2">
-                      {b.toMemberId && b.toMitglnr ? (
+                      {b.toMemberId ? (
                         <Link
                           to="/app/mitglieder/$mitgliedsnummer"
-                          params={{ mitgliedsnummer: b.toMitglnr }}
+                          params={{ mitgliedsnummer: b.toMitglnr ?? String(b.toAdrNr) }}
                           className="font-medium text-primary hover:underline"
                         >
                           {name}
@@ -116,6 +116,11 @@ export function BeziehungenCard({
                         <span className="font-medium text-muted-foreground">{name}</span>
                       )}
                       {b.beziehung ? <Badge variant="secondary">{b.beziehung}</Badge> : null}
+                      {b.toMemberId && !b.toMitglnr ? (
+                        <Badge variant="outline" title="Zahler/Kontakt, kein Mitglied">
+                          Kontakt
+                        </Badge>
+                      ) : null}
                     </div>
                     {b.notiz ? <p className="text-xs text-muted-foreground">{b.notiz}</p> : null}
                     {b.datVon || b.datBis ? (

@@ -37,6 +37,7 @@ import { Route as AppBerichteAbteilungsStatistikRouteImport } from './app/berich
 import { Route as AppBeitragNeuRouteImport } from './app/beitrag/neu'
 import { Route as AppBeitragIdRouteImport } from './app/beitrag/$id'
 import { Route as AppAdminSnapshotsRouteImport } from './app/admin/snapshots'
+import { Route as AppAdminErweitertRouteImport } from './app/admin/erweitert'
 import { Route as ApiRpcSplatRouteImport } from './api/rpc.$'
 import { Route as ApiIngestSvumsRouteImport } from './api/ingest.svums'
 import { Route as ApiFilesIdRouteImport } from './api/files.$id'
@@ -190,6 +191,11 @@ const AppAdminSnapshotsRoute = AppAdminSnapshotsRouteImport.update({
   path: '/admin/snapshots',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppAdminErweitertRoute = AppAdminErweitertRouteImport.update({
+  id: '/admin/erweitert',
+  path: '/admin/erweitert',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
   id: '/api/rpc/$',
   path: '/api/rpc/$',
@@ -236,6 +242,7 @@ export interface FileRoutesByFullPath {
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/ingest/svums': typeof ApiIngestSvumsRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
@@ -271,6 +278,7 @@ export interface FileRoutesByTo {
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/ingest/svums': typeof ApiIngestSvumsRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
@@ -308,6 +316,7 @@ export interface FileRoutesById {
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/ingest/svums': typeof ApiIngestSvumsRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
@@ -346,6 +355,7 @@ export interface FileRouteTypes {
     | '/api/files/$id'
     | '/api/ingest/svums'
     | '/api/rpc/$'
+    | '/app/admin/erweitert'
     | '/app/admin/snapshots'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
@@ -381,6 +391,7 @@ export interface FileRouteTypes {
     | '/api/files/$id'
     | '/api/ingest/svums'
     | '/api/rpc/$'
+    | '/app/admin/erweitert'
     | '/app/admin/snapshots'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
@@ -417,6 +428,7 @@ export interface FileRouteTypes {
     | '/api/files/$id'
     | '/api/ingest/svums'
     | '/api/rpc/$'
+    | '/app/admin/erweitert'
     | '/app/admin/snapshots'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
@@ -651,6 +663,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminSnapshotsRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/admin/erweitert': {
+      id: '/app/admin/erweitert'
+      path: '/admin/erweitert'
+      fullPath: '/app/admin/erweitert'
+      preLoaderRoute: typeof AppAdminErweitertRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/api/rpc/$': {
       id: '/api/rpc/$'
       path: '/api/rpc/$'
@@ -700,6 +719,7 @@ interface AppRouteRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppImportRoute: typeof AppImportRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppAdminErweitertRoute: typeof AppAdminErweitertRoute
   AppAdminSnapshotsRoute: typeof AppAdminSnapshotsRoute
   AppBeitragIdRoute: typeof AppBeitragIdRoute
   AppBeitragNeuRoute: typeof AppBeitragNeuRoute
@@ -727,6 +747,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppImportRoute: AppImportRoute,
   AppIndexRoute: AppIndexRoute,
+  AppAdminErweitertRoute: AppAdminErweitertRoute,
   AppAdminSnapshotsRoute: AppAdminSnapshotsRoute,
   AppBeitragIdRoute: AppBeitragIdRoute,
   AppBeitragNeuRoute: AppBeitragNeuRoute,

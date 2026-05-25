@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   Building2,
   Clock,
   Coins,
@@ -103,6 +104,12 @@ const SECTIONS: NavSection[] = [
         to: "/app/admin/snapshots",
         label: "Snapshots",
         icon: <History className="size-[18px]" />,
+        adminOnly: true,
+      },
+      {
+        to: "/app/admin/erweitert",
+        label: "Adminbereich",
+        icon: <AlertTriangle className="size-[18px]" />,
         adminOnly: true,
       },
     ],
