@@ -9,6 +9,7 @@ import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { signIn } from "~/lib/auth-client";
 import { orpc } from "~/lib/orpc";
+import { VersionChip } from "~/components/ui/version-chip";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -109,7 +110,11 @@ function LoginPage() {
         </CardContent>
       </Card>
 
-      <p className="absolute bottom-4 text-xs text-muted-foreground">SV Untereuerheim 1945 e.V.</p>
+      <div className="absolute bottom-4 flex items-center gap-3 text-xs text-muted-foreground">
+        <span>SV Untereuerheim 1945 e.V.</span>
+        <span aria-hidden className="text-muted-foreground/40">|</span>
+        <VersionChip variant="muted" />
+      </div>
     </div>
   );
 }

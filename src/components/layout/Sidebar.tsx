@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
+import { VersionChip } from "~/components/ui/version-chip";
 import { cn } from "~/lib/cn";
 import { useRecentMembers } from "~/lib/use-recent-members";
 
@@ -245,13 +246,14 @@ function SidebarBody({
           </div>
         ) : null}
       </nav>
-      <div className="border-t border-sidebar-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="flex flex-col gap-1.5 border-t border-sidebar-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent/50 px-3 py-2 text-[11px] text-sidebar-muted">
           <ShieldCheck className="size-3.5 text-brand" />
           <span>
             Rolle: <span className="font-medium text-sidebar-foreground">{role}</span>
           </span>
         </div>
+        <VersionChip />
       </div>
     </>
   );
