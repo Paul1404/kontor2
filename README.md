@@ -10,17 +10,25 @@ Webverein" desktop software. Internal admin tool, German UI.
   the `members` table without truncation. Linear's `bit(1)` flags become
   proper booleans. The single-letter status codes (`A`, `P`, `N`) stay as
   text because that's what they actually are.
-- IBANs are AES-256-GCM encrypted at rest. Clients only ever see the last
+- IBANs are AES-256-GCM encrypted at rest with a keyring (`APP_SECRET` plus
+  optional `APP_SECRET_PREV` for rotation). Clients only ever see the last
   four digits.
 - Full CRUD with edit, create, soft-delete and undelete.
 - Many-to-many Abteilungen with per-Abteilung Eintritts- and Austrittsdaten.
 - Verknüpfungen (Familienbeziehungen) imported from Linear and editable in the
   UI.
+- Kontakt entries (Zahlende ohne eigene Mitgliedschaft) imported from
+  Linear are first-class. They open from the list and from Beziehungen,
+  fall back to `AdrNr` when there is no Mitgliedsnummer, and get a "Kontakt"
+  badge so they're not mistaken for members. Admin-only filter surfaces
+  orphan Kontakte without any relationship as candidates for cleanup.
 - Per-member file attachments via S3. Signed URLs, PDF/PNG/JPEG only, 10 MB
   cap.
 - vCard 3.0 export per member. Works with iOS Contacts and macOS Contacts
   without complaints.
 - Clickable phone, email and address fields. `tel:`, `mailto:`, maps link.
+- DSGVO panel on the member detail page links straight to Auskunft, Löschung
+  and Einwilligungs-Log for that person.
 
 ### Beitragsläufe
 - Wizard that selects active mandates for a billing year, picks the right
@@ -55,11 +63,34 @@ Webverein" desktop software. Internal admin tool, German UI.
   picks individual fields, or rejects with notes. Applied changes write
   through to `members` with a full audit entry.
 
+### DSGVO
+- Auskunft nach Art. 15. Per-member dossier as JSON and PDF with masked
+  IBANs and 24-hour-signed S3 download links for every attachment.
+  Deterministic SHA-256 over the canonical serialization, recorded in
+  `dsgvo_requests` so an export can be reproduced and verified later.
+- Löschung nach Art. 17 with an explicit pseudonymisation policy per
+  column. Financial and SEPA-mandate fields are preserved per §147 AO
+  (10 Jahre) and SEPA Rulebook (14 Monate). Two-step: a preview shows the
+  before/after diff plus the earliest legal erasure date. Execution
+  requires Admin role, plus an explicit override and a written reason when
+  the retention window has not expired.
+- Einwilligungs-Log. Append-only history per consent type
+  (Datenverarbeitung, Foto/Name, Newsletter, Vereinszeitung) with free-text
+  evidence. The latest row per type is the current state.
+- Anfragen-Ticketing. Auskunfts- und Löschanfragen werden zentral
+  verwaltet; die 30-Tage-Frist nach Art. 12 (3) DSGVO wird automatisch
+  berechnet.
+
 ### Reports (Berichte)
 - Geburtstagsliste with month and runden Geburtstag filters.
 - Ehrungen (10/25/40/50/60/70 Jahre Mitgliedschaft) with year selector.
 - Abteilungs-Statistik. Mitglieder je Abteilung, Altersverteilung, Geschlecht.
 - Finanzbericht. Sollstellungen aggregated by Beitragsart.
+- Bestandserhebung zum Stichtag. Pro Abteilung × Geschlecht × LSB-Altersgruppe
+  (0-6, 7-14, 15-18, 19-26, 27-40, 41-60, 61+, unbekannt). Mehrfach-
+  mitgliedschaften zählen mehrfach wie vom DOSB vorgegeben. CSV-Export plus
+  Unterschriften-PDF für den Vorstand. Jede erzeugte Erhebung wird mit
+  SHA-256-Fingerprint archiviert, damit Nachdrucke nicht abweichen.
 - Every report exports to CSV and has a print-friendly view.
 
 ### Import and ingest
@@ -70,6 +101,25 @@ Webverein" desktop software. Internal admin tool, German UI.
   SQL upload and JSON push.
 - Both paths write through the same ingest pipeline. Diffs land in the audit
   log and trigger a pre-import snapshot.
+- Historische Tabellen werden mitgenommen, nicht weggeworfen:
+  - `mgsolln` becomes Sollstellungen with `source='linear_import'`. The
+    `(AdrNr, Jahr, VertragNr, Art, Zeitraum)` PK is aggregated by summing
+    `Betrag/Bezahlt/Offen` per Vertrag + Jahr so the existing unique
+    constraint holds. Linear's first-row GUID is preserved on
+    `linear_guid` and used as the join key against `lastprots.SollGUID`.
+  - `mgartdat` populates a `fee_type_price_history` lookup so reports can
+    resolve the effective Beitragsart-Preis per Monat.
+  - `sportarten` and `fachverbaende` are loaded into `linear_sport_types`
+    and `linear_federations` lookups for later Abteilungs-Picklists.
+  - `lastprot` / `lastproth` become `legacy_sepa_runs` with the raw
+    pain.008 XML preserved verbatim; `archived=true` distinguishes the
+    purged journal. `lastprots` / `lastprotsh` map to
+    `legacy_sepa_run_items` and link runs to historical Sollstellungen
+    via GUID.
+  - Re-imports are idempotent: the `fee_runs_linear_guid_uk` unique
+    index dedupes on Linear's GUID.
+  - Linear's `pass` table (BENUTZER/PASSWORT/UI-prefs of the desktop
+    app) is intentionally not imported. better-auth owns user accounts.
 
 ### Snapshots
 - Automatic nightly snapshot of every member at 02:30 local time. Skips
@@ -91,17 +141,37 @@ Webverein" desktop software. Internal admin tool, German UI.
 ### Auth and access
 - better-auth with `tanstackStartCookies`. Email + password.
 - Invite-only signup. Admin sends an invite link with a single-use token.
+  A partially-failed acceptance can be retried instead of permanently
+  blocking the address.
 - Three roles: Admin, Vorstand, Readonly. Every protected oRPC procedure
   checks role server-side. Route guards alone are not trusted.
 - First-run bootstrap admin from `SVUWV_BOOTSTRAP_ADMIN_EMAIL` and
-  `SVUWV_BOOTSTRAP_ADMIN_PASSWORD` when the user table is empty.
+  `SVUWV_BOOTSTRAP_ADMIN_PASSWORD` when the user table is empty. If those
+  env vars are not set, the very first request is redirected to `/setup`
+  for an interactive first-admin form.
+- Last-admin guard. The better-auth admin endpoints
+  (`set-user-banned`, `remove-user`, `set-role`) are intercepted before
+  they can leave the instance with zero active admins. No operator can
+  lock the building from the inside.
 - SMTP settings configurable from the admin UI. SNI hostname is sent and
   there's a toggle to skip cert verification for in-house MTAs with self-signed
-  certs.
+  certs. The "Test mail" button accepts the inline form values, so a new
+  config can be validated before it's saved.
 
 ### Admin
 - CRUD for Abteilungen, Beitragsarten, Benutzer, SMTP, Vereinsdaten.
 - Snapshot run history with bytes, member counts and trigger reason.
+- Verschlüsselung. Inspect the active keyring (current key + fallbacks)
+  and run "Daten neu verschlüsseln" after an `APP_SECRET` rotation. v1
+  ciphertexts stay readable via per-key fallback; failures are logged
+  instead of silently dropped.
+- Danger zone (`/app/admin/erweitert`, admin-only). Four cards with live
+  counts and type-to-confirm dialogs: delete orphan Kontakte, purge
+  soft-deleted members older than N days, trim the audit log older than
+  N days, and a double-confirm "wipe everything" that resets
+  members/contracts/sepa/snapshots/audit but keeps users, Abteilungen,
+  Beitragsarten and settings. Every execution writes a `danger_zone`
+  audit row before it runs.
 
 ### Dashboard
 - Mitgliederzahl, Neue und Austritte im Monat, Mitglieder je Abteilung.
@@ -113,6 +183,30 @@ Webverein" desktop software. Internal admin tool, German UI.
   `g s` for navigation. `n` for new member, `e` to edit.
 - Sortable member list with column state synced into the URL. Pasting a link
   reproduces the exact view.
+- Mobile drawer navigation. Hamburger button, slide-in sidebar, backdrop
+  click and Escape close it. Body scroll is locked while open. iOS Safari
+  won't zoom on input focus (16px minimum below `sm`), grids that were
+  fixed two-column collapse to one, and `safe-area-inset-bottom` is
+  honoured on the bottom edge.
+- Route-level error boundaries. The shell stays visible on child-route
+  errors and shows an `ErrorPanel` with retry plus collapsible technical
+  details. Unknown routes get a `NotFoundPanel` with a back link instead
+  of a bare 404. Skeleton placeholders replace "Wird geladen…" on the
+  dashboard, list, detail, edit and audit views.
+- Subtle motion on dialogs and toasts (fade + zoom, slide-in). Respects
+  `prefers-reduced-motion`. The confirm dialog autofocuses the confirm
+  button so Enter submits. Destructive actions use a
+  type-to-confirm dialog where the user has to type a fixed German phrase
+  (the wipe action requires two).
+- Einklappbare "So funktioniert es"-Erklärungen auf komplexen Admin-Seiten
+  (Portal-Anfragen, Benutzer, Mahnstufen, Mahnläufe, Beitragsläufe,
+  Beitragsarten, Ehrungen, Finanzbericht, Linear-Import). Standardmäßig
+  zugeklappt, damit sie erfahrene Nutzer nicht stören.
+- Version chip in the sidebar footer and on the login / setup pages. One
+  click opens a "Was ist neu"-Dialog with the curated release log grouped
+  by Neu / Behoben / Verbessert / Breaking / Intern. An unread dot lights
+  up whenever the bundled `CURRENT_VERSION` differs from the one the
+  browser previously acknowledged.
 - Light and dark theme.
 - SV Untereuerheim crest as favicon. Full icon set (SVG, ICO, PNG variants,
   apple-touch, web manifest).
@@ -147,9 +241,15 @@ The first user is created from `SVUWV_BOOTSTRAP_ADMIN_EMAIL` and
 bun test
 ```
 
-Covers the SQL importer, ingest HMAC, SEPA mandate selection, pain.008
-output, IBAN normalisation, snapshot diff and restore, audit diffing,
-report calculations, vCard output and BLZ lookup.
+Covers the SQL importer (incl. phase-2 mgsolln aggregation and a
+real-dump smoke test against `reference/linear/datesicherung.sql`),
+ingest HMAC, SEPA mandate selection, pain.008 output, IBAN normalisation,
+encryption keyring round-trip across `APP_SECRET` rotations, last-admin
+guard request shape, DSGVO policy, Bestandserhebung age buckets,
+snapshot diff and restore, audit diffing, report calculations, vCard
+output, BLZ lookup, and the release-notes invariants (newest-first, no
+duplicate versions, `CURRENT_VERSION` stays in sync with
+`package.json`).
 
 ## Deploy
 
