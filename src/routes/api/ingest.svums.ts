@@ -47,6 +47,14 @@ async function handle({ request }: { request: Request }): Promise<Response> {
     relationships?: Array<Record<string, unknown>>;
     inter?: Array<Record<string, unknown>>;
     interes?: Array<Record<string, unknown>>;
+    mgsolln?: Array<Record<string, unknown>>;
+    mgartdat?: Array<Record<string, unknown>>;
+    sportarten?: Array<Record<string, unknown>>;
+    fachverbaende?: Array<Record<string, unknown>>;
+    lastprot?: Array<Record<string, unknown>>;
+    lastproth?: Array<Record<string, unknown>>;
+    lastprots?: Array<Record<string, unknown>>;
+    lastprotsh?: Array<Record<string, unknown>>;
   };
   try {
     payload = JSON.parse(raw) as typeof payload;
@@ -68,6 +76,14 @@ async function handle({ request }: { request: Request }): Promise<Response> {
     relationships: payload.relationships as never,
     inter: payload.inter as never,
     interes: payload.interes as never,
+    mgsolln: payload.mgsolln as never,
+    mgartdat: payload.mgartdat as never,
+    sportarten: payload.sportarten as never,
+    fachverbaende: payload.fachverbaende as never,
+    lastprot: payload.lastprot as never,
+    lastproth: payload.lastproth as never,
+    lastprots: payload.lastprots as never,
+    lastprotsh: payload.lastprotsh as never,
     requestId: request.headers.get("x-request-id"),
   });
 
@@ -81,6 +97,12 @@ async function handle({ request }: { request: Request }): Promise<Response> {
     contractsWritten: result.contractsWritten,
     sepaWritten: result.sepaWritten,
     relationshipsWritten: result.relationshipsWritten,
+    sollStellungenImported: result.sollStellungenImported,
+    feeTypeHistoryImported: result.feeTypeHistoryImported,
+    sportTypesImported: result.sportTypesImported,
+    federationsImported: result.federationsImported,
+    legacySepaRunsImported: result.legacySepaRunsImported,
+    legacySepaItemsImported: result.legacySepaItemsImported,
     errors: result.errors,
   });
 }

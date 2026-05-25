@@ -472,6 +472,142 @@ export function mapInteresRow(d: LinearRow): InteresMapped | null {
   };
 }
 
+/**
+ * Linear `mgsolln` row → partially-mapped Sollstellung. The pipeline still
+ * has to resolve `adrNr` → memberId and (adrNr, vertragNr) → contractId, so
+ * this returns the natural-key fields untouched. `Mahnstuffe` (Linear's
+ * typo for Mahnstufe) is preserved as-is; status is derived from the row's
+ * `Bezahlt` vs `Offen` balance.
+ */
+export type SollStellungMapped = {
+  adrNr: number;
+  jahr: number;
+  vertragNr: string;
+  art: number;
+  zeitraum: number;
+  betrag: string | null;
+  bezahlt: string | null;
+  offen: string | null;
+  mahnstufe: number;
+  falligkeitsdatum: Date | null;
+  guid: string | null;
+  mandatsNr: string | null;
+};
+
+export function mapSollStellungRow(d: LinearRow): SollStellungMapped | null {
+  const adrNr = coerceInt(d.AdrNr ?? null);
+  const jahr = coerceInt(d.Jahr ?? null);
+  const vertragNr = coerceStr(d.VertragNr ?? null, 10);
+  const art = coerceInt(d.Art ?? null);
+  const zeitraum = coerceInt(d.Zeitraum ?? null);
+  if (adrNr === null || jahr === null || !vertragNr || art === null || zeitraum === null) {
+    return null;
+  }
+  return {
+    adrNr,
+    jahr,
+    vertragNr,
+    art,
+    zeitraum,
+    betrag: coerceDecimal(d.Betrag ?? null),
+    bezahlt: coerceDecimal(d.Bezahlt ?? null),
+    offen: coerceDecimal(d.Offen ?? null),
+    mahnstufe: coerceInt(d.Mahnstuffe ?? null) ?? 0,
+    falligkeitsdatum:
+      coerceDate(d.FalligkeitDatum ?? null) ?? coerceDate(d.Datum ?? null),
+    guid: coerceStr(d.GUID ?? null, 64),
+    mandatsNr: coerceStr(d.MandatsNr ?? null, 35),
+  };
+}
+
+export function mapSportartRow(d: LinearRow): Record<string, unknown> | null {
+  const kz = coerceStr(d.KZ ?? null, 50);
+  const nummer = coerceStr(d.NUMMER ?? null, 20);
+  const lfdNr = coerceInt(d.LfdNr ?? null);
+  if (!kz || !nummer || lfdNr === null) return null;
+  return {
+    kz,
+    nummer,
+    sportart: coerceStr(d.SPORTART ?? null, 120),
+    verbandNr: coerceStr(d.VerbandNr ?? null, 20),
+    lfdNr,
+  };
+}
+
+export function mapFachverbandRow(d: LinearRow): Record<string, unknown> | null {
+  const kz = coerceStr(d.KZ ?? null, 50);
+  const nummer = coerceStr(d.NUMMER ?? null, 20);
+  const lfdNr = coerceInt(d.LfdNr ?? null);
+  if (!kz || !nummer || lfdNr === null) return null;
+  return {
+    kz,
+    nummer,
+    fachverband: coerceStr(d.FACHVERBAN ?? null, 120),
+    kn: coerceStr(d.Kn ?? null, 1),
+    lfdNr,
+  };
+}
+
+export function mapMgartDatRow(d: LinearRow): Record<string, unknown> | null {
+  const art = coerceInt(d.Art ?? null);
+  const jahr = coerceInt(d.Jahr ?? null);
+  const monat = coerceInt(d.Monat ?? null);
+  if (art === null || jahr === null || monat === null) return null;
+  return {
+    art,
+    jahr,
+    monat,
+    betrag: coerceDecimal(d.Betrag ?? null),
+    prozent: coerceDecimal(d.Prozent ?? null),
+    datum: coerceDate(d.Datum ?? null),
+  };
+}
+
+/**
+ * Linear `lastprot` / `lastproth` row → archived SEPA run header. The
+ * `XMLData` blob is preserved verbatim so admins can reconstruct exactly
+ * what was submitted to the bank. `archived=true` for `lastproth` (Linear's
+ * history journal for purged runs), `false` for the live `lastprot`.
+ */
+export function mapLastProtRow(
+  d: LinearRow,
+  archived: boolean,
+): Record<string, unknown> | null {
+  const id = coerceInt(d.ID ?? null);
+  const datum = coerceDate(d.Datum ?? null);
+  const benutzer = coerceStr(d.Benutzer ?? null, 250);
+  const guid = coerceStr(d.GUID ?? null, 64);
+  const xmlName = coerceStr(d.XMLName ?? null, 120);
+  if (id === null || !datum || !benutzer || !guid || !xmlName) return null;
+  return {
+    id,
+    datum,
+    falligkeitsdatum: coerceDate(d.Falligkeitsdatum ?? null),
+    benutzer,
+    guid,
+    xmlName,
+    xmlData: typeof d.XMLData === "string" ? d.XMLData : null,
+    archived: archived ? "true" : "false",
+  };
+}
+
+export function mapLastProtSRow(
+  d: LinearRow,
+  archived: boolean,
+): Record<string, unknown> | null {
+  const sepaGuid = coerceStr(d.SepaGUID ?? null, 64);
+  const sollGuid = coerceStr(d.SollGUID ?? null, 36);
+  if (!sepaGuid || !sollGuid) return null;
+  return {
+    sepaGuid,
+    sollGuid,
+    betrag: coerceDecimal(d.Betrag ?? null),
+    offen: coerceDecimal(d.Offen ?? null),
+    ruckLastGuid: coerceStr(d.RuckLastGUID ?? null, 36),
+    archived: archived ? "true" : "false",
+  };
+}
+
 export function mapSepaRow(d: LinearRow): Record<string, unknown> | null {
   const adrNr = coerceInt(d.AdrNr ?? null);
   const mandatsNr = coerceStr(d.MandatsNr ?? null, 50);

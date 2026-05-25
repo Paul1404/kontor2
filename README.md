@@ -165,11 +165,15 @@ Required Railway services:
 Manually set:
 - `APP_SECRET`. 32-byte hex. Every other secret (better-auth signing key,
   data-at-rest key, SVUMS push HMAC) is derived from this via HKDF-SHA256.
-  Rotating it re-keys everything, including the SVUMS push secret, so the
-  SVUMS side has to be updated too. See `bun scripts/print-derived-secrets.ts`.
+  See `bun scripts/print-derived-secrets.ts`.
+- `APP_SECRET_PREV`. Optional. Previous APP_SECRET(s), comma-separated, kept
+  in the keyring during a rotation so existing encrypted rows stay readable.
+  Rotation: set this to the current secret, generate a new `APP_SECRET`,
+  deploy, run Einstellungen > Verschlüsselung > Re-encrypt, then unset.
 - `BETTER_AUTH_URL`. Public URL of the deployment.
 - `SVUWV_BOOTSTRAP_ADMIN_EMAIL`, `SVUWV_BOOTSTRAP_ADMIN_PASSWORD`. Optional,
-  only used on the very first boot.
+  only used on the very first boot. If unset, the first request to the app
+  is redirected to `/setup` where a first admin can be created interactively.
 
 `railway.toml` runs `bun run db:migrate:prod` before each deploy and points
 the healthcheck at `/api/health`. Migrations are applied with a runtime-only

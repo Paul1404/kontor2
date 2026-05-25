@@ -33,18 +33,8 @@ export async function loadSmtpConfig(): Promise<SmtpDispatchConfig | null> {
   };
 }
 
-function transporterFor(cfg: SmtpDispatchConfig): Transporter {
-  const sig = JSON.stringify({
-    h: cfg.host,
-    p: cfg.port,
-    s: cfg.secure,
-    rt: cfg.requireTls,
-    ai: cfg.allowInvalidCerts,
-    u: cfg.username,
-    pw: cfg.password ? "set" : "unset",
-  });
-  if (cachedTransport && cachedTransport.signature === sig) return cachedTransport.transporter;
-  const t = nodemailer.createTransport({
+function buildTransporter(cfg: SmtpDispatchConfig): Transporter {
+  return nodemailer.createTransport({
     host: cfg.host,
     port: cfg.port,
     secure: cfg.secure,
@@ -59,6 +49,20 @@ function transporterFor(cfg: SmtpDispatchConfig): Transporter {
       minVersion: "TLSv1.2",
     },
   });
+}
+
+function transporterFor(cfg: SmtpDispatchConfig): Transporter {
+  const sig = JSON.stringify({
+    h: cfg.host,
+    p: cfg.port,
+    s: cfg.secure,
+    rt: cfg.requireTls,
+    ai: cfg.allowInvalidCerts,
+    u: cfg.username,
+    pw: cfg.password ? "set" : "unset",
+  });
+  if (cachedTransport && cachedTransport.signature === sig) return cachedTransport.transporter;
+  const t = buildTransporter(cfg);
   cachedTransport = { signature: sig, transporter: t };
   return t;
 }
@@ -96,12 +100,20 @@ export async function sendInviteEmail(opts: {
   }
 }
 
+/**
+ * Send a test mail. If `inline` is provided, the saved DB config is bypassed
+ * and a one-shot transporter is built from the supplied values. Lets admins
+ * validate a draft config before persisting it.
+ */
 export async function sendTestMail(opts: {
   to: string;
+  inline?: SmtpDispatchConfig | null;
 }): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const cfg = await loadSmtpConfig();
+  const cfg = opts.inline ?? (await loadSmtpConfig());
   if (!cfg) return { ok: false, reason: "smtp_not_configured" };
-  const t = transporterFor(cfg);
+  // Inline configs skip the transporter cache: the signature would match a
+  // saved config and we'd accidentally reuse the wrong transport.
+  const t = opts.inline ? buildTransporter(cfg) : transporterFor(cfg);
   const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
   try {
     await t.sendMail({

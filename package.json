@@ -1,6 +1,6 @@
 {
   "name": "svuwv",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
     "check": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "routes:regen": "bun scripts/regen-routes.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:prod": "node --experimental-strip-types scripts/migrate.prod.ts",

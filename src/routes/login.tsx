@@ -1,12 +1,15 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Loader2, LogIn } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { signIn } from "~/lib/auth-client";
+import { orpc } from "~/lib/orpc";
+import { VersionChip } from "~/components/ui/version-chip";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -18,6 +21,21 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // First-boot rescue: if no users exist yet, send the operator to /setup
+  // instead of leaving them stranded on a login form for an empty database.
+  const setupStatus = useQuery({
+    queryKey: ["auth.setupStatus"],
+    queryFn: () => orpc.auth.setupStatus(),
+    retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
+  useEffect(() => {
+    if (setupStatus.data?.needsSetup) {
+      navigate({ to: "/setup", replace: true });
+    }
+  }, [setupStatus.data?.needsSetup, navigate]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -92,7 +110,11 @@ function LoginPage() {
         </CardContent>
       </Card>
 
-      <p className="absolute bottom-4 text-xs text-muted-foreground">SV Untereuerheim 1945 e.V.</p>
+      <div className="absolute bottom-4 flex items-center gap-3 text-xs text-muted-foreground">
+        <span>SV Untereuerheim 1945 e.V.</span>
+        <span aria-hidden className="text-muted-foreground/40">|</span>
+        <VersionChip variant="muted" />
+      </div>
     </div>
   );
 }

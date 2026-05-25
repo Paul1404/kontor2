@@ -3,20 +3,37 @@ import { appendAudit, diff } from "~/server/audit/log";
 import type { DB } from "~/server/db/client";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { contractsTable } from "~/server/db/schema/contracts";
+import { sollStellungenTable } from "~/server/db/schema/fee-runs";
+import { feeTypePriceHistoryTable } from "~/server/db/schema/fee-type-history";
 import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { importBatchesTable } from "~/server/db/schema/import-batches";
+import {
+  legacySepaRunItemsTable,
+  legacySepaRunsTable,
+} from "~/server/db/schema/legacy-sepa";
+import {
+  linearFederationsTable,
+  linearSportTypesTable,
+} from "~/server/db/schema/linear-lookups";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { slugify, splitAbteilung } from "~/server/importer/abteilung-splitter";
+import { aggregateMgsolln, statusFor } from "~/server/importer/aggregate-mgsolln";
 import {
   type LinearRow,
   mapContractRow,
+  mapFachverbandRow,
   mapFeeTypeRow,
   mapInteresRow,
   mapInterRow,
+  mapLastProtRow,
+  mapLastProtSRow,
   mapMemberRow,
+  mapMgartDatRow,
   mapSepaRow,
+  mapSollStellungRow,
+  mapSportartRow,
   mapVerknRow,
 } from "~/server/importer/linear-mapper";
 import { invalidateMemberCaches } from "~/server/search/cache";
@@ -36,6 +53,22 @@ export type IngestInput = {
   inter?: LinearRow[];
   /** Linear `interes` table — per-member Abteilungs-Mitgliedschaft. */
   interes?: LinearRow[];
+  /** Linear `mgsolln` — historical Sollstellungen (per (AdrNr, VertragNr, Jahr, Zeitraum)). */
+  mgsolln?: LinearRow[];
+  /** Linear `mgartdat` — per-month Beitragsart price history. */
+  mgartdat?: LinearRow[];
+  /** Linear `sportarten` — DOSB/BLSV sport-type catalogue. */
+  sportarten?: LinearRow[];
+  /** Linear `fachverbaende` — sport federation catalogue. */
+  fachverbaende?: LinearRow[];
+  /** Linear `lastprot` — active SEPA debit run history (with pain.008 XML). */
+  lastprot?: LinearRow[];
+  /** Linear `lastproth` — purged SEPA debit run journal. */
+  lastproth?: LinearRow[];
+  /** Linear `lastprots` — per-debit links from active SEPA runs to Sollstellungen. */
+  lastprots?: LinearRow[];
+  /** Linear `lastprotsh` — per-debit links from purged SEPA runs. */
+  lastprotsh?: LinearRow[];
   requestId?: string | null;
   /**
    * When true, member→Abteilung links are wiped for the AdrNrs in this batch
@@ -56,6 +89,13 @@ export type IngestResult = {
   sepaWritten: number;
   relationshipsWritten: number;
   abteilungenLinked: number;
+  /** Aggregated `(member, contract, year)` rows inserted from Linear `mgsolln`. */
+  sollStellungenImported: number;
+  feeTypeHistoryImported: number;
+  sportTypesImported: number;
+  federationsImported: number;
+  legacySepaRunsImported: number;
+  legacySepaItemsImported: number;
   errors: Array<{ table: string; message: string }>;
 };
 
@@ -427,6 +467,274 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
     }
   }
 
+  // 7. Sportarten + Fachverbaende lookups. Pure reference data; replace
+  // wholesale per (kz, nummer, lfdNr). Both are static catalogues from
+  // BLSV/DOSB so an admin re-importing should overwrite cleanly.
+  let sportTypesImported = 0;
+  for (const raw of input.sportarten ?? []) {
+    try {
+      const row = mapSportartRow(raw);
+      if (!row) continue;
+      await db
+        .insert(linearSportTypesTable)
+        .values(row as never)
+        .onConflictDoUpdate({
+          target: [
+            linearSportTypesTable.kz,
+            linearSportTypesTable.nummer,
+            linearSportTypesTable.lfdNr,
+          ],
+          set: { sportart: (row as { sportart?: string }).sportart, verbandNr: (row as { verbandNr?: string }).verbandNr } as never,
+        });
+      sportTypesImported += 1;
+    } catch (e) {
+      errors.push({ table: "sportarten", message: (e as Error).message });
+    }
+  }
+
+  let federationsImported = 0;
+  for (const raw of input.fachverbaende ?? []) {
+    try {
+      const row = mapFachverbandRow(raw);
+      if (!row) continue;
+      await db
+        .insert(linearFederationsTable)
+        .values(row as never)
+        .onConflictDoUpdate({
+          target: [
+            linearFederationsTable.kz,
+            linearFederationsTable.nummer,
+            linearFederationsTable.lfdNr,
+          ],
+          set: {
+            fachverband: (row as { fachverband?: string }).fachverband,
+            kn: (row as { kn?: string }).kn,
+          } as never,
+        });
+      federationsImported += 1;
+    } catch (e) {
+      errors.push({ table: "fachverbaende", message: (e as Error).message });
+    }
+  }
+
+  // 8. Beitragsart price history. PK is (art, jahr, monat); upsert so a
+  // re-import refreshes the table without piling up duplicates.
+  let feeTypeHistoryImported = 0;
+  for (const raw of input.mgartdat ?? []) {
+    try {
+      const row = mapMgartDatRow(raw);
+      if (!row) continue;
+      await db
+        .insert(feeTypePriceHistoryTable)
+        .values(row as never)
+        .onConflictDoUpdate({
+          target: [
+            feeTypePriceHistoryTable.art,
+            feeTypePriceHistoryTable.jahr,
+            feeTypePriceHistoryTable.monat,
+          ],
+          set: {
+            betrag: (row as { betrag?: string | null }).betrag,
+            prozent: (row as { prozent?: string | null }).prozent,
+            datum: (row as { datum?: Date | null }).datum,
+          } as never,
+        });
+      feeTypeHistoryImported += 1;
+    } catch (e) {
+      errors.push({ table: "mgartdat", message: (e as Error).message });
+    }
+  }
+
+  // 9. Historical Sollstellungen from `mgsolln`.
+  //
+  // Linear's PK is `(AdrNr, Jahr, VertragNr, Art, Zeitraum)` — same year /
+  // contract can carry multiple "Zeitraum" rows. The app's
+  // `soll_stellungen` is unique on `(contract_id, billing_year)`, so we
+  // aggregate by summing `Betrag` / `Bezahlt` / `Offen` across all rows
+  // sharing the natural key. The first row's GUID becomes the
+  // representative `linear_guid` (also the join key into `lastprots`).
+  //
+  // We only import rows whose `(adrNr, vertragNr)` resolves to an existing
+  // contract; the rest are reported in `errors` so an operator can decide
+  // whether to backfill the contract or accept the loss.
+  let sollStellungenImported = 0;
+  if ((input.mgsolln?.length ?? 0) > 0) {
+    // Pre-load the (adrNr, vertragNr) → contractId/memberId map.
+    const contractLookup = new Map<string, { contractId: string; memberId: string }>();
+    const incomingAdrNrs = Array.from(
+      new Set(
+        (input.mgsolln ?? [])
+          .map((r) => Number(r.AdrNr))
+          .filter((n) => Number.isFinite(n)),
+      ),
+    );
+    if (incomingAdrNrs.length > 0) {
+      const contracts = await db
+        .select({
+          id: contractsTable.id,
+          memberId: contractsTable.memberId,
+          adrNr: contractsTable.adrNr,
+          vertragNr: contractsTable.vertragNr,
+        })
+        .from(contractsTable)
+        .where(inArray(contractsTable.adrNr, incomingAdrNrs));
+      for (const c of contracts) {
+        contractLookup.set(`${c.adrNr}|${c.vertragNr}`, {
+          contractId: c.id,
+          memberId: c.memberId,
+        });
+      }
+    }
+
+    // Map raw rows → typed Sollstellungen; drop malformed rows but keep
+    // the count consistent.
+    const mapped: ReturnType<typeof mapSollStellungRow>[] = [];
+    for (const raw of input.mgsolln ?? []) {
+      try {
+        const m = mapSollStellungRow(raw);
+        if (m) mapped.push(m);
+      } catch (e) {
+        errors.push({ table: "mgsolln", message: (e as Error).message });
+      }
+    }
+
+    const { aggregated, missing } = aggregateMgsolln(
+      mapped.filter((m): m is NonNullable<typeof m> => m !== null),
+      (adrNr, vertragNr) => contractLookup.get(`${adrNr}|${vertragNr}`) ?? null,
+    );
+
+    if (missing.length > 0) {
+      // Roll up unresolved (adrNr, vertragNr) pairs into a single error
+      // entry — surfacing thousands of identical messages would drown
+      // legitimate errors.
+      const sample = missing.slice(0, 10).map((m) => `${m.adrNr}/${m.vertragNr}`);
+      errors.push({
+        table: "mgsolln",
+        message: `${missing.length} Zeile(n) ohne passenden Vertrag übersprungen. Beispiele: ${sample.join(", ")}`,
+      });
+    }
+
+    for (const v of aggregated) {
+      try {
+        const status = statusFor(v.openAmount);
+        const falligkeit = v.falligkeitsdatum
+          ? v.falligkeitsdatum.toISOString().slice(0, 10)
+          : `${v.billingYear}-01-01`;
+        await db
+          .insert(sollStellungenTable)
+          .values({
+            memberId: v.memberId,
+            contractId: v.contractId,
+            billingYear: v.billingYear,
+            falligkeitsdatum: falligkeit,
+            amount: v.amount,
+            paidAmount: v.paidAmount,
+            openAmount: v.openAmount,
+            mahnstufe: v.mahnstufe,
+            status,
+            source: "linear_import",
+            linearGuid: v.linearGuid,
+            notes:
+              v.rowCount > 1
+                ? `Aggregat aus ${v.rowCount} Linear-Zeiträumen (mgsolln)`
+                : null,
+          } as never)
+          .onConflictDoUpdate({
+            target: [
+              sollStellungenTable.contractId,
+              sollStellungenTable.billingYear,
+            ],
+            set: {
+              amount: v.amount,
+              paidAmount: v.paidAmount,
+              openAmount: v.openAmount,
+              mahnstufe: v.mahnstufe,
+              status,
+              source: "linear_import",
+              linearGuid: v.linearGuid,
+              falligkeitsdatum: falligkeit,
+              updatedAt: new Date(),
+            } as never,
+          });
+        sollStellungenImported += 1;
+      } catch (e) {
+        errors.push({ table: "mgsolln", message: (e as Error).message });
+      }
+    }
+  }
+
+  // 10. Legacy SEPA runs from `lastprot` (active) and `lastproth` (purged
+  // journal). Upsert by `id` so re-imports refresh the row in place; the
+  // archived flag distinguishes the two sources.
+  let legacySepaRunsImported = 0;
+  for (const [archivedFlag, rows] of [
+    [false, input.lastprot],
+    [true, input.lastproth],
+  ] as const) {
+    for (const raw of rows ?? []) {
+      try {
+        const row = mapLastProtRow(raw, archivedFlag);
+        if (!row) continue;
+        await db
+          .insert(legacySepaRunsTable)
+          .values(row as never)
+          .onConflictDoUpdate({
+            target: legacySepaRunsTable.id,
+            set: {
+              datum: (row as { datum?: Date }).datum,
+              falligkeitsdatum: (row as { falligkeitsdatum?: Date | null }).falligkeitsdatum,
+              benutzer: (row as { benutzer?: string }).benutzer,
+              guid: (row as { guid?: string }).guid,
+              xmlName: (row as { xmlName?: string }).xmlName,
+              xmlData: (row as { xmlData?: string | null }).xmlData,
+              archived: archivedFlag ? "true" : "false",
+              importedAt: new Date(),
+            } as never,
+          });
+        legacySepaRunsImported += 1;
+      } catch (e) {
+        errors.push({
+          table: archivedFlag ? "lastproth" : "lastprot",
+          message: (e as Error).message,
+        });
+      }
+    }
+  }
+
+  // 11. Legacy SEPA run items (`lastprots` / `lastprotsh`). The (sepaGuid,
+  // sollGuid) pair is the natural key.
+  let legacySepaItemsImported = 0;
+  for (const [archivedFlag, rows] of [
+    [false, input.lastprots],
+    [true, input.lastprotsh],
+  ] as const) {
+    for (const raw of rows ?? []) {
+      try {
+        const row = mapLastProtSRow(raw, archivedFlag);
+        if (!row) continue;
+        await db
+          .insert(legacySepaRunItemsTable)
+          .values(row as never)
+          .onConflictDoUpdate({
+            target: [legacySepaRunItemsTable.sepaGuid, legacySepaRunItemsTable.sollGuid],
+            set: {
+              betrag: (row as { betrag?: string | null }).betrag,
+              offen: (row as { offen?: string | null }).offen,
+              ruckLastGuid: (row as { ruckLastGuid?: string | null }).ruckLastGuid,
+              archived: archivedFlag ? "true" : "false",
+              importedAt: new Date(),
+            } as never,
+          });
+        legacySepaItemsImported += 1;
+      } catch (e) {
+        errors.push({
+          table: archivedFlag ? "lastprotsh" : "lastprots",
+          message: (e as Error).message,
+        });
+      }
+    }
+  }
+
   // Count abteilung links for the members touched by THIS batch (not the
   // global table count, which keeps growing across imports and would
   // mislead operators reading the import summary).
@@ -467,6 +775,12 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
     sepaWritten,
     relationshipsWritten,
     abteilungenLinked,
+    sollStellungenImported,
+    feeTypeHistoryImported,
+    sportTypesImported,
+    federationsImported,
+    legacySepaRunsImported,
+    legacySepaItemsImported,
     errors,
   };
 }

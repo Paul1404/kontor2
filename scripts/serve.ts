@@ -72,3 +72,18 @@ try {
 
 const s = Bun.serve({ port, fetch: handle });
 console.log(`[svuwv] listening on ${s.url}`);
+
+// The snapshot scheduler initialises lazily inside `createContext` (oRPC).
+// On a freshly-deployed container with no oRPC traffic between deploy and
+// 02:30, the nightly run would silently skip. Fix: make one self-request to
+// the oRPC endpoint right after `Bun.serve` accepts connections. The HTTP
+// response itself doesn't matter — even a 4xx still runs `createContext`,
+// which is what starts the scheduler.
+queueMicrotask(() => {
+  const url = new URL("/api/rpc/auth/setupStatus", s.url).toString();
+  fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
+    .then(() => console.log("[svuwv] snapshot scheduler warmed up"))
+    .catch((err) =>
+      console.warn(`[svuwv] scheduler warmup failed: ${(err as Error).message}`),
+    );
+});

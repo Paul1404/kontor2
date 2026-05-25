@@ -5,6 +5,7 @@ import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import { auth } from "~/server/auth/auth";
 import { sendInviteEmail } from "~/server/auth/send-invite";
+import { completeSetup, isInSetupMode } from "~/server/auth/setup";
 import { invitations, roleEnum, users } from "~/server/db/schema/auth";
 import { env } from "~/server/env";
 import { adminProc, authedProc, publicProc } from "~/server/orpc/base";
@@ -12,6 +13,45 @@ import { adminProc, authedProc, publicProc } from "~/server/orpc/base";
 const RoleSchema = v.picklist(roleEnum.enumValues);
 
 export const authRouter = {
+  /**
+   * True when the users table is empty. The /setup route uses this to decide
+   * whether to show the first-admin form or redirect to /login. Always
+   * returns `false` once any user exists.
+   */
+  setupStatus: publicProc.input(v.void()).handler(async () => {
+    return { needsSetup: await isInSetupMode() };
+  }),
+
+  /**
+   * Creates the first admin when the users table is empty. Idempotency-safe:
+   * a second concurrent call sees the user table populated and refuses.
+   * This is the recovery path for the "first-boot lockout" — operators who
+   * deployed without SVUWV_BOOTSTRAP_ADMIN_* env vars use this instead of
+   * having to edit env and restart the container.
+   */
+  completeSetup: publicProc
+    .input(
+      v.object({
+        email: v.pipe(v.string(), v.email()),
+        password: v.pipe(v.string(), v.minLength(12)),
+        name: v.pipe(v.string(), v.minLength(1)),
+      }),
+    )
+    .handler(async ({ input }) => {
+      const result = await completeSetup(input);
+      if (!result.ok) {
+        if (result.reason === "already_initialized") {
+          throw new ORPCError("CONFLICT", {
+            message: "Setup wurde bereits abgeschlossen. Bitte über /login anmelden.",
+          });
+        }
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: result.message ?? "Setup fehlgeschlagen.",
+        });
+      }
+      return { ok: true };
+    }),
+
   me: authedProc.input(v.void()).handler(async ({ context }) => ({
     id: context.session!.user.id,
     email: context.session!.user.email,
@@ -222,6 +262,12 @@ export const authRouter = {
         throw new ORPCError("FORBIDDEN", { message: "Einladung ungültig." });
       }
 
+      // Self-healing path: a prior attempt may have created the better-auth
+      // user but failed mid-flight before the role update / audit insert
+      // landed. On retry, the invitation has been rolled back (acceptedAt
+      // = null again) so we get past the claim, but `createUser` would throw
+      // "email already in use" forever. Detect that case and complete the
+      // role update on the existing orphan user instead.
       try {
         // Bootstrap uses `createUser` (admin API) because `signUpEmail`
         // honours `disableSignUp: true` in the auth config. Same reason
@@ -231,27 +277,62 @@ export const authRouter = {
         // built-in `"user" | "admin"`, so we always pass "user" here and
         // overwrite to our real Verein role (`readonly` / `vorstand` /
         // `admin`) in the follow-up update below.
-        const created = await auth().api.createUser({
-          body: {
-            email: inv.email,
-            password: input.password,
-            name: input.name,
-            role: "user",
-          },
-        });
-        if (!created?.user?.id) {
-          throw new ORPCError("INTERNAL_SERVER_ERROR", {
-            message: "Konto konnte nicht angelegt werden.",
+        let userId: string;
+        try {
+          const created = await auth().api.createUser({
+            body: {
+              email: inv.email,
+              password: input.password,
+              name: input.name,
+              role: "user",
+            },
           });
+          if (!created?.user?.id) {
+            throw new ORPCError("INTERNAL_SERVER_ERROR", {
+              message: "Konto konnte nicht angelegt werden.",
+            });
+          }
+          userId = created.user.id;
+        } catch (createErr) {
+          // Look for the "email already exists" signal. better-auth surfaces
+          // this as a thrown APIError with a status / code; match loosely on
+          // the message to cover phrasing changes between versions.
+          const msg = (createErr as Error).message ?? "";
+          const looksLikeDup = /already\s*(in\s*use|exists)|user.*exist/i.test(msg);
+          if (!looksLikeDup) throw createErr;
+
+          const [orphan] = await context.db
+            .select({ id: users.id, role: users.role })
+            .from(users)
+            .where(eq(users.email, inv.email.toLowerCase()))
+            .limit(1);
+          if (!orphan) {
+            // The duplicate signal was misleading — surface the original error.
+            throw createErr;
+          }
+          // Only adopt the orphan if it's still on the default role. A user
+          // with a real role already accepted earlier; we don't overwrite
+          // their state.
+          if (orphan.role !== "readonly") {
+            throw new ORPCError("CONFLICT", {
+              message:
+                "Für diese E-Mail existiert bereits ein Benutzer. Bitte über /login anmelden.",
+            });
+          }
+          userId = orphan.id;
+          console.log(
+            `[invite] adopting orphan user ${userId} for invitation ${inv.id} (retry after partial failure)`,
+          );
         }
+
         await context.db
           .update(users)
           .set({ role: inv.role, emailVerified: true })
-          .where(eq(users.id, created.user.id));
+          .where(eq(users.id, userId));
 
         await appendAudit(context.db, {
           entityType: "user",
-          entityId: created.user.id,
+          entityId: userId,
           action: "create",
           source: "ui",
           actorId: null,
