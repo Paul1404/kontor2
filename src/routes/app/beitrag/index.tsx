@@ -4,6 +4,7 @@ import { Coins, Download, Loader2, Plus } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { InfoBox } from "~/components/ui/info-box";
 import { triggerDownload } from "~/lib/download";
 import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -53,6 +54,34 @@ function FeeRunsListPage() {
           </Link>
         ) : null}
       </div>
+
+      <InfoBox title="So funktioniert ein Beitragslauf" collapsible defaultOpen={false}>
+        <ol className="ml-4 list-decimal space-y-1">
+          <li>
+            <strong>Vorschau</strong>: Jahr und Fälligkeitsdatum wählen. Das System zieht alle
+            aktiven Verträge mit gültigem SEPA-Mandat zusammen und berechnet die Posten je Mitglied.
+            Die Vorschau zeigt, was abgebucht wird, bevor etwas festgeschrieben wird.
+          </li>
+          <li>
+            <strong>Bestätigen</strong>: Beim Erzeugen werden Sollstellungen und die
+            pain.008-XML-Datei in einem Schritt angelegt. Der Lauf wechselt auf <em>Erzeugt</em>.
+            Die Sollstellungen erscheinen ab jetzt unter <em>Forderungen</em> und im Finanzbericht.
+          </li>
+          <li>
+            <strong>XML einreichen</strong>: Die pain.008-Datei (Format 001.02) wird heruntergeladen
+            und im Banking-Portal Ihrer Bank hochgeladen.
+          </li>
+          <li>
+            <strong>Rückläufer</strong>: Nicht eingelöste Lastschriften erfassen Sie unter{" "}
+            <em>SEPA-Rückläufer</em>. Sie werden auf die Sollstellungen zurückgeschrieben und
+            tauchen automatisch wieder unter <em>Forderungen</em> auf.
+          </li>
+        </ol>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Ein erzeugter Lauf kann storniert werden. Dabei werden die zugehörigen Sollstellungen
+          ebenfalls storniert und im Audit-Log protokolliert.
+        </p>
+      </InfoBox>
 
       <Card>
         <CardContent className="p-0">

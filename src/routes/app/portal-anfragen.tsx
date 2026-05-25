@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { toast } from "~/components/ui/toaster";
 import { formatDateTime } from "~/lib/format";
@@ -82,11 +83,35 @@ function PortalRequestsPage() {
         </div>
       </div>
 
+      <InfoBox title="So funktioniert es" collapsible defaultOpen={false}>
+        <ol className="ml-4 list-decimal space-y-1">
+          <li>
+            Mitglieder melden sich im Selbstbedienungsportal an und schlagen Änderungen ihrer Stamm-
+            oder Kontaktdaten vor. Die Daten werden nicht direkt übernommen.
+          </li>
+          <li>
+            Jede offene Anfrage erscheint hier. Pro Feld sehen Sie den alten und den neuen Wert
+            nebeneinander.
+          </li>
+          <li>
+            Per Häkchen entscheiden Sie pro Feld, was übernommen wird. Nicht angehakte Felder
+            bleiben unverändert. Status wird automatisch <em>übernommen</em>, <em>teilweise</em>{" "}
+            oder <em>abgelehnt</em>.
+          </li>
+          <li>
+            Eine Notiz wird intern gespeichert und im Audit-Log abgelegt. Das Mitglied sieht sie
+            nicht direkt, sie hilft aber bei Rückfragen.
+          </li>
+          <li>
+            Bearbeitete Anfragen bleiben in der Historie. Bei Bedarf kann der Mitgliederstand über{" "}
+            <em>Snapshots</em> rückwirkend wiederhergestellt werden.
+          </li>
+        </ol>
+      </InfoBox>
+
       <Card>
         <CardHeader>
-          <CardTitle>
-            {list.data ? `${list.data.total} Anfrage(n)` : "Anfragen"}
-          </CardTitle>
+          <CardTitle>{list.data ? `${list.data.total} Anfrage(n)` : "Anfragen"}</CardTitle>
         </CardHeader>
         <CardContent>
           {list.isLoading ? (
@@ -110,9 +135,7 @@ function PortalRequestsPage() {
   );
 }
 
-type Row = NonNullable<
-  Awaited<ReturnType<typeof orpc.portal.listRequests>>["rows"][number]
->;
+type Row = NonNullable<Awaited<ReturnType<typeof orpc.portal.listRequests>>["rows"][number]>;
 
 function RequestRow({ row, onAction }: { row: Row; onAction: () => void }) {
   const payload = (row.payload as Record<string, { before: unknown; after: unknown }>) ?? {};
@@ -137,7 +160,8 @@ function RequestRow({ row, onAction }: { row: Row; onAction: () => void }) {
       );
       onAction();
     },
-    onError: (e: Error) => toast.error("Konnte nicht bearbeitet werden", { description: e.message }),
+    onError: (e: Error) =>
+      toast.error("Konnte nicht bearbeitet werden", { description: e.message }),
   });
 
   function togglePick(f: string) {
