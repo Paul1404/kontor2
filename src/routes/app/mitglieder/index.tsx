@@ -73,9 +73,7 @@ export const Route = createFileRoute("/app/mitglieder/")({
   // safe shape (the URL is user-controlled).
   validateSearch: (s: Record<string, unknown>): MembersSearch => {
     const status = STATUS_VALUES.includes(s.status as Status) ? (s.status as Status) : "aktiv";
-    const sortBy = SORT_VALUES.includes(s.sortBy as SortBy)
-      ? (s.sortBy as SortBy)
-      : "nachname";
+    const sortBy = SORT_VALUES.includes(s.sortBy as SortBy) ? (s.sortBy as SortBy) : "nachname";
     const sortDir = s.sortDir === "desc" ? "desc" : "asc";
     const pageNum = Number(s.page);
     return {
@@ -146,10 +144,7 @@ function MembersListPage() {
   usePageShortcut("n", canEdit ? () => navigate({ to: "/app/mitglieder/neu" }) : null);
 
   const hasFilter =
-    !!search.q ||
-    search.status !== "aktiv" ||
-    !!search.abteilungId ||
-    search.includeAusgetretene;
+    !!search.q || search.status !== "aktiv" || !!search.abteilungId || search.includeAusgetretene;
 
   const abteilungName = search.abteilungId
     ? abteilungen.data?.find((a) => a.id === search.abteilungId)?.name
@@ -157,14 +152,20 @@ function MembersListPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Mitglieder</h1>
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Mitglieder</h1>
           <p className="text-sm text-muted-foreground">
-            Suchen, filtern und Profile öffnen. Tipp: <kbd className="rounded border border-border bg-muted px-1 text-[10px]">n</kbd> für neu, <kbd className="rounded border border-border bg-muted px-1 text-[10px]">⌘K</kbd> für Suche.
+            <span className="hidden sm:inline">
+              Suchen, filtern und Profile öffnen. Tipp:{" "}
+              <kbd className="rounded border border-border bg-muted px-1 text-[10px]">n</kbd> für
+              neu, <kbd className="rounded border border-border bg-muted px-1 text-[10px]">⌘K</kbd>{" "}
+              für Suche.
+            </span>
+            <span className="sm:hidden">Suchen, filtern und Profile öffnen.</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="outline"
@@ -198,8 +199,8 @@ function MembersListPage() {
       </div>
 
       <Card>
-        <CardContent className="flex flex-wrap items-center gap-3 p-4">
-          <div className="relative min-w-60 flex-1">
+        <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:p-4">
+          <div className="relative w-full sm:min-w-60 sm:flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               className="pl-9"
@@ -208,29 +209,31 @@ function MembersListPage() {
               onChange={(e) => setQDraft(e.target.value)}
             />
           </div>
-          <select
-            value={search.status}
-            onChange={(e) => updateSearch({ status: e.target.value as Status })}
-            className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-          >
-            <option value="aktiv">Aktiv</option>
-            <option value="passiv">Passiv</option>
-            <option value="ausgetreten">Ausgetreten</option>
-            <option value="verstorben">Verstorben</option>
-            <option value="alle">Alle</option>
-          </select>
-          <select
-            value={search.abteilungId ?? ""}
-            onChange={(e) => updateSearch({ abteilungId: e.target.value || null })}
-            className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-          >
-            <option value="">Alle Abteilungen</option>
-            {abteilungen.data?.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name} ({a.count})
-              </option>
-            ))}
-          </select>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-3">
+            <select
+              value={search.status}
+              onChange={(e) => updateSearch({ status: e.target.value as Status })}
+              className="h-10 min-w-0 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+            >
+              <option value="aktiv">Aktiv</option>
+              <option value="passiv">Passiv</option>
+              <option value="ausgetreten">Ausgetreten</option>
+              <option value="verstorben">Verstorben</option>
+              <option value="alle">Alle</option>
+            </select>
+            <select
+              value={search.abteilungId ?? ""}
+              onChange={(e) => updateSearch({ abteilungId: e.target.value || null })}
+              className="h-10 min-w-0 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+            >
+              <option value="">Alle Abteilungen</option>
+              {abteilungen.data?.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} ({a.count})
+                </option>
+              ))}
+            </select>
+          </div>
           <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm shadow-soft">
             <input
               type="checkbox"
@@ -435,9 +438,7 @@ function SortHeader({
         className="-mx-1 flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted hover:text-foreground"
       >
         {label}
-        <Icon
-          className={`size-3 ${isActive ? "text-foreground" : "text-muted-foreground/60"}`}
-        />
+        <Icon className={`size-3 ${isActive ? "text-foreground" : "text-muted-foreground/60"}`} />
       </button>
     </th>
   );

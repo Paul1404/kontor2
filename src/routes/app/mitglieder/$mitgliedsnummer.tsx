@@ -98,7 +98,7 @@ function MemberDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <div>
           <Link
             to="/app/mitglieder"
@@ -107,7 +107,7 @@ function MemberDetailPage() {
           >
             <ArrowLeft className="size-4" /> Zurück zur Liste
           </Link>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
             {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")}
           </h1>
           <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
@@ -117,7 +117,7 @@ function MemberDetailPage() {
             <span>AdrNr {member.adrNr}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="outline"
@@ -195,7 +195,7 @@ function MemberDetailPage() {
           <CardHeader>
             <CardTitle>Stammdaten</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <CardContent className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
             <Field label="Anrede" value={member.anrede} />
             <Field
               label="Geburtsdatum & Alter"

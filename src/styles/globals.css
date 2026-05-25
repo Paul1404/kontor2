@@ -107,6 +107,8 @@
     color-scheme: light;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   html.dark {
     color-scheme: dark;
@@ -125,6 +127,20 @@
   }
   ::selection {
     background-color: color-mix(in oklab, var(--color-primary) 30%, transparent);
+  }
+
+  /*
+   * iOS Safari zooms into form controls whose computed font-size is below
+   * 16px. The UI uses text-sm (14px) inputs/selects/textareas which would
+   * trigger the zoom on every focus. Bump to 16px below `sm` so desktop
+   * styling stays unchanged.
+   */
+  @media (max-width: 639px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 }
 

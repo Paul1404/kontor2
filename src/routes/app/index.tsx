@@ -55,7 +55,7 @@ function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Dashboard</h1>
         <p className="text-sm text-muted-foreground">
           Übersicht über Mitgliederstand und Aktivität.
         </p>
@@ -103,15 +103,17 @@ function DashboardPage() {
             ) : (
               <ul className="flex flex-col gap-3">
                 {data.perAbteilung.map((p) => (
-                  <li key={p.name} className="flex items-center gap-4">
-                    <span className="w-44 truncate text-sm font-medium">{p.name}</span>
+                  <li key={p.name} className="flex items-center gap-3 sm:gap-4">
+                    <span className="w-28 shrink-0 truncate text-sm font-medium sm:w-44">
+                      {p.name}
+                    </span>
                     <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
                       <div
                         className="h-full rounded-full bg-primary transition-[width] duration-500"
                         style={{ width: `${(p.c / maxPerAbt) * 100}%` }}
                       />
                     </div>
-                    <span className="w-10 text-right text-sm tabular-nums text-muted-foreground">
+                    <span className="w-10 shrink-0 text-right text-sm tabular-nums text-muted-foreground">
                       {p.c}
                     </span>
                   </li>
@@ -175,15 +177,17 @@ function BarList({ rows }: { rows: Array<{ label: string; value: number }> }) {
   return (
     <ul className="flex flex-col gap-3">
       {rows.map((r) => (
-        <li key={r.label} className="flex items-center gap-4">
-          <span className="w-28 truncate text-sm font-medium capitalize">{r.label}</span>
+        <li key={r.label} className="flex items-center gap-3 sm:gap-4">
+          <span className="w-20 shrink-0 truncate text-sm font-medium capitalize sm:w-28">
+            {r.label}
+          </span>
           <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-primary/80 transition-[width] duration-500"
               style={{ width: `${(r.value / max) * 100}%` }}
             />
           </div>
-          <span className="w-10 text-right text-sm tabular-nums text-muted-foreground">
+          <span className="w-10 shrink-0 text-right text-sm tabular-nums text-muted-foreground">
             {r.value}
           </span>
         </li>
