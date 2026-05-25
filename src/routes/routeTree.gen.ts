@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './__root'
+import { Route as SetupRouteImport } from './setup'
 import { Route as LoginRouteImport } from './login'
 import { Route as PortalRouteRouteImport } from './portal/route'
 import { Route as AppRouteRouteImport } from './app/route'
@@ -58,6 +59,11 @@ import { Route as AppForderungenMahnungenNeuRouteImport } from './app/forderunge
 import { Route as AppForderungenMahnungenIdRouteImport } from './app/forderungen/mahnungen/$id'
 import { Route as ApiPortalZugangTokenRouteImport } from './api/portal.zugang.$token'
 
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -315,6 +321,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteRouteWithChildren
   '/portal': typeof PortalRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/setup': typeof SetupRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
   '/app/import': typeof AppImportRoute
@@ -363,6 +370,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/setup': typeof SetupRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
   '/app/import': typeof AppImportRoute
@@ -414,6 +422,7 @@ export interface FileRoutesById {
   '/app': typeof AppRouteRouteWithChildren
   '/portal': typeof PortalRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/setup': typeof SetupRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
   '/app/import': typeof AppImportRoute
@@ -466,6 +475,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/portal'
     | '/login'
+    | '/setup'
     | '/api/health'
     | '/app/audit'
     | '/app/import'
@@ -514,6 +524,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/setup'
     | '/api/health'
     | '/app/audit'
     | '/app/import'
@@ -564,6 +575,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/portal'
     | '/login'
+    | '/setup'
     | '/api/health'
     | '/app/audit'
     | '/app/import'
@@ -615,6 +627,7 @@ export interface RootRouteChildren {
   AppRouteRoute: typeof AppRouteRouteWithChildren
   PortalRouteRoute: typeof PortalRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  SetupRoute: typeof SetupRoute
   ApiHealthRoute: typeof ApiHealthRoute
   InviteTokenRoute: typeof InviteTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -628,6 +641,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -1063,6 +1083,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRouteRoute: AppRouteRouteWithChildren,
   PortalRouteRoute: PortalRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  SetupRoute: SetupRoute,
   ApiHealthRoute: ApiHealthRoute,
   InviteTokenRoute: InviteTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

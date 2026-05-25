@@ -13,7 +13,9 @@ export type AppContext = {
 let schedulerStarted = false;
 
 export async function createContext(request: Request): Promise<AppContext> {
-  await ensureBootstrapAdmin();
+  // Start the scheduler before anything that might throw — a transient DB
+  // outage during bootstrap shouldn't prevent the nightly snapshot timer
+  // from ever being installed.
   if (!schedulerStarted) {
     schedulerStarted = true;
     try {
@@ -22,6 +24,7 @@ export async function createContext(request: Request): Promise<AppContext> {
       console.error(`[svuwv] failed to start snapshot scheduler: ${(err as Error).message}`);
     }
   }
+  await ensureBootstrapAdmin();
   const session = await auth().api.getSession({ headers: request.headers });
   return {
     db: db(),

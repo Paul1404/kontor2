@@ -1,12 +1,14 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Loader2, LogIn } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { signIn } from "~/lib/auth-client";
+import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -18,6 +20,21 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // First-boot rescue: if no users exist yet, send the operator to /setup
+  // instead of leaving them stranded on a login form for an empty database.
+  const setupStatus = useQuery({
+    queryKey: ["auth.setupStatus"],
+    queryFn: () => orpc.auth.setupStatus(),
+    retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
+  useEffect(() => {
+    if (setupStatus.data?.needsSetup) {
+      navigate({ to: "/setup", replace: true });
+    }
+  }, [setupStatus.data?.needsSetup, navigate]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

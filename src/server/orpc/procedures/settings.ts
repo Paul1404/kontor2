@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { sendTestMail } from "~/server/auth/send-invite";
+import { inspectEncryptedData, reencryptAllData } from "~/server/crypto/reencrypt";
 import { smtpConfigTable } from "~/server/db/schema/settings";
 import { adminProc } from "~/server/orpc/base";
 
@@ -71,10 +72,35 @@ export const settingsRouter = {
     return { ok: true };
   }),
 
+  /**
+   * Send a test mail. When `inline` is provided, use it directly instead of
+   * the DB-persisted config — lets admins try a new SMTP config without
+   * saving it first (sidesteps the catch-22 of "save broken config to test it").
+   */
   sendTestMail: adminProc
-    .input(v.object({ to: v.pipe(v.string(), v.email()) }))
+    .input(
+      v.object({
+        to: v.pipe(v.string(), v.email()),
+        inline: v.optional(
+          v.nullable(
+            v.object({
+              host: v.pipe(v.string(), v.minLength(1)),
+              port: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65535)),
+              secure: v.boolean(),
+              requireTls: v.optional(v.boolean(), true),
+              allowInvalidCerts: v.optional(v.boolean(), false),
+              username: v.optional(v.nullable(v.string()), null),
+              password: v.optional(v.nullable(v.string()), null),
+              fromAddress: v.pipe(v.string(), v.email()),
+              fromName: v.optional(v.nullable(v.string()), null),
+            }),
+          ),
+          null,
+        ),
+      }),
+    )
     .handler(async ({ input }) => {
-      const result = await sendTestMail({ to: input.to });
+      const result = await sendTestMail({ to: input.to, inline: input.inline ?? null });
       if (!result.ok) {
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
           message: `Versand fehlgeschlagen: ${result.reason}`,
@@ -82,4 +108,47 @@ export const settingsRouter = {
       }
       return { ok: true };
     }),
+
+  /**
+   * Inspect how many encrypted rows live on which key (current vs previous
+   * vs legacy single-key v1). Used by the rotation UI to preview the impact
+   * before running `reencryptData`.
+   */
+  inspectEncryption: adminProc.input(v.void()).handler(async ({ context }) => {
+    return inspectEncryptedData(context.db);
+  }),
+
+  /**
+   * Re-encrypt every encrypted bytea column under the current keyring key.
+   * Idempotent; rows already on the current key are skipped via a cheap
+   * fingerprint check. Rows whose key is not in the keyring are reported as
+   * `failed` and left intact, so an operator can add the missing key to
+   * APP_SECRET_PREV and retry.
+   */
+  reencryptData: adminProc.input(v.void()).handler(async ({ context }) => {
+    const report = await reencryptAllData(context.db);
+    const totals = report.reduce(
+      (acc, r) => ({
+        scanned: acc.scanned + r.scanned,
+        rewritten: acc.rewritten + r.rewritten,
+        failed: acc.failed + r.failed,
+      }),
+      { scanned: 0, rewritten: 0, failed: 0 },
+    );
+    await appendAudit(context.db, {
+      entityType: "encryption",
+      entityId: "reencrypt",
+      action: "update",
+      source: "system",
+      actorId: context.session!.user.id,
+      actorEmail: context.session!.user.email,
+      changes: {
+        scanned: { before: null, after: totals.scanned },
+        rewritten: { before: null, after: totals.rewritten },
+        failed: { before: null, after: totals.failed },
+      },
+      requestId: context.requestId ?? null,
+    });
+    return { report, totals };
+  }),
 };
