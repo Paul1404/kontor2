@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { PageSizeSelect, usePersistentPageSize } from "~/components/ui/page-size-select";
+import { Skeleton } from "~/components/ui/skeleton";
 import {
   actionLabel,
   entityLabel,
@@ -191,7 +192,17 @@ function AuditPage() {
       <Card className="overflow-hidden p-0">
         <ul className="divide-y divide-border">
           {list.isLoading ? (
-            <li className="px-4 py-8 text-center text-sm text-muted-foreground">Wird geladen…</li>
+            Array.from({ length: Math.min(pageSize, 8) }).map((_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: pure visual placeholder
+              <li key={i} className="flex items-start gap-3 px-4 py-3">
+                <Skeleton className="h-5 w-20" />
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Skeleton className="h-3 w-56" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+                <Skeleton className="h-3 w-28" />
+              </li>
+            ))
           ) : (list.data?.rows.length ?? 0) === 0 ? (
             <li className="px-4 py-8 text-center text-sm text-muted-foreground">
               Keine Einträge passen zu diesen Filtern.

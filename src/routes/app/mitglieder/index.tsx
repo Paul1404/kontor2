@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Loader2,
   Plus,
   Search,
   X,
@@ -18,6 +17,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { PageSizeSelect, usePersistentPageSize } from "~/components/ui/page-size-select";
+import { SkeletonTableRows } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
@@ -334,13 +334,7 @@ function MembersListPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {list.isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="size-4 animate-spin" /> Wird geladen…
-                    </span>
-                  </td>
-                </tr>
+                <SkeletonTableRows rows={Math.min(pageSize, 10)} cols={6} />
               ) : list.data?.rows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">

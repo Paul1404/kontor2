@@ -1,5 +1,5 @@
 import { AlertTriangle, Loader2, X } from "lucide-react";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/cn";
 
@@ -26,6 +26,7 @@ export function ConfirmDialog({
   children?: ReactNode;
   onConfirm: () => void;
 }) {
+  const confirmRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -34,9 +35,13 @@ export function ConfirmDialog({
     window.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // Autofocus the confirm button so Enter / Space submits and the focus
+    // ring lands on the action the user is about to take.
+    const t = window.setTimeout(() => confirmRef.current?.focus(), 0);
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
+      window.clearTimeout(t);
     };
   }, [open, onOpenChange]);
 
@@ -45,7 +50,7 @@ export function ConfirmDialog({
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop is a click-to-dismiss affordance; keyboard users dismiss via Escape (wired in the effect above) and via the explicit close button.
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="motion-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
@@ -53,7 +58,7 @@ export function ConfirmDialog({
         if (e.target === e.currentTarget) onOpenChange(false);
       }}
     >
-      <div className="flex w-full max-w-xl flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-card">
+      <div className="motion-zoom-in flex w-full max-w-xl flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-card">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div
@@ -96,6 +101,7 @@ export function ConfirmDialog({
             {cancelLabel}
           </Button>
           <Button
+            ref={confirmRef}
             type="button"
             variant={destructive ? "destructive" : "default"}
             onClick={onConfirm}

@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Cake, Loader2, UserCheck, UserMinus, UserPlus, Users } from "lucide-react";
+import { Cake, UserCheck, UserMinus, UserPlus, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Skeleton } from "~/components/ui/skeleton";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -16,11 +17,7 @@ function DashboardPage() {
   });
 
   if (isLoading || !data) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center gap-2 text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" /> Wird geladen…
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   const cards = [
@@ -193,6 +190,51 @@ function BarList({ rows }: { rows: Array<{ label: string; value: number }> }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-6" aria-busy="true" aria-live="polite">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-7 w-44" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <Card key={i}>
+            <CardContent className="flex items-center justify-between p-5">
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-8 w-16" />
+              </div>
+              <Skeleton className="size-10 rounded-xl" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {[0, 1].map((card) => (
+          <Card key={card}>
+            <CardHeader>
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="mt-2 h-3 w-56" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-3">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-2.5 flex-1 rounded-full" />
+                    <Skeleton className="h-3 w-8" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
   );
 }
 

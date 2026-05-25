@@ -249,7 +249,7 @@ export function CommandPalette({ role }: { role: Role }) {
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismisses on click; keyboard users dismiss via Escape handled by the global keydown listener above.
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[10vh]"
+      className="motion-fade-in fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[10vh]"
       onClick={(e) => {
         if (e.target === e.currentTarget) setOpen(false);
       }}
@@ -257,7 +257,7 @@ export function CommandPalette({ role }: { role: Role }) {
       aria-modal="true"
       aria-label="Befehlspalette"
     >
-      <div className="flex w-full max-w-xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card">
+      <div className="motion-zoom-in flex w-full max-w-xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card">
         <div className="flex items-center gap-2 border-b border-border px-3">
           <Search className="size-4 text-muted-foreground" />
           <input

@@ -103,7 +103,7 @@ function ToastItem({ toast: t, onDismiss }: { toast: Toast; onDismiss: () => voi
   return (
     <div
       className={cn(
-        "pointer-events-auto flex items-start gap-3 rounded-lg border p-3 shadow-card transition-all",
+        "pointer-events-auto motion-slide-in-right flex items-start gap-3 rounded-lg border p-3 shadow-card transition-all",
         tone,
       )}
       role="status"

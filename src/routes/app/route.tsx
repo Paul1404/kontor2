@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import {
+  CatchBoundary,
+  createFileRoute,
+  Outlet,
+  redirect,
+  useRouterState,
+} from "@tanstack/react-router";
 import { AppShell } from "~/components/layout/AppShell";
+import { ErrorPanel, NotFoundPanel } from "~/components/layout/ErrorPanel";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app")({
@@ -15,6 +22,16 @@ export const Route = createFileRoute("/app")({
     }
   },
   component: AppLayout,
+  errorComponent: ({ error, reset }) => (
+    <div className="flex min-h-[60vh] items-center justify-center p-4">
+      <ErrorPanel error={error} reset={reset} />
+    </div>
+  ),
+  notFoundComponent: () => (
+    <div className="flex min-h-[60vh] items-center justify-center p-4">
+      <NotFoundPanel />
+    </div>
+  ),
 });
 
 function AppLayout() {
@@ -25,6 +42,9 @@ function AppLayout() {
     queryFn: () => orpc.auth.me(),
     retry: false,
   });
+  // Reset the catch boundary on every navigation so a failed page doesn't
+  // remain in the error state after the user moves elsewhere.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   if (me.isLoading || !me.data) {
     return (
@@ -36,7 +56,16 @@ function AppLayout() {
 
   return (
     <AppShell role={me.data.role} userEmail={me.data.email}>
-      <Outlet />
+      <CatchBoundary
+        getResetKey={() => pathname}
+        errorComponent={({ error, reset }) => (
+          <div className="flex min-h-[60vh] items-center justify-center">
+            <ErrorPanel error={error} reset={reset} />
+          </div>
+        )}
+      >
+        <Outlet />
+      </CatchBoundary>
     </AppShell>
   );
 }
