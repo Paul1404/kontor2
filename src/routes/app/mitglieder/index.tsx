@@ -48,6 +48,7 @@ type MembersSearch = {
   status: Status;
   abteilungId: string | null;
   includeAusgetretene: boolean;
+  orphanOnly: boolean;
   page: number;
   sortBy: SortBy;
   sortDir: SortDir;
@@ -61,6 +62,7 @@ const EMPTY_SEARCH: MembersSearch = {
   status: "aktiv",
   abteilungId: null,
   includeAusgetretene: false,
+  orphanOnly: false,
   page: 1,
   sortBy: "nachname",
   sortDir: "asc",
@@ -81,6 +83,7 @@ export const Route = createFileRoute("/app/mitglieder/")({
       status,
       abteilungId: typeof s.abteilungId === "string" && s.abteilungId ? s.abteilungId : null,
       includeAusgetretene: s.includeAusgetretene === true || s.includeAusgetretene === "true",
+      orphanOnly: s.orphanOnly === true || s.orphanOnly === "true",
       page: Number.isFinite(pageNum) && pageNum >= 1 ? Math.floor(pageNum) : 1,
       sortBy,
       sortDir,
@@ -144,7 +147,11 @@ function MembersListPage() {
   usePageShortcut("n", canEdit ? () => navigate({ to: "/app/mitglieder/neu" }) : null);
 
   const hasFilter =
-    !!search.q || search.status !== "aktiv" || !!search.abteilungId || search.includeAusgetretene;
+    !!search.q ||
+    search.status !== "aktiv" ||
+    !!search.abteilungId ||
+    search.includeAusgetretene ||
+    search.orphanOnly;
 
   const abteilungName = search.abteilungId
     ? abteilungen.data?.find((a) => a.id === search.abteilungId)?.name
@@ -243,6 +250,20 @@ function MembersListPage() {
             />
             <span className="text-muted-foreground">Ausgetretene anzeigen</span>
           </label>
+          {me.data?.role === "admin" ? (
+            <label
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm shadow-soft"
+              title="Kontakte ohne Mitgliedsnummer und ohne jegliche Beziehung"
+            >
+              <input
+                type="checkbox"
+                checked={search.orphanOnly}
+                onChange={(e) => updateSearch({ orphanOnly: e.target.checked })}
+                className="size-4 accent-primary"
+              />
+              <span className="text-muted-foreground">Nur verwaiste Kontakte</span>
+            </label>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -274,6 +295,12 @@ function MembersListPage() {
             <FilterChip
               label="inkl. Ausgetretene"
               onRemove={() => updateSearch({ includeAusgetretene: false })}
+            />
+          ) : null}
+          {search.orphanOnly ? (
+            <FilterChip
+              label="Verwaiste Kontakte"
+              onRemove={() => updateSearch({ orphanOnly: false })}
             />
           ) : null}
           <button

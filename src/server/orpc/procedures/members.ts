@@ -31,6 +31,7 @@ const ListInput = v.object({
   status: v.optional(StatusSchema, "aktiv"),
   abteilungId: v.optional(v.nullable(v.string()), null),
   includeAusgetretene: v.optional(v.boolean(), false),
+  orphanOnly: v.optional(v.boolean(), false),
   page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
   pageSize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
   sortBy: v.optional(SortBySchema, "nachname"),
@@ -195,6 +196,20 @@ export const membersRouter = {
 
     // Hide soft-deleted members from the normal list view.
     conditions.push(isNull(membersTable.deletedAt) as never);
+
+    // "Verwaiste Kontakte" filter: Kontakt (no mitglnr) AND no relationship
+    // pointing to or from this row. Used by admins to find Linear-import
+    // leftovers.
+    if (input.orphanOnly) {
+      conditions.push(isNull(membersTable.mitglnr) as never);
+      conditions.push(
+        sql`not exists (
+          select 1 from ${relationshipsTable}
+          where ${relationshipsTable.fromMemberId} = ${membersTable.id}
+             or ${relationshipsTable.toMemberId} = ${membersTable.id}
+        )` as never,
+      );
+    }
 
     if (input.q.trim()) {
       const like = `%${input.q.trim()}%`;
@@ -441,6 +456,14 @@ export const membersRouter = {
       const role = (context.session?.user.role as string | undefined) ?? "readonly";
       const visibleAudit = role === "readonly" ? [] : audit;
 
+      // Count of incoming relationships (others who point at this member)
+      // — needed alongside outgoing `beziehungen` to detect orphan
+      // Kontakts: a Kontakt without ANY relationship is dead data.
+      const [incoming] = await context.db
+        .select({ c: count() })
+        .from(relationshipsTable)
+        .where(eq(relationshipsTable.toMemberId, m.id));
+
       return {
         member: stamm,
         abteilungen,
@@ -455,6 +478,7 @@ export const membersRouter = {
         })),
         audit: visibleAudit,
         beziehungen,
+        incomingBeziehungenCount: incoming?.c ?? 0,
         sollstellungen,
       };
     }),

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ChevronDown, Contact, Pencil, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, Contact, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AbteilungenCard } from "~/components/forms/AbteilungenCard";
 import { AttachmentsCard } from "~/components/forms/AttachmentsCard";
@@ -108,8 +108,23 @@ function MemberDetailPage() {
     );
   }
 
-  const { member, abteilungen, vertraege, sepa, anhaenge, audit, beziehungen, sollstellungen } =
-    detail.data;
+  const {
+    member,
+    abteilungen,
+    vertraege,
+    sepa,
+    anhaenge,
+    audit,
+    beziehungen,
+    incomingBeziehungenCount,
+    sollstellungen,
+  } = detail.data;
+  // Kontakt = no Mitgliedsnummer. The data-model rule is that every
+  // such row exists *because* something/someone references it. Zero
+  // relationships in either direction means this row is leftover from
+  // the Linear import and should either get linked up or deleted.
+  const isOrphanKontakt =
+    !member.mitglnr && beziehungen.length === 0 && incomingBeziehungenCount === 0;
 
   // Prefer the IBAN-derived bank name/BIC over the stored values — those
   // were free-text in Linear and don't always match the actual BLZ.
@@ -214,6 +229,28 @@ function MemberDetailPage() {
         loading={softDelete.isPending}
         onConfirm={() => softDelete.mutate(member.id)}
       />
+
+      {isOrphanKontakt ? (
+        <div className="flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+          <div className="flex flex-col gap-1">
+            <p className="font-medium text-foreground">Verwaister Kontakt</p>
+            <p className="text-muted-foreground">
+              Dieser Eintrag hat keine Mitgliedsnummer und keine verknüpften Beziehungen. Kontakte
+              sollten immer einem Mitglied über eine Beziehung zugeordnet sein – sonst sind sie
+              vermutlich Altlasten aus dem Linear-Import.
+            </p>
+            {canEdit && me.data?.role === "admin" ? (
+              <Link
+                to="/app/admin/erweitert"
+                className="text-xs text-warning underline-offset-2 hover:underline"
+              >
+                Im Adminbereich aufräumen →
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">

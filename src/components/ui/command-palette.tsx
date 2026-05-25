@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   Building2,
   Coins,
   FileBarChart,
@@ -85,6 +86,14 @@ const NAV_COMMANDS: NavCommand[] = [
     label: "Snapshots & Wiederherstellung",
     icon: <History className="size-4" />,
     path: "/app/admin/snapshots",
+    needs: ["admin"],
+  },
+  {
+    kind: "nav",
+    id: "danger-zone",
+    label: "Adminbereich (Gefahrenzone)",
+    icon: <AlertTriangle className="size-4" />,
+    path: "/app/admin/erweitert",
     needs: ["admin"],
   },
   {
