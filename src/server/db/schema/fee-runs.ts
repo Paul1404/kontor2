@@ -23,6 +23,13 @@ export const feeRunStatusEnum = pgEnum("fee_run_status", [
   "cancelled",
 ]);
 
+/**
+ * Provenance marker on `fee_runs` / `soll_stellungen`. `app` is the in-app
+ * lifecycle; `linear_import` rows arrive from a Linear Webverein dump and
+ * exist mostly for historical reference (no fresh XML, no re-debit path).
+ */
+export const feeRunSourceEnum = pgEnum("fee_run_source", ["app", "linear_import"]);
+
 export const sepaSequenceTypeEnum = pgEnum("sepa_sequence_type", ["FRST", "RCUR", "OOFF", "FNAL"]);
 
 export const sollStellungStatusEnum = pgEnum("soll_stellung_status", [
@@ -55,6 +62,13 @@ export const feeRunsTable = pgTable(
     xmlFilename: text("xml_filename"),
     xmlContent: text("xml_content"),
     notes: text("notes"),
+    /** Provenance. `linear_import` rows aren't editable / re-submittable. */
+    source: feeRunSourceEnum("source").notNull().default("app"),
+    /**
+     * Linear `lastprot.GUID` for imported runs. Natural key for idempotent
+     * re-import; null for app-created rows.
+     */
+    linearGuid: text("linear_guid"),
     createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     committedAt: timestamp("committed_at", { withTimezone: true }),
@@ -66,6 +80,7 @@ export const feeRunsTable = pgTable(
     index("fee_runs_year_idx").on(t.billingYear),
     index("fee_runs_status_idx").on(t.status),
     index("fee_runs_created_idx").on(t.createdAt),
+    uniqueIndex("fee_runs_linear_guid_uk").on(t.linearGuid),
   ],
 );
 
@@ -145,6 +160,14 @@ export const sollStellungenTable = pgTable(
     // deleted with its fee_run; we keep this as a historical hint only.
     lastFeeRunItemId: uuid("last_fee_run_item_id"),
     notes: text("notes"),
+    /** Provenance. `linear_import` rows mirror Linear's `mgsolln`. */
+    source: feeRunSourceEnum("source").notNull().default("app"),
+    /**
+     * Linear `mgsolln.GUID`. We aggregate multiple Linear rows (one per
+     * `Zeitraum`) into a single Sollstellung; this stores the first row's
+     * GUID and serves as the join key against `lastprots.SollGUID`.
+     */
+    linearGuid: text("linear_guid"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -152,6 +175,7 @@ export const sollStellungenTable = pgTable(
     uniqueIndex("soll_stellungen_contract_year_uk").on(t.contractId, t.billingYear),
     index("soll_stellungen_member_idx").on(t.memberId),
     index("soll_stellungen_status_idx").on(t.status),
+    index("soll_stellungen_linear_guid_idx").on(t.linearGuid),
   ],
 );
 

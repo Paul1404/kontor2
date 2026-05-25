@@ -4,6 +4,7 @@ import * as v from "valibot";
 import { membersTable } from "~/server/db/schema/members";
 import { memberSnapshotsTable, snapshotRunsTable } from "~/server/db/schema/snapshots";
 import { runIngest } from "~/server/importer/ingest-pipeline";
+import type { LinearRow } from "~/server/importer/linear-mapper";
 import { parseDump, rowToDict } from "~/server/importer/sql-tokenizer";
 import { adminProc } from "~/server/orpc/base";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
@@ -35,21 +36,24 @@ export const importRouter = {
       }
       const dump = parseDump(text);
 
-      const members = (dump.rows.adresse ?? []).map((r) =>
-        rowToDict(dump.columns.adresse ?? [], r),
-      );
-      const feeTypes = (dump.rows.mgart ?? []).map((r) => rowToDict(dump.columns.mgart ?? [], r));
-      const contracts = (dump.rows.mgvert ?? []).map((r) =>
-        rowToDict(dump.columns.mgvert ?? [], r),
-      );
-      const sepa = (dump.rows.adrsepa ?? []).map((r) => rowToDict(dump.columns.adrsepa ?? [], r));
-      const relationships = (dump.rows.verkn ?? []).map((r) =>
-        rowToDict(dump.columns.verkn ?? [], r),
-      );
-      const inter = (dump.rows.inter ?? []).map((r) => rowToDict(dump.columns.inter ?? [], r));
-      const interes = (dump.rows.interes ?? []).map((r) =>
-        rowToDict(dump.columns.interes ?? [], r),
-      );
+      const dictOf = (table: string): LinearRow[] =>
+        (dump.rows[table] ?? []).map((r) => rowToDict(dump.columns[table] ?? [], r));
+
+      const members = dictOf("adresse");
+      const feeTypes = dictOf("mgart");
+      const contracts = dictOf("mgvert");
+      const sepa = dictOf("adrsepa");
+      const relationships = dictOf("verkn");
+      const inter = dictOf("inter");
+      const interes = dictOf("interes");
+      const mgsolln = dictOf("mgsolln");
+      const mgartdat = dictOf("mgartdat");
+      const sportarten = dictOf("sportarten");
+      const fachverbaende = dictOf("fachverbaende");
+      const lastprot = dictOf("lastprot");
+      const lastproth = dictOf("lastproth");
+      const lastprots = dictOf("lastprots");
+      const lastprotsh = dictOf("lastprotsh");
 
       if (
         members.length +
@@ -57,7 +61,13 @@ export const importRouter = {
           contracts.length +
           sepa.length +
           relationships.length +
-          interes.length ===
+          interes.length +
+          mgsolln.length +
+          mgartdat.length +
+          sportarten.length +
+          fachverbaende.length +
+          lastprot.length +
+          lastproth.length ===
         0
       ) {
         throw new ORPCError("BAD_REQUEST", {
@@ -148,6 +158,14 @@ export const importRouter = {
         relationships,
         inter,
         interes,
+        mgsolln,
+        mgartdat,
+        sportarten,
+        fachverbaende,
+        lastprot,
+        lastproth,
+        lastprots,
+        lastprotsh,
         requestId: context.requestId,
         forceOverwriteAbteilungLinks: input.forceOverwriteAbteilungLinks,
       });

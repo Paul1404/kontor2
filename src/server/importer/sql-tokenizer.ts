@@ -16,6 +16,15 @@ export const SUPPORTED_TABLES = new Set([
   "verkn",
   "inter",
   "interes",
+  // Phase 2: historical / lookup tables surfaced for archival + reporting.
+  "mgsolln",
+  "mgartdat",
+  "sportarten",
+  "fachverbaende",
+  "lastprot",
+  "lastproth",
+  "lastprots",
+  "lastprotsh",
 ]);
 
 const ESCAPES: Record<string, string> = {
