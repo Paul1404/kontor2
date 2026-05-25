@@ -390,6 +390,7 @@ export const feeRunsRouter = {
         returnReasonCode: feeRunItemsTable.returnReasonCode,
         memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
         mitglnr: membersTable.mitglnr,
+        adrNr: membersTable.adrNr,
         artName: contractsTable.artName,
       })
       .from(feeRunItemsTable)

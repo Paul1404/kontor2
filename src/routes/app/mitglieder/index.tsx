@@ -344,19 +344,37 @@ function MembersListPage() {
               ) : (
                 (list.data?.rows ?? []).map((row) => {
                   const m = row as MemberRow;
+                  const isKontakt = !m.mitglnr;
                   return (
                     <tr key={m.id} className="transition-colors hover:bg-muted/30">
                       <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                        {m.mitglnr ?? "-"}
+                        {m.mitglnr ?? (
+                          <span
+                            className="text-muted-foreground/60"
+                            title="Kein Mitglied – nur Zahler/Kontakt"
+                          >
+                            —
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
-                        <Link
-                          to="/app/mitglieder/$mitgliedsnummer"
-                          params={{ mitgliedsnummer: m.mitglnr ?? String(m.adrNr) }}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {[m.nachname, m.vorname].filter(Boolean).join(", ")}
-                        </Link>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            to="/app/mitglieder/$mitgliedsnummer"
+                            params={{ mitgliedsnummer: m.mitglnr ?? String(m.adrNr) }}
+                            className="font-medium text-primary hover:underline"
+                          >
+                            {[m.nachname, m.vorname].filter(Boolean).join(", ")}
+                          </Link>
+                          {isKontakt ? (
+                            <Badge
+                              variant="outline"
+                              title="Zahlt für ein Mitglied, ist aber selbst keines"
+                            >
+                              Kontakt
+                            </Badge>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-4 py-3">{[m.plz, m.ort].filter(Boolean).join(" ")}</td>
                       <td className="px-4 py-3 text-muted-foreground">{m.email ?? ""}</td>

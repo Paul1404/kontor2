@@ -148,10 +148,11 @@ function DashboardPage() {
                 <li key={b.id} className="flex items-center justify-between py-2">
                   <Link
                     to="/app/mitglieder/$mitgliedsnummer"
-                    params={{ mitgliedsnummer: b.mitglnr ?? "" }}
+                    params={{ mitgliedsnummer: b.mitglnr ?? String(b.adrNr) }}
                     className="hover:underline"
                   >
-                    {[b.vorname, b.nachname].filter(Boolean).join(" ") || `#${b.mitglnr ?? "?"}`}
+                    {[b.vorname, b.nachname].filter(Boolean).join(" ") ||
+                      (b.mitglnr ? `#${b.mitglnr}` : `AdrNr ${b.adrNr}`)}
                   </Link>
                   <span className="text-muted-foreground tabular-nums">
                     {formatDate(b.nextBirthday)} · wird {b.turns}

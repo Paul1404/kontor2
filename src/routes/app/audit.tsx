@@ -291,6 +291,7 @@ type AuditRowData = {
   target: {
     memberId: string;
     mitglnr: string | null;
+    adrNr: number;
     vorname: string | null;
     nachname: string | null;
   } | null;
@@ -323,13 +324,15 @@ function AuditRow({ row }: { row: AuditRowData }) {
             {row.target ? (
               <Link
                 to="/app/mitglieder/$mitgliedsnummer"
-                params={{ mitgliedsnummer: row.target.mitglnr ?? row.target.memberId }}
+                params={{
+                  mitgliedsnummer: row.target.mitglnr ?? String(row.target.adrNr),
+                }}
                 onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center gap-1 text-primary hover:underline"
               >
                 {targetName}
                 <span className="text-xs text-muted-foreground tabular-nums">
-                  ({row.target.mitglnr ?? "—"})
+                  ({row.target.mitglnr ?? `AdrNr ${row.target.adrNr}`})
                 </span>
                 <ExternalLink className="size-3" />
               </Link>

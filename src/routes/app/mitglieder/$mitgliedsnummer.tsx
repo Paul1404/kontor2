@@ -127,13 +127,27 @@ function MemberDetailPage() {
           >
             <ArrowLeft className="size-4" /> Zurück zur Liste
           </Link>
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+          <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
             {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")}
+            {!member.mitglnr ? (
+              <Badge variant="outline" title="Zahlt für ein Mitglied, ist aber selbst keines">
+                Kontakt
+              </Badge>
+            ) : null}
           </h1>
           <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-            Mitgliedsnummer: <span className="tabular-nums">{member.mitglnr}</span>
-            <CopyButton value={member.mitglnr} label="Mitgliedsnummer" />
-            <span className="text-muted-foreground/50">·</span>
+            {member.mitglnr ? (
+              <>
+                Mitgliedsnummer: <span className="tabular-nums">{member.mitglnr}</span>
+                <CopyButton value={member.mitglnr} label="Mitgliedsnummer" />
+                <span className="text-muted-foreground/50">·</span>
+              </>
+            ) : (
+              <>
+                Kein Mitglied – nur Zahler/Kontakt
+                <span className="text-muted-foreground/50">·</span>
+              </>
+            )}
             <span>AdrNr {member.adrNr}</span>
           </p>
         </div>

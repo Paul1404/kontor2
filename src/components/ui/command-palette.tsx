@@ -131,7 +131,8 @@ const NAV_COMMANDS: NavCommand[] = [
 
 type MemberHit = {
   id: string;
-  mitglnr: string;
+  mitglnr: string | null;
+  adrNr: number;
   vorname: string | null;
   nachname: string | null;
   ort: string | null;
@@ -212,7 +213,7 @@ export function CommandPalette({ role }: { role: Role }) {
         setOpen(false);
         navigate({
           to: "/app/mitglieder/$mitgliedsnummer",
-          params: { mitgliedsnummer: hit.mitglnr },
+          params: { mitgliedsnummer: hit.mitglnr ?? String(hit.adrNr) },
         });
       }
       return;
@@ -307,7 +308,7 @@ export function CommandPalette({ role }: { role: Role }) {
                         key={hit.id}
                         icon={<Users className="size-4" />}
                         label={name}
-                        sublabel={`#${hit.mitglnr}${hit.ort ? ` · ${hit.ort}` : ""}`}
+                        sublabel={`${hit.mitglnr ? `#${hit.mitglnr}` : "Kontakt"}${hit.ort ? ` · ${hit.ort}` : ""}`}
                         active={i === highlight}
                         onMouseEnter={() => setHighlight(i)}
                         onClick={() => executeAt(i)}
