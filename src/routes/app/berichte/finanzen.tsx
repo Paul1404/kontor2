@@ -4,6 +4,7 @@ import { Coins, Download, Loader2, Printer } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { InfoBox } from "~/components/ui/info-box";
 import { triggerDownload } from "~/lib/download";
 import { formatCurrency } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -45,6 +46,33 @@ function FinanzenPage() {
           </Button>
         </div>
       </div>
+
+      <InfoBox
+        className="print:hidden"
+        collapsible
+        defaultOpen={false}
+        title="Wie liest sich der Bericht?"
+      >
+        <ul className="space-y-1">
+          <li>
+            <strong>Soll</strong>: Summe aller Sollstellungen, die im gewählten Jahr fällig geworden
+            sind. Sollstellungen entstehen aus Beitragsläufen.
+          </li>
+          <li>
+            <strong>Bezahlt</strong>: Bereits ausgeglichene Sollstellungen (volle und teilweise
+            Zahlungen).
+          </li>
+          <li>
+            <strong>Offen</strong>: Differenz aus Soll und Bezahlt. Diese Posten erscheinen unter{" "}
+            <em>Forderungen</em> und sind Kandidaten für Mahnungen.
+          </li>
+        </ul>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Die Zahlen werden live aus den Sollstellungen ermittelt, es gibt keinen Buchungslauf
+          dazwischen. Stornierte Beitragsläufe fließen nicht in das Soll ein. CSV-Export eignet sich
+          für die Jahresabschluss-Buchhaltung.
+        </p>
+      </InfoBox>
 
       <Card className="print:hidden">
         <CardContent className="flex flex-wrap items-center gap-3 p-4">

@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, Loader2, UserPlus, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, Loader2, ShieldCheck, UserPlus, Users, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { orpc } from "~/lib/orpc";
@@ -57,6 +58,38 @@ function UsersPage() {
           Einladungen und Rollen für Mitarbeiter im Vorstand und Admin-Team.
         </p>
       </div>
+
+      <InfoBox title="Welche Rolle bekommt wer?" collapsible defaultOpen={false}>
+        <ul className="space-y-2">
+          <li className="flex items-start gap-2">
+            <Eye className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <span>
+              <strong>Readonly</strong>: Sieht Mitglieder, Berichte und Forderungen. Kann nichts
+              ändern. Geeignet für Trainer oder Abteilungsleiter, die nur Listen einsehen wollen.
+            </span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Users className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <span>
+              <strong>Vorstand</strong>: Operatives Tagesgeschäft. Mitglieder anlegen und
+              bearbeiten, Beitrags- und Mahnläufe starten, Portal-Anfragen freigeben, Berichte
+              exportieren. Keine Stamm- und Systemeinstellungen.
+            </span>
+          </li>
+          <li className="flex items-start gap-2">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <span>
+              <strong>Admin</strong>: Vorstand-Rechte plus Vereinsdaten, SMTP, Beitragsarten,
+              Abteilungen, Benutzer-Rollen, Snapshots und der Adminbereich (Restore, endgültiges
+              Löschen, Wipe). Es muss immer mindestens ein Admin existieren.
+            </span>
+          </li>
+        </ul>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Rollenwechsel wirken sofort beim nächsten Request. Bestehende Sessions bleiben aktiv, aber
+          Berechtigungen werden serverseitig pro Aufruf geprüft.
+        </p>
+      </InfoBox>
 
       <Card>
         <CardHeader>

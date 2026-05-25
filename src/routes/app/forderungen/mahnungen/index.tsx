@@ -4,6 +4,7 @@ import { ArrowLeft, Plus } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { InfoBox } from "~/components/ui/info-box";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -37,6 +38,32 @@ function MahnungenListPage() {
           </Button>
         </Link>
       </div>
+
+      <InfoBox title="So läuft ein Mahnlauf ab" collapsible defaultOpen={false}>
+        <ol className="ml-4 list-decimal space-y-1">
+          <li>
+            <strong>Stufe wählen</strong>: Erinnerung, 1. Mahnung oder 2. Mahnung. Für die nächste
+            Stufe muss die vorherige bereits gelaufen sein.
+          </li>
+          <li>
+            <strong>Vorschau</strong>: Es werden alle Mitglieder gelistet, die für die gewählte
+            Stufe in Frage kommen. Mahngesperrte Mitglieder werden übersprungen.
+          </li>
+          <li>
+            <strong>Empfänger auswählen</strong>: Standardmäßig sind alle ausgewählt. Einzelne
+            können abgewählt werden, etwa wenn vorab telefonisch geklärt.
+          </li>
+          <li>
+            <strong>Abschicken</strong>: Der Lauf erzeugt PDFs pro Empfänger, schreibt die Mahnstufe
+            und Mahngebühr auf den Sollstellungen fort und legt einen Eintrag im Audit an. Versand
+            der PDFs erfolgt manuell (Druck oder E-Mail).
+          </li>
+        </ol>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Ein erstellter Lauf lässt sich im Detail stornieren. Dann werden Mahnstufe und Gebühr auf
+          den betroffenen Posten zurückgesetzt.
+        </p>
+      </InfoBox>
 
       <Card>
         <CardHeader>

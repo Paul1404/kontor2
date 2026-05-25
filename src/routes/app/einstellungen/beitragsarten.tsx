@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { formatCurrency } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -128,6 +129,24 @@ function BeitragsartenSettingsPage() {
           </Button>
         ) : null}
       </div>
+
+      <InfoBox title="Was ist eine Beitragsart?" collapsible defaultOpen={false}>
+        <p>
+          Eine Beitragsart ist eine wiederkehrende Beitragsposition, die einem Mitglied per Vertrag
+          zugeordnet wird. Beispiele: <em>Erwachsene</em>, <em>Jugend</em>, <em>Familie</em>,{" "}
+          <em>Passiv</em>, <em>Tennisabteilung</em>.
+        </p>
+        <p className="mt-2">
+          Jede Beitragsart hat einen Betrag, eine Sollstellungsregel, einen Verwendungszweck und
+          optional eine Abteilung. Beim Anlegen eines Beitragslaufs greift das System auf die hier
+          hinterlegten Werte zurück.
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Inaktive Arten erscheinen in keiner neuen Beitragsabrechnung mehr, bestehende Verträge mit
+          dieser Art bleiben aber bestehen. <span className="font-mono">mgart</span> ist der
+          Schlüssel in Linear Webverein und wird beim Import erhalten.
+        </p>
+      </InfoBox>
 
       {adding || editingArt != null ? (
         <Card>

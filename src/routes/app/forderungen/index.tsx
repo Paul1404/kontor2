@@ -13,6 +13,7 @@ import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { InfoBox } from "~/components/ui/info-box";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -38,7 +39,8 @@ function ForderungenPage() {
       setSelected(new Set());
       qc.invalidateQueries({ queryKey: ["dunning.open"] });
     },
-    onError: (e: Error) => toast.error("Konnte nicht aktualisiert werden", { description: e.message }),
+    onError: (e: Error) =>
+      toast.error("Konnte nicht aktualisiert werden", { description: e.message }),
   });
 
   function toggle(id: string) {
@@ -79,6 +81,31 @@ function ForderungenPage() {
           </Link>
         </div>
       </div>
+
+      <InfoBox title="Was bedeuten die Mahnstufen?" collapsible defaultOpen={false}>
+        <ul className="space-y-1">
+          <li>
+            <strong>Noch nicht gemahnt (0)</strong>: Posten ist fällig oder überfällig, wurde aber
+            noch nicht angemahnt.
+          </li>
+          <li>
+            <strong>1. Erinnerung</strong>: Freundlicher Hinweis, in der Standardkonfiguration ohne
+            Gebühr.
+          </li>
+          <li>
+            <strong>1. Mahnung</strong>: Erste formelle Mahnung mit Mahngebühr.
+          </li>
+          <li>
+            <strong>2. Mahnung</strong>: Letzte Mahnstufe vor weiteren Schritten, höhere Mahngebühr.
+          </li>
+        </ul>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Über <em>Neue Mahnungen</em> erstellen Sie einen Mahnlauf. Vorgemerkte Empfänger werden
+          vorher angezeigt, die Stufe wird erst beim Abschicken angehoben. SEPA-Rückläufer
+          erscheinen mit eigener R-Gebühr und können hier sofort als bezahlt markiert werden, wenn
+          das Mitglied überwiesen hat.
+        </p>
+      </InfoBox>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
@@ -210,9 +237,7 @@ function ForderungenPage() {
                               />
                               <span className="tabular-nums">{p.billingYear}</span>
                               <span>fällig {formatDate(p.falligkeitsdatum)}</span>
-                              <span className="tabular-nums">
-                                {formatCurrency(p.openAmount)}
-                              </span>
+                              <span className="tabular-nums">{formatCurrency(p.openAmount)}</span>
                               {Number(p.rueckgebuhr) > 0 ? (
                                 <span className="tabular-nums text-warning">
                                   + {formatCurrency(p.rueckgebuhr)} R-Geb.

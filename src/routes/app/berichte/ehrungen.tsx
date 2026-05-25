@@ -4,6 +4,7 @@ import { Download, Loader2, Printer, Trophy } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { InfoBox } from "~/components/ui/info-box";
 import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -42,7 +43,8 @@ function EhrungenPage() {
             <Trophy className="size-6 text-brand" /> Ehrungen
           </h1>
           <p className="text-sm text-muted-foreground">
-            Mitglieder mit anstehendem Jubiläum im gewählten Jahr.
+            Mitglieder mit anstehendem Vereinsjubiläum (25, 40, 50 Jahre und mehr) im gewählten
+            Jahr.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -54,6 +56,24 @@ function EhrungenPage() {
           </Button>
         </div>
       </div>
+
+      <InfoBox
+        className="print:hidden"
+        collapsible
+        defaultOpen={false}
+        title="Was wird hier gelistet?"
+      >
+        <p>
+          Es geht um <strong>Vereinsjubiläen</strong>, nicht um Geburtstage. Grundlage ist das
+          Eintrittsdatum: Ein Mitglied mit Eintritt 1975 hat im Jahr 2025 sein 50-jähriges
+          Vereinsjubiläum. Geburtstage finden Sie unter <em>Geburtstage</em>.
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Die Schalter oben filtern, welche Jubiläumsjahre berücksichtigt werden. Standardmäßig sind
+          alle aktiv. CSV-Export ist für die Erstellung von Urkunden und die Übergabe an die
+          Geehrten-Verwaltung gedacht.
+        </p>
+      </InfoBox>
 
       <Card className="print:hidden">
         <CardContent className="flex flex-wrap items-center gap-4 p-4">

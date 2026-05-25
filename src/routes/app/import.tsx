@@ -4,6 +4,7 @@ import { CheckCircle2, Loader2, Upload, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { InfoBox } from "~/components/ui/info-box";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/import")({
@@ -46,6 +47,35 @@ function ImportPage() {
           SQL-Dump (mysqldump-Format) hochladen. Maximalgröße 50 MB.
         </p>
       </div>
+
+      <InfoBox title="So läuft der Import" collapsible defaultOpen={false}>
+        <ol className="ml-4 list-decimal space-y-1">
+          <li>
+            <strong>Export aus Linear Webverein</strong>: In Linear Webverein einen mysqldump-Export
+            erstellen. Die <span className="font-mono">.sql</span>-Datei muss mindestens die
+            Tabellen für Mitglieder, Adressen, Verträge, SEPA-Mandate und Abteilungen enthalten.
+          </li>
+          <li>
+            <strong>Snapshot vor Import</strong>: Vor dem ersten Schreibzugriff wird ein
+            vollständiger Snapshot aller Mitglieder abgelegt. Im Fehlerfall lässt sich der Zustand
+            vor dem Import unter <em>Snapshots</em> wieder herstellen.
+          </li>
+          <li>
+            <strong>Normalisieren</strong>: Linear-Daten werden in das Schema dieser Anwendung
+            überführt. Stammdaten, Verträge und SEPA-Mandate werden grundsätzlich überschrieben.
+            Abteilungs-Zuordnungen nur, wenn das entsprechende Häkchen gesetzt ist.
+          </li>
+          <li>
+            <strong>Ergebnisbericht</strong>: Nach dem Import wird angezeigt, wie viele Mitglieder
+            neu, aktualisiert oder fehlerhaft waren. Inkonsistenzen erscheinen im Audit-Log.
+          </li>
+        </ol>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Der Import ist idempotent in Bezug auf Stammdaten. Mehrfaches Hochladen desselben Dumps
+          führt nicht zu Duplikaten. Nicht in Linear vorhandene Mitglieder bleiben in dieser
+          Anwendung erhalten.
+        </p>
+      </InfoBox>
 
       <Card>
         <CardHeader>
