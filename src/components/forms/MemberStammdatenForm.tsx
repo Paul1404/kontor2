@@ -223,7 +223,7 @@ export function MemberStammdatenForm({
           <CardHeader>
             <CardTitle>Stammdaten</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
+          <CardContent className="grid grid-cols-1 gap-x-4 gap-y-4 text-sm sm:grid-cols-2">
             {mitglnrInput ? (
               <FormField label="Mitgliedsnummer (leer = automatisch)">
                 <Input
@@ -439,7 +439,7 @@ export function MemberStammdatenForm({
         </div>
       ) : null}
 
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
         <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
           <X className="size-4" /> Abbrechen
         </Button>
@@ -462,7 +462,7 @@ function FormField({
   full?: boolean;
 }) {
   return (
-    <div className={`flex flex-col gap-1.5 ${full ? "col-span-2" : ""}`}>
+    <div className={`flex flex-col gap-1.5 ${full ? "sm:col-span-2" : ""}`}>
       <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>
       {children}
     </div>
