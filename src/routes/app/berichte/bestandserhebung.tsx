@@ -19,7 +19,16 @@ export const Route = createFileRoute("/app/berichte/bestandserhebung")({
   component: BestandserhebungPage,
 });
 
-const AGE_BUCKETS = ["0-6", "7-14", "15-18", "19-26", "27-40", "41-60", "61+", "unbekannt"] as const;
+const AGE_BUCKETS = [
+  "0-6",
+  "7-14",
+  "15-18",
+  "19-26",
+  "27-40",
+  "41-60",
+  "61+",
+  "unbekannt",
+] as const;
 
 function defaultStichtag(): string {
   const now = new Date();
@@ -67,7 +76,10 @@ function BestandserhebungPage() {
 
   const cellMap = new Map<string, number>();
   for (const c of data.data?.cells ?? []) {
-    cellMap.set(`${c.abteilungId}|${c.ageBucket}`, (cellMap.get(`${c.abteilungId}|${c.ageBucket}`) ?? 0) + c.count);
+    cellMap.set(
+      `${c.abteilungId}|${c.ageBucket}`,
+      (cellMap.get(`${c.abteilungId}|${c.ageBucket}`) ?? 0) + c.count,
+    );
   }
 
   return (
@@ -110,7 +122,8 @@ function BestandserhebungPage() {
             />
           </div>
           <div className="ml-auto text-sm text-muted-foreground">
-            Mitglieder gesamt: <span className="font-semibold text-foreground">{data.data?.grandTotal ?? 0}</span>
+            Mitglieder gesamt:{" "}
+            <span className="font-semibold text-foreground">{data.data?.grandTotal ?? 0}</span>
           </div>
         </CardContent>
       </Card>
@@ -243,9 +256,7 @@ function BestandserhebungPage() {
               </Button>
             </div>
             {archive.isError ? (
-              <div className="text-xs text-destructive">
-                {(archive.error as Error).message}
-              </div>
+              <div className="text-xs text-destructive">{(archive.error as Error).message}</div>
             ) : null}
             {archive.isSuccess ? (
               <div className="text-xs text-success">

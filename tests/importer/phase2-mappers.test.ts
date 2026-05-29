@@ -146,7 +146,7 @@ describe("mapLastProtRow", () => {
         Benutzer: "Kassier",
         GUID: "abc-123",
         XMLName: "SEPAXML202401150930.xml",
-        XMLData: "<?xml version=\"1.0\"?><Document/>",
+        XMLData: '<?xml version="1.0"?><Document/>',
       },
       false,
     );
@@ -157,7 +157,7 @@ describe("mapLastProtRow", () => {
       xmlName: "SEPAXML202401150930.xml",
       archived: "false",
     });
-    expect(active?.xmlData).toBe("<?xml version=\"1.0\"?><Document/>");
+    expect(active?.xmlData).toBe('<?xml version="1.0"?><Document/>');
 
     const archived = mapLastProtRow(
       {

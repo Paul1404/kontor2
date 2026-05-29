@@ -1,5 +1,5 @@
 import { Keyboard, X } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 
 type Shortcut = { keys: string[]; label: string; needsRole?: Array<"vorstand" | "admin"> };
 
@@ -91,10 +91,7 @@ export function KeyboardCheatsheet({
                 </div>
                 <ul className="flex flex-col divide-y divide-border/60 rounded-lg border border-border bg-muted/30">
                   {items.map((s) => (
-                    <li
-                      key={s.label}
-                      className="flex items-center justify-between gap-3 px-3 py-2"
-                    >
+                    <li key={s.label} className="flex items-center justify-between gap-3 px-3 py-2">
                       <span>{s.label}</span>
                       <span className="flex items-center gap-1">
                         {s.keys.map((k) => (

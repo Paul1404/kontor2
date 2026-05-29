@@ -1,19 +1,16 @@
 import { createHash } from "node:crypto";
 import { asc, desc, eq } from "drizzle-orm";
+import { lastFour } from "~/server/crypto/encrypt";
+import type { DB } from "~/server/db/client";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { attachmentsTable } from "~/server/db/schema/attachments";
 import { auditLogTable } from "~/server/db/schema/audit";
 import { contractsTable } from "~/server/db/schema/contracts";
-import {
-  dsgvoConsentLogTable,
-  dsgvoRequestsTable,
-} from "~/server/db/schema/dsgvo";
+import { dsgvoConsentLogTable, dsgvoRequestsTable } from "~/server/db/schema/dsgvo";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
-import type { DB } from "~/server/db/client";
-import { lastFour } from "~/server/crypto/encrypt";
 import { presignDownload } from "~/server/s3/client";
 
 /**
@@ -136,10 +133,7 @@ export async function buildAuskunftsPackage(
     db.select().from(sepaMandatesTable).where(eq(sepaMandatesTable.memberId, memberId)),
     db.select().from(sollStellungenTable).where(eq(sollStellungenTable.memberId, memberId)),
     db.select().from(attachmentsTable).where(eq(attachmentsTable.memberId, memberId)),
-    db
-      .select()
-      .from(relationshipsTable)
-      .where(eq(relationshipsTable.fromMemberId, memberId)),
+    db.select().from(relationshipsTable).where(eq(relationshipsTable.fromMemberId, memberId)),
     db
       .select()
       .from(dsgvoConsentLogTable)

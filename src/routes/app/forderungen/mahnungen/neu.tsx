@@ -123,14 +123,13 @@ function NewDunningRunPage() {
             </select>
           </Field>
           <Field label="Lauf-Datum">
-            <Input
-              type="date"
-              value={runDate}
-              onChange={(e) => setRunDate(e.target.value)}
-            />
+            <Input type="date" value={runDate} onChange={(e) => setRunDate(e.target.value)} />
           </Field>
           <Field label="Frist">
-            <Input value={preview.data?.dueDate ? formatDate(preview.data.dueDate) : "—"} disabled />
+            <Input
+              value={preview.data?.dueDate ? formatDate(preview.data.dueDate) : "—"}
+              disabled
+            />
           </Field>
           <div className="sm:col-span-3">
             <Field label="Notiz">
@@ -157,7 +156,8 @@ function NewDunningRunPage() {
               {preview.data.blocked.map((b) => (
                 <li key={b.memberId} className="flex items-center justify-between py-2">
                   <span>
-                    {b.name} <span className="text-xs text-muted-foreground">#{b.mitglnr ?? b.adrNr}</span>
+                    {b.name}{" "}
+                    <span className="text-xs text-muted-foreground">#{b.mitglnr ?? b.adrNr}</span>
                   </span>
                   <span className="text-sm tabular-nums">{formatCurrency(b.openSum)}</span>
                 </li>
@@ -169,9 +169,7 @@ function NewDunningRunPage() {
 
       <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle>
-            Empfänger {preview.data ? `(${preview.data.items.length})` : ""}
-          </CardTitle>
+          <CardTitle>Empfänger {preview.data ? `(${preview.data.items.length})` : ""}</CardTitle>
           {preview.data && preview.data.items.length > 0 ? (
             <button
               type="button"
@@ -213,9 +211,7 @@ function NewDunningRunPage() {
                       <span className="text-xs text-muted-foreground tabular-nums">
                         #{i.mitglnr ?? i.adrNr}
                       </span>
-                      {!i.hasAddress ? (
-                        <Badge variant="warning">Anschrift fehlt</Badge>
-                      ) : null}
+                      {!i.hasAddress ? <Badge variant="warning">Anschrift fehlt</Badge> : null}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {i.postings.length} offene(r) Posten
@@ -223,9 +219,7 @@ function NewDunningRunPage() {
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-0.5">
-                    <span className="font-semibold tabular-nums">
-                      {formatCurrency(i.totalDue)}
-                    </span>
+                    <span className="font-semibold tabular-nums">{formatCurrency(i.totalDue)}</span>
                     <span className="text-xs text-muted-foreground">
                       offen {formatCurrency(i.openSum)} · Gebühr {formatCurrency(i.mahngebuhr)}
                     </span>

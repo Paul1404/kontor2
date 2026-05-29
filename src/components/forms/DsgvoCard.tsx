@@ -84,11 +84,7 @@ export function DsgvoCard({
             Auskunft Art. 15 erstellen
           </Button>
           {isAdmin ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowErasure((v) => !v)}
-            >
+            <Button size="sm" variant="outline" onClick={() => setShowErasure((v) => !v)}>
               <ShieldAlert className="size-4" />
               Löschung Art. 17
             </Button>
@@ -134,7 +130,12 @@ function ConsentSection({
   canManage,
 }: {
   memberId: string;
-  current: Array<{ consentType: string; granted: boolean; recordedAt: Date | string; evidence: string | null }>;
+  current: Array<{
+    consentType: string;
+    granted: boolean;
+    recordedAt: Date | string;
+    evidence: string | null;
+  }>;
   canManage: boolean;
 }) {
   const qc = useQueryClient();
@@ -143,8 +144,7 @@ function ConsentSection({
   const [evidence, setEvidence] = useState("");
 
   const record = useMutation({
-    mutationFn: () =>
-      orpc.dsgvo.recordConsent({ memberId, consentType, granted, evidence }),
+    mutationFn: () => orpc.dsgvo.recordConsent({ memberId, consentType, granted, evidence }),
     onSuccess: async () => {
       setEvidence("");
       await qc.invalidateQueries({ queryKey: ["dsgvo.consent", memberId] });
@@ -222,11 +222,7 @@ function ConsentSection({
               onChange={(e) => setEvidence(e.target.value)}
               className="h-9 flex-1 min-w-[200px] rounded-md border border-input bg-card px-2 text-sm shadow-soft"
             />
-            <Button
-              size="sm"
-              onClick={() => record.mutate()}
-              disabled={record.isPending}
-            >
+            <Button size="sm" onClick={() => record.mutate()} disabled={record.isPending}>
               {record.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
               Speichern
             </Button>
@@ -237,13 +233,7 @@ function ConsentSection({
   );
 }
 
-function ErasureSection({
-  memberId,
-  memberSlug,
-}: {
-  memberId: string;
-  memberSlug: string;
-}) {
+function ErasureSection({ memberId, memberSlug }: { memberId: string; memberSlug: string }) {
   const qc = useQueryClient();
   const [forceOverride, setForceOverride] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
@@ -292,9 +282,8 @@ function ErasureSection({
       <div className="flex items-start gap-2 text-sm">
         <AlertTriangle className="mt-0.5 size-4 text-amber-500" />
         <div>
-          Pseudonymisierung gemäß Art. 17 DSGVO. Finanzdaten bleiben aus steuerlichen Gründen
-          (§147 AO, 10 Jahre) bestehen, alle identifizierenden Felder werden überschrieben oder
-          geleert.
+          Pseudonymisierung gemäß Art. 17 DSGVO. Finanzdaten bleiben aus steuerlichen Gründen (§147
+          AO, 10 Jahre) bestehen, alle identifizierenden Felder werden überschrieben oder geleert.
         </div>
       </div>
 

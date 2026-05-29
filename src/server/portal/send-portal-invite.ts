@@ -1,5 +1,5 @@
-import { loadSmtpConfig } from "~/server/auth/send-invite";
 import nodemailer from "nodemailer";
+import { loadSmtpConfig } from "~/server/auth/send-invite";
 
 export async function sendPortalInvite(opts: {
   to: string;

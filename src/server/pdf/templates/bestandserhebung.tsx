@@ -77,10 +77,7 @@ export function BestandserhebungDocument({
   vereinsname: string;
 }) {
   return (
-    <Document
-      title={`Bestandserhebung ${data.stichtag} – ${vereinsname}`}
-      author="SVUWV"
-    >
+    <Document title={`Bestandserhebung ${data.stichtag} – ${vereinsname}`} author="SVUWV">
       <Page size="A4" style={styles.page} wrap>
         <Text style={styles.h1}>Bestandserhebung</Text>
         <Text style={styles.meta}>
@@ -115,15 +112,9 @@ export function BestandserhebungDocument({
           <Text style={styles.cName}>Gesamt</Text>
           <Text style={styles.cSport}> </Text>
           <Text style={styles.cVerband}> </Text>
-          <Text style={styles.cNum}>
-            {data.perAbteilung.reduce((s, a) => s + a.male, 0)}
-          </Text>
-          <Text style={styles.cNum}>
-            {data.perAbteilung.reduce((s, a) => s + a.female, 0)}
-          </Text>
-          <Text style={styles.cNum}>
-            {data.perAbteilung.reduce((s, a) => s + a.divers, 0)}
-          </Text>
+          <Text style={styles.cNum}>{data.perAbteilung.reduce((s, a) => s + a.male, 0)}</Text>
+          <Text style={styles.cNum}>{data.perAbteilung.reduce((s, a) => s + a.female, 0)}</Text>
+          <Text style={styles.cNum}>{data.perAbteilung.reduce((s, a) => s + a.divers, 0)}</Text>
           <Text style={styles.cNum}>{data.grandTotal}</Text>
         </View>
 
@@ -154,15 +145,7 @@ export function BestandserhebungDocument({
 }
 
 const AGE_LABELS: ReadonlyArray<{
-  bucket:
-    | "0-6"
-    | "7-14"
-    | "15-18"
-    | "19-26"
-    | "27-40"
-    | "41-60"
-    | "61+"
-    | "unbekannt";
+  bucket: "0-6" | "7-14" | "15-18" | "19-26" | "27-40" | "41-60" | "61+" | "unbekannt";
   label: string;
 }> = [
   { bucket: "0-6", label: "0–6" },

@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import type { DB } from "~/server/db/client";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import type {
   BestandserhebungAgeBucket,
@@ -7,7 +8,6 @@ import type {
   BestandserhebungGender,
 } from "~/server/db/schema/bestandserhebungen";
 import { membersTable } from "~/server/db/schema/members";
-import type { DB } from "~/server/db/client";
 
 /**
  * Standard LSB / DOSB age buckets used for Bestandserhebung.
@@ -127,8 +127,11 @@ export async function computeBestandserhebung(
     : allAbteilungen;
 
   type CellKey = string;
-  const cellKey = (abtId: string, g: BestandserhebungGender, b: BestandserhebungAgeBucket): CellKey =>
-    `${abtId}|${g}|${b}`;
+  const cellKey = (
+    abtId: string,
+    g: BestandserhebungGender,
+    b: BestandserhebungAgeBucket,
+  ): CellKey => `${abtId}|${g}|${b}`;
 
   const cellsMap = new Map<CellKey, BestandserhebungCell>();
 
@@ -177,10 +180,7 @@ export async function computeBestandserhebung(
 
   const cells = Array.from(cellsMap.values());
 
-  const perAbteilungMap = new Map<
-    string,
-    BestandserhebungBreakdown["perAbteilung"][number]
-  >();
+  const perAbteilungMap = new Map<string, BestandserhebungBreakdown["perAbteilung"][number]>();
   for (const c of cells) {
     let row = perAbteilungMap.get(c.abteilungId);
     if (!row) {

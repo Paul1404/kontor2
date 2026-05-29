@@ -415,7 +415,7 @@ export const feeRunsRouter = {
         .from(feeRunsTable)
         .where(eq(feeRunsTable.id, input.id))
         .limit(1);
-      if (!run || !run.xmlContent || !run.xmlFilename) {
+      if (!run?.xmlContent || !run.xmlFilename) {
         throw new ORPCError("NOT_FOUND", { message: "Keine XML-Datei für diesen Lauf vorhanden." });
       }
 

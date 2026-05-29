@@ -85,7 +85,6 @@ export function* parseValues(payload: string): IterableIterator<Row> {
     i += 1;
     const row: Row = [];
     // Read values until matching ')'
-    // biome-ignore lint/correctness/noConstantCondition: inner loop has explicit breaks
     while (true) {
       while (i < n && isWhitespace(payload[i])) i += 1;
       if (i >= n) throw new Error("Unterminated tuple in SQL dump");
@@ -306,7 +305,9 @@ export function parseDump(text: string, supported: Set<string> = SUPPORTED_TABLE
       try {
         const rows = [...parseValues(payload)];
         if (rows.length > 0) {
-          (out.rows[table] ??= []).push(...rows);
+          const existing = out.rows[table];
+          if (existing) existing.push(...rows);
+          else out.rows[table] = rows;
         }
       } catch (err) {
         if (process.env.NODE_ENV !== "production") {

@@ -34,7 +34,7 @@ function tryStaticFile(pathname: string): { path: string; mime: string } | null 
   const safe = normalize(pathname).replace(/^[/\\]+/, "");
   for (const root of [CLIENT_DIR, PUBLIC_DIR]) {
     const full = join(root, safe);
-    if (!full.startsWith(root + "/") && full !== root) continue;
+    if (!full.startsWith(`${root}/`) && full !== root) continue;
     try {
       const s = statSync(full);
       if (s.isFile()) {
@@ -83,7 +83,5 @@ queueMicrotask(() => {
   const url = new URL("/api/rpc/auth/setupStatus", s.url).toString();
   fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
     .then(() => console.log("[svuwv] snapshot scheduler warmed up"))
-    .catch((err) =>
-      console.warn(`[svuwv] scheduler warmup failed: ${(err as Error).message}`),
-    );
+    .catch((err) => console.warn(`[svuwv] scheduler warmup failed: ${(err as Error).message}`));
 });

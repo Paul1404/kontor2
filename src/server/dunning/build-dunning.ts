@@ -76,15 +76,15 @@ export type LoadOpenParams = {
  * `mahnSperre` members are returned too so the UI can flag them; commit
  * skips them.
  */
-export async function loadOpenPostings(db: DB, params: LoadOpenParams = {}): Promise<MemberWithDebt[]> {
+export async function loadOpenPostings(
+  db: DB,
+  params: LoadOpenParams = {},
+): Promise<MemberWithDebt[]> {
   const cutoff = params.cutoffDate ?? new Date();
   const cutoffStr = cutoff.toISOString().slice(0, 10);
 
   const conditions = [
-    or(
-      eq(sollStellungenTable.status, "open"),
-      eq(sollStellungenTable.status, "returned"),
-    ),
+    or(eq(sollStellungenTable.status, "open"), eq(sollStellungenTable.status, "returned")),
     lte(sollStellungenTable.falligkeitsdatum, cutoffStr),
     sql`${sollStellungenTable.openAmount}::numeric > 0`,
   ];

@@ -214,7 +214,10 @@ function VereinsdatenPage() {
                     inputMode="decimal"
                   />
                 </Field>
-                <Field label="Zahlungsfrist in Tagen" hint="Wie viele Tage nach Mahndatum die Frist ist">
+                <Field
+                  label="Zahlungsfrist in Tagen"
+                  hint="Wie viele Tage nach Mahndatum die Frist ist"
+                >
                   <Input
                     type="number"
                     min={1}

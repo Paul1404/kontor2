@@ -32,9 +32,7 @@ export const RETENTION_YEARS = {
  * pseudonym to write. Pseudonyms are used where a NOT NULL constraint or
  * downstream join would otherwise break.
  */
-export type ErasureScrubRule =
-  | { kind: "null" }
-  | { kind: "pseudonym"; value: string };
+export type ErasureScrubRule = { kind: "null" } | { kind: "pseudonym"; value: string };
 
 /**
  * Lookup of every members column we touch during erasure.

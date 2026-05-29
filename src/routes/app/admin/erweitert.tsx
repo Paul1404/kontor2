@@ -50,22 +50,13 @@ function DangerZonePage() {
         </p>
       </div>
 
-      <OrphanKontaktsCard
-        count={overview.data?.orphanKontakts ?? 0}
-        loading={overview.isLoading}
-      />
+      <OrphanKontaktsCard count={overview.data?.orphanKontakts ?? 0} loading={overview.isLoading} />
       <PurgeSoftDeletedCard
         count={overview.data?.softDeletedMembers ?? 0}
         loading={overview.isLoading}
       />
-      <TrimAuditCard
-        totalEntries={overview.data?.auditEntries ?? 0}
-        loading={overview.isLoading}
-      />
-      <WipeEverythingCard
-        memberCount={overview.data?.members ?? 0}
-        loading={overview.isLoading}
-      />
+      <TrimAuditCard totalEntries={overview.data?.auditEntries ?? 0} loading={overview.isLoading} />
+      <WipeEverythingCard memberCount={overview.data?.members ?? 0} loading={overview.isLoading} />
     </div>
   );
 }
@@ -108,8 +99,7 @@ function OrphanKontaktsCard({ count, loading }: { count: number; loading: boolea
     enabled: dialogOpen,
   });
   const mut = useMutation({
-    mutationFn: (confirmation: string) =>
-      orpc.dangerZone.deleteOrphanKontakts({ confirmation }),
+    mutationFn: (confirmation: string) => orpc.dangerZone.deleteOrphanKontakts({ confirmation }),
     onSuccess: async (res) => {
       toast.success(`${res.deleted} verwaiste Kontakte gelöscht`);
       setDialogOpen(false);
@@ -369,8 +359,7 @@ function TrimAuditCard({ totalEntries, loading }: { totalEntries: number; loadin
         title="Audit Log kürzen"
         description={
           <>
-            Löscht{" "}
-            <strong className="text-foreground">{preview.data?.total ?? "…"}</strong>{" "}
+            Löscht <strong className="text-foreground">{preview.data?.total ?? "…"}</strong>{" "}
             Audit-Einträge älter als{" "}
             <strong className="text-foreground">
               {preview.data?.threshold ? formatDateTime(preview.data.threshold) : "…"}
@@ -408,13 +397,7 @@ function TrimAuditCard({ totalEntries, loading }: { totalEntries: number; loadin
   );
 }
 
-function WipeEverythingCard({
-  memberCount,
-  loading,
-}: {
-  memberCount: number;
-  loading: boolean;
-}) {
+function WipeEverythingCard({ memberCount, loading }: { memberCount: number; loading: boolean }) {
   const qc = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const preview = useQuery({
@@ -458,11 +441,7 @@ function WipeEverythingCard({
             Diese Aktion lässt sich nicht rückgängig machen.
           </span>
         </div>
-        <Button
-          variant="destructive"
-          disabled={loading}
-          onClick={() => setDialogOpen(true)}
-        >
+        <Button variant="destructive" disabled={loading} onClick={() => setDialogOpen(true)}>
           <Trash2 className="size-4" /> Alles löschen
         </Button>
       </div>
@@ -500,4 +479,3 @@ function WipeEverythingCard({
     </DangerCard>
   );
 }
-

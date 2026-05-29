@@ -225,41 +225,39 @@ export const sepaReturnsRouter = {
     return { id: result };
   }),
 
-  delete: vorstandProc
-    .input(v.object({ id: v.string() }))
-    .handler(async ({ context, input }) => {
-      const [row] = await context.db
-        .select()
+  delete: vorstandProc.input(v.object({ id: v.string() })).handler(async ({ context, input }) => {
+    const [row] = await context.db
+      .select()
+      .from(sepaReturnsTable)
+      .where(eq(sepaReturnsTable.id, input.id))
+      .limit(1);
+    if (!row) throw new ORPCError("NOT_FOUND", { message: "Rückläufer nicht gefunden." });
+
+    await context.db.transaction(async (tx) => {
+      await tx.delete(sepaReturnsTable).where(eq(sepaReturnsTable.id, input.id));
+      // Best effort: clear the returned marker if no other returns reference this item.
+      const [stillReturned] = await tx
+        .select({ c: count() })
         .from(sepaReturnsTable)
-        .where(eq(sepaReturnsTable.id, input.id))
-        .limit(1);
-      if (!row) throw new ORPCError("NOT_FOUND", { message: "Rückläufer nicht gefunden." });
-
-      await context.db.transaction(async (tx) => {
-        await tx.delete(sepaReturnsTable).where(eq(sepaReturnsTable.id, input.id));
-        // Best effort: clear the returned marker if no other returns reference this item.
-        const [stillReturned] = await tx
-          .select({ c: count() })
-          .from(sepaReturnsTable)
-          .where(eq(sepaReturnsTable.feeRunItemId, row.feeRunItemId));
-        if ((stillReturned?.c ?? 0) === 0) {
-          await tx
-            .update(feeRunItemsTable)
-            .set({ returnedAt: null, returnReasonCode: null })
-            .where(eq(feeRunItemsTable.id, row.feeRunItemId));
-        }
-        await appendAudit(tx, {
-          entityType: "sepa_return",
-          entityId: input.id,
-          action: "delete",
-          source: "ui",
-          actorId: context.session!.user.id,
-          actorEmail: context.session!.user.email,
-          changes: { undone: { before: row.reasonCode ?? null, after: null } },
-          requestId: context.requestId ?? null,
-        });
+        .where(eq(sepaReturnsTable.feeRunItemId, row.feeRunItemId));
+      if ((stillReturned?.c ?? 0) === 0) {
+        await tx
+          .update(feeRunItemsTable)
+          .set({ returnedAt: null, returnReasonCode: null })
+          .where(eq(feeRunItemsTable.id, row.feeRunItemId));
+      }
+      await appendAudit(tx, {
+        entityType: "sepa_return",
+        entityId: input.id,
+        action: "delete",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: { undone: { before: row.reasonCode ?? null, after: null } },
+        requestId: context.requestId ?? null,
       });
+    });
 
-      return { ok: true };
-    }),
+    return { ok: true };
+  }),
 };

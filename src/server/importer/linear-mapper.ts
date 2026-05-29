@@ -286,7 +286,7 @@ export function mapMemberRow(d: LinearRow): Record<string, unknown> | null {
   return m;
 }
 
-function yn(value: Cell): boolean | null {
+function _yn(value: Cell): boolean | null {
   if (value === null || value === undefined) return null;
   if (typeof value === "boolean") return value;
   const s = String(value).trim().toUpperCase();
@@ -513,8 +513,7 @@ export function mapSollStellungRow(d: LinearRow): SollStellungMapped | null {
     bezahlt: coerceDecimal(d.Bezahlt ?? null),
     offen: coerceDecimal(d.Offen ?? null),
     mahnstufe: coerceInt(d.Mahnstuffe ?? null) ?? 0,
-    falligkeitsdatum:
-      coerceDate(d.FalligkeitDatum ?? null) ?? coerceDate(d.Datum ?? null),
+    falligkeitsdatum: coerceDate(d.FalligkeitDatum ?? null) ?? coerceDate(d.Datum ?? null),
     guid: coerceStr(d.GUID ?? null, 64),
     mandatsNr: coerceStr(d.MandatsNr ?? null, 35),
   };
@@ -569,10 +568,7 @@ export function mapMgartDatRow(d: LinearRow): Record<string, unknown> | null {
  * what was submitted to the bank. `archived=true` for `lastproth` (Linear's
  * history journal for purged runs), `false` for the live `lastprot`.
  */
-export function mapLastProtRow(
-  d: LinearRow,
-  archived: boolean,
-): Record<string, unknown> | null {
+export function mapLastProtRow(d: LinearRow, archived: boolean): Record<string, unknown> | null {
   const id = coerceInt(d.ID ?? null);
   const datum = coerceDate(d.Datum ?? null);
   const benutzer = coerceStr(d.Benutzer ?? null, 250);
@@ -591,10 +587,7 @@ export function mapLastProtRow(
   };
 }
 
-export function mapLastProtSRow(
-  d: LinearRow,
-  archived: boolean,
-): Record<string, unknown> | null {
+export function mapLastProtSRow(d: LinearRow, archived: boolean): Record<string, unknown> | null {
   const sepaGuid = coerceStr(d.SepaGUID ?? null, 64);
   const sollGuid = coerceStr(d.SollGUID ?? null, 36);
   if (!sepaGuid || !sollGuid) return null;

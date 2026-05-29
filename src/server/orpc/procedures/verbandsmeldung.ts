@@ -1,5 +1,5 @@
-import { ORPCError } from "@orpc/server";
 import { createHash } from "node:crypto";
+import { ORPCError } from "@orpc/server";
 import { desc, eq } from "drizzle-orm";
 import * as v from "valibot";
 import { bestandserhebungenTable } from "~/server/db/schema/bestandserhebungen";
@@ -10,10 +10,7 @@ import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { BestandserhebungDocument } from "~/server/pdf/templates/bestandserhebung";
 import { computeBestandserhebung } from "~/server/verbandsmeldung/bestandserhebung";
 
-const ISO_DATE = v.pipe(
-  v.string(),
-  v.regex(/^\d{4}-\d{2}-\d{2}$/, "Erwartet YYYY-MM-DD"),
-);
+const ISO_DATE = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/, "Erwartet YYYY-MM-DD"));
 
 const ComputeInput = v.object({
   stichtag: ISO_DATE,
@@ -58,12 +55,13 @@ const CSV_COLUMNS: ReadonlyArray<CsvColumn<CsvRow>> = [
   { key: "total", label: "Gesamt" },
 ];
 
-function toCsvRows(
-  data: Awaited<ReturnType<typeof computeBestandserhebung>>,
-): CsvRow[] {
+function toCsvRows(data: Awaited<ReturnType<typeof computeBestandserhebung>>): CsvRow[] {
   const cellMap = new Map<string, number>();
   for (const c of data.cells) {
-    cellMap.set(`${c.abteilungId}|${c.ageBucket}`, (cellMap.get(`${c.abteilungId}|${c.ageBucket}`) ?? 0) + c.count);
+    cellMap.set(
+      `${c.abteilungId}|${c.ageBucket}`,
+      (cellMap.get(`${c.abteilungId}|${c.ageBucket}`) ?? 0) + c.count,
+    );
   }
   return data.perAbteilung.map((a) => ({
     abteilungName: a.abteilungName,
@@ -119,9 +117,7 @@ export const verbandsmeldungRouter = {
       abteilungIds: input.abteilungIds?.length ? input.abteilungIds : undefined,
     });
     const vereinsname = await loadVereinsname(context.db);
-    const pdf = await renderPdfBase64(
-      BestandserhebungDocument({ data, vereinsname }),
-    );
+    const pdf = await renderPdfBase64(BestandserhebungDocument({ data, vereinsname }));
     return {
       filename: `bestandserhebung-${input.stichtag}.pdf`,
       base64: pdf.base64,
@@ -139,9 +135,7 @@ export const verbandsmeldungRouter = {
     .handler(async ({ context, input }) => {
       const data = await computeBestandserhebung(context.db, { stichtag: input.stichtag });
       const actor = context.session?.user;
-      const sha = createHash("sha256")
-        .update(JSON.stringify(data))
-        .digest("hex");
+      const sha = createHash("sha256").update(JSON.stringify(data)).digest("hex");
       const [row] = await context.db
         .insert(bestandserhebungenTable)
         .values({
@@ -157,7 +151,8 @@ export const verbandsmeldungRouter = {
           notes: input.notes || null,
         })
         .returning({ id: bestandserhebungenTable.id });
-      if (!row) throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Speichern fehlgeschlagen." });
+      if (!row)
+        throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Speichern fehlgeschlagen." });
       return { id: row.id, sha256: sha };
     }),
 

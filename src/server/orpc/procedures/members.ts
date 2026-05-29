@@ -253,11 +253,7 @@ export const membersRouter = {
     const direction = input.sortDir === "desc" ? desc : asc;
     // Always tie-break on (nachname, vorname) so paging is stable when
     // the primary sort key is null/duplicated.
-    const orderBy = [
-      direction(sortColumn),
-      asc(membersTable.nachname),
-      asc(membersTable.vorname),
-    ];
+    const orderBy = [direction(sortColumn), asc(membersTable.nachname), asc(membersTable.vorname)];
 
     const offset = (input.page - 1) * input.pageSize;
     const [rows, [totalRow]] = await Promise.all([

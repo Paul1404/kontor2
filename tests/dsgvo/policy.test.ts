@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  RETAINED_COLUMNS,
-  RETENTION_YEARS,
   buildScrubRules,
   earliestErasureDate,
+  RETAINED_COLUMNS,
+  RETENTION_YEARS,
 } from "~/server/dsgvo/policy";
 
 describe("buildScrubRules", () => {

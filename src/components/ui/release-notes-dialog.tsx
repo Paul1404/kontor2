@@ -3,8 +3,8 @@ import { useEffect } from "react";
 import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
-  type Release,
   RELEASES,
+  type Release,
   type ReleaseCategory,
   writeLastSeenVersion,
 } from "~/lib/release-notes";
@@ -63,7 +63,8 @@ export function ReleaseNotesDialog({
             <div>
               <h2 className="text-base font-semibold tracking-tight">Versionshinweise</h2>
               <p className="text-xs text-muted-foreground">
-                Aktuelle Version: <span className="font-medium text-foreground">{RELEASES[0]?.version}</span>
+                Aktuelle Version:{" "}
+                <span className="font-medium text-foreground">{RELEASES[0]?.version}</span>
               </p>
             </div>
           </div>
@@ -84,7 +85,8 @@ export function ReleaseNotesDialog({
         </div>
 
         <div className="border-t border-border px-6 py-3 text-[11px] text-muted-foreground">
-          Hinweise leben in <code className="rounded bg-muted px-1 py-0.5 font-mono">src/lib/release-notes.ts</code>.
+          Hinweise leben in{" "}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono">src/lib/release-notes.ts</code>.
         </div>
       </div>
     </div>
@@ -100,9 +102,7 @@ function ReleaseSection({ release }: { release: Release }) {
           <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[12px] font-semibold tabular-nums text-primary">
             {release.version}
           </span>
-          {release.title ? (
-            <span className="text-sm font-medium">{release.title}</span>
-          ) : null}
+          {release.title ? <span className="text-sm font-medium">{release.title}</span> : null}
         </div>
         <span className="text-[11px] tabular-nums text-muted-foreground">{release.date}</span>
       </header>

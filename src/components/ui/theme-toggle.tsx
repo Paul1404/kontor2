@@ -23,6 +23,9 @@ export function ThemeToggle({ className }: { className?: string }) {
         const active = theme === o.value;
         const Icon = o.icon;
         return (
+          // Styled segmented control: an icon-only button carrying the radio
+          // role, not a native <input type="radio">, so it can be themed.
+          // biome-ignore lint/a11y/useSemanticElements: themed radio button
           <button
             key={o.value}
             type="button"

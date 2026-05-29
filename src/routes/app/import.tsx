@@ -186,8 +186,8 @@ function ImportPage() {
                   {upload.data.errors.length} Warnungen
                 </summary>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-                  {upload.data.errors.slice(0, 25).map((err, idx) => (
-                    <li key={idx}>
+                  {upload.data.errors.slice(0, 25).map((err) => (
+                    <li key={`${err.table}:${err.message}`}>
                       [{err.table}] {err.message}
                     </li>
                   ))}

@@ -81,9 +81,7 @@ export function env(): Env {
     const master = Buffer.from(parsed.APP_SECRET, "hex");
     const dataEncryptionKey = derive(master, "svuwv:data-encryption-key:v1");
     const previousMasters = parsePreviousSecrets(parsed.APP_SECRET_PREV);
-    const previousDataKeys = previousMasters.map((m) =>
-      derive(m, "svuwv:data-encryption-key:v1"),
-    );
+    const previousDataKeys = previousMasters.map((m) => derive(m, "svuwv:data-encryption-key:v1"));
     const encryptionKeyring: Keyring = {
       current: makeKeyringEntry("current", dataEncryptionKey),
       previous: previousDataKeys.map((k, i) => makeKeyringEntry(`prev-${i}`, k)),

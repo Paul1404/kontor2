@@ -49,10 +49,7 @@ export async function completeSetup(input: {
       if (!created?.user?.id) {
         return { ok: false, reason: "create_failed" } as const;
       }
-      await tx
-        .update(users)
-        .set({ emailVerified: true })
-        .where(eq(users.id, created.user.id));
+      await tx.update(users).set({ emailVerified: true }).where(eq(users.id, created.user.id));
       console.log(`[setup] created first admin ${input.email} via /setup`);
       return { ok: true, userId: created.user.id } as const;
     } catch (err) {
