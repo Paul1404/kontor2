@@ -75,6 +75,18 @@ async function checkS3(): Promise<void> {
   }
 }
 
+// App secrets that the bundled `env()` validator also checks, repeated here so
+// a misconfigured deploy fails at boot with a clear message instead of on the
+// first request. Kept in sync with `src/server/env.ts`.
+async function checkAppConfig(): Promise<void> {
+  const secret = process.env.APP_SECRET;
+  if (!secret) throw new Error("APP_SECRET not set");
+  if (!/^[0-9a-fA-F]{64}$/.test(secret)) {
+    throw new Error("APP_SECRET must be 64 hex chars (openssl rand -hex 32)");
+  }
+  if (!process.env.BETTER_AUTH_URL) throw new Error("BETTER_AUTH_URL not set");
+}
+
 type Result =
   | { name: string; ok: true; ms: number }
   | { name: string; ok: false; ms: number; error: string };
@@ -96,6 +108,7 @@ async function run(name: string, fn: () => Promise<void>): Promise<Result> {
 
 export async function preflight(): Promise<void> {
   const results = await Promise.all([
+    run("config", checkAppConfig),
     run("postgres", checkPostgres),
     run("redis", checkRedis),
     run("s3", checkS3),

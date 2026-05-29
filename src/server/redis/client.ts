@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import { env } from "~/server/env";
+import { logger } from "~/server/lib/logger";
 
 let client: Redis | undefined;
 
@@ -11,7 +12,7 @@ export function redis(): Redis {
       enableReadyCheck: true,
     });
     client.on("error", (err) => {
-      if (env().NODE_ENV !== "test") console.error("[redis]", err.message);
+      if (env().NODE_ENV !== "test") logger.error("redis error", { error: err.message });
     });
   }
   return client;

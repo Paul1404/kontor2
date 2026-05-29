@@ -17,6 +17,50 @@ const PUBLIC_DIR = resolve(import.meta.dir, "..", "public");
 type ServerLike = { fetch: (req: Request) => Promise<Response> };
 const handler = server as unknown as ServerLike;
 
+// Response headers applied to every response. These are safe defaults that
+// don't depend on the request: clickjacking, MIME-sniffing, referrer leakage,
+// and feature-policy lockdown. HSTS is harmless over plain HTTP (browsers only
+// honour it on HTTPS) and Railway terminates TLS in front of us.
+const SECURITY_HEADERS: Record<string, string> = {
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), browsing-topics=()",
+  "strict-transport-security": "max-age=63072000; includeSubDomains",
+  "x-dns-prefetch-control": "off",
+};
+
+// Content-Security-Policy for HTML documents. `unsafe-inline` is required for
+// the SSR hydration/router script TanStack Start injects inline and for inline
+// style attributes; `img-src https:` allows member attachments served from
+// signed S3 URLs. Override the whole policy with CONTENT_SECURITY_POLICY, or
+// set it empty to disable.
+const DEFAULT_CSP = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline'",
+  "connect-src 'self'",
+].join("; ");
+
+const CSP = process.env.CONTENT_SECURITY_POLICY ?? DEFAULT_CSP;
+
+function withSecurityHeaders(res: Response): Response {
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    if (!res.headers.has(key)) res.headers.set(key, value);
+  }
+  const type = res.headers.get("content-type") ?? "";
+  if (CSP && type.includes("text/html") && !res.headers.has("content-security-policy")) {
+    res.headers.set("content-security-policy", CSP);
+  }
+  return res;
+}
+
 const MIME: Record<string, string> = {
   svg: "image/svg+xml",
   png: "image/png",
@@ -53,14 +97,16 @@ async function handle(request: Request): Promise<Response> {
   const hit = tryStaticFile(url.pathname);
   if (hit) {
     const file = Bun.file(hit.path);
-    return new Response(file.stream(), {
-      headers: {
-        "content-type": hit.mime,
-        "cache-control": "public, max-age=86400, immutable",
-      },
-    });
+    return withSecurityHeaders(
+      new Response(file.stream(), {
+        headers: {
+          "content-type": hit.mime,
+          "cache-control": "public, max-age=86400, immutable",
+        },
+      }),
+    );
   }
-  return handler.fetch(request);
+  return withSecurityHeaders(await handler.fetch(request));
 }
 
 try {

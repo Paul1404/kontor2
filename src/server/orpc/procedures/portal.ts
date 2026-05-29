@@ -6,7 +6,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { portalChangeRequestsTable, portalTokensTable } from "~/server/db/schema/portal";
 import { env } from "~/server/env";
-import { base, vorstandProc } from "~/server/orpc/base";
+import { base, observability, vorstandProc } from "~/server/orpc/base";
 import {
   buildPortalUrl,
   getPortalCookieFromHeaders,
@@ -33,7 +33,7 @@ const EDITABLE_FIELDS = [
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
 
-const portalProc = base.use(
+const portalProc = base.use(observability).use(
   base.middleware(async ({ context, next }) => {
     const cookie = getPortalCookieFromHeaders(context.headers);
     const session = await resolvePortalSession(context.db, cookie);
