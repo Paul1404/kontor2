@@ -8,6 +8,7 @@
 import { statSync } from "node:fs";
 import { join, normalize, resolve } from "node:path";
 import server from "../dist/server/server.js";
+import { log } from "./log";
 import { preflight } from "./preflight";
 
 const port = Number(process.env.PORT ?? 3000);
@@ -112,12 +113,12 @@ async function handle(request: Request): Promise<Response> {
 try {
   await preflight();
 } catch (err) {
-  console.error(`[svuwv] startup aborted: ${(err as Error).message}`);
+  log.error("startup aborted", { error: err instanceof Error ? err.message : String(err) });
   process.exit(1);
 }
 
 const s = Bun.serve({ port, fetch: handle });
-console.log(`[svuwv] listening on ${s.url}`);
+log.info("listening", { url: String(s.url) });
 
 // The snapshot scheduler initialises lazily inside `createContext` (oRPC).
 // On a freshly-deployed container with no oRPC traffic between deploy and
@@ -128,6 +129,10 @@ console.log(`[svuwv] listening on ${s.url}`);
 queueMicrotask(() => {
   const url = new URL("/api/rpc/auth/setupStatus", s.url).toString();
   fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
-    .then(() => console.log("[svuwv] snapshot scheduler warmed up"))
-    .catch((err) => console.warn(`[svuwv] scheduler warmup failed: ${(err as Error).message}`));
+    .then(() => log.info("snapshot scheduler warmed up"))
+    .catch((err) =>
+      log.warn("scheduler warmup failed", {
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
 });

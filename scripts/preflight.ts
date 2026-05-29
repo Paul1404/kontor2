@@ -7,6 +7,7 @@
 import { HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import Redis from "ioredis";
 import postgres from "postgres";
+import { log } from "./log";
 
 const TIMEOUT_MS = 5_000;
 
@@ -114,8 +115,8 @@ export async function preflight(): Promise<void> {
     run("s3", checkS3),
   ]);
   for (const r of results) {
-    if (r.ok) console.log(`[svuwv] ${r.name.padEnd(8)} ok (${r.ms}ms)`);
-    else console.error(`[svuwv] ${r.name.padEnd(8)} FAIL (${r.ms}ms): ${r.error}`);
+    if (r.ok) log.info("preflight check ok", { check: r.name, ms: r.ms });
+    else log.error("preflight check failed", { check: r.name, ms: r.ms, error: r.error });
   }
   const failed = results.filter((r) => !r.ok);
   if (failed.length > 0) {
