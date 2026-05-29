@@ -1,11 +1,11 @@
 import { desc, eq, sql } from "drizzle-orm";
+import { appendAudit } from "~/server/audit/log";
+import type { DBOrTx } from "~/server/db/client";
 import { auditLogTable } from "~/server/db/schema/audit";
 import { dsgvoRequestsTable } from "~/server/db/schema/dsgvo";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
-import type { DBOrTx } from "~/server/db/client";
-import { appendAudit } from "~/server/audit/log";
 import { buildScrubRules, earliestErasureDate } from "~/server/dsgvo/policy";
 
 export type ErasureDiffEntry = {
@@ -42,17 +42,12 @@ async function lastFinancialEventAt(db: DBOrTx, memberId: string): Promise<Date 
     .select({ ts: sql<Date | null>`max(${sepaMandatesTable.letzteVerwendung})` })
     .from(sepaMandatesTable)
     .where(eq(sepaMandatesTable.memberId, memberId));
-  const candidates = [feeRow?.ts ?? null, sepaRow?.ts ?? null].filter(
-    (v): v is Date => v != null,
-  );
+  const candidates = [feeRow?.ts ?? null, sepaRow?.ts ?? null].filter((v): v is Date => v != null);
   if (candidates.length === 0) return null;
   return candidates.reduce((a, b) => (a > b ? a : b));
 }
 
-export async function previewErasure(
-  db: DBOrTx,
-  memberId: string,
-): Promise<ErasurePreview> {
+export async function previewErasure(db: DBOrTx, memberId: string): Promise<ErasurePreview> {
   const [member] = await db
     .select()
     .from(membersTable)
@@ -137,7 +132,10 @@ export async function executeErasure(
   await db.update(membersTable).set(updates).where(eq(membersTable.id, memberId));
 
   const changes = Object.fromEntries(
-    Object.keys({ ...before, ...after }).map((k) => [k, { before: before[k] ?? null, after: after[k] ?? null }]),
+    Object.keys({ ...before, ...after }).map((k) => [
+      k,
+      { before: before[k] ?? null, after: after[k] ?? null },
+    ]),
   );
   if (opts.forceOverride && opts.overrideReason) {
     changes.__override = { before: null, after: opts.overrideReason };

@@ -2,6 +2,7 @@ import { eq, isNull } from "drizzle-orm";
 import { db } from "~/server/db/client";
 import { membersTable } from "~/server/db/schema/members";
 import { memberSnapshotsTable, snapshotRunsTable } from "~/server/db/schema/snapshots";
+import { logger } from "~/server/lib/logger";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 // Postgres advisory-lock key. Picked at random; just needs to be the same
@@ -110,7 +111,7 @@ export async function runNightlySnapshot(
 
 export function startSnapshotScheduler(): void {
   if (process.env.SNAPSHOT_CRON_DISABLED === "1") {
-    console.log("[svuwv] snapshot scheduler disabled (SNAPSHOT_CRON_DISABLED=1)");
+    logger.info("snapshot scheduler disabled", { reason: "SNAPSHOT_CRON_DISABLED=1" });
     return;
   }
   if (scheduledTimeout) return; // already started
@@ -118,22 +119,28 @@ export function startSnapshotScheduler(): void {
   function schedule() {
     const next = nextRunAt();
     const delayMs = next.getTime() - Date.now();
-    console.log(
-      `[svuwv] next nightly snapshot scheduled for ${next.toISOString()} (in ${Math.round(delayMs / 60000)} min)`,
-    );
+    logger.info("nightly snapshot scheduled", {
+      at: next.toISOString(),
+      inMinutes: Math.round(delayMs / 60000),
+    });
     scheduledTimeout = setTimeout(async () => {
       scheduledTimeout = null;
       try {
         const result = await runNightlySnapshot({ actorEmail: "system:scheduler" });
         if (result.acquiredLock) {
-          console.log(
-            `[svuwv] nightly snapshot run ${result.runId ?? "noop"}: ${result.memberCount} new, ${result.skippedCount} unchanged, ${(result.bytesTotal / 1024).toFixed(0)} kB`,
-          );
+          logger.info("nightly snapshot run", {
+            runId: result.runId ?? "noop",
+            created: result.memberCount,
+            unchanged: result.skippedCount,
+            kb: Math.round(result.bytesTotal / 1024),
+          });
         } else {
-          console.log("[svuwv] nightly snapshot skipped (another replica holds the lock)");
+          logger.info("nightly snapshot skipped", { reason: "another replica holds the lock" });
         }
       } catch (err) {
-        console.error(`[svuwv] nightly snapshot failed: ${(err as Error).message}`);
+        logger.error("nightly snapshot failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
       } finally {
         schedule();
       }

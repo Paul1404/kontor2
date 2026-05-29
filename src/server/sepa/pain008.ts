@@ -161,7 +161,7 @@ function computeTotals(items: Pain008Item[]): { count: number; sum: string } {
 
 function amountToCents(s: string): bigint {
   const [intp, fracp = ""] = s.split(".");
-  const frac = (fracp + "00").slice(0, 2);
+  const frac = `${fracp}00`.slice(0, 2);
   return BigInt(intp ?? "0") * 100n + BigInt(frac || "0");
 }
 

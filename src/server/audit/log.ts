@@ -1,10 +1,6 @@
 import { lastFour } from "~/server/crypto/encrypt";
 import type { DBOrTx } from "~/server/db/client";
-import {
-  type AuditAction,
-  auditLogTable,
-  type AuditSource,
-} from "~/server/db/schema/audit";
+import { type AuditAction, type AuditSource, auditLogTable } from "~/server/db/schema/audit";
 
 /**
  * Columns whose plaintext values should NEVER appear in the audit log.

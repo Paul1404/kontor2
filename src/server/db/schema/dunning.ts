@@ -10,7 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
-import { feeRunItemsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
+import { feeRunItemsTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 
 export const dunningRunStatusEnum = pgEnum("dunning_run_status", [

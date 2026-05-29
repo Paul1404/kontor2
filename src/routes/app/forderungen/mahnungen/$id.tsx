@@ -98,9 +98,7 @@ function MahnungDetailPage() {
         </CardContent>
       </Card>
 
-      {run.notes ? (
-        <p className="text-sm text-muted-foreground italic">{run.notes}</p>
-      ) : null}
+      {run.notes ? <p className="text-sm text-muted-foreground italic">{run.notes}</p> : null}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -149,8 +147,8 @@ function MahnungDetailPage() {
                       <SentBadge channel={i.sentChannel} sentAt={i.sentAt} />
                     </div>
                     <p className="text-xs text-muted-foreground tabular-nums">
-                      offen {formatCurrency(i.openSum)} · Gebühr {formatCurrency(i.mahngebuhr)} · gesamt{" "}
-                      {formatCurrency(i.totalDue)} · Frist {formatDate(i.dueDate)}
+                      offen {formatCurrency(i.openSum)} · Gebühr {formatCurrency(i.mahngebuhr)} ·
+                      gesamt {formatCurrency(i.totalDue)} · Frist {formatDate(i.dueDate)}
                     </p>
                     {i.sentTo ? (
                       <p className="text-xs text-muted-foreground">an {i.sentTo}</p>
@@ -218,13 +216,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SentBadge({
-  channel,
-  sentAt,
-}: {
-  channel: string;
-  sentAt: string | Date | null;
-}) {
+function SentBadge({ channel, sentAt }: { channel: string; sentAt: string | Date | null }) {
   if (channel === "pending") return <Badge variant="warning">nicht versendet</Badge>;
   if (channel === "email")
     return (

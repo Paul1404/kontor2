@@ -24,8 +24,7 @@ describe("LSB_AGE_BUCKETS", () => {
 
   it("places the bucket boundaries on the LSB cutoffs", () => {
     // Spot-check: 14-year-old is "7-14", 15-year-old is "15-18", 60 is "41-60", 61 is "61+".
-    const find = (age: number) =>
-      LSB_AGE_BUCKETS.find((b) => age >= b.min && age <= b.max)?.label;
+    const find = (age: number) => LSB_AGE_BUCKETS.find((b) => age >= b.min && age <= b.max)?.label;
     expect(find(14)).toBe("7-14");
     expect(find(15)).toBe("15-18");
     expect(find(60)).toBe("41-60");

@@ -7,14 +7,8 @@ import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { feeTypePriceHistoryTable } from "~/server/db/schema/fee-type-history";
 import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { importBatchesTable } from "~/server/db/schema/import-batches";
-import {
-  legacySepaRunItemsTable,
-  legacySepaRunsTable,
-} from "~/server/db/schema/legacy-sepa";
-import {
-  linearFederationsTable,
-  linearSportTypesTable,
-} from "~/server/db/schema/linear-lookups";
+import { legacySepaRunItemsTable, legacySepaRunsTable } from "~/server/db/schema/legacy-sepa";
+import { linearFederationsTable, linearSportTypesTable } from "~/server/db/schema/linear-lookups";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
@@ -484,7 +478,10 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
             linearSportTypesTable.nummer,
             linearSportTypesTable.lfdNr,
           ],
-          set: { sportart: (row as { sportart?: string }).sportart, verbandNr: (row as { verbandNr?: string }).verbandNr } as never,
+          set: {
+            sportart: (row as { sportart?: string }).sportart,
+            verbandNr: (row as { verbandNr?: string }).verbandNr,
+          } as never,
         });
       sportTypesImported += 1;
     } catch (e) {
@@ -562,11 +559,7 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
     // Pre-load the (adrNr, vertragNr) → contractId/memberId map.
     const contractLookup = new Map<string, { contractId: string; memberId: string }>();
     const incomingAdrNrs = Array.from(
-      new Set(
-        (input.mgsolln ?? [])
-          .map((r) => Number(r.AdrNr))
-          .filter((n) => Number.isFinite(n)),
-      ),
+      new Set((input.mgsolln ?? []).map((r) => Number(r.AdrNr)).filter((n) => Number.isFinite(n))),
     );
     if (incomingAdrNrs.length > 0) {
       const contracts = await db
@@ -634,16 +627,10 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
             status,
             source: "linear_import",
             linearGuid: v.linearGuid,
-            notes:
-              v.rowCount > 1
-                ? `Aggregat aus ${v.rowCount} Linear-Zeiträumen (mgsolln)`
-                : null,
+            notes: v.rowCount > 1 ? `Aggregat aus ${v.rowCount} Linear-Zeiträumen (mgsolln)` : null,
           } as never)
           .onConflictDoUpdate({
-            target: [
-              sollStellungenTable.contractId,
-              sollStellungenTable.billingYear,
-            ],
+            target: [sollStellungenTable.contractId, sollStellungenTable.billingYear],
             set: {
               amount: v.amount,
               paidAmount: v.paidAmount,

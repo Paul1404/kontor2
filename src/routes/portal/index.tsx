@@ -44,7 +44,10 @@ function PortalHome() {
           <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <Detail label="Mitgliedsnummer" value={m.mitglnr ?? `Adr. ${m.adrNr}`} />
             <Detail label="Eintritt" value={m.eintritt ? formatDate(m.eintritt) : "—"} />
-            <Detail label="Geburtsdatum" value={m.geburtsdatum ? formatDate(m.geburtsdatum) : "—"} />
+            <Detail
+              label="Geburtsdatum"
+              value={m.geburtsdatum ? formatDate(m.geburtsdatum) : "—"}
+            />
             <Detail label="Status" value={m.austritt ? "Ausgetreten" : "Aktiv"} />
           </dl>
         </CardContent>
@@ -106,13 +109,7 @@ function PortalHome() {
   );
 }
 
-function Detail({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | null | undefined;
-}) {
+function Detail({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
       <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

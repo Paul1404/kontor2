@@ -3,6 +3,7 @@ import { auth } from "~/server/auth/auth";
 import { db } from "~/server/db/client";
 import { users } from "~/server/db/schema/auth";
 import { env } from "~/server/env";
+import { logger } from "~/server/lib/logger";
 
 let pending: Promise<void> | undefined;
 let done = false;
@@ -43,9 +44,9 @@ async function run(): Promise<void> {
     });
     if (result?.user?.id) {
       await db().update(users).set({ emailVerified: true }).where(eq(users.id, result.user.id));
-      console.log(`[bootstrap] created admin user ${e.SVUWV_BOOTSTRAP_ADMIN_EMAIL}`);
+      logger.info("bootstrap admin created", { email: e.SVUWV_BOOTSTRAP_ADMIN_EMAIL });
     }
   } catch (err) {
-    console.error("[bootstrap] failed:", (err as Error).message);
+    logger.error("bootstrap failed", { error: err instanceof Error ? err.message : String(err) });
   }
 }

@@ -2,6 +2,7 @@ import { count, eq } from "drizzle-orm";
 import { auth } from "~/server/auth/auth";
 import { db } from "~/server/db/client";
 import { users } from "~/server/db/schema/auth";
+import { logger } from "~/server/lib/logger";
 
 /**
  * Setup-mode check. The instance is "in setup mode" while the users table is
@@ -49,11 +50,8 @@ export async function completeSetup(input: {
       if (!created?.user?.id) {
         return { ok: false, reason: "create_failed" } as const;
       }
-      await tx
-        .update(users)
-        .set({ emailVerified: true })
-        .where(eq(users.id, created.user.id));
-      console.log(`[setup] created first admin ${input.email} via /setup`);
+      await tx.update(users).set({ emailVerified: true }).where(eq(users.id, created.user.id));
+      logger.info("first admin created via /setup", { email: input.email });
       return { ok: true, userId: created.user.id } as const;
     } catch (err) {
       return {

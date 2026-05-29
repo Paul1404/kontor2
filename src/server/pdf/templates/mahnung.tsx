@@ -172,7 +172,10 @@ export function MahnungDocument({ pkg }: { pkg: MahnungInput }) {
   ].filter(Boolean);
 
   return (
-    <Document title={`${title} ${pkg.member.mitglnr ?? pkg.member.adrNr}`} author={pkg.organization.vereinsname}>
+    <Document
+      title={`${title} ${pkg.member.mitglnr ?? pkg.member.adrNr}`}
+      author={pkg.organization.vereinsname}
+    >
       <Page size="A4" style={styles.page} wrap>
         <View style={styles.headerRow}>
           <Text style={styles.sender}>{senderLine}</Text>
@@ -186,7 +189,9 @@ export function MahnungDocument({ pkg }: { pkg: MahnungInput }) {
         </View>
 
         <View style={styles.meta}>
-          <Text style={styles.metaItem}>Mitgliedsnummer: {pkg.member.mitglnr ?? `AdrNr ${pkg.member.adrNr}`}</Text>
+          <Text style={styles.metaItem}>
+            Mitgliedsnummer: {pkg.member.mitglnr ?? `AdrNr ${pkg.member.adrNr}`}
+          </Text>
           <Text style={styles.metaItem}>Datum: {fmtDate(pkg.runDate)}</Text>
         </View>
 

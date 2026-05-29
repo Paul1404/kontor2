@@ -196,7 +196,9 @@ export function TypeToConfirmDialog({
               <h2 id="type-to-confirm-title" className="text-base font-semibold tracking-tight">
                 {title}
               </h2>
-              {description ? <div className="text-sm text-muted-foreground">{description}</div> : null}
+              {description ? (
+                <div className="text-sm text-muted-foreground">{description}</div>
+              ) : null}
             </div>
           </div>
           <button
@@ -267,12 +269,7 @@ export function TypeToConfirmDialog({
           >
             {cancelLabel}
           </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={onConfirm}
-            disabled={!canConfirm}
-          >
+          <Button type="button" variant="destructive" onClick={onConfirm} disabled={!canConfirm}>
             {loading ? <Loader2 className="size-4 animate-spin" /> : null}
             {confirmLabel}
           </Button>

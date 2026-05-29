@@ -37,7 +37,7 @@ describe("verifySignature", () => {
     const v = verifySignature({
       secret: SECRET,
       timestampHeader: String(now),
-      signatureHeader: sig.slice(0, -2) + "00",
+      signatureHeader: `${sig.slice(0, -2)}00`,
       rawBody: body,
       nowSeconds: now,
     });

@@ -15,7 +15,7 @@ import { organizationSettingsTable } from "~/server/db/schema/organization-setti
 import { loadOpenPostings, mahngebuhrFor, sumDecimal } from "~/server/dunning/build-dunning";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
-import { type MahnungInput, MahnungDocument } from "~/server/pdf/templates/mahnung";
+import { MahnungDocument, type MahnungInput } from "~/server/pdf/templates/mahnung";
 
 const Level = v.picklist([1, 2, 3] as const);
 
@@ -61,7 +61,8 @@ export const dunningRouter = {
       const totalOpen = sumDecimal(filtered.map((p) => p.openSum));
       const totalPostings = filtered.reduce((a, p) => a + p.postings.length, 0);
       const byStufe: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
-      for (const p of filtered) byStufe[p.currentMahnstufe] = (byStufe[p.currentMahnstufe] ?? 0) + 1;
+      for (const p of filtered)
+        byStufe[p.currentMahnstufe] = (byStufe[p.currentMahnstufe] ?? 0) + 1;
       return {
         members: filtered,
         totals: {
@@ -107,7 +108,9 @@ export const dunningRouter = {
           : all
       ).filter((m) => !m.mahnSperre || m.mahnSperre === "" || m.mahnSperre === "0");
 
-      const blocked = all.filter((m) => m.mahnSperre && m.mahnSperre !== "" && m.mahnSperre !== "0");
+      const blocked = all.filter(
+        (m) => m.mahnSperre && m.mahnSperre !== "" && m.mahnSperre !== "0",
+      );
 
       const gebuhr = mahngebuhrFor(input.level, org);
 
@@ -193,7 +196,8 @@ export const dunningRouter = {
       );
       if (eligible.length === 0) {
         throw new ORPCError("PRECONDITION_FAILED", {
-          message: "Keine versendbaren Mahnungen (alle Empfänger sind mahngesperrt oder ohne offene Beträge).",
+          message:
+            "Keine versendbaren Mahnungen (alle Empfänger sind mahngesperrt oder ohne offene Beträge).",
         });
       }
 
@@ -418,7 +422,7 @@ export const dunningRouter = {
         .from(dunningItemsTable)
         .where(eq(dunningItemsTable.id, input.itemId))
         .limit(1);
-      if (!row || !row.base64 || !row.filename) {
+      if (!row?.base64 || !row.filename) {
         throw new ORPCError("NOT_FOUND", { message: "Keine PDF-Datei hinterlegt." });
       }
       return { filename: row.filename, base64: row.base64 };

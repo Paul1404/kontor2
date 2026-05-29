@@ -26,8 +26,8 @@ import { CopyButton } from "~/components/ui/copy-button";
 import { Skeleton } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/audit-labels";
-import { triggerDownload } from "~/lib/download";
 import { formatLand } from "~/lib/country";
+import { triggerDownload } from "~/lib/download";
 import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 import { usePageShortcut } from "~/lib/use-global-shortcuts";
@@ -200,7 +200,11 @@ function MemberDetailPage() {
                 mitglnr: member.mitglnr,
               });
               triggerDownload(
-                vcardFilename({ vorname: member.vorname, nachname: member.nachname, mitglnr: member.mitglnr }),
+                vcardFilename({
+                  vorname: member.vorname,
+                  nachname: member.nachname,
+                  mitglnr: member.mitglnr,
+                }),
                 vcf,
                 "text/vcard;charset=utf-8",
               );
@@ -524,9 +528,12 @@ function buildWebsiteHref(value: string | null | undefined): string | null {
   return `https://${trimmed}`;
 }
 
-function buildMapsUrl(
-  m: { strasse?: string | null; hausnummer?: string | null; plz?: string | null; ort?: string | null },
-): string | null {
+function buildMapsUrl(m: {
+  strasse?: string | null;
+  hausnummer?: string | null;
+  plz?: string | null;
+  ort?: string | null;
+}): string | null {
   const street = `${m.strasse ?? ""} ${m.hausnummer ?? ""}`.trim();
   const city = `${m.plz ?? ""} ${m.ort ?? ""}`.trim();
   const query = [street, city].filter(Boolean).join(", ");

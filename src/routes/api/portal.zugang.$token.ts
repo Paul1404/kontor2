@@ -1,14 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { db } from "~/server/db/client";
-import {
-  buildPortalCookie,
-  consumePortalToken,
-} from "~/server/portal/auth";
+import { buildPortalCookie, consumePortalToken } from "~/server/portal/auth";
 
 async function handle({ request, params }: { request: Request; params: { token: string } }) {
   const url = new URL(request.url);
-  const ipAddress =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
   const userAgent = request.headers.get("user-agent");
   const result = await consumePortalToken(db(), params.token, { ipAddress, userAgent });
   if (!result) {

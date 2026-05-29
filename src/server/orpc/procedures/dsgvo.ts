@@ -5,8 +5,8 @@ import { appendAudit } from "~/server/audit/log";
 import {
   consentTypeEnum,
   dsgvoConsentLogTable,
-  dsgvoRequestsTable,
   dsgvoRequestStatusEnum,
+  dsgvoRequestsTable,
   dsgvoRequestTypeEnum,
 } from "~/server/db/schema/dsgvo";
 import { membersTable } from "~/server/db/schema/members";
@@ -68,10 +68,7 @@ export const dsgvoRouter = {
           .orderBy(desc(dsgvoRequestsTable.requestedAt))
           .limit(input.pageSize)
           .offset(offset),
-        context.db
-          .select({ c: count() })
-          .from(dsgvoRequestsTable)
-          .where(where),
+        context.db.select({ c: count() }).from(dsgvoRequestsTable).where(where),
       ]);
 
       return { rows, total: totals[0]?.c ?? 0 };

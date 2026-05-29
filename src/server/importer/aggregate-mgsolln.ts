@@ -39,11 +39,14 @@ export function aggregateMgsolln(
   aggregated: AggregatedSollStellung[];
   missing: Array<{ adrNr: number; vertragNr: string }>;
 } {
-  const agg = new Map<string, AggregatedSollStellung & {
-    amountCents: bigint;
-    paidCents: bigint;
-    openCents: bigint;
-  }>();
+  const agg = new Map<
+    string,
+    AggregatedSollStellung & {
+      amountCents: bigint;
+      paidCents: bigint;
+      openCents: bigint;
+    }
+  >();
   const missing: Array<{ adrNr: number; vertragNr: string }> = [];
 
   for (const m of rows) {

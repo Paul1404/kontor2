@@ -72,7 +72,7 @@ export type PreviewParams = {
  * snapshot exactly mirrors what the user saw.
  */
 export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise<Preview> {
-  const { billingYear, falligkeitsdatum, mandateOverrides = {} } = params;
+  const { billingYear, mandateOverrides = {} } = params;
   const yearStart = new Date(Date.UTC(billingYear, 0, 1));
   const yearEnd = new Date(Date.UTC(billingYear, 11, 31, 23, 59, 59));
 
@@ -309,7 +309,7 @@ function toCents(n: number): bigint {
 
 function amountStrToCents(s: string): bigint {
   const [intp = "0", fracp = ""] = s.split(".");
-  const frac = (fracp + "00").slice(0, 2);
+  const frac = `${fracp}00`.slice(0, 2);
   return BigInt(intp) * 100n + BigInt(frac || "0");
 }
 

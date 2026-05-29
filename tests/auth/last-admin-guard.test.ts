@@ -41,9 +41,7 @@ describe("guardAdminPluginRequest", () => {
   });
 
   it("returns null when body is missing userId", async () => {
-    const out = await guardAdminPluginRequest(
-      post("/api/auth/admin/remove-user", { other: "x" }),
-    );
+    const out = await guardAdminPluginRequest(post("/api/auth/admin/remove-user", { other: "x" }));
     expect(out).toBe(null);
   });
 

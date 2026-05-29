@@ -34,15 +34,29 @@ const STATUS_LABEL: Record<string, string> = {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { icon: typeof CheckCircle2; tone: string }> = {
-    open: { icon: Clock, tone: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200" },
-    in_progress: { icon: Clock, tone: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200" },
-    completed: { icon: CheckCircle2, tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200" },
-    rejected: { icon: XCircle, tone: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200" },
+    open: {
+      icon: Clock,
+      tone: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
+    },
+    in_progress: {
+      icon: Clock,
+      tone: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200",
+    },
+    completed: {
+      icon: CheckCircle2,
+      tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200",
+    },
+    rejected: {
+      icon: XCircle,
+      tone: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200",
+    },
   };
   const entry = map[status] ?? map.open!;
   const Icon = entry.icon;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${entry.tone}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${entry.tone}`}
+    >
       <Icon className="size-3" /> {STATUS_LABEL[status] ?? status}
     </span>
   );
@@ -147,9 +161,7 @@ function DsgvoIndexPage() {
                     <td className="px-4 py-3">
                       <StatusBadge status={r.status} />
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {r.requestedByEmail ?? "—"}
-                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{r.requestedByEmail ?? "—"}</td>
                   </tr>
                 ))
               )}

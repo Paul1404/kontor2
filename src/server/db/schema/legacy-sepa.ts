@@ -1,12 +1,4 @@
-import {
-  decimal,
-  index,
-  integer,
-  pgTable,
-  primaryKey,
-  text,
-  timestamp,
-} from "drizzle-orm/pg-core";
+import { decimal, index, integer, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 /**
  * Historical SEPA runs imported from Linear `lastprot`. Stand-alone (does

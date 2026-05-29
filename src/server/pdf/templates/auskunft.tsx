@@ -209,8 +209,8 @@ export function AuskunftDocument({ pkg }: { pkg: AuskunftsPackage }) {
               <View key={a.id} style={styles.row} wrap={false}>
                 <Text style={styles.key}>{a.filename}</Text>
                 <Text style={styles.value}>
-                  {a.mimeType} · {Math.round(a.sizeBytes / 1024)} KB ·{" "}
-                  hochgeladen {new Date(a.uploadedAt).toLocaleDateString("de-DE")}
+                  {a.mimeType} · {Math.round(a.sizeBytes / 1024)} KB · hochgeladen{" "}
+                  {new Date(a.uploadedAt).toLocaleDateString("de-DE")}
                 </Text>
               </View>
             ))}

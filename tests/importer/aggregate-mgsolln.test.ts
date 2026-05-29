@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  aggregateMgsolln,
-  statusFor,
-} from "~/server/importer/aggregate-mgsolln";
+import { aggregateMgsolln, statusFor } from "~/server/importer/aggregate-mgsolln";
 import type { SollStellungMapped } from "~/server/importer/linear-mapper";
 
 function rec(
@@ -32,8 +29,10 @@ function rec(
   };
 }
 
-const resolver = (mapping: Record<string, { contractId: string; memberId: string }>) =>
-  (adrNr: number, vertragNr: string) => mapping[`${adrNr}|${vertragNr}`] ?? null;
+const resolver =
+  (mapping: Record<string, { contractId: string; memberId: string }>) =>
+  (adrNr: number, vertragNr: string) =>
+    mapping[`${adrNr}|${vertragNr}`] ?? null;
 
 describe("aggregateMgsolln", () => {
   it("collapses multiple Zeitraums into one (contract, year) row", () => {
@@ -72,9 +71,7 @@ describe("aggregateMgsolln", () => {
       }),
     );
     expect(out.aggregated).toHaveLength(3);
-    const byKey = new Map(
-      out.aggregated.map((a) => [`${a.contractId}|${a.billingYear}`, a]),
-    );
+    const byKey = new Map(out.aggregated.map((a) => [`${a.contractId}|${a.billingYear}`, a]));
     expect(byKey.get("c1|2018")?.openAmount).toBe("0.00000000");
     expect(byKey.get("c1|2019")?.openAmount).toBe("100.00000000");
     expect(byKey.get("c2|2019")?.openAmount).toBe("50.00000000");
@@ -111,10 +108,7 @@ describe("aggregateMgsolln", () => {
 
   it("collects rows with no matching contract under `missing`", () => {
     const out = aggregateMgsolln(
-      [
-        rec(7, "11", 2018, 1, "100", "0", "100"),
-        rec(99, "X", 2018, 1, "100", "0", "100"),
-      ],
+      [rec(7, "11", 2018, 1, "100", "0", "100"), rec(99, "X", 2018, 1, "100", "0", "100")],
       resolver({ "7|11": { contractId: "c1", memberId: "m1" } }),
     );
     expect(out.aggregated).toHaveLength(1);

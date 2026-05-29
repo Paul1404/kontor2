@@ -102,8 +102,8 @@ function RuecklaeuferPage() {
                       {r.reasonCode ? <Badge variant="warning">{r.reasonCode}</Badge> : null}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Beitragsjahr {r.billingYear} · zurückgegeben {formatDate(r.returnedOn)} · ursprünglich{" "}
-                      {formatCurrency(r.amount)}
+                      Beitragsjahr {r.billingYear} · zurückgegeben {formatDate(r.returnedOn)} ·
+                      ursprünglich {formatCurrency(r.amount)}
                       {Number(r.rueckgebuhr) > 0 ? (
                         <> · R-Gebühr {formatCurrency(r.rueckgebuhr)}</>
                       ) : null}
@@ -238,11 +238,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Datum Rückgabe">
-            <Input
-              type="date"
-              value={returnedOn}
-              onChange={(e) => setReturnedOn(e.target.value)}
-            />
+            <Input type="date" value={returnedOn} onChange={(e) => setReturnedOn(e.target.value)} />
           </Field>
           <Field label="R-Transaction-Code">
             <select
@@ -288,10 +284,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
           <Button variant="outline" onClick={onDone}>
             Abbrechen
           </Button>
-          <Button
-            disabled={!selected || create.isPending}
-            onClick={() => create.mutate()}
-          >
+          <Button disabled={!selected || create.isPending} onClick={() => create.mutate()}>
             Erfassen
           </Button>
         </div>

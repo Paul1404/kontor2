@@ -79,9 +79,7 @@ function DsgvoDetailPage() {
             {new Date(data.deadline).toLocaleString("de-DE")}
           </Field>
           <Field icon={<CheckCircle2 className="size-4" />} label="Abgeschlossen">
-            {data.completedAt
-              ? new Date(data.completedAt).toLocaleString("de-DE")
-              : "—"}
+            {data.completedAt ? new Date(data.completedAt).toLocaleString("de-DE") : "—"}
           </Field>
           {data.deliverableSha256 ? (
             <Field icon={<Hash className="size-4" />} label="SHA-256">
@@ -111,23 +109,15 @@ function DsgvoDetailPage() {
         <CardContent className="p-5 text-sm text-muted-foreground">
           Die ausgelieferte Datei wurde aus Datenschutzgründen nicht persistiert. Bei Bedarf kann
           eine neue Auskunft auf der Mitgliederseite erstellt werden. Der SHA-256 oben ist der
-          deterministische Fingerprint des damals erzeugten Datensatzes; eine neue Auskunft
-          erzeugt denselben Hash, solange sich keine Daten geändert haben.
+          deterministische Fingerprint des damals erzeugten Datensatzes; eine neue Auskunft erzeugt
+          denselben Hash, solange sich keine Daten geändert haben.
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function Field({
-  icon,
-  label,
-  children,
-}: {
-  icon: ReactNode;
-  label: string;
-  children: ReactNode;
-}) {
+function Field({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-1 text-xs font-semibold uppercase text-muted-foreground">

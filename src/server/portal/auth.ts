@@ -2,10 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import type { DB } from "~/server/db/client";
 import { membersTable } from "~/server/db/schema/members";
-import {
-  portalSessionsTable,
-  portalTokensTable,
-} from "~/server/db/schema/portal";
+import { portalSessionsTable, portalTokensTable } from "~/server/db/schema/portal";
 
 const PORTAL_COOKIE = "svuwv_portal";
 const SESSION_TTL_DAYS = 30;
@@ -193,11 +190,7 @@ export function portalCookieName(): string {
   return PORTAL_COOKIE;
 }
 
-export function buildPortalCookie(
-  value: string,
-  maxAgeSeconds: number,
-  isSecure: boolean,
-): string {
+export function buildPortalCookie(value: string, maxAgeSeconds: number, isSecure: boolean): string {
   const parts = [
     `${PORTAL_COOKIE}=${value}`,
     "Path=/",

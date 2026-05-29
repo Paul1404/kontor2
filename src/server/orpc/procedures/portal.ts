@@ -4,12 +4,9 @@ import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
-import {
-  portalChangeRequestsTable,
-  portalTokensTable,
-} from "~/server/db/schema/portal";
+import { portalChangeRequestsTable, portalTokensTable } from "~/server/db/schema/portal";
 import { env } from "~/server/env";
-import { base, vorstandProc } from "~/server/orpc/base";
+import { base, observability, vorstandProc } from "~/server/orpc/base";
 import {
   buildPortalUrl,
   getPortalCookieFromHeaders,
@@ -36,7 +33,7 @@ const EDITABLE_FIELDS = [
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
 
-const portalProc = base.use(
+const portalProc = base.use(observability).use(
   base.middleware(async ({ context, next }) => {
     const cookie = getPortalCookieFromHeaders(context.headers);
     const session = await resolvePortalSession(context.db, cookie);
@@ -103,61 +100,59 @@ export const portalRouter = {
     };
   }),
 
-  submitChanges: portalProc
-    .input(ChangeRequestSchema)
-    .handler(async ({ context, input }) => {
-      const { memberId, sessionId } = context.portalSession;
+  submitChanges: portalProc.input(ChangeRequestSchema).handler(async ({ context, input }) => {
+    const { memberId, sessionId } = context.portalSession;
 
-      const [member] = await context.db
-        .select()
-        .from(membersTable)
-        .where(eq(membersTable.id, memberId))
-        .limit(1);
-      if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+    const [member] = await context.db
+      .select()
+      .from(membersTable)
+      .where(eq(membersTable.id, memberId))
+      .limit(1);
+    if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
 
-      const proposed: Record<string, unknown> = {};
-      for (const field of EDITABLE_FIELDS) {
-        if (field in input) {
-          proposed[field] = normalize(input[field]);
-        }
+    const proposed: Record<string, unknown> = {};
+    for (const field of EDITABLE_FIELDS) {
+      if (field in input) {
+        proposed[field] = normalize(input[field]);
       }
+    }
 
-      const payload: Record<string, { before: unknown; after: unknown }> = {};
-      for (const [key, value] of Object.entries(proposed)) {
-        const before = (member as unknown as Record<string, unknown>)[key];
-        const beforeNorm = typeof before === "string" ? normalize(before) : before ?? null;
-        if (beforeNorm === value) continue;
-        payload[key] = { before: beforeNorm, after: value };
-      }
-      if (Object.keys(payload).length === 0) {
-        throw new ORPCError("BAD_REQUEST", { message: "Keine Änderungen erkannt." });
-      }
+    const payload: Record<string, { before: unknown; after: unknown }> = {};
+    for (const [key, value] of Object.entries(proposed)) {
+      const before = (member as unknown as Record<string, unknown>)[key];
+      const beforeNorm = typeof before === "string" ? normalize(before) : (before ?? null);
+      if (beforeNorm === value) continue;
+      payload[key] = { before: beforeNorm, after: value };
+    }
+    if (Object.keys(payload).length === 0) {
+      throw new ORPCError("BAD_REQUEST", { message: "Keine Änderungen erkannt." });
+    }
 
-      const ipAddress = context.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+    const ipAddress = context.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 
-      const [row] = await context.db
-        .insert(portalChangeRequestsTable)
-        .values({
-          memberId,
-          sessionId,
-          payload,
-          submittedIp: ipAddress,
-        } as never)
-        .returning({ id: portalChangeRequestsTable.id });
+    const [row] = await context.db
+      .insert(portalChangeRequestsTable)
+      .values({
+        memberId,
+        sessionId,
+        payload,
+        submittedIp: ipAddress,
+      } as never)
+      .returning({ id: portalChangeRequestsTable.id });
 
-      await appendAudit(context.db, {
-        entityType: "portal_change_request",
-        entityId: row!.id,
-        action: "create",
-        source: "system",
-        actorId: null,
-        actorEmail: member.eMailName ?? null,
-        changes: payload,
-        requestId: context.requestId ?? null,
-      });
+    await appendAudit(context.db, {
+      entityType: "portal_change_request",
+      entityId: row!.id,
+      action: "create",
+      source: "system",
+      actorId: null,
+      actorEmail: member.eMailName ?? null,
+      changes: payload,
+      requestId: context.requestId ?? null,
+    });
 
-      return { id: row!.id, fieldCount: Object.keys(payload).length };
-    }),
+    return { id: row!.id, fieldCount: Object.keys(payload).length };
+  }),
 
   /** Admin side: issue a token + mail. */
   issueToken: vorstandProc
@@ -359,7 +354,7 @@ export const portalRouter = {
           for (const f of applied) {
             updates[f] = payload[f]?.after ?? null;
           }
-          updates["updatedAt"] = new Date();
+          updates.updatedAt = new Date();
 
           const [memberAfter] = await tx
             .update(membersTable)
@@ -431,4 +426,3 @@ export const portalRouter = {
         .limit(20);
     }),
 };
-

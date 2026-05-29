@@ -28,7 +28,11 @@ export type VCardInput = {
 };
 
 function escapeVcard(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/;/g, "\\;").replace(/,/g, "\\,");
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\n/g, "\\n")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,");
 }
 
 function line(key: string, value: string | null | undefined): string | null {
@@ -89,9 +93,10 @@ export function buildVCard(m: VCardInput): string {
 }
 
 export function vcardFilename(m: VCardInput): string {
-  const safe = [m.vorname, m.nachname]
-    .filter(Boolean)
-    .join("-")
-    .replace(/[^a-zA-Z0-9_-]+/g, "_") || `mitglied-${m.mitglnr ?? "unbekannt"}`;
+  const safe =
+    [m.vorname, m.nachname]
+      .filter(Boolean)
+      .join("-")
+      .replace(/[^a-zA-Z0-9_-]+/g, "_") || `mitglied-${m.mitglnr ?? "unbekannt"}`;
   return `${safe}.vcf`;
 }

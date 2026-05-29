@@ -7,9 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
+import { VersionChip } from "~/components/ui/version-chip";
 import { signIn } from "~/lib/auth-client";
 import { orpc } from "~/lib/orpc";
-import { VersionChip } from "~/components/ui/version-chip";
 
 export const Route = createFileRoute("/setup")({
   component: SetupPage,
@@ -32,8 +32,7 @@ function SetupPage() {
   const [error, setError] = useState<string | null>(null);
 
   const setup = useMutation({
-    mutationFn: () =>
-      orpc.auth.completeSetup({ email: email.trim(), password, name: name.trim() }),
+    mutationFn: () => orpc.auth.completeSetup({ email: email.trim(), password, name: name.trim() }),
     onSuccess: async () => {
       const result = await signIn.email({ email: email.trim(), password });
       if (result.error) {
@@ -174,7 +173,9 @@ function SetupPage() {
 
       <div className="absolute bottom-4 flex items-center gap-3 text-xs text-muted-foreground">
         <span>SV Untereuerheim 1945 e.V.</span>
-        <span aria-hidden className="text-muted-foreground/40">|</span>
+        <span aria-hidden className="text-muted-foreground/40">
+          |
+        </span>
         <VersionChip variant="muted" />
       </div>
     </div>

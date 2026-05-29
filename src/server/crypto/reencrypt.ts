@@ -1,10 +1,6 @@
 import { sql } from "drizzle-orm";
+import { decryptWithRing, encryptWithRing, inspectCiphertext } from "~/server/crypto/encrypt";
 import type { DB } from "~/server/db/client";
-import {
-  decryptWithRing,
-  encryptWithRing,
-  inspectCiphertext,
-} from "~/server/crypto/encrypt";
 import { env } from "~/server/env";
 
 export type ReencryptReport = {
@@ -83,9 +79,7 @@ async function reencryptBlobColumn(db: DB, target: EncryptedTarget): Promise<Ree
     try {
       const plain = decryptWithRing(ring, row.v);
       const fresh = encryptWithRing(ring, plain);
-      await db.execute(
-        sql`update ${tableRef} set ${colRef} = ${fresh} where ${idRef} = ${row.id}`,
-      );
+      await db.execute(sql`update ${tableRef} set ${colRef} = ${fresh} where ${idRef} = ${row.id}`);
       report.rewritten += 1;
     } catch (err) {
       report.failed += 1;
