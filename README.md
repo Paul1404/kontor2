@@ -1,7 +1,8 @@
 # SVUWV
 
 Vereinsverwaltung for SV 1945 Untereuerheim e.V. Replaces the legacy "Linear
-Webverein" desktop software. Internal admin tool, German UI.
+Webverein" web software (the ASP.NET app hosted at
+`online.linear-software.de`). Internal admin tool, German UI.
 
 ## What it does
 
@@ -118,7 +119,7 @@ Webverein" desktop software. Internal admin tool, German UI.
     via GUID.
   - Re-imports are idempotent: the `fee_runs_linear_guid_uk` unique
     index dedupes on Linear's GUID.
-  - Linear's `pass` table (BENUTZER/PASSWORT/UI-prefs of the desktop
+  - Linear's `pass` table (BENUTZER/PASSWORT/UI-prefs of the Linear web
     app) is intentionally not imported. better-auth owns user accounts.
 
 ### Snapshots
