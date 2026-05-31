@@ -1,3 +1,11 @@
+// Load the TanStack Start type augmentations globally. Start adds the `server`
+// option (request handlers, server middleware) to file-route options via a
+// `declare module "@tanstack/router-core"` augmentation that ships in
+// `@tanstack/react-start`. Nothing in `src` imports that package directly, so
+// without this reference the augmentation never enters the program and
+// `createFileRoute(...)({ server: ... })` fails to typecheck.
+/// <reference types="@tanstack/react-start" />
+
 declare module "*.css?url" {
   const url: string;
   export default url;
