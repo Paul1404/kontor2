@@ -129,19 +129,26 @@
   ::selection {
     background-color: color-mix(in oklab, var(--color-primary) 30%, transparent);
   }
+}
 
-  /*
-   * iOS Safari zooms into form controls whose computed font-size is below
-   * 16px. The UI uses text-sm (14px) inputs/selects/textareas which would
-   * trigger the zoom on every focus. Bump to 16px below `sm` so desktop
-   * styling stays unchanged.
-   */
-  @media (max-width: 639px) {
-    input,
-    select,
-    textarea {
-      font-size: 16px;
-    }
+/*
+ * iOS Safari zooms into form controls whose computed font-size is below
+ * 16px and never zooms back out, so the app looks zoomed in after the
+ * first focus (e.g. tapping the email field on the login form). The UI
+ * uses text-sm (14px) inputs/selects/textareas, so we bump them to 16px
+ * below `sm`; desktop styling stays unchanged.
+ *
+ * This rule is intentionally UNLAYERED. Tailwind's `text-sm` utility lives
+ * in the `utilities` cascade layer, which wins over anything in `@layer
+ * base`. Unlayered declarations beat all layered ones regardless of
+ * selector specificity, so keeping this outside `@layer` is what makes the
+ * 16px actually stick over `text-sm`.
+ */
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
   }
 }
 
