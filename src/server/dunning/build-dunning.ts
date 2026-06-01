@@ -74,6 +74,22 @@ export function isDunningBlocked(mahnSperre: string | null | undefined): boolean
   return v !== "" && v !== "0";
 }
 
+/**
+ * Decide how to reopen a Sollstellung that was booked as `eingezogen`
+ * (SEPA presumed collected) but is being manually flagged as *not*
+ * collected. Returns the update to apply, or `null` if the row is not
+ * `eingezogen` and must be left untouched -- a settled (`paid`),
+ * cancelled, or already dunnable (`open` / `returned`) posting must never
+ * be resurrected or double-counted.
+ */
+export function planNichtEingezogen(row: {
+  status: string;
+  amount: string;
+}): { status: "open"; paidAmount: "0"; openAmount: string; mahnstufe: 0 } | null {
+  if (row.status !== "eingezogen") return null;
+  return { status: "open", paidAmount: "0", openAmount: row.amount, mahnstufe: 0 };
+}
+
 export type LoadOpenParams = {
   /** Only include postings older than this date. Default: today. */
   cutoffDate?: Date;

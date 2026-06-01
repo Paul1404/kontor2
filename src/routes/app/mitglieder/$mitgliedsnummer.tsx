@@ -382,7 +382,11 @@ function MemberDetailPage() {
         />
       </div>
 
-      <SollstellungenCard rows={sollstellungen as never} />
+      <SollstellungenCard
+        rows={sollstellungen as never}
+        mitgliedsnummer={mitgliedsnummer}
+        canEdit={canEdit}
+      />
 
       <AttachmentsCard
         memberId={member.id}
@@ -583,7 +587,36 @@ type SollstellungRow = {
   status: string;
 };
 
-function SollstellungenCard({ rows }: { rows: SollstellungRow[] }) {
+function SollstellungenCard({
+  rows,
+  mitgliedsnummer,
+  canEdit,
+}: {
+  rows: SollstellungRow[];
+  mitgliedsnummer: string;
+  canEdit: boolean;
+}) {
+  const qc = useQueryClient();
+  const [target, setTarget] = useState<SollstellungRow | null>(null);
+
+  const markNichtEingezogen = useMutation({
+    mutationFn: (id: string) => orpc.dunning.markNichtEingezogen({ sollStellungIds: [id] }),
+    onSuccess: (r) => {
+      if (r.count > 0) {
+        toast.success("Als nicht eingezogen markiert. Erscheint jetzt in den Forderungen.");
+      } else {
+        toast.info("Keine Änderung. Posten war nicht im Status „Eingezogen“.");
+      }
+      setTarget(null);
+      qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
+      qc.invalidateQueries({ queryKey: ["dunning.open"] });
+    },
+    onError: (e: Error) => {
+      setTarget(null);
+      toast.error("Konnte nicht aktualisiert werden", { description: e.message });
+    },
+  });
+
   if (!rows || rows.length === 0) {
     return (
       <Card>
@@ -598,6 +631,7 @@ function SollstellungenCard({ rows }: { rows: SollstellungRow[] }) {
       </Card>
     );
   }
+  const showActions = canEdit && rows.some((r) => r.status === "eingezogen");
   return (
     <Card>
       <CardHeader>
@@ -614,6 +648,7 @@ function SollstellungenCard({ rows }: { rows: SollstellungRow[] }) {
               <th className="px-4 py-2 text-right font-medium">Betrag</th>
               <th className="px-4 py-2 text-right font-medium">Offen</th>
               <th className="px-4 py-2 font-medium">Status</th>
+              {showActions ? <th className="px-4 py-2 text-right font-medium">Aktion</th> : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -632,11 +667,43 @@ function SollstellungenCard({ rows }: { rows: SollstellungRow[] }) {
                 <td className="px-4 py-2">
                   <SollstellungStatusBadge status={r.status} />
                 </td>
+                {showActions ? (
+                  <td className="px-4 py-2 text-right">
+                    {r.status === "eingezogen" ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setTarget(r)}
+                        disabled={markNichtEingezogen.isPending}
+                      >
+                        Nicht eingezogen
+                      </Button>
+                    ) : null}
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
         </table>
       </CardContent>
+
+      <ConfirmDialog
+        open={target !== null}
+        onOpenChange={(o) => {
+          if (!o && !markNichtEingezogen.isPending) setTarget(null);
+        }}
+        title="Als nicht eingezogen markieren"
+        description={
+          target
+            ? `Sollstellung ${target.billingYear} (${formatCurrency(target.amount)}) als nicht eingezogen markieren? Der Posten wird wieder geöffnet und erscheint in den Forderungen, sodass er gemahnt werden kann.`
+            : ""
+        }
+        confirmLabel="Nicht eingezogen"
+        loading={markNichtEingezogen.isPending}
+        onConfirm={() => {
+          if (target) markNichtEingezogen.mutate(target.id);
+        }}
+      />
     </Card>
   );
 }

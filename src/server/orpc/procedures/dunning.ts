@@ -16,6 +16,7 @@ import {
   isDunningBlocked,
   loadOpenPostings,
   mahngebuhrFor,
+  planNichtEingezogen,
   sumDecimal,
 } from "~/server/dunning/build-dunning";
 import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
@@ -534,6 +535,102 @@ export const dunningRouter = {
               status: { before: row.status, after: "paid" },
               paidAmount: { before: row.paidAmount, after: row.amount },
               openAmount: { before: row.openAmount, after: "0" },
+              ...(input.notes != null && input.notes !== row.notes
+                ? { notes: { before: row.notes, after: input.notes } }
+                : {}),
+            },
+            requestId,
+          });
+          changed += 1;
+        }
+
+        return { changed, skipped };
+      });
+
+      return { count: result.changed, skipped: result.skipped };
+    }),
+
+  /**
+   * Manually flag Sollstellungen that were booked as `eingezogen` (SEPA
+   * direct debit presumed collected) as *not* collected, so they reappear
+   * in the Forderungen-/Mahnwesen. Reverses the eingezogen assumption when
+   * the Vorstand knows a debit did not actually clear but no formal
+   * Rücklastschrift (camt.054) is on hand: status -> open, paidAmount -> 0,
+   * openAmount -> full amount, Mahnstufe reset to 0.
+   *
+   * Only touches `eingezogen` rows; anything already open/returned/paid/
+   * cancelled is skipped so a settled or already-dunnable posting is never
+   * resurrected or double-counted.
+   */
+  markNichtEingezogen: vorstandProc
+    .input(
+      v.object({
+        sollStellungIds: v.pipe(v.array(v.string()), v.minLength(1)),
+        notes: v.optional(v.nullable(v.string()), null),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const ids = [...new Set(input.sollStellungIds)];
+      const actorId = context.session!.user.id;
+      const actorEmail = context.session!.user.email;
+      const requestId = context.requestId ?? null;
+
+      const result = await context.db.transaction(async (tx) => {
+        // Read current state first so the audit log records real
+        // before-values and so we skip rows that are not `eingezogen`
+        // instead of clobbering them.
+        const existing = await tx
+          .select({
+            id: sollStellungenTable.id,
+            status: sollStellungenTable.status,
+            amount: sollStellungenTable.amount,
+            paidAmount: sollStellungenTable.paidAmount,
+            openAmount: sollStellungenTable.openAmount,
+            mahnstufe: sollStellungenTable.mahnstufe,
+            notes: sollStellungenTable.notes,
+          })
+          .from(sollStellungenTable)
+          .where(inArray(sollStellungenTable.id, ids));
+
+        let changed = 0;
+        let skipped = 0;
+        const now = new Date();
+
+        for (const row of existing) {
+          // Only an `eingezogen` posting can be turned back into an open
+          // claim here. Everything else is already in a sane state.
+          const plan = planNichtEingezogen(row);
+          if (!plan) {
+            skipped += 1;
+            continue;
+          }
+          const nextNotes = input.notes ?? row.notes;
+          await tx
+            .update(sollStellungenTable)
+            .set({
+              status: plan.status,
+              paidAmount: plan.paidAmount,
+              openAmount: plan.openAmount,
+              mahnstufe: plan.mahnstufe,
+              notes: nextNotes,
+              updatedAt: now,
+            })
+            .where(eq(sollStellungenTable.id, row.id));
+
+          await appendAudit(tx, {
+            entityType: "soll_stellung",
+            entityId: row.id,
+            action: "update",
+            source: "ui",
+            actorId,
+            actorEmail,
+            changes: {
+              status: { before: row.status, after: plan.status },
+              paidAmount: { before: row.paidAmount, after: plan.paidAmount },
+              openAmount: { before: row.openAmount, after: plan.openAmount },
+              ...(row.mahnstufe !== plan.mahnstufe
+                ? { mahnstufe: { before: String(row.mahnstufe), after: String(plan.mahnstufe) } }
+                : {}),
               ...(input.notes != null && input.notes !== row.notes
                 ? { notes: { before: row.notes, after: input.notes } }
                 : {}),
