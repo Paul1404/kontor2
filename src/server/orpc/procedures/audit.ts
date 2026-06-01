@@ -12,7 +12,9 @@ const ActionEnum = v.picklist(["create", "update", "delete", "restore"]);
 const ListInput = v.object({
   page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
   pageSize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
-  q: v.optional(v.string(), ""),
+  // Cap the free-text length: the search runs `changes::text ilike` over the
+  // whole audit log (no index), so an unbounded term is a slow-query vector.
+  q: v.optional(v.pipe(v.string(), v.maxLength(200)), ""),
   actorEmail: v.optional(v.nullable(v.string()), null),
   action: v.optional(v.nullable(ActionEnum), null),
   entityType: v.optional(v.nullable(v.string()), null),
