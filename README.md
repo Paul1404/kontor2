@@ -217,6 +217,98 @@ TanStack Start (Vite), TanStack Router, TanStack Query, TanStack Form,
 oRPC v1, better-auth, Drizzle ORM, Valibot, PostgreSQL, Redis, S3, Bun,
 Tailwind v4, shadcn-style components, lucide-react, Vitest, Biome.
 
+## Architecture
+
+One TanStack Start app does both SSR and client. Vite builds it into
+`dist/server` and `dist/client`. In production `scripts/serve.ts` wraps the
+built server handler on `Bun.serve`, serves static assets from `dist/client`
+and `public` with a 1-day cache, runs a startup preflight, and adds security
+headers plus a Content-Security-Policy to every HTML response. Railway
+terminates TLS in front of it.
+
+### Request lifecycle
+
+1. A request hits the Bun server. Static files are served directly; everything
+   else falls through to the SSR handler.
+2. File-based routes in `src/routes` resolve. `__root.tsx` is the document
+   shell, `app/route.tsx` is the authed app, `portal/route.tsx` is the member
+   self-service shell, and `api/*.ts` are server routes.
+3. Data and mutations go through oRPC, mounted at `/api/rpc/$`. The browser
+   talks to it through an isomorphic `@orpc/tanstack-query` client so the same
+   calls work during SSR and after hydration.
+4. Every procedure runs through one middleware chain: `observability` (times
+   the call, logs the outcome once with a request id) then a role gate. That
+   gives four entrypoints in `src/server/orpc/base.ts`: `publicProc`,
+   `authedProc`, `vorstandProc`, `adminProc`. Roles are hierarchical
+   (`admin` ⊃ `vorstand` ⊃ `readonly`) and checked server-side on every call,
+   never by route guards alone.
+5. `createContext` builds the per-request context (Drizzle handle, better-auth
+   session, headers, request id), ensures the bootstrap admin exists, and lazily
+   starts the snapshot scheduler.
+
+### Layers
+
+- **Routes** (`src/routes`) -- thin. They load data via oRPC and render
+  components. The route tree (`routeTree.gen.ts`) is generated.
+- **API** (`src/server/orpc`) -- `router.ts` composes one domain router per file
+  in `procedures/` into `appRouter`. Input and output are validated with
+  Valibot. Errors are thrown as `ORPCError` with uppercase codes.
+- **Domain logic** (`src/server/*`) -- the heavy lifting lives outside the
+  procedures so it stays testable:
+  - `importer/` -- Linear `mysqldump` ingest. `sql-tokenizer.ts` splits the
+    dump, `linear-mapper.ts` maps raw columns, `aggregate-mgsolln.ts` folds
+    historical Sollstellungen, `ingest-pipeline.ts` is the shared write path
+    for both SQL upload and SVUMS push.
+  - `sepa/` -- `build-fee-run.ts`, `select-mandate.ts`, `pain008.ts` (the
+    pain.008.001.02 writer), `iban.ts`, `direct-debit.ts`.
+  - `dunning/`, `dsgvo/` (`auskunft`, `erasure`, `policy`), `reports/`,
+    `verbandsmeldung/` (Bestandserhebung), `snapshots/`, `audit/`.
+  - `pdf/` -- `@react-pdf/renderer` templates and a render wrapper.
+- **Data** (`src/server/db`) -- Drizzle over Postgres (`postgres.js`). Tables in
+  `schema/`, columns snake_case mirroring Linear, table objects camelCase.
+  Secret columns use the `encryptedText` type, which transparently AES-256-GCM
+  encrypts on write and decrypts on read.
+- **Frontend libs** (`src/lib`) -- theme, global shortcuts, saved table views,
+  vCard, CSV export, formatting, and the release-notes source of truth.
+  Components live in `src/components`, with shadcn-style primitives in
+  `components/ui`.
+
+### Secrets and crypto
+
+A single `APP_SECRET` (32-byte hex) is the only secret you set. Everything else
+is derived from it with HKDF-SHA256 in `src/server/env.ts`: the better-auth
+signing key, the data-at-rest encryption key, and the SVUMS push HMAC key. The
+encryption keyring keeps rotated-out keys readable, so an `APP_SECRET` rotation
+plus a re-encrypt pass never strands existing ciphertext. Env is parsed and
+validated with Valibot at startup; a bad value fails fast with a readable
+message.
+
+### External services
+
+- **Postgres** -- system of record, accessed only from server code.
+- **Redis** (`ioredis`) -- live member-search cache behind the command palette
+  and nonce dedupe for SVUMS push replay protection.
+- **S3** -- per-member file attachments, served through short-lived signed URLs.
+
+### Scheduling
+
+The nightly member snapshot runs in-process. It initialises lazily inside
+`createContext`, so `serve.ts` fires one self-request on boot to make sure the
+timer is installed even on a fresh container with no traffic. A Postgres
+advisory lock keeps multiple replicas from running it at once. Set
+`SNAPSHOT_CRON_DISABLED=1` and drive it externally via the HMAC-protected
+`POST /api/cron/snapshots` route instead.
+
+### Server routes
+
+- `/api/rpc/$` -- oRPC handler (all app data and mutations).
+- `/api/auth/$` -- better-auth handler.
+- `/api/health` -- Railway healthcheck.
+- `/api/files/$id` -- signed attachment download.
+- `/api/ingest/svums` -- HMAC-signed SVUMS push.
+- `/api/cron/snapshots` -- external snapshot trigger.
+- `/api/portal/zugang/$token`, `/api/portal/logout` -- magic-link portal session.
+
 ## Run locally
 
 ```bash
