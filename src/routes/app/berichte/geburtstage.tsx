@@ -6,7 +6,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { QueryErrorRow } from "~/components/ui/query-error";
-import { triggerDownload } from "~/lib/download";
+import { exportCsvFile } from "~/lib/export";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -45,9 +45,8 @@ function GeburtstagePage() {
     queryFn: () => orpc.reports.geburtstage({ month, year, abteilungId }),
   });
 
-  async function exportCsv() {
-    const res = await orpc.reports.geburtstageExport({ month, year, abteilungId });
-    triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+  function exportCsv() {
+    return exportCsvFile(() => orpc.reports.geburtstageExport({ month, year, abteilungId }));
   }
 
   return (

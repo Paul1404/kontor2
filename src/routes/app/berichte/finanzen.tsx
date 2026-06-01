@@ -6,7 +6,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
 import { QueryError } from "~/components/ui/query-error";
-import { triggerDownload } from "~/lib/download";
+import { exportCsvFile } from "~/lib/export";
 import { formatCurrency } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -22,9 +22,8 @@ function FinanzenPage() {
     queryFn: () => orpc.reports.finanzbericht({ year }),
   });
 
-  async function exportCsv() {
-    const res = await orpc.reports.finanzberichtExport({ year });
-    triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+  function exportCsv() {
+    return exportCsvFile(() => orpc.reports.finanzberichtExport({ year }));
   }
 
   return (

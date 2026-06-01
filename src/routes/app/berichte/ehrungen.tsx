@@ -6,7 +6,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
 import { QueryError } from "~/components/ui/query-error";
-import { triggerDownload } from "~/lib/download";
+import { exportCsvFile } from "~/lib/export";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -31,9 +31,8 @@ function EhrungenPage() {
     );
   }
 
-  async function exportCsv() {
-    const res = await orpc.reports.ehrungenExport({ year, jubilaeen: selected });
-    triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+  function exportCsv() {
+    return exportCsvFile(() => orpc.reports.ehrungenExport({ year, jubilaeen: selected }));
   }
 
   return (

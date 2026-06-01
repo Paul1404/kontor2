@@ -437,29 +437,31 @@ export const dunningRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      const [updated] = await context.db
-        .update(dunningItemsTable)
-        .set({
-          sentChannel: input.channel,
-          sentTo: input.sentTo,
-          sentAt: new Date(),
-        })
-        .where(eq(dunningItemsTable.id, input.itemId))
-        .returning({ id: dunningItemsTable.id, memberId: dunningItemsTable.memberId });
-      if (!updated) throw new ORPCError("NOT_FOUND", { message: "Mahnung nicht gefunden." });
+      await context.db.transaction(async (tx) => {
+        const [updated] = await tx
+          .update(dunningItemsTable)
+          .set({
+            sentChannel: input.channel,
+            sentTo: input.sentTo,
+            sentAt: new Date(),
+          })
+          .where(eq(dunningItemsTable.id, input.itemId))
+          .returning({ id: dunningItemsTable.id, memberId: dunningItemsTable.memberId });
+        if (!updated) throw new ORPCError("NOT_FOUND", { message: "Mahnung nicht gefunden." });
 
-      await appendAudit(context.db, {
-        entityType: "dunning_item",
-        entityId: updated.id,
-        action: "update",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: {
-          sentChannel: { before: "pending", after: input.channel },
-          sentTo: { before: null, after: input.sentTo },
-        },
-        requestId: context.requestId ?? null,
+        await appendAudit(tx, {
+          entityType: "dunning_item",
+          entityId: updated.id,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            sentChannel: { before: "pending", after: input.channel },
+            sentTo: { before: null, after: input.sentTo },
+          },
+          requestId: context.requestId ?? null,
+        });
       });
 
       return { ok: true };
@@ -477,32 +479,72 @@ export const dunningRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      const updated = await context.db
-        .update(sollStellungenTable)
-        .set({
-          status: "paid",
-          paidAmount: sql`${sollStellungenTable.amount}`,
-          openAmount: "0",
-          notes: input.notes ?? sql`${sollStellungenTable.notes}`,
-          updatedAt: new Date(),
-        })
-        .where(inArray(sollStellungenTable.id, input.sollStellungIds))
-        .returning({ id: sollStellungenTable.id, memberId: sollStellungenTable.memberId });
+      const ids = [...new Set(input.sollStellungIds)];
+      const actorId = context.session!.user.id;
+      const actorEmail = context.session!.user.email;
+      const requestId = context.requestId ?? null;
 
-      for (const row of updated) {
-        await appendAudit(context.db, {
-          entityType: "soll_stellung",
-          entityId: row.id,
-          action: "update",
-          source: "ui",
-          actorId: context.session!.user.id,
-          actorEmail: context.session!.user.email,
-          changes: { status: { before: "open", after: "paid" } },
-          requestId: context.requestId ?? null,
-        });
-      }
+      const result = await context.db.transaction(async (tx) => {
+        // Read the current state first so the audit log records the real
+        // before-values (not a hard-coded "open") and so we skip rows that
+        // are already paid instead of re-stamping them.
+        const existing = await tx
+          .select({
+            id: sollStellungenTable.id,
+            status: sollStellungenTable.status,
+            amount: sollStellungenTable.amount,
+            paidAmount: sollStellungenTable.paidAmount,
+            openAmount: sollStellungenTable.openAmount,
+            notes: sollStellungenTable.notes,
+          })
+          .from(sollStellungenTable)
+          .where(inArray(sollStellungenTable.id, ids));
 
-      return { count: updated.length };
+        let changed = 0;
+        let skipped = 0;
+        const now = new Date();
+
+        for (const row of existing) {
+          if (row.status === "paid") {
+            skipped += 1;
+            continue;
+          }
+          const nextNotes = input.notes ?? row.notes;
+          await tx
+            .update(sollStellungenTable)
+            .set({
+              status: "paid",
+              paidAmount: row.amount,
+              openAmount: "0",
+              notes: nextNotes,
+              updatedAt: now,
+            })
+            .where(eq(sollStellungenTable.id, row.id));
+
+          await appendAudit(tx, {
+            entityType: "soll_stellung",
+            entityId: row.id,
+            action: "update",
+            source: "ui",
+            actorId,
+            actorEmail,
+            changes: {
+              status: { before: row.status, after: "paid" },
+              paidAmount: { before: row.paidAmount, after: row.amount },
+              openAmount: { before: row.openAmount, after: "0" },
+              ...(input.notes != null && input.notes !== row.notes
+                ? { notes: { before: row.notes, after: input.notes } }
+                : {}),
+            },
+            requestId,
+          });
+          changed += 1;
+        }
+
+        return { changed, skipped };
+      });
+
+      return { count: result.changed, skipped: result.skipped };
     }),
 
   cancel: vorstandProc

@@ -12,7 +12,7 @@ import {
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
-import { triggerDownload, triggerDownloadBase64 } from "~/lib/download";
+import { exportBase64File, exportCsvFile } from "~/lib/export";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/berichte/bestandserhebung")({
@@ -64,14 +64,16 @@ function BestandserhebungPage() {
     },
   });
 
-  async function exportCsv() {
-    const res = await orpc.verbandsmeldung.exportCsv({ stichtag, abteilungIds: [] });
-    triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+  function exportCsv() {
+    return exportCsvFile(() => orpc.verbandsmeldung.exportCsv({ stichtag, abteilungIds: [] }));
   }
 
-  async function exportPdf() {
-    const res = await orpc.verbandsmeldung.exportPdf({ stichtag, abteilungIds: [] });
-    triggerDownloadBase64(res.filename, res.base64, "application/pdf");
+  function exportPdf() {
+    return exportBase64File(
+      () => orpc.verbandsmeldung.exportPdf({ stichtag, abteilungIds: [] }),
+      "application/pdf",
+      "PDF heruntergeladen",
+    );
   }
 
   const cellMap = new Map<string, number>();

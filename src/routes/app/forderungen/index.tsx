@@ -37,7 +37,8 @@ function ForderungenPage() {
   const markPaid = useMutation({
     mutationFn: (sollStellungIds: string[]) => orpc.dunning.markPaid({ sollStellungIds }),
     onSuccess: (r) => {
-      toast.success(`${r.count} Posten als bezahlt markiert.`);
+      const skippedNote = r.skipped > 0 ? ` (${r.skipped} bereits bezahlt)` : "";
+      toast.success(`${r.count} Posten als bezahlt markiert.${skippedNote}`);
       setSelected(new Set());
       setConfirmPaidOpen(false);
       qc.invalidateQueries({ queryKey: ["dunning.open"] });

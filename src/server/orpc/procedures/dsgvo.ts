@@ -130,36 +130,41 @@ export const dsgvoRouter = {
 
       const actor = context.session?.user;
       const now = new Date();
-      const [created] = await context.db
-        .insert(dsgvoRequestsTable)
-        .values({
-          memberId: input.memberId,
-          type: "auskunft",
-          status: "completed",
-          requestedAt: now,
-          requestedBy: actor?.id ?? null,
-          requestedByEmail: actor?.email ?? null,
-          deadline: makeDeadline(),
-          completedAt: now,
-          completedBy: actor?.id ?? null,
-          notes: input.notes || null,
-          deliverableSha256: sha256,
-          deliverableSizeBytes: byteSize,
-        })
-        .returning({ id: dsgvoRequestsTable.id });
+      // Request record + audit entry are written atomically so an export is
+      // never logged as delivered without its audit row (or vice versa).
+      const created = await context.db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(dsgvoRequestsTable)
+          .values({
+            memberId: input.memberId,
+            type: "auskunft",
+            status: "completed",
+            requestedAt: now,
+            requestedBy: actor?.id ?? null,
+            requestedByEmail: actor?.email ?? null,
+            deadline: makeDeadline(),
+            completedAt: now,
+            completedBy: actor?.id ?? null,
+            notes: input.notes || null,
+            deliverableSha256: sha256,
+            deliverableSizeBytes: byteSize,
+          })
+          .returning({ id: dsgvoRequestsTable.id });
 
-      await appendAudit(context.db, {
-        entityType: "member",
-        entityId: input.memberId,
-        action: "dsgvo_export",
-        source: "dsgvo",
-        actorId: actor?.id ?? null,
-        actorEmail: actor?.email ?? null,
-        changes: {
-          sha256: { before: null, after: sha256 },
-          requestId: { before: null, after: created?.id ?? null },
-        },
-        requestId: context.requestId,
+        await appendAudit(tx, {
+          entityType: "member",
+          entityId: input.memberId,
+          action: "dsgvo_export",
+          source: "dsgvo",
+          actorId: actor?.id ?? null,
+          actorEmail: actor?.email ?? null,
+          changes: {
+            sha256: { before: null, after: sha256 },
+            requestId: { before: null, after: row?.id ?? null },
+          },
+          requestId: context.requestId,
+        });
+        return row;
       });
 
       const stamp = now.toISOString().slice(0, 10);
@@ -219,20 +224,18 @@ export const dsgvoRouter = {
     )
     .handler(async ({ context, input }) => {
       const actor = context.session?.user;
-      try {
-        const result = await executeErasure(context.db, input.memberId, {
-          forceOverride: input.forceOverride,
-          overrideReason: input.overrideReason,
-          requestId: input.requestId,
-          actorId: actor?.id ?? null,
-          actorEmail: actor?.email ?? null,
-        });
-        return result;
-      } catch (err) {
-        throw new ORPCError("VALIDATION_FAILED", {
-          message: (err as Error).message,
-        });
-      }
+      // Guard failures (retention not expired, missing override reason,
+      // member not found) are raised as typed ORPCErrors inside
+      // executeErasure and propagate with the right code. Unexpected errors
+      // bubble to the observability layer and surface as a generic 500
+      // instead of being mislabelled as a validation error.
+      return await executeErasure(context.db, input.memberId, {
+        forceOverride: input.forceOverride,
+        overrideReason: input.overrideReason,
+        requestId: input.requestId,
+        actorId: actor?.id ?? null,
+        actorEmail: actor?.email ?? null,
+      });
     }),
 
   lastErasure: vorstandProc
@@ -252,25 +255,29 @@ export const dsgvoRouter = {
     )
     .handler(async ({ context, input }) => {
       const actor = context.session?.user;
-      await context.db.insert(dsgvoConsentLogTable).values({
-        memberId: input.memberId,
-        consentType: input.consentType,
-        granted: input.granted,
-        recordedBy: actor?.id ?? null,
-        recordedByEmail: actor?.email ?? null,
-        evidence: input.evidence || null,
-      });
-      await appendAudit(context.db, {
-        entityType: "member",
-        entityId: input.memberId,
-        action: "dsgvo_consent_change",
-        source: "dsgvo",
-        actorId: actor?.id ?? null,
-        actorEmail: actor?.email ?? null,
-        changes: {
-          [input.consentType]: { before: null, after: input.granted },
-        },
-        requestId: context.requestId,
+      // Consent record + its audit entry must land together — a consent log
+      // without an audit trail is a compliance gap.
+      await context.db.transaction(async (tx) => {
+        await tx.insert(dsgvoConsentLogTable).values({
+          memberId: input.memberId,
+          consentType: input.consentType,
+          granted: input.granted,
+          recordedBy: actor?.id ?? null,
+          recordedByEmail: actor?.email ?? null,
+          evidence: input.evidence || null,
+        });
+        await appendAudit(tx, {
+          entityType: "member",
+          entityId: input.memberId,
+          action: "dsgvo_consent_change",
+          source: "dsgvo",
+          actorId: actor?.id ?? null,
+          actorEmail: actor?.email ?? null,
+          changes: {
+            [input.consentType]: { before: null, after: input.granted },
+          },
+          requestId: context.requestId,
+        });
       });
       return { ok: true };
     }),

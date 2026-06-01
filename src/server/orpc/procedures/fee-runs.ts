@@ -150,6 +150,29 @@ export const feeRunsRouter = {
     const mandateById = new Map(mandates.map((m) => [m.id, m]));
 
     const result = await context.db.transaction(async (tx) => {
+      // Serialize commits for the same billing year. Without this, two
+      // concurrent requests can both pass the duplicate-check above and both
+      // insert a committed run -> double SEPA collection. The advisory xact
+      // lock blocks the second commit until the first finishes and is
+      // released automatically at COMMIT/ROLLBACK. We then re-check inside
+      // the lock so the check-and-insert is atomic.
+      await tx.execute(sql`select pg_advisory_xact_lock(4711, ${input.billingYear})`);
+      const [dupe] = await tx
+        .select({ id: feeRunsTable.id })
+        .from(feeRunsTable)
+        .where(
+          and(
+            eq(feeRunsTable.billingYear, input.billingYear),
+            eq(feeRunsTable.status, "committed"),
+          ),
+        )
+        .limit(1);
+      if (dupe) {
+        throw new ORPCError("CONFLICT", {
+          message: `Für ${input.billingYear} existiert bereits ein abgeschlossener Beitragslauf. Stornieren Sie ihn, um einen neuen zu erzeugen.`,
+        });
+      }
+
       // 1. Insert fee run header.
       const [run] = await tx
         .insert(feeRunsTable)
