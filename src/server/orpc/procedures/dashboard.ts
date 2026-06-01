@@ -12,9 +12,15 @@ function startOfMonth(): Date {
 export const dashboardRouter = {
   stats: authedProc.input(v.void()).handler(async ({ context }) => {
     const since = startOfMonth();
-    // All four counts must exclude soft-deleted members or the dashboard
-    // drifts from the member list as soon as the first soft-delete happens.
-    const notDeleted = isNull(membersTable.deletedAt);
+    // All counts must exclude soft-deleted members or the dashboard drifts
+    // from the member list / fee runs. Members carry TWO delete flags: the
+    // app's `deletedAt` and the legacy Linear `geloscht` (set on imported
+    // rows). The canonical "live member" definition (build-fee-run,
+    // build-dunning) excludes both.
+    const notDeleted = and(
+      isNull(membersTable.deletedAt),
+      sql`coalesce(${membersTable.geloscht}, false) = false`,
+    );
     const [
       [total],
       [aktiv],
@@ -58,6 +64,7 @@ export const dashboardRouter = {
           end as bucket
           from ${membersTable}
           where ${membersTable.deletedAt} is null
+            and coalesce(${membersTable.geloscht}, false) = false
             and ${membersTable.austritt} is null
             and ${membersTable.verstorbenAm} is null
         ) t
@@ -77,6 +84,7 @@ export const dashboardRouter = {
           end as gender
           from ${membersTable}
           where ${membersTable.deletedAt} is null
+            and coalesce(${membersTable.geloscht}, false) = false
             and ${membersTable.austritt} is null
             and ${membersTable.verstorbenAm} is null
         ) t
@@ -119,6 +127,7 @@ export const dashboardRouter = {
             end as next_birthday
           from ${membersTable}
           where ${membersTable.deletedAt} is null
+            and coalesce(${membersTable.geloscht}, false) = false
             and ${membersTable.austritt} is null
             and ${membersTable.verstorbenAm} is null
             and ${membersTable.geburtsdatum} is not null
@@ -141,6 +150,7 @@ export const dashboardRouter = {
           end as bucket
           from ${membersTable}
           where ${membersTable.deletedAt} is null
+            and coalesce(${membersTable.geloscht}, false) = false
             and ${membersTable.austritt} is null
             and ${membersTable.verstorbenAm} is null
         ) t
@@ -157,7 +167,13 @@ export const dashboardRouter = {
       .from(memberAbteilungenTable)
       .innerJoin(abteilungenTable, eq(memberAbteilungenTable.abteilungId, abteilungenTable.id))
       .innerJoin(membersTable, eq(membersTable.id, memberAbteilungenTable.memberId))
-      .where(and(isNull(memberAbteilungenTable.austrittsdatum), isNull(membersTable.deletedAt)))
+      .where(
+        and(
+          isNull(memberAbteilungenTable.austrittsdatum),
+          isNull(membersTable.deletedAt),
+          sql`coalesce(${membersTable.geloscht}, false) = false`,
+        ),
+      )
       .groupBy(abteilungenTable.name)
       .orderBy(sql`count(*) desc`);
 

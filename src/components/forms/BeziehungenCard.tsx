@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Loader2, Plus, Search, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -177,6 +177,8 @@ function AddRelationshipForm({
   const [reciprocal, setReciprocal] = useState(true);
   const [notiz, setNotiz] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const kindId = useId();
+  const notizId = useId();
 
   const search = useMutation({
     mutationFn: (query: string) =>
@@ -276,18 +278,24 @@ function AddRelationshipForm({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          <Label htmlFor={kindId} className="text-xs uppercase tracking-wide text-muted-foreground">
             Beziehungsart
           </Label>
           <Input
+            id={kindId}
             value={kind}
             onChange={(e) => setKind(e.target.value)}
             placeholder="z. B. Familienmitglied"
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Notiz</Label>
-          <Input value={notiz} onChange={(e) => setNotiz(e.target.value)} />
+          <Label
+            htmlFor={notizId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Notiz
+          </Label>
+          <Input id={notizId} value={notiz} onChange={(e) => setNotiz(e.target.value)} />
         </div>
       </div>
 

@@ -5,7 +5,23 @@ import { env } from "~/server/env";
 import { runIngest } from "~/server/importer/ingest-pipeline";
 import { acquireNonce, rateLimit } from "~/server/redis/client";
 
+// Mirror the 50 MB cap the interactive SQL-dump import enforces, so a
+// compromised or buggy SVUMS sender can't exhaust memory with an unbounded
+// (but correctly signed) body.
+const MAX_BYTES = 50 * 1024 * 1024;
+
+function tooLarge(): Response {
+  return new Response(JSON.stringify({ error: "payload_too_large" }), {
+    status: 413,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 async function handle({ request }: { request: Request }): Promise<Response> {
+  const declaredLength = Number(request.headers.get("content-length") ?? "");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BYTES) {
+    return tooLarge();
+  }
   const limit = await rateLimit({
     key: `ingest-svums:${request.headers.get("x-forwarded-for") ?? "ip"}`,
     limit: 30,
@@ -18,6 +34,11 @@ async function handle({ request }: { request: Request }): Promise<Response> {
     });
   }
   const raw = await request.text();
+  // Defend against a missing/dishonest Content-Length: re-check the actual
+  // body size before doing any work with it.
+  if (raw.length > MAX_BYTES) {
+    return tooLarge();
+  }
   const verify = verifySignature({
     secret: env().svumsPushSecret,
     timestampHeader: request.headers.get("x-svums-timestamp"),
