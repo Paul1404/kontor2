@@ -183,13 +183,20 @@ export const membersRouter = {
     }
     if (input.status === "aktiv") {
       // Match the dashboard's "Aktive Mitglieder" definition: not exited
-      // and not deceased. The Linear `Aktiv` column is a free-form string
-      // ("J"/"N"/empty in German source data) and not reliable here.
+      // and not deceased. Enforce `isNull(austritt)` here directly so the
+      // result is correct even when `includeAusgetretene` is set (the
+      // explicit status wins over that broad toggle — otherwise exited
+      // members would leak into the "aktiv" list). The Linear `Aktiv`
+      // column is a free-form string and not reliable here.
+      conditions.push(isNull(membersTable.austritt) as never);
       conditions.push(isNull(membersTable.verstorbenAm) as never);
     }
     if (input.status === "passiv") {
+      // A passive member who has left is no longer passive — exclude exited
+      // and deceased regardless of `includeAusgetretene`.
       conditions.push(
         eq(membersTable.aktivPasiv, "P") as never,
+        isNull(membersTable.austritt) as never,
         isNull(membersTable.verstorbenAm) as never,
       );
     }

@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { CheckCircle2, Clock, FileText, ShieldCheck, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent } from "~/components/ui/card";
+import { formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/dsgvo/")({
@@ -153,10 +154,10 @@ function DsgvoIndexPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {new Date(r.requestedAt).toLocaleString("de-DE")}
+                      {formatDateTime(r.requestedAt)}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground tabular-nums">
-                      {new Date(r.deadline).toLocaleDateString("de-DE")}
+                      {formatDate(r.deadline)}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={r.status} />

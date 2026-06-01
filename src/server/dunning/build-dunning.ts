@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import type { DB } from "~/server/db/client";
 import { sepaReturnsTable } from "~/server/db/schema/dunning";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
@@ -121,7 +121,16 @@ export async function loadOpenPostings(
     })
     .from(sollStellungenTable)
     .innerJoin(membersTable, eq(sollStellungenTable.memberId, membersTable.id))
-    .where(and(...conditions, sql`coalesce(${membersTable.geloscht}, false) = false`))
+    .where(
+      and(
+        ...conditions,
+        // Skip both soft-delete flags: legacy `geloscht` and the app's
+        // `deletedAt` (set by members.softDelete). A UI-deleted member must
+        // never receive a Mahnung.
+        sql`coalesce(${membersTable.geloscht}, false) = false`,
+        isNull(membersTable.deletedAt),
+      ),
+    )
     .orderBy(membersTable.nachname, membersTable.vorname, sollStellungenTable.billingYear);
 
   // Optional Rücklastgebühr sum per Sollstellung (latest return only is

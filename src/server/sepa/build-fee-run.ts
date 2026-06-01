@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { DB } from "~/server/db/client";
 import type { Contract } from "~/server/db/schema/contracts";
 import { contractsTable } from "~/server/db/schema/contracts";
@@ -92,7 +92,11 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
     .innerJoin(membersTable, eq(contractsTable.memberId, membersTable.id))
     .where(
       and(
+        // Exclude both the legacy Linear soft-delete (`geloscht`) and the
+        // app's own soft-delete (`deletedAt`). A member deleted via the UI
+        // only has `deletedAt` set — without this they'd still be collected.
         sql`coalesce(${membersTable.geloscht}, false) = false`,
+        isNull(membersTable.deletedAt),
         sql`(${contractsTable.vertragBegin} is null or ${contractsTable.vertragBegin} <= ${yearEnd})`,
         sql`(${contractsTable.vertragEnde} is null or ${contractsTable.vertragEnde} > ${yearStart})`,
       ),

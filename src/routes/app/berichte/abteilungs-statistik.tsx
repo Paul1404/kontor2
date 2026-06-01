@@ -4,6 +4,7 @@ import { BarChart3, Download, Loader2, Printer } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { QueryErrorRow } from "~/components/ui/query-error";
 import { triggerDownload } from "~/lib/download";
 import { orpc } from "~/lib/orpc";
 
@@ -92,6 +93,8 @@ function AbteilungsStatistikPage() {
                     </span>
                   </td>
                 </tr>
+              ) : data.isError ? (
+                <QueryErrorRow colSpan={4} onRetry={() => data.refetch()} />
               ) : !data.data || data.data.rows.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">

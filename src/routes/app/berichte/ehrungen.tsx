@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
+import { QueryError } from "~/components/ui/query-error";
 import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -118,6 +119,8 @@ function EhrungenPage() {
             <Loader2 className="size-5 animate-spin" /> Lade...
           </CardContent>
         </Card>
+      ) : data.isError ? (
+        <QueryError error={data.error} onRetry={() => data.refetch()} />
       ) : !data.data || data.data.groups.every((g) => g.members.length === 0) ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center gap-2 p-12 text-center text-muted-foreground">

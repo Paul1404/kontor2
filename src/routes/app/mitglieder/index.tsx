@@ -255,6 +255,11 @@ function MembersListPage() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (isTypingTarget(e.target)) return;
       if (confirmOpenRef.current) return;
+      // Don't drive the table while any modal overlay is open (command
+      // palette, cheatsheet, release notes, confirm dialogs). They all mark
+      // themselves aria-modal; without this guard `j/k/o` would move the
+      // cursor — or worse, navigate away — behind an open dialog.
+      if (typeof document !== "undefined" && document.querySelector('[aria-modal="true"]')) return;
       const currentRows = rowsRef.current;
       const len = currentRows.length;
       const k = e.key;

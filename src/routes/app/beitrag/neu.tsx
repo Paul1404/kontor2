@@ -15,6 +15,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { QueryError } from "~/components/ui/query-error";
 import { triggerDownload } from "~/lib/download";
 import { formatCurrency } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -127,6 +128,9 @@ function NewFeeRunPage() {
           preview={previewQuery.data}
           isLoading={previewQuery.isLoading}
           isFetching={previewQuery.isFetching}
+          isError={previewQuery.isError}
+          error={previewQuery.error}
+          onRetry={() => previewQuery.refetch()}
           billingYear={billingYear}
           falligkeitsdatum={falligkeitsdatum}
           mandateOverrides={mandateOverrides}
@@ -225,6 +229,9 @@ function PreviewStep(props: {
   preview: PreviewData | undefined;
   isLoading: boolean;
   isFetching: boolean;
+  isError: boolean;
+  error: unknown;
+  onRetry: () => void;
   billingYear: number;
   falligkeitsdatum: string;
   mandateOverrides: Record<string, string>;
@@ -234,6 +241,23 @@ function PreviewStep(props: {
   commitPending: boolean;
   commitError: string | null;
 }) {
+  if (props.isError) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-4 p-10">
+          <QueryError
+            title="Vorschau fehlgeschlagen"
+            description="Der Beitragslauf konnte nicht berechnet werden."
+            error={props.error}
+            onRetry={props.onRetry}
+          />
+          <Button type="button" variant="outline" onClick={props.onBack}>
+            Zurück
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
   if (props.isLoading || !props.preview) {
     return (
       <Card>

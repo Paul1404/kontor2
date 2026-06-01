@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Calendar, CheckCircle2, FileLock2, Hash, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { Card, CardContent } from "~/components/ui/card";
+import { formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/dsgvo/$id")({
@@ -70,16 +71,16 @@ function DsgvoDetailPage() {
             )}
           </Field>
           <Field icon={<Calendar className="size-4" />} label="Eingegangen">
-            {new Date(data.requestedAt).toLocaleString("de-DE")}
+            {formatDateTime(data.requestedAt)}
             {data.requestedByEmail ? (
               <span className="text-muted-foreground"> · {data.requestedByEmail}</span>
             ) : null}
           </Field>
           <Field icon={<Calendar className="size-4" />} label="Frist">
-            {new Date(data.deadline).toLocaleString("de-DE")}
+            {formatDateTime(data.deadline)}
           </Field>
           <Field icon={<CheckCircle2 className="size-4" />} label="Abgeschlossen">
-            {data.completedAt ? new Date(data.completedAt).toLocaleString("de-DE") : "—"}
+            {data.completedAt ? formatDateTime(data.completedAt) : "—"}
           </Field>
           {data.deliverableSha256 ? (
             <Field icon={<Hash className="size-4" />} label="SHA-256">

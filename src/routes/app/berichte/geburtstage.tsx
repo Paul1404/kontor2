@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { QueryErrorRow } from "~/components/ui/query-error";
 import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -134,6 +135,8 @@ function GeburtstagePage() {
                     </span>
                   </td>
                 </tr>
+              ) : data.isError ? (
+                <QueryErrorRow colSpan={6} onRetry={() => data.refetch()} />
               ) : !data.data || data.data.rows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
