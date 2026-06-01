@@ -130,25 +130,30 @@ export const portalRouter = {
 
     const ipAddress = context.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 
-    const [row] = await context.db
-      .insert(portalChangeRequestsTable)
-      .values({
-        memberId,
-        sessionId,
-        payload,
-        submittedIp: ipAddress,
-      } as never)
-      .returning({ id: portalChangeRequestsTable.id });
+    // Change request + its audit entry must be written together — a portal
+    // submission without an audit row is a gap the Vorstand can't trace.
+    const row = await context.db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(portalChangeRequestsTable)
+        .values({
+          memberId,
+          sessionId,
+          payload,
+          submittedIp: ipAddress,
+        } as never)
+        .returning({ id: portalChangeRequestsTable.id });
 
-    await appendAudit(context.db, {
-      entityType: "portal_change_request",
-      entityId: row!.id,
-      action: "create",
-      source: "system",
-      actorId: null,
-      actorEmail: member.eMailName ?? null,
-      changes: payload,
-      requestId: context.requestId ?? null,
+      await appendAudit(tx, {
+        entityType: "portal_change_request",
+        entityId: inserted!.id,
+        action: "create",
+        source: "system",
+        actorId: null,
+        actorEmail: member.eMailName ?? null,
+        changes: payload,
+        requestId: context.requestId ?? null,
+      });
+      return inserted;
     });
 
     return { id: row!.id, fieldCount: Object.keys(payload).length };
@@ -248,13 +253,32 @@ export const portalRouter = {
   revokeToken: vorstandProc
     .input(v.object({ id: v.string(), reason: v.optional(v.nullable(v.string()), null) }))
     .handler(async ({ context, input }) => {
-      const [updated] = await context.db
-        .update(portalTokensTable)
-        .set({ revokedAt: new Date(), revokedReason: input.reason })
-        .where(eq(portalTokensTable.id, input.id))
-        .returning({ id: portalTokensTable.id });
-      if (!updated) throw new ORPCError("NOT_FOUND", { message: "Token nicht gefunden." });
-      return { ok: true };
+      const now = new Date();
+      const updated = await context.db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(portalTokensTable)
+          .set({ revokedAt: now, revokedReason: input.reason })
+          .where(eq(portalTokensTable.id, input.id))
+          .returning({ id: portalTokensTable.id, memberId: portalTokensTable.memberId });
+        if (!row) throw new ORPCError("NOT_FOUND", { message: "Token nicht gefunden." });
+
+        // Revoking portal access is a state change like every sibling
+        // mutation — record it so the audit trail is complete.
+        await appendAudit(tx, {
+          entityType: "member",
+          entityId: row.memberId,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            portalTokenRevoked: { before: null, after: input.reason ?? true },
+          },
+          requestId: context.requestId ?? null,
+        });
+        return row;
+      });
+      return { ok: true, memberId: updated.memberId };
     }),
 
   /** Admin side: list pending change requests for review. */

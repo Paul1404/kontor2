@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -160,6 +160,9 @@ function AddContractForm({
   const [art, setArt] = useState<string>("");
   const [vertragBegin, setVertragBegin] = useState(() => new Date().toISOString().slice(0, 10));
   const [error, setError] = useState<string | null>(null);
+  const artId = useId();
+  const vertragNrId = useId();
+  const beginId = useId();
 
   // Hide inactive Beitragsarten and anything the member already has.
   const options = (feeTypes.data ?? []).filter(
@@ -190,7 +193,7 @@ function AddContractForm({
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="flex flex-col gap-1.5 md:col-span-2">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          <Label htmlFor={artId} className="text-xs uppercase tracking-wide text-muted-foreground">
             Beitragsart
           </Label>
           {feeTypes.isLoading ? (
@@ -203,6 +206,7 @@ function AddContractForm({
             </p>
           ) : (
             <select
+              id={artId}
               value={art}
               onChange={(e) => setArt(e.target.value)}
               className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
@@ -218,10 +222,14 @@ function AddContractForm({
           )}
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          <Label
+            htmlFor={vertragNrId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
             Vertragsnummer
           </Label>
           <Input
+            id={vertragNrId}
             value={vertragNr}
             onChange={(e) => setVertragNr(e.target.value)}
             placeholder="z. B. 2026-001"
@@ -229,8 +237,14 @@ function AddContractForm({
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Beginn</Label>
+          <Label
+            htmlFor={beginId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Beginn
+          </Label>
           <Input
+            id={beginId}
             type="date"
             value={vertragBegin}
             onChange={(e) => setVertragBegin(e.target.value)}

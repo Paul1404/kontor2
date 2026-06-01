@@ -12,7 +12,12 @@ import {
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
-import { loadOpenPostings, mahngebuhrFor, sumDecimal } from "~/server/dunning/build-dunning";
+import {
+  isDunningBlocked,
+  loadOpenPostings,
+  mahngebuhrFor,
+  sumDecimal,
+} from "~/server/dunning/build-dunning";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { MahnungDocument, type MahnungInput } from "~/server/pdf/templates/mahnung";
@@ -106,11 +111,9 @@ export const dunningRouter = {
         input.memberIds && input.memberIds.length > 0
           ? all.filter((m) => input.memberIds!.includes(m.memberId))
           : all
-      ).filter((m) => !m.mahnSperre || m.mahnSperre === "" || m.mahnSperre === "0");
+      ).filter((m) => !isDunningBlocked(m.mahnSperre));
 
-      const blocked = all.filter(
-        (m) => m.mahnSperre && m.mahnSperre !== "" && m.mahnSperre !== "0",
-      );
+      const blocked = all.filter((m) => isDunningBlocked(m.mahnSperre));
 
       const gebuhr = mahngebuhrFor(input.level, org);
 
@@ -191,9 +194,7 @@ export const dunningRouter = {
         mahnstufe: input.level - 1,
         memberIds: input.memberIds,
       });
-      const eligible = allEligible.filter(
-        (m) => !m.mahnSperre || m.mahnSperre === "" || m.mahnSperre === "0",
-      );
+      const eligible = allEligible.filter((m) => !isDunningBlocked(m.mahnSperre));
       if (eligible.length === 0) {
         throw new ORPCError("PRECONDITION_FAILED", {
           message:

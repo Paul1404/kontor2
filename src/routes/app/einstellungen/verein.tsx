@@ -321,12 +321,15 @@ function Field({
   hint?: string;
   children: React.ReactNode;
 }) {
+  // Wrap the control inside the <label> so clicking the label focuses the
+  // field and screen readers announce it — without threading an id through
+  // every call site.
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
+    <Label className="flex flex-col gap-1.5">
+      <span>{label}</span>
       {children}
-      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
-    </div>
+      {hint ? <span className="text-xs font-normal text-muted-foreground">{hint}</span> : null}
+    </Label>
   );
 }
 

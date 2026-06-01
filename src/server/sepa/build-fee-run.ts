@@ -311,13 +311,20 @@ function toCents(n: number): bigint {
   return BigInt(Math.round(n * 100));
 }
 
-function amountStrToCents(s: string): bigint {
-  const [intp = "0", fracp = ""] = s.split(".");
+export function amountStrToCents(s: string): bigint {
+  const trimmed = s.trim();
+  const negative = trimmed.startsWith("-");
+  const unsigned = negative || trimmed.startsWith("+") ? trimmed.slice(1) : trimmed;
+  const [intp = "0", fracp = ""] = unsigned.split(".");
   const frac = `${fracp}00`.slice(0, 2);
-  return BigInt(intp) * 100n + BigInt(frac || "0");
+  // Build the magnitude from the unsigned parts, then apply the sign once.
+  // (Splitting the sign onto only the integer part would drop the cents'
+  // sign, e.g. "-5.50" -> -5*100 + 50 = -450 instead of -550.)
+  const magnitude = BigInt(intp || "0") * 100n + BigInt(frac || "0");
+  return negative ? -magnitude : magnitude;
 }
 
-function centsToAmount(cents: bigint): string {
+export function centsToAmount(cents: bigint): string {
   const sign = cents < 0n ? "-" : "";
   const abs = cents < 0n ? -cents : cents;
   return `${sign}${(abs / 100n).toString()}.${(abs % 100n).toString().padStart(2, "0")}`;

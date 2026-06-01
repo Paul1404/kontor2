@@ -191,8 +191,8 @@ function SetupStep(props: {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label>Beitragsjahr</Label>
+          <Label className="flex flex-col gap-1.5">
+            <span>Beitragsjahr</span>
             <Input
               type="number"
               min={2000}
@@ -200,18 +200,18 @@ function SetupStep(props: {
               value={props.billingYear}
               onChange={(e) => props.setBillingYear(Number(e.target.value) || props.billingYear)}
             />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Fälligkeitsdatum</Label>
+          </Label>
+          <Label className="flex flex-col gap-1.5">
+            <span>Fälligkeitsdatum</span>
             <Input
               type="date"
               value={props.falligkeitsdatum}
               onChange={(e) => props.setFalligkeitsdatum(e.target.value)}
             />
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs font-normal text-muted-foreground">
               Datum, zu dem die Bank die Lastschrift einreichen soll.
             </span>
-          </div>
+          </Label>
         </div>
         <div className="mt-6 flex justify-end">
           <Button onClick={props.onNext}>

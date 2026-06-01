@@ -62,6 +62,18 @@ export function mahngebuhrFor(
   return org.mahngebuhr3;
 }
 
+/**
+ * Whether a member's `mahnSperre` (dunning block) flag suppresses dunning.
+ * The legacy Linear column is free-form; we treat an empty/whitespace-only
+ * value and the sentinel "0" as "not blocked" and anything else as blocked.
+ * Trimming matters: a stray space must not silently block all dunning.
+ */
+export function isDunningBlocked(mahnSperre: string | null | undefined): boolean {
+  if (!mahnSperre) return false;
+  const v = mahnSperre.trim();
+  return v !== "" && v !== "0";
+}
+
 export type LoadOpenParams = {
   /** Only include postings older than this date. Default: today. */
   cutoffDate?: Date;
