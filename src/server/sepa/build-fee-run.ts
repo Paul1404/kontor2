@@ -8,6 +8,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import type { SepaMandate } from "~/server/db/schema/sepa";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { paysByDirectDebit } from "~/server/sepa/direct-debit";
 import { selectMandate, sequenceTypeFor } from "~/server/sepa/select-mandate";
 
 export type MandateSummary = {
@@ -163,7 +164,7 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
       continue;
     }
 
-    if (contract.lastschrift && contract.lastschrift.toUpperCase() !== "J") {
+    if (!paysByDirectDebit(contract.lastschrift, contract.aufRechnung)) {
       excluded.push({
         memberId: member.id,
         memberName,
