@@ -1,7 +1,8 @@
 import { ORPCError } from "@orpc/server";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
+import { withUniqueRetry } from "~/server/db/retry";
 import { membersTable } from "~/server/db/schema/members";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { vorstandProc } from "~/server/orpc/base";
@@ -41,71 +42,94 @@ const UpdateInput = v.object({
 
 export const sepaRouter = {
   create: vorstandProc.input(CreateInput).handler(async ({ context, input }) => {
-    return await context.db.transaction(async (tx) => {
-      const [member] = await tx
-        .select({ id: membersTable.id, adrNr: membersTable.adrNr })
-        .from(membersTable)
-        .where(eq(membersTable.id, input.memberId))
-        .limit(1);
-      if (!member) {
-        throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
-      }
+    // Auto-generated `M{seq}` mandate refs race under concurrency: two
+    // creates for the same member can read the same max and collide on the
+    // (adrNr, mandatsNr) unique index. Retry re-reads the max and picks the
+    // next free suffix. A user-supplied duplicate is caught explicitly below
+    // and surfaces as a friendly CONFLICT instead of being retried.
+    return await withUniqueRetry(() =>
+      context.db.transaction(async (tx) => {
+        const [member] = await tx
+          .select({ id: membersTable.id, adrNr: membersTable.adrNr })
+          .from(membersTable)
+          .where(eq(membersTable.id, input.memberId))
+          .limit(1);
+        if (!member) {
+          throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        }
 
-      let mandatsNr = input.mandatsNr?.trim();
-      if (!mandatsNr) {
-        // Generate `M{seq}` where seq is the next integer suffix not yet
-        // used for this member. Keeps the format short and predictable,
-        // and avoids collisions with the Linear-imported numeric mandate
-        // refs.
-        const [maxRow] = await tx
-          .select({
-            maxSeq: sql<number>`coalesce(max(nullif(regexp_replace(${sepaMandatesTable.mandatsNr}, '\\D', '', 'g'), '')::int), 0)::int`,
-          })
-          .from(sepaMandatesTable)
-          .where(eq(sepaMandatesTable.memberId, member.id));
-        mandatsNr = `M${(maxRow?.maxSeq ?? 0) + 1}`;
-      }
+        let mandatsNr = input.mandatsNr?.trim();
+        if (mandatsNr) {
+          const [dupe] = await tx
+            .select({ id: sepaMandatesTable.id })
+            .from(sepaMandatesTable)
+            .where(
+              and(
+                eq(sepaMandatesTable.adrNr, member.adrNr),
+                eq(sepaMandatesTable.mandatsNr, mandatsNr),
+              ),
+            )
+            .limit(1);
+          if (dupe) {
+            throw new ORPCError("CONFLICT", {
+              message: `Mandatsreferenz ${mandatsNr} ist für dieses Mitglied bereits vergeben.`,
+            });
+          }
+        } else {
+          // Generate `M{seq}` where seq is the next integer suffix not yet
+          // used for this member. Keeps the format short and predictable,
+          // and avoids collisions with the Linear-imported numeric mandate
+          // refs.
+          const [maxRow] = await tx
+            .select({
+              maxSeq: sql<number>`coalesce(max(nullif(regexp_replace(${sepaMandatesTable.mandatsNr}, '\\D', '', 'g'), '')::int), 0)::int`,
+            })
+            .from(sepaMandatesTable)
+            .where(eq(sepaMandatesTable.memberId, member.id));
+          mandatsNr = `M${(maxRow?.maxSeq ?? 0) + 1}`;
+        }
 
-      const values = {
-        memberId: member.id,
-        adrNr: member.adrNr,
-        mandatsNr,
-        lastschriftart: input.lastschriftart ?? null,
-        typ: input.typ ?? null,
-        status: input.status ?? null,
-        angelegtAm: new Date(),
-        unterschriftDatum: toDateOrNull(input.unterschriftDatum, "Unterschriftsdatum"),
-        gueltigAb: toDateOrNull(input.gueltigAb, "Gültig ab"),
-        gultigBis: toDateOrNull(input.gultigBis, "Gültig bis"),
-      };
+        const values = {
+          memberId: member.id,
+          adrNr: member.adrNr,
+          mandatsNr,
+          lastschriftart: input.lastschriftart ?? null,
+          typ: input.typ ?? null,
+          status: input.status ?? null,
+          angelegtAm: new Date(),
+          unterschriftDatum: toDateOrNull(input.unterschriftDatum, "Unterschriftsdatum"),
+          gueltigAb: toDateOrNull(input.gueltigAb, "Gültig ab"),
+          gultigBis: toDateOrNull(input.gultigBis, "Gültig bis"),
+        };
 
-      const [row] = await tx
-        .insert(sepaMandatesTable)
-        .values(values as never)
-        .returning({ id: sepaMandatesTable.id });
-      if (!row) {
-        throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
-      }
+        const [row] = await tx
+          .insert(sepaMandatesTable)
+          .values(values as never)
+          .returning({ id: sepaMandatesTable.id });
+        if (!row) {
+          throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
+        }
 
-      const auditId = await appendAudit(tx, {
-        entityType: "sepa_mandate",
-        entityId: row.id,
-        action: "create",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: diff(null, values as Record<string, unknown>),
-        requestId: context.requestId ?? null,
-      });
-      await takeMemberSnapshot(tx, member.id, {
-        trigger: "mutation",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        auditId,
-      });
+        const auditId = await appendAudit(tx, {
+          entityType: "sepa_mandate",
+          entityId: row.id,
+          action: "create",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: diff(null, values as Record<string, unknown>),
+          requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, member.id, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
+        });
 
-      return { id: row.id, mandatsNr };
-    });
+        return { id: row.id, mandatsNr };
+      }),
+    );
   }),
 
   update: vorstandProc

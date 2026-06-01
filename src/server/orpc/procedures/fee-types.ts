@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { asc, count, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
+import { withUniqueRetry } from "~/server/db/retry";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { adminProc, authedProc } from "~/server/orpc/base";
@@ -75,39 +76,43 @@ export const feeTypesRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      return await context.db.transaction(async (tx) => {
-        let art = input.art ?? null;
-        if (art == null) {
-          const [row] = await tx
-            .select({ max: sql<number>`coalesce(max(${feeTypesTable.art}), 0)::int` })
-            .from(feeTypesTable);
-          art = (row?.max ?? 0) + 1;
-        } else {
-          const [dupe] = await tx
-            .select({ art: feeTypesTable.art })
-            .from(feeTypesTable)
-            .where(eq(feeTypesTable.art, art))
-            .limit(1);
-          if (dupe) {
-            throw new ORPCError("CONFLICT", {
-              message: `Beitragsart mit Nummer ${art} existiert bereits.`,
-            });
+      // Auto-numbered `art` races under concurrency (two creates read the
+      // same max and collide on the unique index). Retry re-reads the max.
+      return await withUniqueRetry(() =>
+        context.db.transaction(async (tx) => {
+          let art = input.art ?? null;
+          if (art == null) {
+            const [row] = await tx
+              .select({ max: sql<number>`coalesce(max(${feeTypesTable.art}), 0)::int` })
+              .from(feeTypesTable);
+            art = (row?.max ?? 0) + 1;
+          } else {
+            const [dupe] = await tx
+              .select({ art: feeTypesTable.art })
+              .from(feeTypesTable)
+              .where(eq(feeTypesTable.art, art))
+              .limit(1);
+            if (dupe) {
+              throw new ORPCError("CONFLICT", {
+                message: `Beitragsart mit Nummer ${art} existiert bereits.`,
+              });
+            }
           }
-        }
-        const patch = buildPatch(input.patch);
-        await tx.insert(feeTypesTable).values({ ...patch, art, updatedAt: new Date() } as never);
-        await appendAudit(tx, {
-          entityType: "fee_type",
-          entityId: String(art),
-          action: "create",
-          source: "ui",
-          actorId: context.session!.user.id,
-          actorEmail: context.session!.user.email,
-          changes: diff(null, { ...patch, art }),
-          requestId: context.requestId ?? null,
-        });
-        return { art };
-      });
+          const patch = buildPatch(input.patch);
+          await tx.insert(feeTypesTable).values({ ...patch, art, updatedAt: new Date() } as never);
+          await appendAudit(tx, {
+            entityType: "fee_type",
+            entityId: String(art),
+            action: "create",
+            source: "ui",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            changes: diff(null, { ...patch, art }),
+            requestId: context.requestId ?? null,
+          });
+          return { art };
+        }),
+      );
     }),
 
   update: adminProc
