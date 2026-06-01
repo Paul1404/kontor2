@@ -193,6 +193,13 @@ export const feeRunsRouter = {
       // 2. Bulk-upsert soll_stellungen — one statement instead of one per
       //    candidate. .returning() gives us back the ids in input order,
       //    so we can correlate them with the candidates below.
+      //
+      //    Every candidate here is a SEPA direct-debit payer (build-fee-run
+      //    excludes anyone without `lastschrift = 'J'` and an active mandate).
+      //    A direct debit is collected unless the bank reports a return, so we
+      //    book the posting as `eingezogen` (presumed collected) right away
+      //    instead of `open`. Recording a Rücklastschrift reopens it. This is
+      //    what keeps the Mahnwesen from chasing money that was already pulled.
       const sollByContract = new Map<string, string>();
       if (preview.candidates.length > 0) {
         const sollValues = preview.candidates.map((c) => ({
@@ -201,9 +208,9 @@ export const feeRunsRouter = {
           billingYear: input.billingYear,
           falligkeitsdatum: input.falligkeitsdatum,
           amount: c.amount,
-          paidAmount: "0",
-          openAmount: c.amount,
-          status: "open" as const,
+          paidAmount: c.amount,
+          openAmount: "0",
+          status: "eingezogen" as const,
         }));
         const insertedSoll = await tx
           .insert(sollStellungenTable)
@@ -212,9 +219,9 @@ export const feeRunsRouter = {
             target: [sollStellungenTable.contractId, sollStellungenTable.billingYear],
             set: {
               amount: sql`excluded.amount`,
-              openAmount: sql`excluded.open_amount`,
-              paidAmount: "0",
-              status: "open",
+              openAmount: "0",
+              paidAmount: sql`excluded.amount`,
+              status: "eingezogen",
               falligkeitsdatum: input.falligkeitsdatum,
               updatedAt: new Date(),
             },

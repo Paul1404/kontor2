@@ -9,8 +9,10 @@ import { auditLogTable } from "~/server/db/schema/audit";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
+import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import {
   CACHE_NS,
@@ -518,6 +520,16 @@ export const membersRouter = {
         const patch = buildMemberPatch(input.patch);
         if (Object.keys(patch).length === 0) {
           return { mitglnr: existing.mitglnr };
+        }
+
+        // Enforce the configurable Kündigungsfrist only when the Austritt is
+        // newly set or changed. No-op when the feature is disabled.
+        if (
+          patch.austritt instanceof Date &&
+          patch.austritt.getTime() !== existing.austritt?.getTime()
+        ) {
+          const [settings] = await tx.select().from(organizationSettingsTable).limit(1);
+          assertCancellationAllowed(settings, patch.austritt);
         }
 
         // Build the projected next-state for the diff so the audit log

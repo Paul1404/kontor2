@@ -1,14 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { AlertTriangle, FileWarning, ScrollText, Trash2, UserMinus, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  Banknote,
+  FileWarning,
+  ScrollText,
+  Trash2,
+  UserMinus,
+  Users,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { TypeToConfirmDialog } from "~/components/ui/confirm-dialog";
+import { ConfirmDialog, TypeToConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { Skeleton } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
-import { formatDateTime } from "~/lib/format";
+import { formatCurrency, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/admin/erweitert")({
@@ -55,6 +63,7 @@ function DangerZonePage() {
         count={overview.data?.softDeletedMembers ?? 0}
         loading={overview.isLoading}
       />
+      <SettleHistoricalCard />
       <TrimAuditCard totalEntries={overview.data?.auditEntries ?? 0} loading={overview.isLoading} />
       <WipeEverythingCard memberCount={overview.data?.members ?? 0} loading={overview.isLoading} />
     </div>
@@ -86,6 +95,120 @@ function DangerCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">{children}</CardContent>
+    </Card>
+  );
+}
+
+function SettleHistoricalCard() {
+  const qc = useQueryClient();
+  const [throughYear, setThroughYear] = useState(() => new Date().getUTCFullYear() - 1);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const preview = useQuery({
+    queryKey: ["dunning.settleHistoricalPreview", throughYear],
+    queryFn: () => orpc.dunning.settleHistoricalPreview({ throughYear }),
+  });
+  const mut = useMutation({
+    mutationFn: () =>
+      orpc.dunning.settleHistorical({ throughYear, expectedCount: preview.data?.count ?? 0 }),
+    onSuccess: async (res) => {
+      toast.success(`${res.count} Altposten als eingezogen markiert`);
+      setDialogOpen(false);
+      await qc.invalidateQueries({ queryKey: ["dunning.settleHistoricalPreview"] });
+      await qc.invalidateQueries({ queryKey: ["dunning.open"] });
+    },
+    onError: (e) =>
+      toast.error("Abgleich fehlgeschlagen", {
+        description: e instanceof Error ? e.message : String(e),
+      }),
+  });
+
+  const count = preview.data?.count ?? 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sky-600/10 text-sky-600">
+            <Banknote className="size-5" />
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <CardTitle>Alt-Lastschriften abgleichen</CardTitle>
+            <CardDescription>
+              Markiert offene Sollstellungen von Lastschriftzahlern bis zum gewählten Jahr als
+              eingezogen. SEPA-Lastschriften gelten als eingezogen, solange kein Rückläufer erfasst
+              wurde. Rechnungszahler bleiben offen. Reversibel durch Erfassen eines Rückläufers.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the Input component below. */}
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-muted-foreground">Bis einschließlich Jahr</span>
+            <Input
+              type="number"
+              min={2000}
+              max={2100}
+              value={throughYear}
+              onChange={(e) => setThroughYear(Number(e.target.value) || throughYear)}
+              className="w-32"
+            />
+          </label>
+          <div className="flex flex-col">
+            <span className="text-sm text-muted-foreground">Betroffene Posten</span>
+            {preview.isLoading ? (
+              <Skeleton className="mt-1 h-6 w-16" />
+            ) : (
+              <span className="text-2xl font-semibold tabular-nums">
+                {count}
+                {count > 0 ? (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    {formatCurrency(preview.data?.openSum ?? "0")}
+                  </span>
+                ) : null}
+              </span>
+            )}
+          </div>
+          <Button
+            size="sm"
+            disabled={preview.isLoading || count === 0}
+            onClick={() => setDialogOpen(true)}
+          >
+            <Banknote className="size-4" /> Als eingezogen markieren
+          </Button>
+        </div>
+        <ConfirmDialog
+          open={dialogOpen}
+          onOpenChange={(v) => {
+            if (!mut.isPending) setDialogOpen(v);
+          }}
+          title="Alt-Lastschriften als eingezogen markieren"
+          description={`${count} Posten (${formatCurrency(preview.data?.openSum ?? "0")}) von Lastschriftzahlern bis einschließlich ${throughYear} werden auf "eingezogen" gesetzt und verschwinden aus den Forderungen.`}
+          confirmLabel={`${count} Posten abgleichen`}
+          loading={mut.isPending}
+          onConfirm={() => mut.mutate()}
+        >
+          {(preview.data?.byYear.length ?? 0) > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Nach Jahr</p>
+              <ul className="flex flex-col gap-0.5">
+                {preview.data?.byYear.map((y) => (
+                  <li
+                    key={y.year}
+                    className="flex items-center justify-between gap-3 py-0.5 text-sm"
+                  >
+                    <span className="tabular-nums">{y.year}</span>
+                    <span className="shrink-0 text-muted-foreground">
+                      {y.count} Posten · {formatCurrency(y.openSum)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </ConfirmDialog>
+      </CardContent>
     </Card>
   );
 }

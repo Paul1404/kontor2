@@ -642,18 +642,26 @@ function SollstellungenCard({ rows }: { rows: SollstellungRow[] }) {
 }
 
 function SollstellungStatusBadge({ status }: { status: string }) {
-  const variant: "outline" | "success" | "warning" | "secondary" =
-    status === "paid" ? "success" : status === "open" ? "warning" : "secondary";
+  const variant: "outline" | "success" | "warning" | "secondary" | "info" =
+    status === "paid"
+      ? "success"
+      : status === "eingezogen"
+        ? "info"
+        : status === "open"
+          ? "warning"
+          : "secondary";
   const label =
     status === "paid"
       ? "Bezahlt"
-      : status === "open"
-        ? "Offen"
-        : status === "returned"
-          ? "Rückläufer"
-          : status === "cancelled"
-            ? "Storniert"
-            : status;
+      : status === "eingezogen"
+        ? "Eingezogen"
+        : status === "open"
+          ? "Offen"
+          : status === "returned"
+            ? "Rückläufer"
+            : status === "cancelled"
+              ? "Storniert"
+              : status;
   return <Badge variant={variant}>{label}</Badge>;
 }
 

@@ -24,6 +24,14 @@ const UpdateInput = v.object({
   mahngebuhr3: v.optional(MoneyString, "10"),
   sepaReturnFee: v.optional(MoneyString, "0"),
   mahnFristTage: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(90)), 14),
+  beitragModus: v.optional(v.picklist(["voll", "anteilig"]), "voll"),
+  anteilEinheit: v.optional(v.picklist(["monat", "tag"]), "monat"),
+  kuendigungsfristAktiv: v.optional(v.boolean(), false),
+  kuendigungsfristTage: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365)),
+    0,
+  ),
+  kuendigungZumMonatsende: v.optional(v.boolean(), false),
 });
 
 export const organizationSettingsRouter = {
@@ -69,6 +77,11 @@ export const organizationSettingsRouter = {
       mahngebuhr3: input.mahngebuhr3,
       sepaReturnFee: input.sepaReturnFee,
       mahnFristTage: input.mahnFristTage,
+      beitragModus: input.beitragModus,
+      anteilEinheit: input.anteilEinheit,
+      kuendigungsfristAktiv: input.kuendigungsfristAktiv,
+      kuendigungsfristTage: input.kuendigungsfristTage,
+      kuendigungZumMonatsende: input.kuendigungZumMonatsende,
       updatedAt: new Date(),
       updatedBy: context.session!.user.id,
     };

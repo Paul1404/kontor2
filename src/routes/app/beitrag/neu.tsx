@@ -489,6 +489,11 @@ function IncludedTable(props: { candidates: PreviewData["candidates"] }) {
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums">
                       {formatCurrency(c.amount)}
+                      {c.prorationLabel ? (
+                        <div className="text-xs text-muted-foreground">
+                          anteilig: {c.prorationLabel}
+                        </div>
+                      ) : null}
                       {c.includesAufnahmegebuhr ? (
                         <div className="text-xs text-muted-foreground">inkl. Aufnahmegebühr</div>
                       ) : null}
