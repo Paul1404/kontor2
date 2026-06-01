@@ -521,9 +521,18 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
     try {
       const row = mapMgartDatRow(raw);
       if (!row) continue;
+      // `datum` is a Postgres DATE column (string mode in Drizzle). The mapper
+      // returns a JS Date; passing it straight through serialises via
+      // toString() ("Fri Jan 01 2016 ...") which Postgres rejects as invalid
+      // date syntax. Normalise to an ISO YYYY-MM-DD string first, same as the
+      // soll_stellungen / abteilungen date columns.
+      const datumRaw = (row as { datum?: Date | null }).datum;
+      const datum = datumRaw ? datumRaw.toISOString().slice(0, 10) : null;
+      const betrag = (row as { betrag?: string | null }).betrag;
+      const prozent = (row as { prozent?: string | null }).prozent;
       await db
         .insert(feeTypePriceHistoryTable)
-        .values(row as never)
+        .values({ ...row, datum } as never)
         .onConflictDoUpdate({
           target: [
             feeTypePriceHistoryTable.art,
@@ -531,9 +540,9 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
             feeTypePriceHistoryTable.monat,
           ],
           set: {
-            betrag: (row as { betrag?: string | null }).betrag,
-            prozent: (row as { prozent?: string | null }).prozent,
-            datum: (row as { datum?: Date | null }).datum,
+            betrag,
+            prozent,
+            datum,
           } as never,
         });
       feeTypeHistoryImported += 1;
