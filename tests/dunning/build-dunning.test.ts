@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mahngebuhrFor, sumDecimal } from "~/server/dunning/build-dunning";
+import { mahngebuhrFor, planNichtEingezogen, sumDecimal } from "~/server/dunning/build-dunning";
 
 describe("sumDecimal", () => {
   it("adds in integer cents to avoid float drift", () => {
@@ -34,5 +34,22 @@ describe("mahngebuhrFor", () => {
   it("clamps unexpected levels to nearest", () => {
     expect(mahngebuhrFor(0, org)).toBe("0");
     expect(mahngebuhrFor(4, org)).toBe("10");
+  });
+});
+
+describe("planNichtEingezogen", () => {
+  it("reopens an eingezogen posting back to open with the full amount", () => {
+    expect(planNichtEingezogen({ status: "eingezogen", amount: "42.50" })).toEqual({
+      status: "open",
+      paidAmount: "0",
+      openAmount: "42.50",
+      mahnstufe: 0,
+    });
+  });
+
+  it("leaves non-eingezogen postings untouched", () => {
+    for (const status of ["open", "returned", "paid", "cancelled"]) {
+      expect(planNichtEingezogen({ status, amount: "10.00" })).toBeNull();
+    }
   });
 });
