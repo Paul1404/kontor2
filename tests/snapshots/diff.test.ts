@@ -58,4 +58,26 @@ describe("diffSnapshotVsCurrent", () => {
     expect(out.sepa.removed).toBe(0);
     expect(out.sepa.changedIds).toEqual(["m1"]);
   });
+
+  it("diffs member_abteilungen by composite key, not memberId", () => {
+    // All rows share the same memberId; keying on memberId alone would
+    // collapse them and report 0 added / 0 removed (the bug).
+    const snap = {
+      ...emptyBlob(),
+      memberAbteilungen: [
+        { memberId: "x", abteilungId: "a", eintrittsdatum: "2020-01-01" },
+        { memberId: "x", abteilungId: "b", eintrittsdatum: "2020-01-01" },
+      ],
+    };
+    const live = {
+      ...emptyBlob(),
+      memberAbteilungen: [
+        { memberId: "x", abteilungId: "b", eintrittsdatum: "2020-01-01" },
+        { memberId: "x", abteilungId: "c", eintrittsdatum: "2021-06-01" },
+      ],
+    };
+    const out = diffSnapshotVsCurrent(snap, live);
+    expect(out.memberAbteilungen.added).toBe(1); // c
+    expect(out.memberAbteilungen.removed).toBe(1); // a
+  });
 });

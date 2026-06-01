@@ -160,9 +160,15 @@ function computeTotals(items: Pain008Item[]): { count: number; sum: string } {
 }
 
 function amountToCents(s: string): bigint {
-  const [intp, fracp = ""] = s.split(".");
+  const trimmed = s.trim();
+  const negative = trimmed.startsWith("-");
+  const unsigned = negative || trimmed.startsWith("+") ? trimmed.slice(1) : trimmed;
+  const [intp = "0", fracp = ""] = unsigned.split(".");
   const frac = `${fracp}00`.slice(0, 2);
-  return BigInt(intp ?? "0") * 100n + BigInt(frac || "0");
+  // Apply the sign once to the whole magnitude: splitting it onto only the
+  // integer part dropped the cents' sign ("-5.50" -> -450 instead of -550).
+  const magnitude = BigInt(intp || "0") * 100n + BigInt(frac || "0");
+  return negative ? -magnitude : magnitude;
 }
 
 function centsToAmount(cents: bigint): string {

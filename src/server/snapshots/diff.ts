@@ -13,12 +13,14 @@ export type SnapshotDiff = {
 function compareList(
   before: Record<string, unknown>[],
   after: Record<string, unknown>[],
-  key: string = "id",
+  key: string | ((row: Record<string, unknown>) => string) = "id",
 ): { added: number; removed: number; changedIds: string[] } {
+  const keyOf =
+    typeof key === "function" ? key : (row: Record<string, unknown>) => String(row[key]);
   const beforeMap = new Map<string, Record<string, unknown>>();
-  for (const row of before) beforeMap.set(String(row[key]), row);
+  for (const row of before) beforeMap.set(keyOf(row), row);
   const afterMap = new Map<string, Record<string, unknown>>();
-  for (const row of after) afterMap.set(String(row[key]), row);
+  for (const row of after) afterMap.set(keyOf(row), row);
 
   let added = 0;
   let removed = 0;
@@ -73,10 +75,14 @@ export function diffSnapshotVsCurrent(
     sepa: compareList(snapshot.sepa, current.sepa),
     attachments: compareList(snapshot.attachments, current.attachments),
     relationships: compareList(snapshot.relationships, current.relationships),
+    // member_abteilungen has no surrogate id; its identity is the composite
+    // PK (member, abteilung, entry date). Keying on memberId alone would
+    // collapse every department membership of a member into one and badly
+    // under-report add/remove in the restore preview.
     memberAbteilungen: compareList(
       snapshot.memberAbteilungen,
       current.memberAbteilungen,
-      "memberId",
+      (r) => `${r.memberId}|${r.abteilungId}|${r.eintrittsdatum}`,
     ),
     sollstellungen: compareList(snapshot.sollstellungen, current.sollstellungen),
   };
