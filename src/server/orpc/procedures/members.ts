@@ -13,6 +13,8 @@ import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import {
+  CACHE_NS,
+  cached,
   getCached,
   invalidateMemberCaches,
   searchCacheKey,
@@ -486,17 +488,19 @@ export const membersRouter = {
       };
     }),
 
-  abteilungenList: authedProc.input(v.void()).handler(async ({ context }) => {
-    return context.db
-      .select({
-        id: abteilungenTable.id,
-        name: abteilungenTable.name,
-        slug: abteilungenTable.slug,
-        count: sql<number>`(select count(*)::int from member_abteilungen ma where ma.abteilung_id = abteilungen.id)`,
-      })
-      .from(abteilungenTable)
-      .orderBy(asc(abteilungenTable.name));
-  }),
+  abteilungenList: authedProc.input(v.void()).handler(async ({ context }) =>
+    cached(CACHE_NS.abteilungen, "members-list", 300, () =>
+      context.db
+        .select({
+          id: abteilungenTable.id,
+          name: abteilungenTable.name,
+          slug: abteilungenTable.slug,
+          count: sql<number>`(select count(*)::int from member_abteilungen ma where ma.abteilung_id = abteilungen.id)`,
+        })
+        .from(abteilungenTable)
+        .orderBy(asc(abteilungenTable.name)),
+    ),
+  ),
 
   update: vorstandProc
     .input(v.object({ memberId: v.string(), patch: StammdatenInput }))

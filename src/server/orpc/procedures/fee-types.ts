@@ -6,6 +6,7 @@ import { withUniqueRetry } from "~/server/db/retry";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { adminProc, authedProc } from "~/server/orpc/base";
+import { CACHE_NS, cached, invalidateFeeTypeCaches } from "~/server/search/cache";
 
 const TextOrNull = v.optional(v.nullable(v.string()));
 const DecimalOrNull = v.optional(v.nullable(v.string()));
@@ -46,27 +47,29 @@ function buildPatch(input: v.InferOutput<typeof FeeTypePatch>): Record<string, u
 }
 
 export const feeTypesRouter = {
-  list: authedProc.input(v.void()).handler(async ({ context }) => {
-    // Aliased subquery is intentional: Drizzle elides table qualifiers for
-    // column refs inside `sql` templates when used in a top-level select(),
-    // so `${contractsTable.art} = ${feeTypesTable.art}` would compile to
-    // `"art" = "art"` (always true) and return the total row count for
-    // every fee type. Using an alias on the inner table sidesteps that.
-    return context.db
-      .select({
-        art: feeTypesTable.art,
-        bezeichnung: feeTypesTable.bezeichnung,
-        abteilung: feeTypesTable.abteilung,
-        betrag1: feeTypesTable.betrag1,
-        sollstellung: feeTypesTable.sollstellung,
-        kontoname: feeTypesTable.kontoname,
-        valuta: feeTypesTable.valuta,
-        nichAktiv: feeTypesTable.nichAktiv,
-        contractCount: sql<number>`(select count(*)::int from contracts c where c.art = fee_types.art)`,
-      })
-      .from(feeTypesTable)
-      .orderBy(asc(feeTypesTable.art));
-  }),
+  list: authedProc.input(v.void()).handler(async ({ context }) =>
+    cached(CACHE_NS.feeTypes, "list", 300, () =>
+      // Aliased subquery is intentional: Drizzle elides table qualifiers for
+      // column refs inside `sql` templates when used in a top-level select(),
+      // so `${contractsTable.art} = ${feeTypesTable.art}` would compile to
+      // `"art" = "art"` (always true) and return the total row count for
+      // every fee type. Using an alias on the inner table sidesteps that.
+      context.db
+        .select({
+          art: feeTypesTable.art,
+          bezeichnung: feeTypesTable.bezeichnung,
+          abteilung: feeTypesTable.abteilung,
+          betrag1: feeTypesTable.betrag1,
+          sollstellung: feeTypesTable.sollstellung,
+          kontoname: feeTypesTable.kontoname,
+          valuta: feeTypesTable.valuta,
+          nichAktiv: feeTypesTable.nichAktiv,
+          contractCount: sql<number>`(select count(*)::int from contracts c where c.art = fee_types.art)`,
+        })
+        .from(feeTypesTable)
+        .orderBy(asc(feeTypesTable.art)),
+    ),
+  ),
 
   create: adminProc
     .input(
@@ -78,7 +81,7 @@ export const feeTypesRouter = {
     .handler(async ({ context, input }) => {
       // Auto-numbered `art` races under concurrency (two creates read the
       // same max and collide on the unique index). Retry re-reads the max.
-      return await withUniqueRetry(() =>
+      const result = await withUniqueRetry(() =>
         context.db.transaction(async (tx) => {
           let art = input.art ?? null;
           if (art == null) {
@@ -113,6 +116,8 @@ export const feeTypesRouter = {
           return { art };
         }),
       );
+      await invalidateFeeTypeCaches();
+      return result;
     }),
 
   update: adminProc
@@ -157,6 +162,7 @@ export const feeTypesRouter = {
           });
         }
       });
+      await invalidateFeeTypeCaches();
       return { ok: true };
     }),
 
@@ -195,6 +201,7 @@ export const feeTypesRouter = {
           requestId: context.requestId ?? null,
         });
       });
+      await invalidateFeeTypeCaches();
       return { ok: true };
     }),
 };

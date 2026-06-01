@@ -10,6 +10,7 @@ import { authedProc, vorstandProc } from "~/server/orpc/base";
 import type { AppContext } from "~/server/orpc/context";
 import { isRoundBirthday } from "~/server/reports/birthday";
 import { isExcludedFromJubilee, jubileeDateFor, jubileeYearFor } from "~/server/reports/jubilee";
+import { CACHE_NS, cached } from "~/server/search/cache";
 
 const StatusSchema = v.picklist(["aktiv", "passiv", "ausgetreten", "verstorben", "alle"]);
 
@@ -370,12 +371,16 @@ const MEMBER_EXPORT_COLUMNS: readonly CsvColumn<MemberExportRow>[] = [
 ];
 
 export const reportsRouter = {
-  abteilungenList: authedProc.input(v.void()).handler(async ({ context }) => {
-    return context.db
-      .select({ id: abteilungenTable.id, name: abteilungenTable.name })
-      .from(abteilungenTable)
-      .orderBy(asc(abteilungenTable.name));
-  }),
+  abteilungenList: authedProc
+    .input(v.void())
+    .handler(async ({ context }) =>
+      cached(CACHE_NS.abteilungen, "reports-list", 300, () =>
+        context.db
+          .select({ id: abteilungenTable.id, name: abteilungenTable.name })
+          .from(abteilungenTable)
+          .orderBy(asc(abteilungenTable.name)),
+      ),
+    ),
 
   membersExport: authedProc.input(MemberExportInput).handler(async ({ context, input }) => {
     // Explicit-selection export: filter purely by the given ids.

@@ -3,6 +3,7 @@ import * as v from "valibot";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
 import { authedProc } from "~/server/orpc/base";
+import { CACHE_NS, cached } from "~/server/search/cache";
 
 function startOfMonth(): Date {
   const d = new Date();
@@ -10,48 +11,54 @@ function startOfMonth(): Date {
 }
 
 export const dashboardRouter = {
-  stats: authedProc.input(v.void()).handler(async ({ context }) => {
-    const since = startOfMonth();
-    // All counts must exclude soft-deleted members or the dashboard drifts
-    // from the member list / fee runs. Members carry TWO delete flags: the
-    // app's `deletedAt` and the legacy Linear `geloscht` (set on imported
-    // rows). The canonical "live member" definition (build-fee-run,
-    // build-dunning) excludes both.
-    const notDeleted = and(
-      isNull(membersTable.deletedAt),
-      sql`coalesce(${membersTable.geloscht}, false) = false`,
-    );
-    const [
-      [total],
-      [aktiv],
-      [newThisMonth],
-      [austritteThisMonth],
-      ageBuckets,
-      genderRows,
-      birthdaysSoon,
-      tenureBuckets,
-    ] = await Promise.all([
-      context.db.select({ c: count() }).from(membersTable).where(notDeleted),
-      context.db
-        .select({ c: count() })
-        .from(membersTable)
-        .where(and(notDeleted, isNull(membersTable.austritt), isNull(membersTable.verstorbenAm))),
-      context.db
-        .select({ c: count() })
-        .from(membersTable)
-        .where(
-          and(notDeleted, isNotNull(membersTable.eintritt), gte(membersTable.eintritt, since)),
-        ),
-      context.db
-        .select({ c: count() })
-        .from(membersTable)
-        .where(
-          and(notDeleted, isNotNull(membersTable.austritt), gte(membersTable.austritt, since)),
-        ),
-      // Age buckets, computed over current active members. Anyone without a
-      // birthday gets bucketed into "unbekannt" so we can show the data
-      // gap; useful for nudging the office to backfill records.
-      context.db.execute<{ bucket: string; c: number }>(sql`
+  stats: authedProc.input(v.void()).handler(async ({ context }) =>
+    // Read-through cached: the KPIs are global (no per-user data) and run ~9
+    // aggregations per call. Busted on every member/Abteilung mutation, with
+    // a short TTL as a backstop. The `since` (month start) is part of the
+    // semantics but not the cache key — at month rollover the stale entry
+    // expires within the TTL.
+    cached(CACHE_NS.dashboard, "stats", 120, async () => {
+      const since = startOfMonth();
+      // All counts must exclude soft-deleted members or the dashboard drifts
+      // from the member list / fee runs. Members carry TWO delete flags: the
+      // app's `deletedAt` and the legacy Linear `geloscht` (set on imported
+      // rows). The canonical "live member" definition (build-fee-run,
+      // build-dunning) excludes both.
+      const notDeleted = and(
+        isNull(membersTable.deletedAt),
+        sql`coalesce(${membersTable.geloscht}, false) = false`,
+      );
+      const [
+        [total],
+        [aktiv],
+        [newThisMonth],
+        [austritteThisMonth],
+        ageBuckets,
+        genderRows,
+        birthdaysSoon,
+        tenureBuckets,
+      ] = await Promise.all([
+        context.db.select({ c: count() }).from(membersTable).where(notDeleted),
+        context.db
+          .select({ c: count() })
+          .from(membersTable)
+          .where(and(notDeleted, isNull(membersTable.austritt), isNull(membersTable.verstorbenAm))),
+        context.db
+          .select({ c: count() })
+          .from(membersTable)
+          .where(
+            and(notDeleted, isNotNull(membersTable.eintritt), gte(membersTable.eintritt, since)),
+          ),
+        context.db
+          .select({ c: count() })
+          .from(membersTable)
+          .where(
+            and(notDeleted, isNotNull(membersTable.austritt), gte(membersTable.austritt, since)),
+          ),
+        // Age buckets, computed over current active members. Anyone without a
+        // birthday gets bucketed into "unbekannt" so we can show the data
+        // gap; useful for nudging the office to backfill records.
+        context.db.execute<{ bucket: string; c: number }>(sql`
         select bucket, count(*)::int as c from (
           select case
             when ${membersTable.geburtsdatum} is null then 'unbekannt'
@@ -71,10 +78,10 @@ export const dashboardRouter = {
         group by bucket
         order by bucket
       `),
-      // Gender from the explicit `geschlecht` enum column. Members whose
-      // column is NULL (shouldn't happen post-backfill, but defensive)
-      // fall into "unbekannt".
-      context.db.execute<{ gender: string; c: number }>(sql`
+        // Gender from the explicit `geschlecht` enum column. Members whose
+        // column is NULL (shouldn't happen post-backfill, but defensive)
+        // fall into "unbekannt".
+        context.db.execute<{ gender: string; c: number }>(sql`
         select gender, count(*)::int as c from (
           select case ${membersTable.geschlecht}::text
             when 'm' then 'männlich'
@@ -96,19 +103,19 @@ export const dashboardRouter = {
           else 4
         end
       `),
-      // Birthdays in the next 30 days. We compute on the next anniversary
-      // (year +1 if it has already passed this year) so the list wraps
-      // around December → January cleanly.
-      context.db.execute<{
-        id: string;
-        mitglnr: string | null;
-        adr_nr: number;
-        vorname: string | null;
-        nachname: string | null;
-        geburtsdatum: Date;
-        next_birthday: Date;
-        turns: number;
-      }>(sql`
+        // Birthdays in the next 30 days. We compute on the next anniversary
+        // (year +1 if it has already passed this year) so the list wraps
+        // around December → January cleanly.
+        context.db.execute<{
+          id: string;
+          mitglnr: string | null;
+          adr_nr: number;
+          vorname: string | null;
+          nachname: string | null;
+          geburtsdatum: Date;
+          next_birthday: Date;
+          turns: number;
+        }>(sql`
         select id, mitglnr, adr_nr, vorname, nachname, geburtsdatum, next_birthday,
                extract(year from age(next_birthday, geburtsdatum))::int as turns
         from (
@@ -136,9 +143,9 @@ export const dashboardRouter = {
         order by next_birthday asc
         limit 12
       `),
-      // Mitgliedsdauer (Tenure) buckets for active members. Anyone without
-      // an Eintritt date is grouped separately.
-      context.db.execute<{ bucket: string; c: number }>(sql`
+        // Mitgliedsdauer (Tenure) buckets for active members. Anyone without
+        // an Eintritt date is grouped separately.
+        context.db.execute<{ bucket: string; c: number }>(sql`
         select bucket, count(*)::int as c from (
           select case
             when ${membersTable.eintritt} is null then 'unbekannt'
@@ -157,50 +164,51 @@ export const dashboardRouter = {
         group by bucket
         order by bucket
       `),
-    ]);
+      ]);
 
-    const perAbteilung = await context.db
-      .select({
-        name: abteilungenTable.name,
-        c: sql<number>`count(*)::int`,
-      })
-      .from(memberAbteilungenTable)
-      .innerJoin(abteilungenTable, eq(memberAbteilungenTable.abteilungId, abteilungenTable.id))
-      .innerJoin(membersTable, eq(membersTable.id, memberAbteilungenTable.memberId))
-      .where(
-        and(
-          isNull(memberAbteilungenTable.austrittsdatum),
-          isNull(membersTable.deletedAt),
-          sql`coalesce(${membersTable.geloscht}, false) = false`,
-        ),
-      )
-      .groupBy(abteilungenTable.name)
-      .orderBy(sql`count(*) desc`);
+      const perAbteilung = await context.db
+        .select({
+          name: abteilungenTable.name,
+          c: sql<number>`count(*)::int`,
+        })
+        .from(memberAbteilungenTable)
+        .innerJoin(abteilungenTable, eq(memberAbteilungenTable.abteilungId, abteilungenTable.id))
+        .innerJoin(membersTable, eq(membersTable.id, memberAbteilungenTable.memberId))
+        .where(
+          and(
+            isNull(memberAbteilungenTable.austrittsdatum),
+            isNull(membersTable.deletedAt),
+            sql`coalesce(${membersTable.geloscht}, false) = false`,
+          ),
+        )
+        .groupBy(abteilungenTable.name)
+        .orderBy(sql`count(*) desc`);
 
-    // postgres-js returns the result array directly from db.execute.
-    const ageBucketsArr = ageBuckets as unknown as Array<{ bucket: string; c: number }>;
-    const genderArr = genderRows as unknown as Array<{ gender: string; c: number }>;
-    const birthdaysArr = birthdaysSoon as unknown as Array<Record<string, unknown>>;
-    const tenureArr = tenureBuckets as unknown as Array<{ bucket: string; c: number }>;
+      // postgres-js returns the result array directly from db.execute.
+      const ageBucketsArr = ageBuckets as unknown as Array<{ bucket: string; c: number }>;
+      const genderArr = genderRows as unknown as Array<{ gender: string; c: number }>;
+      const birthdaysArr = birthdaysSoon as unknown as Array<Record<string, unknown>>;
+      const tenureArr = tenureBuckets as unknown as Array<{ bucket: string; c: number }>;
 
-    return {
-      total: total?.c ?? 0,
-      aktiv: aktiv?.c ?? 0,
-      newThisMonth: newThisMonth?.c ?? 0,
-      austritteThisMonth: austritteThisMonth?.c ?? 0,
-      perAbteilung,
-      ageBuckets: ageBucketsArr,
-      gender: genderArr,
-      birthdays: birthdaysArr.map((b) => ({
-        id: String(b.id),
-        mitglnr: (b.mitglnr as string | null) ?? null,
-        adrNr: Number(b.adr_nr),
-        vorname: (b.vorname as string | null) ?? null,
-        nachname: (b.nachname as string | null) ?? null,
-        nextBirthday: b.next_birthday as string | Date,
-        turns: Number(b.turns),
-      })),
-      tenure: tenureArr,
-    };
-  }),
+      return {
+        total: total?.c ?? 0,
+        aktiv: aktiv?.c ?? 0,
+        newThisMonth: newThisMonth?.c ?? 0,
+        austritteThisMonth: austritteThisMonth?.c ?? 0,
+        perAbteilung,
+        ageBuckets: ageBucketsArr,
+        gender: genderArr,
+        birthdays: birthdaysArr.map((b) => ({
+          id: String(b.id),
+          mitglnr: (b.mitglnr as string | null) ?? null,
+          adrNr: Number(b.adr_nr),
+          vorname: (b.vorname as string | null) ?? null,
+          nachname: (b.nachname as string | null) ?? null,
+          nextBirthday: b.next_birthday as string | Date,
+          turns: Number(b.turns),
+        })),
+        tenure: tenureArr,
+      };
+    }),
+  ),
 };
