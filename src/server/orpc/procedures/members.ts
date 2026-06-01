@@ -743,6 +743,194 @@ export const membersRouter = {
     }),
 
   /**
+   * Bulk-apply one action to many members in a single transaction. Each
+   * affected member gets its own audit entry + snapshot so the change is
+   * fully reversible and attributable, exactly like the single-record
+   * mutations above. Members that already match the target state (or that
+   * no longer exist / are soft-deleted) are counted as `skipped`, not
+   * failed, so a partially-applicable selection still succeeds.
+   */
+  bulk: vorstandProc
+    .input(
+      v.object({
+        memberIds: v.pipe(
+          v.array(v.pipe(v.string(), v.uuid())),
+          v.minLength(1, "Keine Mitglieder ausgewählt."),
+          v.maxLength(500, "Zu viele Mitglieder auf einmal (max. 500)."),
+        ),
+        action: v.variant("type", [
+          v.object({ type: v.literal("setAktivPasiv"), value: v.picklist(["A", "P"]) }),
+          v.object({ type: v.literal("addAbteilung"), abteilungId: v.pipe(v.string(), v.uuid()) }),
+          v.object({
+            type: v.literal("removeAbteilung"),
+            abteilungId: v.pipe(v.string(), v.uuid()),
+          }),
+        ]),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const actorId = context.session!.user.id;
+      const actorEmail = context.session!.user.email;
+      const requestId = context.requestId ?? null;
+      // Dedupe so a member selected twice (shouldn't happen from the UI,
+      // but the input is user-controlled) is only touched once.
+      const ids = [...new Set(input.memberIds)];
+      const today = new Date().toISOString().slice(0, 10);
+
+      const result = await context.db.transaction(async (tx) => {
+        let abteilungName: string | null = null;
+        if (input.action.type === "addAbteilung" || input.action.type === "removeAbteilung") {
+          const [abt] = await tx
+            .select({ id: abteilungenTable.id, name: abteilungenTable.name })
+            .from(abteilungenTable)
+            .where(eq(abteilungenTable.id, input.action.abteilungId))
+            .limit(1);
+          if (!abt) throw new ORPCError("NOT_FOUND", { message: "Abteilung nicht gefunden." });
+          abteilungName = abt.name;
+        }
+
+        let changed = 0;
+        let skipped = 0;
+
+        for (const memberId of ids) {
+          const [existing] = await tx
+            .select()
+            .from(membersTable)
+            .where(and(eq(membersTable.id, memberId), isNull(membersTable.deletedAt)))
+            .limit(1);
+          if (!existing) {
+            skipped += 1;
+            continue;
+          }
+
+          if (input.action.type === "setAktivPasiv") {
+            if (existing.aktivPasiv === input.action.value) {
+              skipped += 1;
+              continue;
+            }
+            await tx
+              .update(membersTable)
+              .set({ aktivPasiv: input.action.value, updatedAt: new Date() } as never)
+              .where(eq(membersTable.id, memberId));
+            const auditId = await appendAudit(tx, {
+              entityType: "member",
+              entityId: memberId,
+              action: "update",
+              source: "ui",
+              actorId,
+              actorEmail,
+              changes: {
+                aktivPasiv: { before: existing.aktivPasiv, after: input.action.value },
+              },
+              requestId,
+            });
+            await takeMemberSnapshot(tx, memberId, {
+              trigger: "mutation",
+              actorId,
+              actorEmail,
+              auditId,
+            });
+            changed += 1;
+          } else if (input.action.type === "addAbteilung") {
+            // Skip members that already hold an active membership in this
+            // Abteilung (austrittsdatum is null) — re-adding would be a no-op.
+            const [active] = await tx
+              .select({ memberId: memberAbteilungenTable.memberId })
+              .from(memberAbteilungenTable)
+              .where(
+                and(
+                  eq(memberAbteilungenTable.memberId, memberId),
+                  eq(memberAbteilungenTable.abteilungId, input.action.abteilungId),
+                  isNull(memberAbteilungenTable.austrittsdatum),
+                ),
+              )
+              .limit(1);
+            if (active) {
+              skipped += 1;
+              continue;
+            }
+            await tx
+              .insert(memberAbteilungenTable)
+              .values({
+                memberId,
+                abteilungId: input.action.abteilungId,
+                eintrittsdatum: today,
+              })
+              .onConflictDoNothing();
+            const auditId = await appendAudit(tx, {
+              entityType: "member",
+              entityId: memberId,
+              action: "update",
+              source: "ui",
+              actorId,
+              actorEmail,
+              changes: {
+                [`abteilung:${abteilungName}`]: {
+                  before: null,
+                  after: { eintrittsdatum: today },
+                },
+              },
+              requestId,
+            });
+            await takeMemberSnapshot(tx, memberId, {
+              trigger: "mutation",
+              actorId,
+              actorEmail,
+              auditId,
+            });
+            changed += 1;
+          } else {
+            // removeAbteilung: close out every active membership in this
+            // Abteilung by stamping today's austrittsdatum. Non-destructive
+            // (the row + its history stay) and reversible via snapshot.
+            const closed = await tx
+              .update(memberAbteilungenTable)
+              .set({ austrittsdatum: today })
+              .where(
+                and(
+                  eq(memberAbteilungenTable.memberId, memberId),
+                  eq(memberAbteilungenTable.abteilungId, input.action.abteilungId),
+                  isNull(memberAbteilungenTable.austrittsdatum),
+                ),
+              )
+              .returning({ memberId: memberAbteilungenTable.memberId });
+            if (closed.length === 0) {
+              skipped += 1;
+              continue;
+            }
+            const auditId = await appendAudit(tx, {
+              entityType: "member",
+              entityId: memberId,
+              action: "update",
+              source: "ui",
+              actorId,
+              actorEmail,
+              changes: {
+                [`abteilung:${abteilungName}`]: {
+                  before: { austrittsdatum: null },
+                  after: { austrittsdatum: today },
+                },
+              },
+              requestId,
+            });
+            await takeMemberSnapshot(tx, memberId, {
+              trigger: "mutation",
+              actorId,
+              actorEmail,
+              auditId,
+            });
+            changed += 1;
+          }
+        }
+
+        return { changed, skipped };
+      });
+
+      await invalidateMemberCaches();
+      return { ok: true, ...result };
+    }),
+
+  /**
    * Lightweight typeahead used by the Cmd+K command palette. Returns only
    * the columns needed to render a result row + a link.
    */

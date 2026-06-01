@@ -1,20 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   Download,
+  Layers,
+  Loader2,
   Plus,
   Search,
+  UserCheck,
+  UserMinus,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { PageSizeSelect, usePersistentPageSize } from "~/components/ui/page-size-select";
 import { SkeletonTableRows } from "~/components/ui/skeleton";
@@ -22,6 +28,7 @@ import { toast } from "~/components/ui/toaster";
 import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
+import { headerCheckState, rangeIds } from "~/lib/selection";
 import { usePageShortcut } from "~/lib/use-global-shortcuts";
 
 type Status = "aktiv" | "passiv" | "ausgetreten" | "verstorben" | "alle";
@@ -145,6 +152,113 @@ function MembersListPage() {
   }
 
   usePageShortcut("n", canEdit ? () => navigate({ to: "/app/mitglieder/neu" }) : null);
+
+  const rows = (list.data?.rows ?? []) as MemberRow[];
+  const visibleIds = useMemo(() => rows.map((r) => r.id), [rows]);
+
+  // Multi-select lives in page-local state (not the URL): it's a transient
+  // working set, not something you'd bookmark. Selection is scoped to the
+  // rows currently on screen and clears whenever the view changes.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const anchorRef = useRef<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkAbteilungId, setBulkAbteilungId] = useState("");
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    description: string;
+    destructive: boolean;
+    run: () => Promise<void>;
+  } | null>(null);
+
+  // Reset the selection whenever the underlying result set changes (filter,
+  // sort, page, page size) so a stale id can never be acted on.
+  const viewKey = JSON.stringify({ ...search, pageSize });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: viewKey is the trigger; we intentionally only reset state.
+  useEffect(() => {
+    setSelected(new Set());
+    anchorRef.current = null;
+  }, [viewKey]);
+
+  const headerState = headerCheckState(visibleIds, selected);
+  const selectedCount = selected.size;
+
+  function toggleRow(id: string, shiftKey: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (shiftKey && anchorRef.current) {
+        // Shift-click selects the whole inclusive range between the last
+        // clicked row and this one.
+        for (const rid of rangeIds(visibleIds, anchorRef.current, id)) next.add(rid);
+      } else if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+    anchorRef.current = id;
+  }
+
+  function toggleAllOnPage() {
+    setSelected((prev) => {
+      const everySelected = visibleIds.length > 0 && visibleIds.every((id) => prev.has(id));
+      if (everySelected) {
+        const next = new Set(prev);
+        for (const id of visibleIds) next.delete(id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const id of visibleIds) next.add(id);
+      return next;
+    });
+    anchorRef.current = null;
+  }
+
+  function clearSelection() {
+    setSelected(new Set());
+    anchorRef.current = null;
+  }
+
+  async function runBulk(
+    action:
+      | { type: "setAktivPasiv"; value: "A" | "P" }
+      | { type: "addAbteilung"; abteilungId: string }
+      | { type: "removeAbteilung"; abteilungId: string },
+    successVerb: string,
+  ) {
+    const ids = [...selected];
+    setBulkBusy(true);
+    try {
+      const res = await orpc.members.bulk({ memberIds: ids, action });
+      await Promise.all([list.refetch(), abteilungen.refetch()]);
+      clearSelection();
+      const skippedNote = res.skipped > 0 ? ` (${res.skipped} übersprungen)` : "";
+      toast.success(`${res.changed} ${successVerb}${skippedNote}`);
+    } catch (err) {
+      toast.error("Aktion fehlgeschlagen", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBulkBusy(false);
+      setConfirm(null);
+    }
+  }
+
+  async function exportSelection() {
+    try {
+      const res = await orpc.reports.membersExport({ ids: [...selected] });
+      triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+      toast.success(`${selectedCount} Mitglieder exportiert`);
+    } catch (err) {
+      toast.error("Export fehlgeschlagen", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  const bulkAbteilungName = bulkAbteilungId
+    ? abteilungen.data?.find((a) => a.id === bulkAbteilungId)?.name
+    : null;
 
   const hasFilter =
     !!search.q ||
@@ -316,11 +430,143 @@ function MembersListPage() {
         </div>
       ) : null}
 
+      {canEdit && selectedCount > 0 ? (
+        <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/95 p-2.5 shadow-soft backdrop-blur">
+          <span className="px-1 text-sm font-medium tabular-nums">{selectedCount} ausgewählt</span>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            aria-label="Auswahl aufheben"
+            title="Auswahl aufheben"
+          >
+            <X className="size-4" />
+          </button>
+          <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={bulkBusy}
+            onClick={() =>
+              setConfirm({
+                title: "Als aktiv markieren",
+                description: `${selectedCount} ausgewählte Mitglieder auf "Aktiv" setzen?`,
+                destructive: false,
+                run: () => runBulk({ type: "setAktivPasiv", value: "A" }, "auf Aktiv gesetzt"),
+              })
+            }
+          >
+            <UserCheck className="size-4" /> Aktiv
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={bulkBusy}
+            onClick={() =>
+              setConfirm({
+                title: "Als passiv markieren",
+                description: `${selectedCount} ausgewählte Mitglieder auf "Passiv" setzen?`,
+                destructive: false,
+                run: () => runBulk({ type: "setAktivPasiv", value: "P" }, "auf Passiv gesetzt"),
+              })
+            }
+          >
+            <UserMinus className="size-4" /> Passiv
+          </Button>
+          <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+          <div className="flex items-center gap-1.5">
+            <Layers className="size-4 text-muted-foreground" />
+            <select
+              value={bulkAbteilungId}
+              onChange={(e) => setBulkAbteilungId(e.target.value)}
+              className="h-9 min-w-0 max-w-44 rounded-lg border border-input bg-card px-2 text-sm shadow-soft focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+              aria-label="Abteilung für Massenaktion"
+            >
+              <option value="">Abteilung wählen…</option>
+              {abteilungen.data?.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={bulkBusy || !bulkAbteilungId}
+              onClick={() =>
+                setConfirm({
+                  title: "Zu Abteilung hinzufügen",
+                  description: `${selectedCount} ausgewählte Mitglieder der Abteilung "${bulkAbteilungName}" zuordnen? Bereits zugeordnete werden übersprungen.`,
+                  destructive: false,
+                  run: () =>
+                    runBulk(
+                      { type: "addAbteilung", abteilungId: bulkAbteilungId },
+                      `zu ${bulkAbteilungName} hinzugefügt`,
+                    ),
+                })
+              }
+            >
+              Hinzufügen
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={bulkBusy || !bulkAbteilungId}
+              onClick={() =>
+                setConfirm({
+                  title: "Aus Abteilung entfernen",
+                  description: `Mitgliedschaft in "${bulkAbteilungName}" für ${selectedCount} ausgewählte Mitglieder beenden (Austrittsdatum heute)?`,
+                  destructive: true,
+                  run: () =>
+                    runBulk(
+                      { type: "removeAbteilung", abteilungId: bulkAbteilungId },
+                      `aus ${bulkAbteilungName} entfernt`,
+                    ),
+                })
+              }
+            >
+              Entfernen
+            </Button>
+          </div>
+          <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={bulkBusy}
+            onClick={exportSelection}
+          >
+            <Download className="size-4" /> Auswahl als CSV
+          </Button>
+          {bulkBusy ? (
+            <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+          ) : null}
+        </div>
+      ) : null}
+
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
+                {canEdit ? (
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Alle auf dieser Seite auswählen"
+                      className="size-4 accent-primary align-middle"
+                      checked={headerState === "all"}
+                      ref={(el) => {
+                        if (el) el.indeterminate = headerState === "some";
+                      }}
+                      onChange={toggleAllOnPage}
+                    />
+                  </th>
+                ) : null}
                 <SortHeader
                   label="Mitgl.-Nr."
                   col="mitglnr"
@@ -361,19 +607,56 @@ function MembersListPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {list.isLoading ? (
-                <SkeletonTableRows rows={Math.min(pageSize, 10)} cols={6} />
-              ) : list.data?.rows.length === 0 ? (
+                <SkeletonTableRows rows={Math.min(pageSize, 10)} cols={canEdit ? 7 : 6} />
+              ) : list.isError ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={canEdit ? 7 : 6} className="px-4 py-10 text-center">
+                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                      <AlertTriangle className="size-6 text-warning" />
+                      <p className="text-sm">Mitglieder konnten nicht geladen werden.</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => list.refetch()}
+                      >
+                        Erneut versuchen
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={canEdit ? 7 : 6}
+                    className="px-4 py-8 text-center text-muted-foreground"
+                  >
                     Keine Mitglieder gefunden.
                   </td>
                 </tr>
               ) : (
-                (list.data?.rows ?? []).map((row) => {
-                  const m = row as MemberRow;
+                rows.map((m) => {
                   const isKontakt = !m.mitglnr;
+                  const isSelected = selected.has(m.id);
                   return (
-                    <tr key={m.id} className="transition-colors hover:bg-muted/30">
+                    <tr
+                      key={m.id}
+                      className={`transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-muted/30"}`}
+                    >
+                      {canEdit ? (
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            aria-label={`${[m.nachname, m.vorname].filter(Boolean).join(", ")} auswählen`}
+                            className="size-4 accent-primary align-middle"
+                            checked={isSelected}
+                            onClick={(e) => toggleRow(m.id, e.shiftKey)}
+                            onChange={() => {
+                              /* handled in onClick to read shiftKey */
+                            }}
+                          />
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3 tabular-nums text-muted-foreground">
                         {m.mitglnr ?? (
                           <span
@@ -450,6 +733,21 @@ function MembersListPage() {
           </div>
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        onOpenChange={(open) => {
+          if (!open && !bulkBusy) setConfirm(null);
+        }}
+        title={confirm?.title ?? ""}
+        description={confirm?.description}
+        confirmLabel="Anwenden"
+        destructive={confirm?.destructive ?? false}
+        loading={bulkBusy}
+        onConfirm={() => {
+          if (confirm) void confirm.run();
+        }}
+      />
     </div>
   );
 }

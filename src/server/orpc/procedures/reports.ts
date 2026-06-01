@@ -18,6 +18,10 @@ const MemberExportInput = v.object({
   status: v.optional(StatusSchema, "aktiv"),
   abteilungId: v.optional(v.nullable(v.string()), null),
   includeAusgetretene: v.optional(v.boolean(), false),
+  // When present, export exactly these members and ignore the filter
+  // fields above. Used by the "Auswahl als CSV" bulk action so the file
+  // matches the rows the user ticked, not the active filter.
+  ids: v.optional(v.array(v.pipe(v.string(), v.uuid()))),
 });
 
 const GeburtstageInput = v.object({
@@ -374,6 +378,38 @@ export const reportsRouter = {
   }),
 
   membersExport: authedProc.input(MemberExportInput).handler(async ({ context, input }) => {
+    // Explicit-selection export: filter purely by the given ids.
+    if (input.ids && input.ids.length > 0) {
+      const ids = [...new Set(input.ids)];
+      const selected: MemberExportRow[] = await context.db
+        .select({
+          mitglnr: membersTable.mitglnr,
+          anrede: membersTable.anrede,
+          titel: membersTable.titel1,
+          vorname: membersTable.vorname,
+          nachname: membersTable.nachname,
+          geburtsdatum: membersTable.geburtsdatum,
+          strasse: membersTable.strasse,
+          hausnummer: membersTable.hausnummer,
+          plz: membersTable.plz,
+          ort: membersTable.ort,
+          telefon: membersTable.telefon1,
+          email: membersTable.eMailName,
+          eintritt: membersTable.eintritt,
+          austritt: membersTable.austritt,
+          verstorbenAm: membersTable.verstorbenAm,
+          aktivPasiv: membersTable.aktivPasiv,
+        })
+        .from(membersTable)
+        .where(and(inArray(membersTable.id, ids), isNull(membersTable.deletedAt)))
+        .orderBy(asc(membersTable.nachname), asc(membersTable.vorname));
+      const stamp = new Date().toISOString().slice(0, 10);
+      return {
+        filename: `mitglieder-auswahl-${stamp}.csv`,
+        content: toCsv(selected, MEMBER_EXPORT_COLUMNS),
+      };
+    }
+
     const conditions = buildMemberWhereClauses(input);
 
     if (input.abteilungId) {
