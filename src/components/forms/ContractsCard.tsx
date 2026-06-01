@@ -3,6 +3,7 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { formatCurrency, formatDate } from "~/lib/format";
@@ -38,13 +39,18 @@ export function ContractsCard({
   // Track which specific row is being deleted so the spinner / disabled
   // state only applies to that one row, not every Trash icon in the table.
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<Contract | null>(null);
   const remove = useMutation({
     mutationFn: (id: string) => orpc.contracts.remove({ id }),
     onSuccess: async () => {
       setPendingDeleteId(null);
+      setConfirmTarget(null);
       await refresh();
     },
-    onError: () => setPendingDeleteId(null),
+    onError: () => {
+      setPendingDeleteId(null);
+      setConfirmTarget(null);
+    },
   });
 
   return (
@@ -105,16 +111,7 @@ export function ContractsCard({
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `Vertrag ${v.vertragNr} (${v.artName ?? v.art}) löschen?`,
-                              )
-                            ) {
-                              setPendingDeleteId(v.id);
-                              remove.mutate(v.id);
-                            }
-                          }}
+                          onClick={() => setConfirmTarget(v)}
                           disabled={isDeleting}
                           title="Vertrag löschen"
                         >
@@ -133,6 +130,27 @@ export function ContractsCard({
           </table>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        onOpenChange={(o) => {
+          if (!o && !remove.isPending) setConfirmTarget(null);
+        }}
+        title="Vertrag löschen"
+        description={
+          confirmTarget
+            ? `Vertrag ${confirmTarget.vertragNr} (${confirmTarget.artName ?? confirmTarget.art}) wirklich löschen?`
+            : ""
+        }
+        confirmLabel="Löschen"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() => {
+          if (confirmTarget) {
+            setPendingDeleteId(confirmTarget.id);
+            remove.mutate(confirmTarget.id);
+          }
+        }}
+      />
     </Card>
   );
 }
