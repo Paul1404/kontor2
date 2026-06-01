@@ -170,4 +170,54 @@ describe("resolveRecipient", () => {
     expect(r.minorWithoutGuardian).toBe(true);
     expect(r.recipient.name).toBe("Max Muster");
   });
+
+  describe("recipientEmail", () => {
+    it("uses the member's own email for adults", () => {
+      const r = resolveRecipient(
+        makeMember({ geburtsdatum: "1990-01-01", eMailName: "max@example.org" }),
+        null,
+        asOf,
+      );
+      expect(r.recipientEmail).toBe("max@example.org");
+    });
+
+    it("prefers the guardian connection's email for minors", () => {
+      const r = resolveRecipient(
+        makeMember({ geburtsdatum: minorBirth, eMailName: "kid@example.org" }),
+        {
+          anrede: "Frau",
+          name: "Erika Muster",
+          strasse: null,
+          hausnummer: null,
+          plz: null,
+          ort: null,
+          email: "erika@example.org",
+        },
+        asOf,
+      );
+      expect(r.recipientEmail).toBe("erika@example.org");
+    });
+
+    it("falls back to the member's email when the guardian has none", () => {
+      const r = resolveRecipient(
+        makeMember({ geburtsdatum: minorBirth, eMailName: "kid@example.org" }),
+        {
+          anrede: "Frau",
+          name: "Erika Muster",
+          strasse: null,
+          hausnummer: null,
+          plz: null,
+          ort: null,
+          email: null,
+        },
+        asOf,
+      );
+      expect(r.recipientEmail).toBe("kid@example.org");
+    });
+
+    it("returns null when neither has an email", () => {
+      const r = resolveRecipient(makeMember({ geburtsdatum: minorBirth }), null, asOf);
+      expect(r.recipientEmail).toBeNull();
+    });
+  });
 });

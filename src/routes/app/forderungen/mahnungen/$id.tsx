@@ -183,8 +183,12 @@ function MahnungDetailPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => setEmailItemId(i.id)}
-                        disabled={!i.eMail}
-                        title={i.eMail ? `E-Mail an ${i.eMail}` : "Keine E-Mail hinterlegt"}
+                        disabled={!i.recipientEmail}
+                        title={
+                          i.recipientEmail
+                            ? `E-Mail an ${i.recipientEmail}${i.addressedToGuardian ? " (Vertretung)" : ""}`
+                            : "Keine E-Mail hinterlegt"
+                        }
                       >
                         <Mail className="size-4" />
                       </Button>
@@ -262,6 +266,11 @@ function MahnungDetailPage() {
               <span className="text-muted-foreground">Anhang</span>
               <span className="break-all">{emailPreview.data.attachmentName}</span>
             </div>
+            {emailPreview.data.addressedToGuardian ? (
+              <p className="text-xs text-muted-foreground">
+                Diese Mahnung geht an die gesetzliche Vertretung des Mitglieds.
+              </p>
+            ) : null}
             <pre className="whitespace-pre-wrap rounded-lg border border-border bg-card p-3 font-sans text-xs leading-relaxed">
               {emailPreview.data.body}
             </pre>

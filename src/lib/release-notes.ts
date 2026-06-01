@@ -48,7 +48,7 @@ export const RELEASES: Release[] = [
       {
         category: "feature",
         description:
-          "Mahnungen lassen sich jetzt direkt per E-Mail mit angehängtem PDF versenden. Vor dem Versand zeigt eine Vorschau Empfänger, Betreff und Text.",
+          "Mahnungen lassen sich jetzt direkt per E-Mail mit angehängtem PDF versenden. Vor dem Versand zeigt eine Vorschau Empfänger, Betreff und Text. Bei minderjährigen Mitgliedern geht die E-Mail an die gesetzliche Vertretung, sofern dort eine Adresse hinterlegt ist.",
       },
       {
         category: "improvement",
