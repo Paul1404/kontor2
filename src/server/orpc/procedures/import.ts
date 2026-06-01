@@ -5,6 +5,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { memberSnapshotsTable, snapshotRunsTable } from "~/server/db/schema/snapshots";
 import { runIngest } from "~/server/importer/ingest-pipeline";
 import type { LinearRow } from "~/server/importer/linear-mapper";
+import { createProgressReporter, readImportProgress } from "~/server/importer/progress";
 import { parseDump, rowToDict } from "~/server/importer/sql-tokenizer";
 import { adminProc } from "~/server/orpc/base";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
@@ -12,15 +13,36 @@ import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 const MAX_BYTES = 50 * 1024 * 1024;
 
 export const importRouter = {
+  /** Live progress for an in-flight import, keyed by the token the client
+   *  generated and passed to `uploadSqlDump`. Polled by the upload UI. */
+  progress: adminProc
+    .input(v.object({ token: v.pipe(v.string(), v.minLength(1)) }))
+    .handler(async ({ input }) => {
+      return (
+        (await readImportProgress(input.token)) ?? {
+          phase: "",
+          processed: 0,
+          total: 0,
+          percent: 0,
+          done: false,
+          startedAt: 0,
+          updatedAt: 0,
+        }
+      );
+    }),
+
   uploadSqlDump: adminProc
     .input(
       v.object({
         filename: v.string(),
         contentBase64: v.pipe(v.string(), v.minLength(1)),
         forceOverwriteAbteilungLinks: v.optional(v.boolean(), false),
+        /** Opaque token the client also polls `import.progress` with. */
+        progressToken: v.optional(v.string()),
       }),
     )
     .handler(async ({ context, input }) => {
+      const reporter = createProgressReporter(input.progressToken);
       const buf = Buffer.from(input.contentBase64, "base64");
       if (buf.length === 0) {
         throw new ORPCError("BAD_REQUEST", { message: "Leere Datei." });
@@ -75,6 +97,26 @@ export const importRouter = {
         });
       }
 
+      // Total work for the progress bar: pre-import snapshots plus every input
+      // row the ingest pipeline will touch. The snapshot count is only known
+      // after we query existing members below.
+      const ingestTotal =
+        members.length +
+        feeTypes.length +
+        contracts.length +
+        sepa.length +
+        relationships.length +
+        interes.length +
+        sportarten.length +
+        fachverbaende.length +
+        mgartdat.length +
+        mgsolln.length +
+        lastprot.length +
+        lastproth.length +
+        lastprots.length +
+        lastprotsh.length;
+      let snapshotPlanned = 0;
+
       // Pre-import snapshots for every existing member that this dump
       // will touch. One shared snapshot_run row groups them so the admin
       // UI can offer "Undo this import" later. Best-effort: snapshot
@@ -97,6 +139,7 @@ export const importRouter = {
             .from(membersTable)
             .where(inArray(membersTable.adrNr, incomingAdrNrs));
           if (existing.length > 0) {
+            snapshotPlanned = existing.length;
             const [run] = await context.db
               .insert(snapshotRunsTable)
               .values({
@@ -124,6 +167,11 @@ export const importRouter = {
                     `[import] pre-import snapshot for member ${m.id} failed: ${(snapErr as Error).message}`,
                   );
                 }
+                reporter.report({
+                  phase: "Snapshot",
+                  processed: snapshotMemberCount,
+                  total: snapshotPlanned + ingestTotal,
+                });
               }
               const sizeRows = await context.db
                 .select({ byteSize: memberSnapshotsTable.byteSize })
@@ -145,30 +193,39 @@ export const importRouter = {
         console.error(`[import] pre-import snapshot batch failed: ${(err as Error).message}`);
       }
 
-      const result = await runIngest(context.db, {
-        source: "sql_upload",
-        filename: input.filename,
-        fileSizeBytes: buf.length,
-        startedBy: context.session!.user.id,
-        startedByEmail: context.session!.user.email,
-        members,
-        feeTypes,
-        contracts,
-        sepa,
-        relationships,
-        inter,
-        interes,
-        mgsolln,
-        mgartdat,
-        sportarten,
-        fachverbaende,
-        lastprot,
-        lastproth,
-        lastprots,
-        lastprotsh,
-        requestId: context.requestId,
-        forceOverwriteAbteilungLinks: input.forceOverwriteAbteilungLinks,
-      });
-      return { ...result, snapshotRunId, snapshotMemberCount };
+      try {
+        const result = await runIngest(context.db, {
+          source: "sql_upload",
+          filename: input.filename,
+          fileSizeBytes: buf.length,
+          startedBy: context.session!.user.id,
+          startedByEmail: context.session!.user.email,
+          members,
+          feeTypes,
+          contracts,
+          sepa,
+          relationships,
+          inter,
+          interes,
+          mgsolln,
+          mgartdat,
+          sportarten,
+          fachverbaende,
+          lastprot,
+          lastproth,
+          lastprots,
+          lastprotsh,
+          requestId: context.requestId,
+          forceOverwriteAbteilungLinks: input.forceOverwriteAbteilungLinks,
+          onProgress: reporter.report,
+          progressBase: snapshotPlanned,
+          progressTotal: snapshotPlanned + ingestTotal,
+        });
+        await reporter.finish();
+        return { ...result, snapshotRunId, snapshotMemberCount };
+      } catch (err) {
+        await reporter.finish({ error: (err as Error).message });
+        throw err;
+      }
     }),
 };

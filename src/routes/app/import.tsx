@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { CheckCircle2, Loader2, Upload, XCircle } from "lucide-react";
 import { useState } from "react";
@@ -27,17 +27,39 @@ function fileToBase64(file: File): Promise<string> {
 function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [forceOverwriteAbteilungLinks, setForceOverwriteAbteilungLinks] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
   const upload = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (progressToken: string) => {
       if (!file) throw new Error("Keine Datei ausgewählt.");
       const contentBase64 = await fileToBase64(file);
       return orpc.import.uploadSqlDump({
         filename: file.name,
         contentBase64,
         forceOverwriteAbteilungLinks,
+        progressToken,
       });
     },
   });
+
+  // Poll the server-published progress while the upload request is in flight.
+  // The import runs as one long request, so this out-of-band channel is the
+  // only way to surface phase + percent before it returns.
+  const progress = useQuery({
+    queryKey: ["import-progress", token],
+    queryFn: () => orpc.import.progress({ token: token as string }),
+    enabled: !!token && upload.isPending,
+    refetchInterval: 400,
+    gcTime: 0,
+  });
+
+  const startImport = () => {
+    const t = crypto.randomUUID();
+    setToken(t);
+    upload.mutate(t);
+  };
+
+  const prog = upload.isPending ? progress.data : undefined;
+  const percent = prog && prog.total > 0 ? prog.percent : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -124,7 +146,7 @@ function ImportPage() {
             </span>
           </label>
           <div className="flex items-center gap-3">
-            <Button onClick={() => upload.mutate()} disabled={!file || upload.isPending}>
+            <Button onClick={startImport} disabled={!file || upload.isPending}>
               {upload.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
@@ -133,6 +155,31 @@ function ImportPage() {
               {upload.isPending ? "Wird verarbeitet..." : "Importieren"}
             </Button>
           </div>
+
+          {upload.isPending ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">{prog?.phase || "Vorbereiten"}</span>
+                <span className="tabular-nums text-muted-foreground">
+                  {percent === null ? "" : `${percent}%`}
+                  {prog && prog.total > 0 ? (
+                    <span className="ml-2">
+                      {prog.processed.toLocaleString("de-DE")} /{" "}
+                      {prog.total.toLocaleString("de-DE")}
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full rounded-full bg-primary transition-all duration-300 ${
+                    percent === null ? "animate-pulse w-1/3" : ""
+                  }`}
+                  style={percent === null ? undefined : { width: `${percent}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

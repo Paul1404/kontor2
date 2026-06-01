@@ -14,6 +14,7 @@ import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { slugify, splitAbteilung } from "~/server/importer/abteilung-splitter";
 import { aggregateMgsolln, statusFor } from "~/server/importer/aggregate-mgsolln";
+import { batchInsert } from "~/server/importer/batch";
 import {
   type LinearRow,
   mapContractRow,
@@ -71,6 +72,17 @@ export type IngestInput = {
    * in the UI after the previous import.
    */
   forceOverwriteAbteilungLinks?: boolean;
+  /**
+   * Optional progress sink. Called as phases advance with the running count of
+   * input rows consumed. Kept Redis-agnostic so the pipeline stays pure and
+   * testable; the caller wires it to wherever progress should surface.
+   */
+  onProgress?: (p: { phase: string; processed: number; total: number }) => void;
+  /** Rows already accounted for before this ingest (e.g. pre-import snapshots),
+   *  so a multi-stage import can report one monotonic bar. */
+  progressBase?: number;
+  /** Grand total to report against. Defaults to this ingest's own row sum. */
+  progressTotal?: number;
 };
 
 export type IngestResult = {
@@ -108,24 +120,53 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
     .returning({ id: importBatchesTable.id });
   if (!batch) throw new Error("Could not create import batch");
 
+  // Progress scaffolding. `processed` counts input rows consumed so the UI can
+  // render one monotonic 0..total bar across every phase. `len()` is the per-
+  // phase input size; after each phase we snap `processed` to the phase end so
+  // rows the mapper dropped don't leave the bar short.
+  const len = (rows?: LinearRow[]): number => rows?.length ?? 0;
+  const localTotal =
+    len(input.feeTypes) +
+    len(input.members) +
+    len(input.contracts) +
+    len(input.sepa) +
+    len(input.relationships) +
+    len(input.interes) +
+    len(input.sportarten) +
+    len(input.fachverbaende) +
+    len(input.mgartdat) +
+    len(input.mgsolln) +
+    len(input.lastprot) +
+    len(input.lastproth) +
+    len(input.lastprots) +
+    len(input.lastprotsh);
+  const grandTotal = input.progressTotal ?? localTotal;
+  let processed = input.progressBase ?? 0;
+  const report = (phase: string): void =>
+    input.onProgress?.({ phase, processed, total: grandTotal });
+
   // 1. Fee types: upsert by `art`.
-  let feeTypesWritten = 0;
+  const feeTypeValues: Record<string, unknown>[] = [];
   for (const raw of input.feeTypes ?? []) {
     try {
       const row = mapFeeTypeRow(raw);
       if (!row) continue;
-      await db
-        .insert(feeTypesTable)
-        .values({ ...row, importBatchId: batch.id, updatedAt: new Date() } as never)
-        .onConflictDoUpdate({
-          target: feeTypesTable.art,
-          set: { ...row, importBatchId: batch.id, updatedAt: new Date() } as never,
-        });
-      feeTypesWritten += 1;
+      feeTypeValues.push({ ...row, importBatchId: batch.id, updatedAt: new Date() });
     } catch (e) {
       errors.push({ table: "mgart", message: (e as Error).message });
     }
   }
+  const feeTypeBase = processed;
+  const feeTypesWritten = await batchInsert(db, feeTypesTable, feeTypeValues, {
+    conflict: { target: feeTypesTable.art },
+    onError: (_r, e) => errors.push({ table: "mgart", message: e.message }),
+    onProgress: (p) => {
+      processed = feeTypeBase + p;
+      report("Beitragsarten");
+    },
+  });
+  processed = feeTypeBase + len(input.feeTypes);
+  report("Beitragsarten");
 
   // 2. Members: upsert by `adr_nr`. Collect created/updated stats for audit.
   let membersCreated = 0;
@@ -159,15 +200,53 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
     }
   }
 
+  // Preload every existing member this dump touches in one query, keyed by
+  // adrNr. Replaces a per-row SELECT (the biggest source of round-trips in
+  // this phase) with a single read; the upsert/audit still runs per row
+  // because the create/update decision and field-level diff are row-specific.
+  const existingByAdrNr = new Map<number, typeof membersTable.$inferSelect>();
+  {
+    const incoming = (input.members ?? [])
+      .map((r) => Number(r.AdrNr ?? r.adr_nr ?? r.adrNr))
+      .filter((n) => Number.isFinite(n)) as number[];
+    if (incoming.length > 0) {
+      for (const m of await db
+        .select()
+        .from(membersTable)
+        .where(inArray(membersTable.adrNr, incoming))) {
+        existingByAdrNr.set(m.adrNr, m);
+      }
+    }
+  }
+
+  // Member→Abteilung links are collected here and flushed as one batch after
+  // the loop (deduped, since the same pair can arrive from both adresse.Abteilung
+  // and the interes table). `pushLink` records one resolved link.
+  const memberLinkValues: Record<string, unknown>[] = [];
+  const seenLinks = new Set<string>();
+  const pushLink = (
+    memberId: string,
+    abteilungId: string,
+    row: {
+      eintrittsdatum: string;
+      austrittsdatum: string | null;
+    },
+  ): void => {
+    const key = `${memberId}|${abteilungId}`;
+    if (seenLinks.has(key)) return;
+    seenLinks.add(key);
+    memberLinkValues.push({ memberId, abteilungId, ...row });
+  };
+
+  const membersBase = processed;
+  let memberRowIndex = 0;
   for (const raw of input.members ?? []) {
     try {
       const row = mapMemberRow(raw);
       if (!row) continue;
       const adrNr = row.adrNr as number;
 
-      const existing = (
-        await db.select().from(membersTable).where(eq(membersTable.adrNr, adrNr)).limit(1)
-      )[0];
+      const existing = existingByAdrNr.get(adrNr);
 
       let memberId: string;
       if (existing) {
@@ -236,21 +315,30 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
         const eintritt = (row as Record<string, unknown>).eintritt as Date | null;
         const austritt = (row as Record<string, unknown>).austritt as Date | null;
         const dateStr = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
-        const eintrittsdatum = dateStr(eintritt) ?? "1900-01-01";
-        await db
-          .insert(memberAbteilungenTable)
-          .values({
-            memberId,
-            abteilungId: aid,
-            eintrittsdatum,
-            austrittsdatum: dateStr(austritt),
-          })
-          .onConflictDoNothing();
+        pushLink(memberId, aid, {
+          eintrittsdatum: dateStr(eintritt) ?? "1900-01-01",
+          austrittsdatum: dateStr(austritt),
+        });
       }
     } catch (e) {
       errors.push({ table: "adresse", message: (e as Error).message });
     }
+    if (++memberRowIndex % 25 === 0) {
+      processed = membersBase + memberRowIndex;
+      report("Mitglieder");
+    }
   }
+  processed = membersBase + len(input.members);
+  report("Mitglieder");
+
+  // Flush the Abteilungs-Mitgliedschaften gathered from adresse.Abteilung in
+  // one batch (the interes table appends more below before they're all read
+  // back for the summary count).
+  await batchInsert(db, memberAbteilungenTable, memberLinkValues, {
+    conflict: { updateKeys: [] },
+    onError: (_r, e) => errors.push({ table: "adresse", message: e.message }),
+  });
+  memberLinkValues.length = 0;
 
   // 3. Contracts: replace all rows for AdrNrs that the dump touches.
   //
@@ -305,54 +393,65 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
     }
   }
 
+  const contractBase = processed;
   let contractsWritten = 0;
   if ((input.contracts?.length ?? 0) > 0 && allReferencedAdrNrs.length > 0) {
     await db.delete(contractsTable).where(inArray(contractsTable.adrNr, allReferencedAdrNrs));
+    const contractValues: Record<string, unknown>[] = [];
     for (const raw of input.contracts ?? []) {
       try {
         const row = mapContractRow(raw);
         if (!row) continue;
         const memberId = adrNrToMemberId.get(row.adrNr as number);
         if (!memberId) continue;
-        await db.insert(contractsTable).values({
-          ...row,
-          memberId,
-          importBatchId: batch.id,
-          updatedAt: new Date(),
-        } as never);
-        contractsWritten += 1;
+        contractValues.push({ ...row, memberId, importBatchId: batch.id, updatedAt: new Date() });
       } catch (e) {
         errors.push({ table: "mgvert", message: (e as Error).message });
       }
     }
+    contractsWritten = await batchInsert(db, contractsTable, contractValues, {
+      onError: (_r, e) => errors.push({ table: "mgvert", message: e.message }),
+      onProgress: (p) => {
+        processed = contractBase + p;
+        report("Verträge");
+      },
+    });
   }
+  processed = contractBase + len(input.contracts);
+  report("Verträge");
 
   // 4. SEPA mandates: same strategy as contracts.
+  const sepaBase = processed;
   let sepaWritten = 0;
   if ((input.sepa?.length ?? 0) > 0 && allReferencedAdrNrs.length > 0) {
     await db.delete(sepaMandatesTable).where(inArray(sepaMandatesTable.adrNr, allReferencedAdrNrs));
+    const sepaValues: Record<string, unknown>[] = [];
     for (const raw of input.sepa ?? []) {
       try {
         const row = mapSepaRow(raw);
         if (!row) continue;
         const memberId = adrNrToMemberId.get(row.adrNr as number);
         if (!memberId) continue;
-        await db.insert(sepaMandatesTable).values({
-          ...row,
-          memberId,
-          importBatchId: batch.id,
-          updatedAt: new Date(),
-        } as never);
-        sepaWritten += 1;
+        sepaValues.push({ ...row, memberId, importBatchId: batch.id, updatedAt: new Date() });
       } catch (e) {
         errors.push({ table: "adrsepa", message: (e as Error).message });
       }
     }
+    sepaWritten = await batchInsert(db, sepaMandatesTable, sepaValues, {
+      onError: (_r, e) => errors.push({ table: "adrsepa", message: e.message }),
+      onProgress: (p) => {
+        processed = sepaBase + p;
+        report("SEPA-Mandate");
+      },
+    });
   }
+  processed = sepaBase + len(input.sepa);
+  report("SEPA-Mandate");
 
   // 5. Relationships (verkn): replace rows touching any imported AdrNr on
   // either side, then upsert. Linear keeps reciprocal pairs as separate
   // rows, so we preserve direction.
+  const relBase = processed;
   let relationshipsWritten = 0;
   if ((input.relationships?.length ?? 0) > 0 && allReferencedAdrNrs.length > 0) {
     await db
@@ -363,6 +462,10 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
           inArray(relationshipsTable.toAdrNr, allReferencedAdrNrs),
         ),
       );
+    // Dedupe on the (fromAdrNr, toAdrNr) conflict key so a single multi-row
+    // upsert never tries to touch the same row twice (Postgres rejects that);
+    // last occurrence wins, matching the per-row "last write" behaviour.
+    const relByKey = new Map<string, Record<string, unknown>>();
     for (const raw of input.relationships ?? []) {
       try {
         const row = mapVerknRow(raw);
@@ -370,31 +473,28 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
         const fromMemberId = adrNrToMemberId.get(row.fromAdrNr as number);
         if (!fromMemberId) continue;
         const toMemberId = adrNrToMemberId.get(row.toAdrNr as number) ?? null;
-        await db
-          .insert(relationshipsTable)
-          .values({
-            ...row,
-            fromMemberId,
-            toMemberId,
-            importBatchId: batch.id,
-            updatedAt: new Date(),
-          } as never)
-          .onConflictDoUpdate({
-            target: [relationshipsTable.fromAdrNr, relationshipsTable.toAdrNr],
-            set: {
-              ...row,
-              fromMemberId,
-              toMemberId,
-              importBatchId: batch.id,
-              updatedAt: new Date(),
-            } as never,
-          });
-        relationshipsWritten += 1;
+        relByKey.set(`${row.fromAdrNr}|${row.toAdrNr}`, {
+          ...row,
+          fromMemberId,
+          toMemberId,
+          importBatchId: batch.id,
+          updatedAt: new Date(),
+        });
       } catch (e) {
         errors.push({ table: "verkn", message: (e as Error).message });
       }
     }
+    relationshipsWritten = await batchInsert(db, relationshipsTable, [...relByKey.values()], {
+      conflict: { target: [relationshipsTable.fromAdrNr, relationshipsTable.toAdrNr] },
+      onError: (_r, e) => errors.push({ table: "verkn", message: e.message }),
+      onProgress: (p) => {
+        processed = relBase + p;
+        report("Beziehungen");
+      },
+    });
   }
+  processed = relBase + len(input.relationships);
+  report("Beziehungen");
 
   // 6. Per-member Abteilungs-Mitgliedschaften from Linear's `interes` table.
   // Linear stores them as numeric FKs into `inter` (and *also* sometimes
@@ -445,102 +545,123 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
         if (!aid) continue;
 
         const dateStr = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
-        const eintrittsdatum = dateStr(mapped.eintritt) ?? "1900-01-01";
-        await db
-          .insert(memberAbteilungenTable)
-          .values({
-            memberId,
-            abteilungId: aid,
-            eintrittsdatum,
-            austrittsdatum: dateStr(mapped.austritt),
-          })
-          .onConflictDoNothing();
+        pushLink(memberId, aid, {
+          eintrittsdatum: dateStr(mapped.eintritt) ?? "1900-01-01",
+          austrittsdatum: dateStr(mapped.austritt),
+        });
       } catch (e) {
         errors.push({ table: "interes", message: (e as Error).message });
       }
     }
+
+    await batchInsert(db, memberAbteilungenTable, memberLinkValues, {
+      conflict: { updateKeys: [] },
+      onError: (_r, e) => errors.push({ table: "interes", message: e.message }),
+    });
+    memberLinkValues.length = 0;
   }
+  processed += len(input.interes);
+  report("Abteilungs-Zuordnungen");
 
   // 7. Sportarten + Fachverbaende lookups. Pure reference data; replace
   // wholesale per (kz, nummer, lfdNr). Both are static catalogues from
   // BLSV/DOSB so an admin re-importing should overwrite cleanly.
-  let sportTypesImported = 0;
+  const sportValues: Record<string, unknown>[] = [];
   for (const raw of input.sportarten ?? []) {
     try {
       const row = mapSportartRow(raw);
-      if (!row) continue;
-      await db
-        .insert(linearSportTypesTable)
-        .values(row as never)
-        .onConflictDoUpdate({
-          target: [
-            linearSportTypesTable.kz,
-            linearSportTypesTable.nummer,
-            linearSportTypesTable.lfdNr,
-          ],
-          set: {
-            sportart: (row as { sportart?: string }).sportart,
-            verbandNr: (row as { verbandNr?: string }).verbandNr,
-          } as never,
-        });
-      sportTypesImported += 1;
+      if (row) sportValues.push(row as Record<string, unknown>);
     } catch (e) {
       errors.push({ table: "sportarten", message: (e as Error).message });
     }
   }
+  const sportBase = processed;
+  const sportTypesImported = await batchInsert(db, linearSportTypesTable, sportValues, {
+    conflict: {
+      target: [linearSportTypesTable.kz, linearSportTypesTable.nummer, linearSportTypesTable.lfdNr],
+      updateKeys: ["sportart", "verbandNr"],
+    },
+    onError: (_r, e) => errors.push({ table: "sportarten", message: e.message }),
+    onProgress: (p) => {
+      processed = sportBase + p;
+      report("Sportarten und Verbände");
+    },
+  });
+  processed = sportBase + len(input.sportarten);
+  report("Sportarten und Verbände");
 
-  let federationsImported = 0;
+  const federationValues: Record<string, unknown>[] = [];
   for (const raw of input.fachverbaende ?? []) {
     try {
       const row = mapFachverbandRow(raw);
-      if (!row) continue;
-      await db
-        .insert(linearFederationsTable)
-        .values(row as never)
-        .onConflictDoUpdate({
-          target: [
-            linearFederationsTable.kz,
-            linearFederationsTable.nummer,
-            linearFederationsTable.lfdNr,
-          ],
-          set: {
-            fachverband: (row as { fachverband?: string }).fachverband,
-            kn: (row as { kn?: string }).kn,
-          } as never,
-        });
-      federationsImported += 1;
+      if (row) federationValues.push(row as Record<string, unknown>);
     } catch (e) {
       errors.push({ table: "fachverbaende", message: (e as Error).message });
     }
   }
+  const fedBase = processed;
+  const federationsImported = await batchInsert(db, linearFederationsTable, federationValues, {
+    conflict: {
+      target: [
+        linearFederationsTable.kz,
+        linearFederationsTable.nummer,
+        linearFederationsTable.lfdNr,
+      ],
+      updateKeys: ["fachverband", "kn"],
+    },
+    onError: (_r, e) => errors.push({ table: "fachverbaende", message: e.message }),
+    onProgress: (p) => {
+      processed = fedBase + p;
+      report("Sportarten und Verbände");
+    },
+  });
+  processed = fedBase + len(input.fachverbaende);
+  report("Sportarten und Verbände");
 
   // 8. Beitragsart price history. PK is (art, jahr, monat); upsert so a
   // re-import refreshes the table without piling up duplicates.
-  let feeTypeHistoryImported = 0;
+  const mgartByKey = new Map<string, Record<string, unknown>>();
   for (const raw of input.mgartdat ?? []) {
     try {
       const row = mapMgartDatRow(raw);
       if (!row) continue;
-      await db
-        .insert(feeTypePriceHistoryTable)
-        .values(row as never)
-        .onConflictDoUpdate({
-          target: [
-            feeTypePriceHistoryTable.art,
-            feeTypePriceHistoryTable.jahr,
-            feeTypePriceHistoryTable.monat,
-          ],
-          set: {
-            betrag: (row as { betrag?: string | null }).betrag,
-            prozent: (row as { prozent?: string | null }).prozent,
-            datum: (row as { datum?: Date | null }).datum,
-          } as never,
-        });
-      feeTypeHistoryImported += 1;
+      // `datum` is a Postgres DATE column (string mode in Drizzle). The mapper
+      // returns a JS Date; passing it straight through serialises via
+      // toString() ("Fri Jan 01 2016 ...") which Postgres rejects as invalid
+      // date syntax. Normalise to an ISO YYYY-MM-DD string first, same as the
+      // soll_stellungen / abteilungen date columns.
+      const datumRaw = (row as { datum?: Date | null }).datum;
+      const datum = datumRaw ? datumRaw.toISOString().slice(0, 10) : null;
+      // Dedupe on the (art, jahr, monat) PK so the multi-row upsert never
+      // touches the same row twice; last occurrence wins.
+      mgartByKey.set(`${row.art}|${row.jahr}|${row.monat}`, { ...row, datum });
     } catch (e) {
       errors.push({ table: "mgartdat", message: (e as Error).message });
     }
   }
+  const mgartBase = processed;
+  const feeTypeHistoryImported = await batchInsert(
+    db,
+    feeTypePriceHistoryTable,
+    [...mgartByKey.values()],
+    {
+      conflict: {
+        target: [
+          feeTypePriceHistoryTable.art,
+          feeTypePriceHistoryTable.jahr,
+          feeTypePriceHistoryTable.monat,
+        ],
+        updateKeys: ["betrag", "prozent", "datum"],
+      },
+      onError: (_r, e) => errors.push({ table: "mgartdat", message: e.message }),
+      onProgress: (p) => {
+        processed = mgartBase + p;
+        report("Beitragshistorie");
+      },
+    },
+  );
+  processed = mgartBase + len(input.mgartdat);
+  report("Beitragshistorie");
 
   // 9. Historical Sollstellungen from `mgsolln`.
   //
@@ -607,48 +728,49 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
       });
     }
 
+    const sollValues: Record<string, unknown>[] = [];
     for (const v of aggregated) {
-      try {
-        const status = statusFor(v.openAmount);
-        const falligkeit = v.falligkeitsdatum
-          ? v.falligkeitsdatum.toISOString().slice(0, 10)
-          : `${v.billingYear}-01-01`;
-        await db
-          .insert(sollStellungenTable)
-          .values({
-            memberId: v.memberId,
-            contractId: v.contractId,
-            billingYear: v.billingYear,
-            falligkeitsdatum: falligkeit,
-            amount: v.amount,
-            paidAmount: v.paidAmount,
-            openAmount: v.openAmount,
-            mahnstufe: v.mahnstufe,
-            status,
-            source: "linear_import",
-            linearGuid: v.linearGuid,
-            notes: v.rowCount > 1 ? `Aggregat aus ${v.rowCount} Linear-Zeiträumen (mgsolln)` : null,
-          } as never)
-          .onConflictDoUpdate({
-            target: [sollStellungenTable.contractId, sollStellungenTable.billingYear],
-            set: {
-              amount: v.amount,
-              paidAmount: v.paidAmount,
-              openAmount: v.openAmount,
-              mahnstufe: v.mahnstufe,
-              status,
-              source: "linear_import",
-              linearGuid: v.linearGuid,
-              falligkeitsdatum: falligkeit,
-              updatedAt: new Date(),
-            } as never,
-          });
-        sollStellungenImported += 1;
-      } catch (e) {
-        errors.push({ table: "mgsolln", message: (e as Error).message });
-      }
+      const status = statusFor(v.openAmount);
+      const falligkeit = v.falligkeitsdatum
+        ? v.falligkeitsdatum.toISOString().slice(0, 10)
+        : `${v.billingYear}-01-01`;
+      sollValues.push({
+        memberId: v.memberId,
+        contractId: v.contractId,
+        billingYear: v.billingYear,
+        falligkeitsdatum: falligkeit,
+        amount: v.amount,
+        paidAmount: v.paidAmount,
+        openAmount: v.openAmount,
+        mahnstufe: v.mahnstufe,
+        status,
+        source: "linear_import",
+        linearGuid: v.linearGuid,
+        notes: v.rowCount > 1 ? `Aggregat aus ${v.rowCount} Linear-Zeiträumen (mgsolln)` : null,
+        updatedAt: new Date(),
+      });
     }
+    sollStellungenImported = await batchInsert(db, sollStellungenTable, sollValues, {
+      conflict: {
+        target: [sollStellungenTable.contractId, sollStellungenTable.billingYear],
+        updateKeys: [
+          "amount",
+          "paidAmount",
+          "openAmount",
+          "mahnstufe",
+          "status",
+          "source",
+          "linearGuid",
+          "falligkeitsdatum",
+          "updatedAt",
+        ],
+      },
+      onError: (_r, e) => errors.push({ table: "mgsolln", message: e.message }),
+      onProgress: () => report("Sollstellungen"),
+    });
   }
+  processed += len(input.mgsolln);
+  report("Sollstellungen");
 
   // 10. Legacy SEPA runs from `lastprot` (active) and `lastproth` (purged
   // journal). Upsert by `id` so re-imports refresh the row in place; the
@@ -687,6 +809,8 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
       }
     }
   }
+  processed += len(input.lastprot) + len(input.lastproth);
+  report("Alt-SEPA-Läufe");
 
   // 11. Legacy SEPA run items (`lastprots` / `lastprotsh`). The (sepaGuid,
   // sollGuid) pair is the natural key.
@@ -721,6 +845,8 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
       }
     }
   }
+  processed += len(input.lastprots) + len(input.lastprotsh);
+  report("Abschluss");
 
   // Count abteilung links for the members touched by THIS batch (not the
   // global table count, which keeps growing across imports and would
