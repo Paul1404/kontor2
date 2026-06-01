@@ -5,6 +5,8 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Bookmark,
+  BookmarkPlus,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -28,8 +30,17 @@ import { toast } from "~/components/ui/toaster";
 import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
+import {
+  createView,
+  loadSavedViews,
+  persistSavedViews,
+  type SavedView,
+  type ViewSearch,
+  viewSearchEquals,
+} from "~/lib/saved-views";
 import { headerCheckState, rangeIds } from "~/lib/selection";
-import { usePageShortcut } from "~/lib/use-global-shortcuts";
+import { moveCursor } from "~/lib/table-nav";
+import { isTypingTarget, usePageShortcut } from "~/lib/use-global-shortcuts";
 
 type Status = "aktiv" | "passiv" | "ausgetreten" | "verstorben" | "alle";
 type SortBy = "nachname" | "mitglnr" | "ort" | "email" | "eintritt";
@@ -177,6 +188,7 @@ function MembersListPage() {
   useEffect(() => {
     setSelected(new Set());
     anchorRef.current = null;
+    setCursor(-1);
   }, [viewKey]);
 
   const headerState = headerCheckState(visibleIds, selected);
@@ -217,6 +229,127 @@ function MembersListPage() {
   function clearSelection() {
     setSelected(new Set());
     anchorRef.current = null;
+  }
+
+  // --- Keyboard-native row navigation (Linear-style j/k cursor) ----------
+  const [cursor, setCursor] = useState(-1);
+  const cursorRef = useRef(cursor);
+  cursorRef.current = cursor;
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const canEditRef = useRef(canEdit);
+  canEditRef.current = canEdit;
+  const confirmOpenRef = useRef(false);
+  confirmOpenRef.current = confirm !== null;
+  const cursorRowRef = useRef<HTMLTableRowElement | null>(null);
+
+  // Scroll the focused row into view as the cursor moves.
+  useEffect(() => {
+    if (cursor >= 0) cursorRowRef.current?.scrollIntoView({ block: "nearest" });
+  }, [cursor]);
+
+  // Bind once; read live values via refs and functional state updates so the
+  // listener never goes stale and doesn't re-bind on every keystroke.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isTypingTarget(e.target)) return;
+      if (confirmOpenRef.current) return;
+      const currentRows = rowsRef.current;
+      const len = currentRows.length;
+      const k = e.key;
+
+      if (k === "j" || k === "k") {
+        if (len === 0) return;
+        e.preventDefault();
+        const next = moveCursor(cursorRef.current, k === "j" ? 1 : -1, len);
+        cursorRef.current = next;
+        setCursor(next);
+        // Shift extends the selection onto the row we just landed on.
+        if (e.shiftKey && canEditRef.current && next >= 0) {
+          const row = currentRows[next];
+          if (row) {
+            setSelected((prev) => new Set(prev).add(row.id));
+            anchorRef.current = row.id;
+          }
+        }
+        return;
+      }
+
+      if (k === "o" || k === "Enter") {
+        const row = cursorRef.current >= 0 ? currentRows[cursorRef.current] : undefined;
+        if (!row) return;
+        e.preventDefault();
+        navigate({
+          to: "/app/mitglieder/$mitgliedsnummer",
+          params: { mitgliedsnummer: row.mitglnr ?? String(row.adrNr) },
+        });
+        return;
+      }
+
+      if (k === "x" && canEditRef.current) {
+        const row = cursorRef.current >= 0 ? currentRows[cursorRef.current] : undefined;
+        if (!row) return;
+        e.preventDefault();
+        setSelected((prev) => {
+          const nextSet = new Set(prev);
+          if (nextSet.has(row.id)) nextSet.delete(row.id);
+          else nextSet.add(row.id);
+          return nextSet;
+        });
+        anchorRef.current = row.id;
+        return;
+      }
+
+      if (k === "Escape") {
+        setSelected((prev) => {
+          if (prev.size === 0) return prev;
+          anchorRef.current = null;
+          return new Set();
+        });
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navigate]);
+
+  // --- Saved Views (per-browser presets of the filter + sort state) ------
+  const [views, setViews] = useState<SavedView[]>([]);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [viewName, setViewName] = useState("");
+  // Load after mount (localStorage isn't available during SSR; deferring also
+  // avoids a hydration mismatch on the chip bar).
+  useEffect(() => {
+    setViews(loadSavedViews());
+  }, []);
+
+  const currentViewSearch: ViewSearch = (() => {
+    const { page: _page, ...rest } = search;
+    return rest;
+  })();
+  const activeViewId =
+    views.find((view) => viewSearchEquals(view.search, currentViewSearch))?.id ?? null;
+
+  function applyView(view: SavedView) {
+    setQDraft(view.search.q);
+    navigate({ search: () => ({ ...view.search, page: 1 }), replace: true });
+  }
+
+  function saveCurrentView() {
+    const name = viewName.trim();
+    if (!name) return;
+    const next = [...views, createView(name, currentViewSearch)];
+    setViews(next);
+    persistSavedViews(next);
+    setViewName("");
+    setSaveOpen(false);
+    toast.success(`Ansicht "${name}" gespeichert`);
+  }
+
+  function deleteView(id: string) {
+    const next = views.filter((view) => view.id !== id);
+    setViews(next);
+    persistSavedViews(next);
   }
 
   async function runBulk(
@@ -279,9 +412,12 @@ function MembersListPage() {
           <p className="text-sm text-muted-foreground">
             <span className="hidden sm:inline">
               Suchen, filtern und Profile öffnen. Tipp:{" "}
+              <kbd className="rounded border border-border bg-muted px-1 text-[10px]">j</kbd>/
+              <kbd className="rounded border border-border bg-muted px-1 text-[10px]">k</kbd> zum
+              Navigieren,{" "}
               <kbd className="rounded border border-border bg-muted px-1 text-[10px]">n</kbd> für
-              neu, <kbd className="rounded border border-border bg-muted px-1 text-[10px]">⌘K</kbd>{" "}
-              für Suche.
+              neu, <kbd className="rounded border border-border bg-muted px-1 text-[10px]">?</kbd>{" "}
+              für alle Kürzel.
             </span>
             <span className="sm:hidden">Suchen, filtern und Profile öffnen.</span>
           </p>
@@ -318,6 +454,77 @@ function MembersListPage() {
           ) : null}
         </div>
       </div>
+
+      {views.length > 0 || hasFilter ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Bookmark className="size-3.5" /> Ansichten
+          </span>
+          {views.map((view) => {
+            const active = view.id === activeViewId;
+            return (
+              <span
+                key={view.id}
+                className={`group inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                  active
+                    ? "border-primary/40 bg-primary/10 text-foreground"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <button type="button" onClick={() => applyView(view)} className="max-w-40 truncate">
+                  {view.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteView(view.id)}
+                  className="rounded-full p-0.5 text-muted-foreground opacity-0 hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                  aria-label={`Ansicht "${view.name}" löschen`}
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            );
+          })}
+          {saveOpen ? (
+            <span className="inline-flex items-center gap-1">
+              <Input
+                autoFocus
+                className="h-8 w-44"
+                value={viewName}
+                onChange={(e) => setViewName(e.target.value)}
+                placeholder="Name der Ansicht"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    saveCurrentView();
+                  } else if (e.key === "Escape") {
+                    setSaveOpen(false);
+                    setViewName("");
+                  }
+                }}
+              />
+              <Button type="button" size="sm" onClick={saveCurrentView} disabled={!viewName.trim()}>
+                Speichern
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSaveOpen(false);
+                  setViewName("");
+                }}
+                className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                aria-label="Abbrechen"
+              >
+                <X className="size-4" />
+              </button>
+            </span>
+          ) : hasFilter && !activeViewId ? (
+            <Button type="button" size="sm" variant="outline" onClick={() => setSaveOpen(true)}>
+              <BookmarkPlus className="size-4" /> Ansicht speichern
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <Card>
         <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:p-4">
@@ -635,13 +842,19 @@ function MembersListPage() {
                   </td>
                 </tr>
               ) : (
-                rows.map((m) => {
+                rows.map((m, index) => {
                   const isKontakt = !m.mitglnr;
                   const isSelected = selected.has(m.id);
+                  const isCursor = index === cursor;
                   return (
                     <tr
                       key={m.id}
-                      className={`transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-muted/30"}`}
+                      ref={isCursor ? cursorRowRef : undefined}
+                      className={`transition-colors ${
+                        isCursor ? "bg-primary/10 ring-2 ring-inset ring-primary/40" : ""
+                      } ${isSelected && !isCursor ? "bg-primary/5" : ""} ${
+                        !isSelected && !isCursor ? "hover:bg-muted/30" : ""
+                      }`}
                     >
                       {canEdit ? (
                         <td className="px-4 py-3">
