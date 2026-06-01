@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.6.0",
+    date: "2026-06-01",
+    title: "Mahnungen mit Logo, voller IBAN und Vertretung für Minderjährige",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Mahnungen tragen jetzt das Vereinslogo und zeigen die vollständige IBAN statt der abgekürzten. Damit ist die Überweisung direkt vom Schreiben möglich.",
+      },
+      {
+        category: "feature",
+        description:
+          "Bei minderjährigen Mitgliedern wird die Mahnung an die gesetzliche Vertretung adressiert: entweder an eine als Vertretung markierte Beziehung oder an die neuen Vertretungs-Felder in den Stammdaten. Die Beziehung hat Vorrang.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Der Mahnlauf warnt jetzt, wenn ein minderjähriges Mitglied keine hinterlegte Vertretung hat, bevor das Schreiben direkt an das Mitglied geht.",
+      },
+    ],
+  },
+  {
     version: "0.5.0",
     date: "2026-06-01",
     title: "Mitgliederliste, Beitragsläufe und viele Korrekturen",
