@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Loader2, Plus, Search, Trash2, X } from "lucide-react";
+import { Loader2, Plus, Search, ShieldCheck, Trash2, X } from "lucide-react";
 import { useId, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -17,6 +17,7 @@ type Beziehung = {
   notiz: string | null;
   datVon: string | Date | null;
   datBis: string | Date | null;
+  istVertreter: boolean;
   toMemberId: string | null;
   toAdrNr: number;
   fallbackName: string | null;
@@ -67,6 +68,19 @@ export function BeziehungenCard({
     onError: () => {
       setPendingDeleteId(null);
       setConfirmTarget(null);
+    },
+  });
+
+  // Toggle which connection is the legal representative (Mahnung recipient for
+  // a minor). The server clears the flag on the member's other connections.
+  const [pendingVertreterId, setPendingVertreterId] = useState<string | null>(null);
+  const setVertreter = useMutation({
+    mutationFn: (args: { id: string; value: boolean }) =>
+      orpc.relationships.update({ id: args.id, patch: { istVertreter: args.value } }),
+    onMutate: (args) => setPendingVertreterId(args.id),
+    onSettled: async () => {
+      setPendingVertreterId(null);
+      await refresh();
     },
   });
 
@@ -127,6 +141,11 @@ export function BeziehungenCard({
                           Kontakt
                         </Badge>
                       ) : null}
+                      {b.istVertreter ? (
+                        <Badge className="gap-1" title="Empfänger für Mahnungen bei Minderjährigen">
+                          <ShieldCheck className="size-3" /> Vertretung
+                        </Badge>
+                      ) : null}
                     </div>
                     {b.notiz ? <p className="text-xs text-muted-foreground">{b.notiz}</p> : null}
                     {b.datVon || b.datBis ? (
@@ -137,19 +156,40 @@ export function BeziehungenCard({
                     ) : null}
                   </div>
                   {canEdit ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setConfirmTarget({ id: b.id, name })}
-                      disabled={pendingDeleteId === b.id}
-                      title="Beziehung entfernen"
-                    >
-                      {pendingDeleteId === b.id ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="size-4 text-destructive" />
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant={b.istVertreter ? "secondary" : "ghost"}
+                        onClick={() => setVertreter.mutate({ id: b.id, value: !b.istVertreter })}
+                        disabled={pendingVertreterId === b.id}
+                        title={
+                          b.istVertreter
+                            ? "Als Vertretung entfernen"
+                            : "Als gesetzliche Vertretung (Mahnungs-Empfänger) festlegen"
+                        }
+                      >
+                        {pendingVertreterId === b.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <ShieldCheck
+                            className={b.istVertreter ? "size-4 text-primary" : "size-4"}
+                          />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setConfirmTarget({ id: b.id, name })}
+                        disabled={pendingDeleteId === b.id}
+                        title="Beziehung entfernen"
+                      >
+                        {pendingDeleteId === b.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-4 text-destructive" />
+                        )}
+                      </Button>
+                    </div>
                   ) : null}
                 </li>
               );

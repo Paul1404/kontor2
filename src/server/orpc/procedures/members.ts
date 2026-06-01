@@ -80,6 +80,13 @@ const StammdatenInput = v.object({
   iban1: v.optional(v.nullable(v.string())),
   abwKontoInh: v.optional(v.nullable(v.string())),
   mandatsrefenz: v.optional(v.nullable(v.string())),
+  // Custom legal representative (gesetzliche Vertretung) for minors.
+  vertreterAnrede: v.optional(v.nullable(v.string())),
+  vertreterName: v.optional(v.nullable(v.string())),
+  vertreterStrasse: v.optional(v.nullable(v.string())),
+  vertreterHausnummer: v.optional(v.nullable(v.string())),
+  vertreterPlz: v.optional(v.nullable(v.string())),
+  vertreterOrt: v.optional(v.nullable(v.string())),
   notes: v.optional(v.nullable(v.string())),
 });
 
@@ -145,6 +152,12 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   setIfPresent("bic1");
   setIfPresent("abwKontoInh");
   setIfPresent("mandatsrefenz");
+  setIfPresent("vertreterAnrede");
+  setIfPresent("vertreterName");
+  setIfPresent("vertreterStrasse");
+  setIfPresent("vertreterHausnummer");
+  setIfPresent("vertreterPlz");
+  setIfPresent("vertreterOrt");
   setIfPresent("notes");
 
   if ("geburtsdatum" in input)
@@ -417,6 +430,7 @@ export const membersRouter = {
               notiz: relationshipsTable.notiz,
               datVon: relationshipsTable.datVon,
               datBis: relationshipsTable.datBis,
+              istVertreter: relationshipsTable.istVertreter,
               toMemberId: relationshipsTable.toMemberId,
               toAdrNr: relationshipsTable.toAdrNr,
               fallbackName: relationshipsTable.name,

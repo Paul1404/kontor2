@@ -17,9 +17,11 @@ import {
   loadOpenPostings,
   mahngebuhrFor,
   planNichtEingezogen,
+  resolveRecipients,
   sumDecimal,
 } from "~/server/dunning/build-dunning";
 import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
+import { clubLogoDataUri } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { MahnungDocument, type MahnungInput } from "~/server/pdf/templates/mahnung";
 import { directDebitSql } from "~/server/sepa/direct-debit";
@@ -118,9 +120,11 @@ export const dunningRouter = {
       const blocked = all.filter((m) => isDunningBlocked(m.mahnSperre));
 
       const gebuhr = mahngebuhrFor(input.level, org);
+      const recipients = await resolveRecipients(context.db, eligible, runDate);
 
       const items = eligible.map((m) => {
         const totalDue = sumDecimal([m.openSum, gebuhr]);
+        const resolved = recipients.get(m.memberId);
         return {
           memberId: m.memberId,
           mitglnr: m.mitglnr,
@@ -136,6 +140,12 @@ export const dunningRouter = {
           mahngebuhr: gebuhr,
           totalDue,
           hasAddress: !!(m.strasse && m.plz && m.ort),
+          // Addressee + minor handling, so the preview can flag a minor that
+          // would be dunned directly without a guardian.
+          recipientName: resolved?.recipient.name ?? null,
+          isMinor: resolved?.isMinor ?? false,
+          guardianSource: resolved?.guardianSource ?? null,
+          minorWithoutGuardian: resolved?.minorWithoutGuardian ?? false,
         };
       });
 
@@ -160,6 +170,7 @@ export const dunningRouter = {
           openSum: sumDecimal(items.map((i) => i.openSum)),
           totalFees: sumDecimal(items.map((i) => i.mahngebuhr)),
           totalDue: sumDecimal(items.map((i) => i.totalDue)),
+          minorsWithoutGuardian: items.filter((i) => i.minorWithoutGuardian).length,
         },
       };
     }),
@@ -223,6 +234,11 @@ export const dunningRouter = {
           : [];
       const descBySoll = new Map(descRows.map((r) => [r.sollId, r.artName ?? r.vertragNr]));
 
+      // Resolve the addressee (member or guardian) per member, and read the
+      // club logo once for the whole run.
+      const recipients = await resolveRecipients(context.db, eligible, runDate);
+      const logoDataUri = clubLogoDataUri();
+
       const result = await context.db.transaction(async (tx) => {
         // Header
         const [runRow] = await tx
@@ -254,6 +270,19 @@ export const dunningRouter = {
             rueckgebuhr: p.rueckgebuhr,
           }));
           const totalDue = sumDecimal([m.openSum, gebuhr]);
+          const resolved = recipients.get(m.memberId);
+          const recipient = resolved?.recipient ?? {
+            anrede: m.anrede,
+            name:
+              [m.vorname, m.nachname].filter(Boolean).join(" ") ||
+              m.kurzname ||
+              m.firma1 ||
+              `AdrNr ${m.adrNr}`,
+            strasse: m.strasse,
+            hausnummer: m.hausnummer,
+            plz: m.plz,
+            ort: m.ort,
+          };
 
           const pdfInput: MahnungInput = {
             level: input.level as 1 | 2 | 3,
@@ -264,10 +293,11 @@ export const dunningRouter = {
               anschriftStrasse: org.anschriftStrasse,
               anschriftPlz: org.anschriftPlz,
               anschriftOrt: org.anschriftOrt,
-              vereinsIbanLast4: org.vereinsIbanLast4,
+              vereinsIban: org.vereinsIban,
               vereinsBic: org.vereinsBic,
               vereinsBankname: org.vereinsBankname,
               glaeubigerId: org.glaeubigerId,
+              logoDataUri,
             },
             member: {
               mitglnr: m.mitglnr,
@@ -276,11 +306,15 @@ export const dunningRouter = {
               nachname: m.nachname,
               kurzname: m.kurzname,
               firma1: m.firma1,
-              strasse: m.strasse,
-              hausnummer: m.hausnummer,
-              plz: m.plz,
-              ort: m.ort,
-              anrede: null,
+            },
+            recipient: {
+              anrede: recipient.anrede,
+              name: recipient.name,
+              strasse: recipient.strasse,
+              hausnummer: recipient.hausnummer,
+              plz: recipient.plz,
+              ort: recipient.ort,
+              vertretungFor: resolved?.vertretungFor ?? null,
             },
             postings,
             openSum: m.openSum,

@@ -41,6 +41,95 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.6.0",
+    date: "2026-06-01",
+    title: "Mahnungen mit Logo, voller IBAN und Vertretung für Minderjährige",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Mahnungen tragen jetzt das Vereinslogo und zeigen die vollständige IBAN statt der abgekürzten. Damit ist die Überweisung direkt vom Schreiben möglich.",
+      },
+      {
+        category: "feature",
+        description:
+          "Bei minderjährigen Mitgliedern wird die Mahnung an die gesetzliche Vertretung adressiert: entweder an eine als Vertretung markierte Beziehung oder an die neuen Vertretungs-Felder in den Stammdaten. Die Beziehung hat Vorrang.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Der Mahnlauf warnt jetzt, wenn ein minderjähriges Mitglied keine hinterlegte Vertretung hat, bevor das Schreiben direkt an das Mitglied geht.",
+      },
+    ],
+  },
+  {
+    version: "0.5.0",
+    date: "2026-06-01",
+    title: "Mitgliederliste, Beitragsläufe und viele Korrekturen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Mitgliederliste: Navigation per Tastatur, gespeicherte Ansichten und Mehrfachauswahl mit Massenaktionen.",
+      },
+      {
+        category: "feature",
+        description:
+          "Beitragsläufe: anteilige Berechnung (Proration) und Kündigungsfrist sind jetzt konfigurierbar.",
+      },
+      {
+        category: "feature",
+        description:
+          "Linear-Import schreibt in Stapeln und zeigt den Fortschritt live an, auch bei großen Dumps.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Dashboard, Abteilungen und Beitragsarten werden zwischengespeichert und laden spürbar schneller.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Löschen von Verträgen und Beziehungen läuft über einen In-App-Bestätigungsdialog statt eines Browser-Popups.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Strukturiertes Logging und zusätzliche Sicherheits-Header im gesamten Backend.",
+      },
+      {
+        category: "fix",
+        description:
+          "iOS: Die Oberfläche ist nach der ersten Anmeldung nicht mehr leicht hineingezoomt.",
+      },
+      {
+        category: "fix",
+        description:
+          "Lastschrift-Fälle werden korrekt eingezogen statt angemahnt, Verträge ohne Lastschrift-Kennung zählen als Lastschrift, und bereits eingezogene Sollstellungen lassen sich zurücksetzen.",
+      },
+      {
+        category: "fix",
+        description:
+          "SEPA und Beitragsarten: korrekte Cent-Beträge, deutsche Zahlenformate und stabile Belegnummern auch bei gleichzeitigen Zugriffen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Magic-Link-Anmeldung im Mitgliederportal ist jetzt wirklich nur einmal verwendbar.",
+      },
+      {
+        category: "fix",
+        description:
+          "Dashboard und Verbandsmeldung: gelöschte Altdatensätze und Doppelzählungen bei der Bestandserhebung werden ausgeschlossen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Weitere Korrektheits- und Stabilitätsfehler in Finanzbuchung, DSGVO-Auskunft, Snapshots, Anhängen und Formularen behoben.",
+      },
+    ],
+  },
+  {
     version: "0.4.0",
     date: "2026-05-25",
     title: "Versionshinweise in der App",
