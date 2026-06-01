@@ -5,7 +5,8 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
-import { triggerDownload } from "~/lib/download";
+import { QueryError } from "~/components/ui/query-error";
+import { exportCsvFile } from "~/lib/export";
 import { formatCurrency } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -21,9 +22,8 @@ function FinanzenPage() {
     queryFn: () => orpc.reports.finanzbericht({ year }),
   });
 
-  async function exportCsv() {
-    const res = await orpc.reports.finanzberichtExport({ year });
-    triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+  function exportCsv() {
+    return exportCsvFile(() => orpc.reports.finanzberichtExport({ year }));
   }
 
   return (
@@ -97,6 +97,8 @@ function FinanzenPage() {
             <Loader2 className="size-5 animate-spin" /> Lade...
           </CardContent>
         </Card>
+      ) : data.isError ? (
+        <QueryError error={data.error} onRetry={() => data.refetch()} />
       ) : !data.data ? (
         <Card>
           <CardContent className="p-12 text-center text-muted-foreground">Keine Daten.</CardContent>

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { QueryErrorRow } from "~/components/ui/query-error";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/einstellungen/benutzer")({
@@ -175,47 +176,63 @@ function UsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {users.data?.map((u) => {
-                  const isSelf = u.id === me.data?.id;
-                  return (
-                    <tr key={u.id} className="transition-colors hover:bg-muted/30">
-                      <td className="px-4 py-3">
-                        {u.email}
-                        {isSelf ? (
-                          <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            Sie
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{u.name}</td>
-                      <td className="px-4 py-3">
-                        <select
-                          value={u.role}
-                          disabled={isSelf || setRoleMutation.isPending}
-                          title={isSelf ? "Eigene Rolle kann nicht geändert werden." : undefined}
-                          onChange={(e) => {
-                            const next = e.target.value as "admin" | "vorstand" | "readonly";
-                            if (
-                              u.role === "admin" &&
-                              next !== "admin" &&
-                              !window.confirm(
-                                `${u.email} wirklich von Administrator auf ${next} herabsetzen?`,
-                              )
-                            ) {
-                              return;
-                            }
-                            setRoleMutation.mutate({ userId: u.id, role: next });
-                          }}
-                          className="h-8 rounded-md border border-input bg-card px-2 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <option value="readonly">Readonly</option>
-                          <option value="vorstand">Vorstand</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {users.isLoading ? (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                      Wird geladen…
+                    </td>
+                  </tr>
+                ) : users.isError ? (
+                  <QueryErrorRow colSpan={3} onRetry={() => users.refetch()} />
+                ) : users.data && users.data.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                      Keine Benutzer.
+                    </td>
+                  </tr>
+                ) : (
+                  users.data?.map((u) => {
+                    const isSelf = u.id === me.data?.id;
+                    return (
+                      <tr key={u.id} className="transition-colors hover:bg-muted/30">
+                        <td className="px-4 py-3">
+                          {u.email}
+                          {isSelf ? (
+                            <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Sie
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{u.name}</td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={u.role}
+                            disabled={isSelf || setRoleMutation.isPending}
+                            title={isSelf ? "Eigene Rolle kann nicht geändert werden." : undefined}
+                            onChange={(e) => {
+                              const next = e.target.value as "admin" | "vorstand" | "readonly";
+                              if (
+                                u.role === "admin" &&
+                                next !== "admin" &&
+                                !window.confirm(
+                                  `${u.email} wirklich von Administrator auf ${next} herabsetzen?`,
+                                )
+                              ) {
+                                return;
+                              }
+                              setRoleMutation.mutate({ userId: u.id, role: next });
+                            }}
+                            className="h-8 rounded-md border border-input bg-card px-2 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <option value="readonly">Readonly</option>
+                            <option value="vorstand">Vorstand</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

@@ -111,6 +111,9 @@ function EditMemberPage() {
       </div>
 
       <MemberStammdatenForm
+        // Remount the form per member so its seeded state resets only when the
+        // record actually changes — never mid-edit on a background refetch.
+        key={(member as Record<string, unknown>).id as string}
         initial={initial}
         submitting={mut.isPending}
         errorMessage={errorMessage}

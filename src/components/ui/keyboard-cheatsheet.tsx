@@ -30,6 +30,17 @@ const SECTIONS: Array<{ title: string; items: Shortcut[] }> = [
       { keys: ["e"], label: "Bearbeiten (auf Mitgliedsdetail)" },
     ],
   },
+  {
+    title: "Mitgliederliste: Tastatur-Navigation",
+    items: [
+      { keys: ["j"], label: "Nächste Zeile" },
+      { keys: ["k"], label: "Vorherige Zeile" },
+      { keys: ["o"], label: "Markierte Zeile öffnen" },
+      { keys: ["x"], label: "Zeile auswählen", needsRole: ["vorstand", "admin"] },
+      { keys: ["⇧", "j / k"], label: "Auswahl erweitern", needsRole: ["vorstand", "admin"] },
+      { keys: ["Esc"], label: "Auswahl aufheben", needsRole: ["vorstand", "admin"] },
+    ],
+  },
 ];
 
 export function KeyboardCheatsheet({

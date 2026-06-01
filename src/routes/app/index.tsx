@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Cake, UserCheck, UserMinus, UserPlus, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { QueryError } from "~/components/ui/query-error";
 import { Skeleton } from "~/components/ui/skeleton";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -11,10 +12,21 @@ export const Route = createFileRoute("/app/")({
 });
 
 function DashboardPage() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["dashboard.stats"],
     queryFn: () => orpc.dashboard.stats(),
   });
+
+  if (isError) {
+    return (
+      <QueryError
+        title="Dashboard konnte nicht geladen werden"
+        description="Die Kennzahlen konnten nicht abgerufen werden."
+        error={error}
+        onRetry={() => refetch()}
+      />
+    );
+  }
 
   if (isLoading || !data) {
     return <DashboardSkeleton />;

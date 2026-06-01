@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { formatCurrency, formatDate } from "~/lib/format";
@@ -38,13 +39,18 @@ export function ContractsCard({
   // Track which specific row is being deleted so the spinner / disabled
   // state only applies to that one row, not every Trash icon in the table.
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<Contract | null>(null);
   const remove = useMutation({
     mutationFn: (id: string) => orpc.contracts.remove({ id }),
     onSuccess: async () => {
       setPendingDeleteId(null);
+      setConfirmTarget(null);
       await refresh();
     },
-    onError: () => setPendingDeleteId(null),
+    onError: () => {
+      setPendingDeleteId(null);
+      setConfirmTarget(null);
+    },
   });
 
   return (
@@ -105,16 +111,7 @@ export function ContractsCard({
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `Vertrag ${v.vertragNr} (${v.artName ?? v.art}) löschen?`,
-                              )
-                            ) {
-                              setPendingDeleteId(v.id);
-                              remove.mutate(v.id);
-                            }
-                          }}
+                          onClick={() => setConfirmTarget(v)}
                           disabled={isDeleting}
                           title="Vertrag löschen"
                         >
@@ -133,6 +130,27 @@ export function ContractsCard({
           </table>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        onOpenChange={(o) => {
+          if (!o && !remove.isPending) setConfirmTarget(null);
+        }}
+        title="Vertrag löschen"
+        description={
+          confirmTarget
+            ? `Vertrag ${confirmTarget.vertragNr} (${confirmTarget.artName ?? confirmTarget.art}) wirklich löschen?`
+            : ""
+        }
+        confirmLabel="Löschen"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() => {
+          if (confirmTarget) {
+            setPendingDeleteId(confirmTarget.id);
+            remove.mutate(confirmTarget.id);
+          }
+        }}
+      />
     </Card>
   );
 }
@@ -160,6 +178,9 @@ function AddContractForm({
   const [art, setArt] = useState<string>("");
   const [vertragBegin, setVertragBegin] = useState(() => new Date().toISOString().slice(0, 10));
   const [error, setError] = useState<string | null>(null);
+  const artId = useId();
+  const vertragNrId = useId();
+  const beginId = useId();
 
   // Hide inactive Beitragsarten and anything the member already has.
   const options = (feeTypes.data ?? []).filter(
@@ -190,7 +211,7 @@ function AddContractForm({
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="flex flex-col gap-1.5 md:col-span-2">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          <Label htmlFor={artId} className="text-xs uppercase tracking-wide text-muted-foreground">
             Beitragsart
           </Label>
           {feeTypes.isLoading ? (
@@ -203,6 +224,7 @@ function AddContractForm({
             </p>
           ) : (
             <select
+              id={artId}
               value={art}
               onChange={(e) => setArt(e.target.value)}
               className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
@@ -218,10 +240,14 @@ function AddContractForm({
           )}
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          <Label
+            htmlFor={vertragNrId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
             Vertragsnummer
           </Label>
           <Input
+            id={vertragNrId}
             value={vertragNr}
             onChange={(e) => setVertragNr(e.target.value)}
             placeholder="z. B. 2026-001"
@@ -229,8 +255,14 @@ function AddContractForm({
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Beginn</Label>
+          <Label
+            htmlFor={beginId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Beginn
+          </Label>
           <Input
+            id={beginId}
             type="date"
             value={vertragBegin}
             onChange={(e) => setVertragBegin(e.target.value)}

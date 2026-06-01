@@ -154,21 +154,31 @@ export const attachmentsRouter = {
       .limit(1);
     const att = rows[0];
     if (!att) throw new ORPCError("NOT_FOUND", { message: "Anhang nicht gefunden." });
-    await context.db.delete(attachmentsTable).where(eq(attachmentsTable.id, input.id));
+
+    // Delete the row and write its audit entry atomically. If the audit
+    // insert fails the row delete rolls back, so the DB never loses the
+    // record without a trail. The S3 object is removed only AFTER commit:
+    // it's external best-effort cleanup, and deleting it before commit would
+    // strand the file if the transaction then rolled back.
+    await context.db.transaction(async (tx) => {
+      await tx.delete(attachmentsTable).where(eq(attachmentsTable.id, input.id));
+      await appendAudit(tx, {
+        entityType: "member_attachment",
+        entityId: input.id,
+        action: "delete",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: { filename: { before: att.filename, after: null } },
+        requestId: context.requestId ?? null,
+      });
+    });
+
     try {
       await deleteObject(att.s3Key);
     } catch {
       /* tolerate orphan in S3; record is gone */
     }
-    await appendAudit(context.db, {
-      entityType: "member_attachment",
-      entityId: input.id,
-      action: "delete",
-      source: "ui",
-      actorId: context.session!.user.id,
-      actorEmail: context.session!.user.email,
-      changes: { filename: { before: att.filename, after: null } },
-    });
     return { ok: true };
   }),
 

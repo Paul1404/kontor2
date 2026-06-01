@@ -77,6 +77,7 @@ export async function computeBestandserhebung(
 
   const rows = await db
     .select({
+      memberId: membersTable.id,
       abteilungId: abteilungenTable.id,
       abteilungName: abteilungenTable.name,
       sportart: abteilungenTable.sportart,
@@ -103,6 +104,9 @@ export async function computeBestandserhebung(
           sql`${membersTable.verstorbenAm} > ${stichtag}::date`,
         ),
         or(isNull(membersTable.deletedAt), sql`${membersTable.deletedAt} > ${stichtag}::date`),
+        // Exclude the legacy Linear soft-delete too; otherwise geloscht
+        // members inflate the official verband report.
+        sql`coalesce(${membersTable.geloscht}, false) = false`,
         whereAbtFilter,
       ),
     );
@@ -156,7 +160,15 @@ export async function computeBestandserhebung(
     }
   }
 
+  // A member can hold more than one active link row in the same Abteilung
+  // (e.g. an import sentinel eintrittsdatum plus a real re-join, both with a
+  // null austrittsdatum). The official report counts each person once per
+  // Sparte, so dedupe on (member, abteilung) before bucketing.
+  const countedPerAbteilung = new Set<string>();
   for (const r of rows) {
+    const dedupeKey = `${r.memberId}|${r.abteilungId}`;
+    if (countedPerAbteilung.has(dedupeKey)) continue;
+    countedPerAbteilung.add(dedupeKey);
     const g = genderFor(r.geschlecht);
     const b = ageBucketFor(r.ageInYears);
     const key = cellKey(r.abteilungId, g, b);

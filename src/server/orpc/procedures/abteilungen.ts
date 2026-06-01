@@ -6,38 +6,45 @@ import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abt
 import { membersTable } from "~/server/db/schema/members";
 import { slugify } from "~/server/importer/abteilung-splitter";
 import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
-import { invalidateMemberCaches } from "~/server/search/cache";
+import {
+  CACHE_NS,
+  cached,
+  invalidateAbteilungCaches,
+  invalidateMemberCaches,
+} from "~/server/search/cache";
 
 const NameInput = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80));
 const DateStringInput = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
 
 export const abteilungenRouter = {
-  list: authedProc.input(v.void()).handler(async ({ context }) => {
-    // Use raw qualified table names in the correlated subquery. Drizzle's
-    // `sql` template elides column qualifiers inside .select(), so passing
-    // `${table.column}` here yields `"id" = "id"` (always true).
-    return context.db
-      .select({
-        id: abteilungenTable.id,
-        name: abteilungenTable.name,
-        slug: abteilungenTable.slug,
-        sportart: abteilungenTable.sportart,
-        verbandName: abteilungenTable.verbandName,
-        verbandNr: abteilungenTable.verbandNr,
-        inaktiv: abteilungenTable.inaktiv,
-        memberCount: sql<number>`(select count(*)::int from member_abteilungen ma where ma.abteilung_id = abteilungen.id and ma.austrittsdatum is null)`,
-        totalCount: sql<number>`(select count(*)::int from member_abteilungen ma where ma.abteilung_id = abteilungen.id)`,
-      })
-      .from(abteilungenTable)
-      .orderBy(asc(abteilungenTable.name));
-  }),
+  list: authedProc.input(v.void()).handler(async ({ context }) =>
+    cached(CACHE_NS.abteilungen, "full", 300, () =>
+      // Use raw qualified table names in the correlated subquery. Drizzle's
+      // `sql` template elides column qualifiers inside .select(), so passing
+      // `${table.column}` here yields `"id" = "id"` (always true).
+      context.db
+        .select({
+          id: abteilungenTable.id,
+          name: abteilungenTable.name,
+          slug: abteilungenTable.slug,
+          sportart: abteilungenTable.sportart,
+          verbandName: abteilungenTable.verbandName,
+          verbandNr: abteilungenTable.verbandNr,
+          inaktiv: abteilungenTable.inaktiv,
+          memberCount: sql<number>`(select count(*)::int from member_abteilungen ma where ma.abteilung_id = abteilungen.id and ma.austrittsdatum is null)`,
+          totalCount: sql<number>`(select count(*)::int from member_abteilungen ma where ma.abteilung_id = abteilungen.id)`,
+        })
+        .from(abteilungenTable)
+        .orderBy(asc(abteilungenTable.name)),
+    ),
+  ),
 
   create: adminProc.input(v.object({ name: NameInput })).handler(async ({ context, input }) => {
     const slug = slugify(input.name);
     if (!slug) {
       throw new ORPCError("VALIDATION_FAILED", { message: "Name ergibt keinen gültigen Slug." });
     }
-    return await context.db.transaction(async (tx) => {
+    const result = await context.db.transaction(async (tx) => {
       const [dupe] = await tx
         .select({ id: abteilungenTable.id })
         .from(abteilungenTable)
@@ -67,12 +74,14 @@ export const abteilungenRouter = {
       });
       return inserted;
     });
+    await invalidateAbteilungCaches();
+    return result;
   }),
 
   rename: adminProc
     .input(v.object({ id: v.string(), name: NameInput }))
     .handler(async ({ context, input }) => {
-      return await context.db.transaction(async (tx) => {
+      const result = await context.db.transaction(async (tx) => {
         const [existing] = await tx
           .select()
           .from(abteilungenTable)
@@ -110,6 +119,8 @@ export const abteilungenRouter = {
         });
         return { ok: true };
       });
+      await invalidateAbteilungCaches();
+      return result;
     }),
 
   update: adminProc
@@ -156,6 +167,7 @@ export const abteilungenRouter = {
           requestId: context.requestId ?? null,
         });
       });
+      await invalidateAbteilungCaches();
       return { ok: true };
     }),
 
@@ -191,6 +203,7 @@ export const abteilungenRouter = {
         requestId: context.requestId ?? null,
       });
     });
+    await invalidateAbteilungCaches();
     return { ok: true };
   }),
 

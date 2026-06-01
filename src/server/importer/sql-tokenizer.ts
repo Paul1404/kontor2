@@ -354,9 +354,19 @@ export function coerceBool(value: Cell): boolean | null {
 
 export function coerceDecimal(value: Cell): string | null {
   if (value === null || value === undefined) return null;
-  if (typeof value === "number") return String(value);
-  const s = String(value).trim().replace(",", ".");
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
+  let s = String(value).trim();
   if (!s) return null;
+  // Normalise German number formatting. With both separators present, '.'
+  // is the thousands separator and ',' the decimal ("1.234,56" -> "1234.56").
+  // With only a comma, the comma is the decimal point ("5,50" -> "5.50").
+  // The previous `replace(",", ".")` only swapped the first comma, turning
+  // "1.234,56" into the un-parseable "1.234.56" and silently dropping the
+  // amount.
+  if (s.includes(",")) {
+    if (s.includes(".")) s = s.replace(/\./g, "");
+    s = s.replace(",", ".");
+  }
   const n = Number(s);
   return Number.isFinite(n) ? String(n) : null;
 }

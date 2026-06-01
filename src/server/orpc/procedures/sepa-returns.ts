@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import { sepaReturnsTable } from "~/server/db/schema/dunning";
@@ -168,6 +168,25 @@ export const sepaReturnsRouter = {
     }
 
     const result = await context.db.transaction(async (tx) => {
+      // Claim the item atomically: mark it returned only if it isn't
+      // already. This closes the race between the pre-check above and the
+      // insert — a double-submit would otherwise create two returns (double
+      // Rücklastgebühr, Sollstellung reopened twice), since there is no
+      // unique constraint on fee_run_item_id.
+      const claimed = await tx
+        .update(feeRunItemsTable)
+        .set({
+          returnedAt: new Date(),
+          returnReasonCode: input.reasonCode ?? null,
+        })
+        .where(and(eq(feeRunItemsTable.id, item.id), isNull(feeRunItemsTable.returnedAt)))
+        .returning({ id: feeRunItemsTable.id });
+      if (claimed.length === 0) {
+        throw new ORPCError("CONFLICT", {
+          message: "Diese Lastschrift wurde bereits als Rückläufer erfasst.",
+        });
+      }
+
       const [row] = await tx
         .insert(sepaReturnsTable)
         .values({
@@ -182,15 +201,6 @@ export const sepaReturnsRouter = {
           createdBy: context.session!.user.id,
         } as never)
         .returning({ id: sepaReturnsTable.id });
-
-      // Mark the fee_run_item itself as returned.
-      await tx
-        .update(feeRunItemsTable)
-        .set({
-          returnedAt: new Date(),
-          returnReasonCode: input.reasonCode ?? null,
-        })
-        .where(eq(feeRunItemsTable.id, item.id));
 
       // Reopen the Sollstellung: paid back to 0, status=returned, openAmount=full
       if (item.sollStellungId) {

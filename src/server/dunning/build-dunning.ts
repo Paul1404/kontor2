@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import type { DB } from "~/server/db/client";
 import { sepaReturnsTable } from "~/server/db/schema/dunning";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
@@ -62,6 +62,18 @@ export function mahngebuhrFor(
   return org.mahngebuhr3;
 }
 
+/**
+ * Whether a member's `mahnSperre` (dunning block) flag suppresses dunning.
+ * The legacy Linear column is free-form; we treat an empty/whitespace-only
+ * value and the sentinel "0" as "not blocked" and anything else as blocked.
+ * Trimming matters: a stray space must not silently block all dunning.
+ */
+export function isDunningBlocked(mahnSperre: string | null | undefined): boolean {
+  if (!mahnSperre) return false;
+  const v = mahnSperre.trim();
+  return v !== "" && v !== "0";
+}
+
 export type LoadOpenParams = {
   /** Only include postings older than this date. Default: today. */
   cutoffDate?: Date;
@@ -121,7 +133,16 @@ export async function loadOpenPostings(
     })
     .from(sollStellungenTable)
     .innerJoin(membersTable, eq(sollStellungenTable.memberId, membersTable.id))
-    .where(and(...conditions, sql`coalesce(${membersTable.geloscht}, false) = false`))
+    .where(
+      and(
+        ...conditions,
+        // Skip both soft-delete flags: legacy `geloscht` and the app's
+        // `deletedAt` (set by members.softDelete). A UI-deleted member must
+        // never receive a Mahnung.
+        sql`coalesce(${membersTable.geloscht}, false) = false`,
+        isNull(membersTable.deletedAt),
+      ),
+    )
     .orderBy(membersTable.nachname, membersTable.vorname, sollStellungenTable.billingYear);
 
   // Optional Rücklastgebühr sum per Sollstellung (latest return only is

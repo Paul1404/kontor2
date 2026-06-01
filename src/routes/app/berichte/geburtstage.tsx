@@ -5,7 +5,8 @@ import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
-import { triggerDownload } from "~/lib/download";
+import { QueryErrorRow } from "~/components/ui/query-error";
+import { exportCsvFile } from "~/lib/export";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -44,9 +45,8 @@ function GeburtstagePage() {
     queryFn: () => orpc.reports.geburtstage({ month, year, abteilungId }),
   });
 
-  async function exportCsv() {
-    const res = await orpc.reports.geburtstageExport({ month, year, abteilungId });
-    triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+  function exportCsv() {
+    return exportCsvFile(() => orpc.reports.geburtstageExport({ month, year, abteilungId }));
   }
 
   return (
@@ -134,6 +134,8 @@ function GeburtstagePage() {
                     </span>
                   </td>
                 </tr>
+              ) : data.isError ? (
+                <QueryErrorRow colSpan={6} onRetry={() => data.refetch()} />
               ) : !data.data || data.data.rows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">

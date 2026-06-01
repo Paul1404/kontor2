@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { PageSizeSelect, usePersistentPageSize } from "~/components/ui/page-size-select";
+import { QueryError } from "~/components/ui/query-error";
 import { Skeleton } from "~/components/ui/skeleton";
 import {
   actionLabel,
@@ -203,6 +204,10 @@ function AuditPage() {
                 <Skeleton className="h-3 w-28" />
               </li>
             ))
+          ) : list.isError ? (
+            <li className="px-4 py-6">
+              <QueryError error={list.error} onRetry={() => list.refetch()} />
+            </li>
           ) : (list.data?.rows.length ?? 0) === 0 ? (
             <li className="px-4 py-8 text-center text-sm text-muted-foreground">
               Keine Einträge passen zu diesen Filtern.

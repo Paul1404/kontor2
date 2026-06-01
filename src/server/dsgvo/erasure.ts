@@ -1,3 +1,4 @@
+import { ORPCError } from "@orpc/server";
 import { desc, eq, sql } from "drizzle-orm";
 import { appendAudit } from "~/server/audit/log";
 import type { DBOrTx } from "~/server/db/client";
@@ -53,7 +54,7 @@ export async function previewErasure(db: DBOrTx, memberId: string): Promise<Eras
     .from(membersTable)
     .where(eq(membersTable.id, memberId))
     .limit(1);
-  if (!member) throw new Error(`Mitglied ${memberId} nicht gefunden.`);
+  if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
 
   const rules = buildScrubRules(memberId);
   const diff: ErasureDiffEntry[] = [];
@@ -105,12 +106,12 @@ export async function executeErasure(
 ): Promise<ErasureResult> {
   const preview = await previewErasure(db, memberId);
   if (!preview.retention.retentionExpired && !opts.forceOverride) {
-    throw new Error(
-      `Aufbewahrungsfrist nicht abgelaufen (frühestens ${preview.retention.earliestErasureDate}). Override erforderlich.`,
-    );
+    throw new ORPCError("PRECONDITION_FAILED", {
+      message: `Aufbewahrungsfrist nicht abgelaufen (frühestens ${preview.retention.earliestErasureDate}). Override erforderlich.`,
+    });
   }
   if (!preview.retention.retentionExpired && opts.forceOverride && !opts.overrideReason?.trim()) {
-    throw new Error("Override-Begründung erforderlich.");
+    throw new ORPCError("PRECONDITION_FAILED", { message: "Override-Begründung erforderlich." });
   }
 
   const rules = buildScrubRules(memberId);

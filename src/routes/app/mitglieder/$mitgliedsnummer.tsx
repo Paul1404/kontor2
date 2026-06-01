@@ -832,7 +832,9 @@ function PortalAccessButton({ memberId, email }: { memberId: string; email: stri
                 <input
                   type="number"
                   value={ttlDays}
-                  onChange={(e) => setTtlDays(Math.max(1, Number(e.target.value) || 14))}
+                  onChange={(e) =>
+                    setTtlDays(Math.min(60, Math.max(1, Number(e.target.value) || 14)))
+                  }
                   min={1}
                   max={60}
                   className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm shadow-soft"

@@ -1,20 +1,28 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Bookmark,
+  BookmarkPlus,
   ChevronLeft,
   ChevronRight,
   Download,
+  Layers,
+  Loader2,
   Plus,
   Search,
+  UserCheck,
+  UserMinus,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { PageSizeSelect, usePersistentPageSize } from "~/components/ui/page-size-select";
 import { SkeletonTableRows } from "~/components/ui/skeleton";
@@ -22,7 +30,17 @@ import { toast } from "~/components/ui/toaster";
 import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
-import { usePageShortcut } from "~/lib/use-global-shortcuts";
+import {
+  createView,
+  loadSavedViews,
+  persistSavedViews,
+  type SavedView,
+  type ViewSearch,
+  viewSearchEquals,
+} from "~/lib/saved-views";
+import { headerCheckState, rangeIds } from "~/lib/selection";
+import { moveCursor } from "~/lib/table-nav";
+import { isTypingTarget, usePageShortcut } from "~/lib/use-global-shortcuts";
 
 type Status = "aktiv" | "passiv" | "ausgetreten" | "verstorben" | "alle";
 type SortBy = "nachname" | "mitglnr" | "ort" | "email" | "eintritt";
@@ -146,6 +164,240 @@ function MembersListPage() {
 
   usePageShortcut("n", canEdit ? () => navigate({ to: "/app/mitglieder/neu" }) : null);
 
+  const rows = (list.data?.rows ?? []) as MemberRow[];
+  const visibleIds = useMemo(() => rows.map((r) => r.id), [rows]);
+
+  // Multi-select lives in page-local state (not the URL): it's a transient
+  // working set, not something you'd bookmark. Selection is scoped to the
+  // rows currently on screen and clears whenever the view changes.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const anchorRef = useRef<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkAbteilungId, setBulkAbteilungId] = useState("");
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    description: string;
+    destructive: boolean;
+    run: () => Promise<void>;
+  } | null>(null);
+
+  // Reset the selection whenever the underlying result set changes (filter,
+  // sort, page, page size) so a stale id can never be acted on.
+  const viewKey = JSON.stringify({ ...search, pageSize });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: viewKey is the trigger; we intentionally only reset state.
+  useEffect(() => {
+    setSelected(new Set());
+    anchorRef.current = null;
+    setCursor(-1);
+  }, [viewKey]);
+
+  const headerState = headerCheckState(visibleIds, selected);
+  const selectedCount = selected.size;
+
+  function toggleRow(id: string, shiftKey: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (shiftKey && anchorRef.current) {
+        // Shift-click selects the whole inclusive range between the last
+        // clicked row and this one.
+        for (const rid of rangeIds(visibleIds, anchorRef.current, id)) next.add(rid);
+      } else if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+    anchorRef.current = id;
+  }
+
+  function toggleAllOnPage() {
+    setSelected((prev) => {
+      const everySelected = visibleIds.length > 0 && visibleIds.every((id) => prev.has(id));
+      if (everySelected) {
+        const next = new Set(prev);
+        for (const id of visibleIds) next.delete(id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const id of visibleIds) next.add(id);
+      return next;
+    });
+    anchorRef.current = null;
+  }
+
+  function clearSelection() {
+    setSelected(new Set());
+    anchorRef.current = null;
+  }
+
+  // --- Keyboard-native row navigation (Linear-style j/k cursor) ----------
+  const [cursor, setCursor] = useState(-1);
+  const cursorRef = useRef(cursor);
+  cursorRef.current = cursor;
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const canEditRef = useRef(canEdit);
+  canEditRef.current = canEdit;
+  const confirmOpenRef = useRef(false);
+  confirmOpenRef.current = confirm !== null;
+  const cursorRowRef = useRef<HTMLTableRowElement | null>(null);
+
+  // Scroll the focused row into view as the cursor moves.
+  useEffect(() => {
+    if (cursor >= 0) cursorRowRef.current?.scrollIntoView({ block: "nearest" });
+  }, [cursor]);
+
+  // Bind once; read live values via refs and functional state updates so the
+  // listener never goes stale and doesn't re-bind on every keystroke.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isTypingTarget(e.target)) return;
+      if (confirmOpenRef.current) return;
+      // Don't drive the table while any modal overlay is open (command
+      // palette, cheatsheet, release notes, confirm dialogs). They all mark
+      // themselves aria-modal; without this guard `j/k/o` would move the
+      // cursor — or worse, navigate away — behind an open dialog.
+      if (typeof document !== "undefined" && document.querySelector('[aria-modal="true"]')) return;
+      const currentRows = rowsRef.current;
+      const len = currentRows.length;
+      const k = e.key;
+
+      if (k === "j" || k === "k") {
+        if (len === 0) return;
+        e.preventDefault();
+        const next = moveCursor(cursorRef.current, k === "j" ? 1 : -1, len);
+        cursorRef.current = next;
+        setCursor(next);
+        // Shift extends the selection onto the row we just landed on.
+        if (e.shiftKey && canEditRef.current && next >= 0) {
+          const row = currentRows[next];
+          if (row) {
+            setSelected((prev) => new Set(prev).add(row.id));
+            anchorRef.current = row.id;
+          }
+        }
+        return;
+      }
+
+      if (k === "o" || k === "Enter") {
+        const row = cursorRef.current >= 0 ? currentRows[cursorRef.current] : undefined;
+        if (!row) return;
+        e.preventDefault();
+        navigate({
+          to: "/app/mitglieder/$mitgliedsnummer",
+          params: { mitgliedsnummer: row.mitglnr ?? String(row.adrNr) },
+        });
+        return;
+      }
+
+      if (k === "x" && canEditRef.current) {
+        const row = cursorRef.current >= 0 ? currentRows[cursorRef.current] : undefined;
+        if (!row) return;
+        e.preventDefault();
+        setSelected((prev) => {
+          const nextSet = new Set(prev);
+          if (nextSet.has(row.id)) nextSet.delete(row.id);
+          else nextSet.add(row.id);
+          return nextSet;
+        });
+        anchorRef.current = row.id;
+        return;
+      }
+
+      if (k === "Escape") {
+        setSelected((prev) => {
+          if (prev.size === 0) return prev;
+          anchorRef.current = null;
+          return new Set();
+        });
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navigate]);
+
+  // --- Saved Views (per-browser presets of the filter + sort state) ------
+  const [views, setViews] = useState<SavedView[]>([]);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [viewName, setViewName] = useState("");
+  // Load after mount (localStorage isn't available during SSR; deferring also
+  // avoids a hydration mismatch on the chip bar).
+  useEffect(() => {
+    setViews(loadSavedViews());
+  }, []);
+
+  const currentViewSearch: ViewSearch = (() => {
+    const { page: _page, ...rest } = search;
+    return rest;
+  })();
+  const activeViewId =
+    views.find((view) => viewSearchEquals(view.search, currentViewSearch))?.id ?? null;
+
+  function applyView(view: SavedView) {
+    setQDraft(view.search.q);
+    navigate({ search: () => ({ ...view.search, page: 1 }), replace: true });
+  }
+
+  function saveCurrentView() {
+    const name = viewName.trim();
+    if (!name) return;
+    const next = [...views, createView(name, currentViewSearch)];
+    setViews(next);
+    persistSavedViews(next);
+    setViewName("");
+    setSaveOpen(false);
+    toast.success(`Ansicht "${name}" gespeichert`);
+  }
+
+  function deleteView(id: string) {
+    const next = views.filter((view) => view.id !== id);
+    setViews(next);
+    persistSavedViews(next);
+  }
+
+  async function runBulk(
+    action:
+      | { type: "setAktivPasiv"; value: "A" | "P" }
+      | { type: "addAbteilung"; abteilungId: string }
+      | { type: "removeAbteilung"; abteilungId: string },
+    successVerb: string,
+  ) {
+    const ids = [...selected];
+    setBulkBusy(true);
+    try {
+      const res = await orpc.members.bulk({ memberIds: ids, action });
+      await Promise.all([list.refetch(), abteilungen.refetch()]);
+      clearSelection();
+      const skippedNote = res.skipped > 0 ? ` (${res.skipped} übersprungen)` : "";
+      toast.success(`${res.changed} ${successVerb}${skippedNote}`);
+    } catch (err) {
+      toast.error("Aktion fehlgeschlagen", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBulkBusy(false);
+      setConfirm(null);
+    }
+  }
+
+  async function exportSelection() {
+    try {
+      const res = await orpc.reports.membersExport({ ids: [...selected] });
+      triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+      toast.success(`${selectedCount} Mitglieder exportiert`);
+    } catch (err) {
+      toast.error("Export fehlgeschlagen", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  const bulkAbteilungName = bulkAbteilungId
+    ? abteilungen.data?.find((a) => a.id === bulkAbteilungId)?.name
+    : null;
+
   const hasFilter =
     !!search.q ||
     search.status !== "aktiv" ||
@@ -165,9 +417,12 @@ function MembersListPage() {
           <p className="text-sm text-muted-foreground">
             <span className="hidden sm:inline">
               Suchen, filtern und Profile öffnen. Tipp:{" "}
+              <kbd className="rounded border border-border bg-muted px-1 text-[10px]">j</kbd>/
+              <kbd className="rounded border border-border bg-muted px-1 text-[10px]">k</kbd> zum
+              Navigieren,{" "}
               <kbd className="rounded border border-border bg-muted px-1 text-[10px]">n</kbd> für
-              neu, <kbd className="rounded border border-border bg-muted px-1 text-[10px]">⌘K</kbd>{" "}
-              für Suche.
+              neu, <kbd className="rounded border border-border bg-muted px-1 text-[10px]">?</kbd>{" "}
+              für alle Kürzel.
             </span>
             <span className="sm:hidden">Suchen, filtern und Profile öffnen.</span>
           </p>
@@ -204,6 +459,77 @@ function MembersListPage() {
           ) : null}
         </div>
       </div>
+
+      {views.length > 0 || hasFilter ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Bookmark className="size-3.5" /> Ansichten
+          </span>
+          {views.map((view) => {
+            const active = view.id === activeViewId;
+            return (
+              <span
+                key={view.id}
+                className={`group inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                  active
+                    ? "border-primary/40 bg-primary/10 text-foreground"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <button type="button" onClick={() => applyView(view)} className="max-w-40 truncate">
+                  {view.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteView(view.id)}
+                  className="rounded-full p-0.5 text-muted-foreground opacity-0 hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                  aria-label={`Ansicht "${view.name}" löschen`}
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            );
+          })}
+          {saveOpen ? (
+            <span className="inline-flex items-center gap-1">
+              <Input
+                autoFocus
+                className="h-8 w-44"
+                value={viewName}
+                onChange={(e) => setViewName(e.target.value)}
+                placeholder="Name der Ansicht"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    saveCurrentView();
+                  } else if (e.key === "Escape") {
+                    setSaveOpen(false);
+                    setViewName("");
+                  }
+                }}
+              />
+              <Button type="button" size="sm" onClick={saveCurrentView} disabled={!viewName.trim()}>
+                Speichern
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSaveOpen(false);
+                  setViewName("");
+                }}
+                className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                aria-label="Abbrechen"
+              >
+                <X className="size-4" />
+              </button>
+            </span>
+          ) : hasFilter && !activeViewId ? (
+            <Button type="button" size="sm" variant="outline" onClick={() => setSaveOpen(true)}>
+              <BookmarkPlus className="size-4" /> Ansicht speichern
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <Card>
         <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:p-4">
@@ -316,11 +642,143 @@ function MembersListPage() {
         </div>
       ) : null}
 
+      {canEdit && selectedCount > 0 ? (
+        <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/95 p-2.5 shadow-soft backdrop-blur">
+          <span className="px-1 text-sm font-medium tabular-nums">{selectedCount} ausgewählt</span>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            aria-label="Auswahl aufheben"
+            title="Auswahl aufheben"
+          >
+            <X className="size-4" />
+          </button>
+          <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={bulkBusy}
+            onClick={() =>
+              setConfirm({
+                title: "Als aktiv markieren",
+                description: `${selectedCount} ausgewählte Mitglieder auf "Aktiv" setzen?`,
+                destructive: false,
+                run: () => runBulk({ type: "setAktivPasiv", value: "A" }, "auf Aktiv gesetzt"),
+              })
+            }
+          >
+            <UserCheck className="size-4" /> Aktiv
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={bulkBusy}
+            onClick={() =>
+              setConfirm({
+                title: "Als passiv markieren",
+                description: `${selectedCount} ausgewählte Mitglieder auf "Passiv" setzen?`,
+                destructive: false,
+                run: () => runBulk({ type: "setAktivPasiv", value: "P" }, "auf Passiv gesetzt"),
+              })
+            }
+          >
+            <UserMinus className="size-4" /> Passiv
+          </Button>
+          <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+          <div className="flex items-center gap-1.5">
+            <Layers className="size-4 text-muted-foreground" />
+            <select
+              value={bulkAbteilungId}
+              onChange={(e) => setBulkAbteilungId(e.target.value)}
+              className="h-9 min-w-0 max-w-44 rounded-lg border border-input bg-card px-2 text-sm shadow-soft focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+              aria-label="Abteilung für Massenaktion"
+            >
+              <option value="">Abteilung wählen…</option>
+              {abteilungen.data?.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={bulkBusy || !bulkAbteilungId}
+              onClick={() =>
+                setConfirm({
+                  title: "Zu Abteilung hinzufügen",
+                  description: `${selectedCount} ausgewählte Mitglieder der Abteilung "${bulkAbteilungName}" zuordnen? Bereits zugeordnete werden übersprungen.`,
+                  destructive: false,
+                  run: () =>
+                    runBulk(
+                      { type: "addAbteilung", abteilungId: bulkAbteilungId },
+                      `zu ${bulkAbteilungName} hinzugefügt`,
+                    ),
+                })
+              }
+            >
+              Hinzufügen
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={bulkBusy || !bulkAbteilungId}
+              onClick={() =>
+                setConfirm({
+                  title: "Aus Abteilung entfernen",
+                  description: `Mitgliedschaft in "${bulkAbteilungName}" für ${selectedCount} ausgewählte Mitglieder beenden (Austrittsdatum heute)?`,
+                  destructive: true,
+                  run: () =>
+                    runBulk(
+                      { type: "removeAbteilung", abteilungId: bulkAbteilungId },
+                      `aus ${bulkAbteilungName} entfernt`,
+                    ),
+                })
+              }
+            >
+              Entfernen
+            </Button>
+          </div>
+          <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={bulkBusy}
+            onClick={exportSelection}
+          >
+            <Download className="size-4" /> Auswahl als CSV
+          </Button>
+          {bulkBusy ? (
+            <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+          ) : null}
+        </div>
+      ) : null}
+
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
+                {canEdit ? (
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Alle auf dieser Seite auswählen"
+                      className="size-4 accent-primary align-middle"
+                      checked={headerState === "all"}
+                      ref={(el) => {
+                        if (el) el.indeterminate = headerState === "some";
+                      }}
+                      onChange={toggleAllOnPage}
+                    />
+                  </th>
+                ) : null}
                 <SortHeader
                   label="Mitgl.-Nr."
                   col="mitglnr"
@@ -361,19 +819,62 @@ function MembersListPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {list.isLoading ? (
-                <SkeletonTableRows rows={Math.min(pageSize, 10)} cols={6} />
-              ) : list.data?.rows.length === 0 ? (
+                <SkeletonTableRows rows={Math.min(pageSize, 10)} cols={canEdit ? 7 : 6} />
+              ) : list.isError ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={canEdit ? 7 : 6} className="px-4 py-10 text-center">
+                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                      <AlertTriangle className="size-6 text-warning" />
+                      <p className="text-sm">Mitglieder konnten nicht geladen werden.</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => list.refetch()}
+                      >
+                        Erneut versuchen
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={canEdit ? 7 : 6}
+                    className="px-4 py-8 text-center text-muted-foreground"
+                  >
                     Keine Mitglieder gefunden.
                   </td>
                 </tr>
               ) : (
-                (list.data?.rows ?? []).map((row) => {
-                  const m = row as MemberRow;
+                rows.map((m, index) => {
                   const isKontakt = !m.mitglnr;
+                  const isSelected = selected.has(m.id);
+                  const isCursor = index === cursor;
                   return (
-                    <tr key={m.id} className="transition-colors hover:bg-muted/30">
+                    <tr
+                      key={m.id}
+                      ref={isCursor ? cursorRowRef : undefined}
+                      className={`transition-colors ${
+                        isCursor ? "bg-primary/10 ring-2 ring-inset ring-primary/40" : ""
+                      } ${isSelected && !isCursor ? "bg-primary/5" : ""} ${
+                        !isSelected && !isCursor ? "hover:bg-muted/30" : ""
+                      }`}
+                    >
+                      {canEdit ? (
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            aria-label={`${[m.nachname, m.vorname].filter(Boolean).join(", ")} auswählen`}
+                            className="size-4 accent-primary align-middle"
+                            checked={isSelected}
+                            onClick={(e) => toggleRow(m.id, e.shiftKey)}
+                            onChange={() => {
+                              /* handled in onClick to read shiftKey */
+                            }}
+                          />
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3 tabular-nums text-muted-foreground">
                         {m.mitglnr ?? (
                           <span
@@ -450,6 +951,21 @@ function MembersListPage() {
           </div>
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        onOpenChange={(open) => {
+          if (!open && !bulkBusy) setConfirm(null);
+        }}
+        title={confirm?.title ?? ""}
+        description={confirm?.description}
+        confirmLabel="Anwenden"
+        destructive={confirm?.destructive ?? false}
+        loading={bulkBusy}
+        onConfirm={() => {
+          if (confirm) void confirm.run();
+        }}
+      />
     </div>
   );
 }

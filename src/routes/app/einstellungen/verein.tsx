@@ -6,6 +6,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { QueryError } from "~/components/ui/query-error";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/einstellungen/verein")({
@@ -87,6 +88,26 @@ function VereinsdatenPage() {
     },
     onError: (err) => setMsg({ kind: "error", text: (err as Error).message }),
   });
+
+  // Don't render the form until the saved config has loaded. Otherwise the
+  // fields show their empty defaults and an early submit would overwrite the
+  // real Gläubiger-ID / IBAN / BIC with blanks.
+  if (cfg.isError) {
+    return (
+      <QueryError
+        title="Vereinsdaten konnten nicht geladen werden"
+        error={cfg.error}
+        onRetry={() => cfg.refetch()}
+      />
+    );
+  }
+  if (cfg.isLoading || !cfg.data) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
+        <Loader2 className="size-5 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -300,12 +321,15 @@ function Field({
   hint?: string;
   children: React.ReactNode;
 }) {
+  // Wrap the control inside the <label> so clicking the label focuses the
+  // field and screen readers announce it — without threading an id through
+  // every call site.
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
+    <Label className="flex flex-col gap-1.5">
+      <span>{label}</span>
       {children}
-      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
-    </div>
+      {hint ? <span className="text-xs font-normal text-muted-foreground">{hint}</span> : null}
+    </Label>
   );
 }
 

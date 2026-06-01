@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Save, X } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -67,19 +67,37 @@ export const EMPTY_STAMM: StammdatenValues = {
 
 function toDateInput(value: string | Date | null | undefined): string {
   if (!value) return "";
-  const d = typeof value === "string" ? new Date(value) : value;
-  if (!Number.isFinite(d.getTime())) return "";
-  return d.toISOString().slice(0, 10);
+  // For string values take the calendar date verbatim. Round-tripping through
+  // `new Date(...).toISOString()` re-interprets a naive timestamp in the local
+  // timezone and can shift the day (e.g. "2020-01-15T00:00:00" -> "2020-01-14"
+  // west of UTC). Dates are stored as UTC midnight, so read Date objects with
+  // the UTC getters.
+  if (typeof value === "string") {
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    const parsed = new Date(value);
+    return Number.isFinite(parsed.getTime()) ? utcDateString(parsed) : "";
+  }
+  return Number.isFinite(value.getTime()) ? utcDateString(value) : "";
+}
+
+function utcDateString(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
+    d.getUTCDate(),
+  ).padStart(2, "0")}`;
 }
 
 function calcAge(yyyymmdd: string): string {
-  const d = new Date(yyyymmdd);
-  if (!Number.isFinite(d.getTime())) return "";
+  const m = yyyymmdd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return "";
+  const birthYear = Number(m[1]);
+  const birthMonth = Number(m[2]);
+  const birthDay = Number(m[3]);
   const now = new Date();
-  let age = now.getFullYear() - d.getFullYear();
+  let age = now.getFullYear() - birthYear;
   const beforeBirthday =
-    now.getMonth() < d.getMonth() ||
-    (now.getMonth() === d.getMonth() && now.getDate() < d.getDate());
+    now.getMonth() + 1 < birthMonth ||
+    (now.getMonth() + 1 === birthMonth && now.getDate() < birthDay);
   if (beforeBirthday) age -= 1;
   return `${age} Jahre`;
 }
@@ -193,10 +211,12 @@ export function MemberStammdatenForm({
   submitLabel = "Speichern",
   mitglnrInput,
 }: Props) {
+  // Seed once from `initial`. The form deliberately does NOT re-sync to later
+  // `initial` changes: the parent re-renders while the user types (e.g. the
+  // IBAN lookup query below resolving, or a background members.get refetch),
+  // and re-seeding would silently discard unsaved edits. Callers that need a
+  // fresh form for a different record pass a `key` so React remounts it.
   const [values, setValues] = useState<StammdatenValues>(initial);
-  useEffect(() => {
-    setValues(initial);
-  }, [initial]);
 
   function update<K extends keyof StammdatenValues>(key: K, value: StammdatenValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));

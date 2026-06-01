@@ -139,6 +139,13 @@ describe("coercion helpers", () => {
     expect(coerceDecimal("12,50")).toBe("12.5");
     expect(coerceDecimal("")).toBe(null);
   });
+  it("coerceDecimal handles German thousands + decimal separators", () => {
+    // Regression: the old impl turned this into "1.234.56" -> NaN -> null.
+    expect(coerceDecimal("1.234,56")).toBe("1234.56");
+    expect(coerceDecimal("1.000.000,00")).toBe("1000000");
+    expect(coerceDecimal("162.00000000")).toBe("162");
+    expect(coerceDecimal("5,50")).toBe("5.5");
+  });
   it("coerceDate handles common Linear formats and zero-date", () => {
     expect(coerceDate("0000-00-00 00:00:00")).toBe(null);
     expect(coerceDate("2024-02-29")).toBeInstanceOf(Date);

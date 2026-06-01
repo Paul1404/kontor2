@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ban, Loader2, Plus } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -147,6 +147,11 @@ function AddMandateForm({
   const [unterschriftDatum, setUnterschriftDatum] = useState("");
   const [gueltigAb, setGueltigAb] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const mandatsNrId = useId();
+  const typId = useId();
+  const lastschriftartId = useId();
+  const unterschriftId = useId();
+  const gueltigAbId = useId();
 
   const create = useMutation({
     mutationFn: () =>
@@ -167,18 +172,25 @@ function AddMandateForm({
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          <Label
+            htmlFor={mandatsNrId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
             Mandatsnummer (leer = automatisch)
           </Label>
           <Input
+            id={mandatsNrId}
             value={mandatsNr}
             onChange={(e) => setMandatsNr(e.target.value)}
             placeholder="auto"
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Typ</Label>
+          <Label htmlFor={typId} className="text-xs uppercase tracking-wide text-muted-foreground">
+            Typ
+          </Label>
           <select
+            id={typId}
             value={typ}
             onChange={(e) => setTyp(e.target.value)}
             className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
@@ -192,10 +204,14 @@ function AddMandateForm({
           </p>
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          <Label
+            htmlFor={lastschriftartId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
             Lastschriftart
           </Label>
           <select
+            id={lastschriftartId}
             value={lastschriftart}
             onChange={(e) => setLastschriftart(e.target.value)}
             className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
@@ -205,18 +221,32 @@ function AddMandateForm({
           </select>
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          <Label
+            htmlFor={unterschriftId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
             Unterschrift
           </Label>
           <Input
+            id={unterschriftId}
             type="date"
             value={unterschriftDatum}
             onChange={(e) => setUnterschriftDatum(e.target.value)}
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Gültig ab</Label>
-          <Input type="date" value={gueltigAb} onChange={(e) => setGueltigAb(e.target.value)} />
+          <Label
+            htmlFor={gueltigAbId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Gültig ab
+          </Label>
+          <Input
+            id={gueltigAbId}
+            type="date"
+            value={gueltigAb}
+            onChange={(e) => setGueltigAb(e.target.value)}
+          />
         </div>
       </div>
 

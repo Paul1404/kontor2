@@ -1,5 +1,5 @@
 import { eq, isNull } from "drizzle-orm";
-import { db } from "~/server/db/client";
+import { db, sql } from "~/server/db/client";
 import { membersTable } from "~/server/db/schema/members";
 import { memberSnapshotsTable, snapshotRunsTable } from "~/server/db/schema/snapshots";
 import { logger } from "~/server/lib/logger";
@@ -7,7 +7,7 @@ import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 // Postgres advisory-lock key. Picked at random; just needs to be the same
 // integer across replicas so only one process can hold it concurrently.
-const ADVISORY_LOCK_KEY = 7_421_001n;
+const ADVISORY_LOCK_KEY = 7_421_001;
 
 const BATCH_SIZE = 50;
 
@@ -37,11 +37,16 @@ export async function runNightlySnapshot(
   const trigger = opts.trigger ?? "nightly";
   const handle = db();
 
-  const acquired = await handle.execute(
-    /* sql */ `select pg_try_advisory_lock(${ADVISORY_LOCK_KEY}::bigint) as ok` as never,
-  );
+  // Session-level advisory locks live on a specific backend connection, so
+  // they must be acquired and released on the SAME connection. With a pooled
+  // client the unlock would otherwise run on a different connection (no-op),
+  // leaking the lock and blocking every future run. Reserve one connection
+  // for the whole run and release the lock on it explicitly.
+  const lock = await sql().reserve();
+  const acquired = await lock`select pg_try_advisory_lock(${ADVISORY_LOCK_KEY}::bigint) as ok`;
   const ok = Boolean((acquired as unknown as Array<{ ok: boolean }>)[0]?.ok);
   if (!ok) {
+    lock.release();
     return { runId: null, memberCount: 0, skippedCount: 0, bytesTotal: 0, acquiredLock: false };
   }
 
@@ -103,9 +108,8 @@ export async function runNightlySnapshot(
 
     return { runId: run.id, memberCount, skippedCount, bytesTotal, acquiredLock: true };
   } finally {
-    await handle.execute(
-      /* sql */ `select pg_advisory_unlock(${ADVISORY_LOCK_KEY}::bigint)` as never,
-    );
+    await lock`select pg_advisory_unlock(${ADVISORY_LOCK_KEY}::bigint)`;
+    lock.release();
   }
 }
 

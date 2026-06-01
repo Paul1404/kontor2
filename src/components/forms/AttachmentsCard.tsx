@@ -83,15 +83,24 @@ export function AttachmentsCard({
     onError: () => setPendingDeleteId(null),
   });
 
-  function handleFiles(files: FileList | null) {
+  async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     // Upload sequentially: each file goes through presign → S3 PUT →
     // finalize, and parallel finalize calls would race for the same
-    // request-id range. Keeping it sequential is also kinder to the user
-    // (errors are easier to attribute to a specific file).
-    for (let i = 0; i < files.length; i += 1) {
-      const f = files.item(i);
-      if (f) upload.mutate(f);
+    // request-id range. `mutate` in a loop fires them all in parallel, so
+    // await each one. Failures are collected and surfaced together at the
+    // end (the per-mutation error state would otherwise be clobbered by the
+    // next file's onMutate).
+    const failed: string[] = [];
+    for (const f of Array.from(files)) {
+      try {
+        await upload.mutateAsync(f);
+      } catch {
+        failed.push(f.name);
+      }
+    }
+    if (failed.length > 0) {
+      setUploadError(`Upload fehlgeschlagen: ${failed.join(", ")}`);
     }
   }
 
@@ -99,11 +108,11 @@ export function AttachmentsCard({
     e.preventDefault();
     setDragging(false);
     if (!canEdit) return;
-    handleFiles(e.dataTransfer?.files ?? null);
+    void handleFiles(e.dataTransfer?.files ?? null);
   }
 
   function onChange(e: ChangeEvent<HTMLInputElement>) {
-    handleFiles(e.target.files);
+    void handleFiles(e.target.files);
     e.target.value = "";
   }
 

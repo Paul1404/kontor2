@@ -13,6 +13,7 @@ import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { InfoBox } from "~/components/ui/info-box";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
@@ -32,15 +33,20 @@ function ForderungenPage() {
     queryFn: () => orpc.dunning.open({ mahnstufe: stufeFilter, minDaysOverdue: 0 }),
   });
 
+  const [confirmPaidOpen, setConfirmPaidOpen] = useState(false);
   const markPaid = useMutation({
     mutationFn: (sollStellungIds: string[]) => orpc.dunning.markPaid({ sollStellungIds }),
     onSuccess: (r) => {
-      toast.success(`${r.count} Posten als bezahlt markiert.`);
+      const skippedNote = r.skipped > 0 ? ` (${r.skipped} bereits bezahlt)` : "";
+      toast.success(`${r.count} Posten als bezahlt markiert.${skippedNote}`);
       setSelected(new Set());
+      setConfirmPaidOpen(false);
       qc.invalidateQueries({ queryKey: ["dunning.open"] });
     },
-    onError: (e: Error) =>
-      toast.error("Konnte nicht aktualisiert werden", { description: e.message }),
+    onError: (e: Error) => {
+      setConfirmPaidOpen(false);
+      toast.error("Konnte nicht aktualisiert werden", { description: e.message });
+    },
   });
 
   function toggle(id: string) {
@@ -185,7 +191,7 @@ function ForderungenPage() {
                 {selected.size > 0 ? (
                   <Button
                     size="sm"
-                    onClick={() => markPaid.mutate([...selected])}
+                    onClick={() => setConfirmPaidOpen(true)}
                     disabled={markPaid.isPending}
                   >
                     <CheckCircle2 className="size-4" />
@@ -270,6 +276,18 @@ function ForderungenPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmPaidOpen}
+        onOpenChange={(o) => {
+          if (!o && !markPaid.isPending) setConfirmPaidOpen(false);
+        }}
+        title="Als bezahlt markieren"
+        description={`${selected.size} offene Posten als vollständig bezahlt markieren? Offene Beträge werden auf 0 gesetzt.`}
+        confirmLabel="Als bezahlt markieren"
+        loading={markPaid.isPending}
+        onConfirm={() => markPaid.mutate([...selected])}
+      />
     </div>
   );
 }

@@ -58,6 +58,17 @@ function sortById<T extends { id?: string | null }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => String(a.id ?? "").localeCompare(String(b.id ?? "")));
 }
 
+/** Stable sort for rows without a surrogate id (member_abteilungen). */
+function sortByComposite<
+  T extends { memberId?: string; abteilungId?: string; eintrittsdatum?: unknown },
+>(rows: T[]): T[] {
+  return [...rows].sort((a, b) =>
+    `${a.memberId}|${a.abteilungId}|${String(a.eintrittsdatum ?? "")}`.localeCompare(
+      `${b.memberId}|${b.abteilungId}|${String(b.eintrittsdatum ?? "")}`,
+    ),
+  );
+}
+
 export async function takeMemberSnapshot(
   tx: DBOrTx,
   memberId: string,
@@ -86,7 +97,11 @@ export async function takeMemberSnapshot(
     sepa: canonicalize(sortById(sepa)),
     attachments: canonicalize(sortById(attachments)),
     relationships: canonicalize(sortById(relationships)),
-    memberAbteilungen: canonicalize(memberAbteilungen),
+    // member_abteilungen has no `id`; sort by its composite PK so the
+    // serialized order (and thus contentHash) is stable across runs.
+    // Otherwise skipIfUnchanged sees phantom changes and writes redundant
+    // snapshots.
+    memberAbteilungen: canonicalize(sortByComposite(memberAbteilungen)),
     sollstellungen: canonicalize(sortById(sollstellungen)),
   };
   const canonicalJson = JSON.stringify(payload);

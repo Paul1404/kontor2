@@ -4,7 +4,8 @@ import { BarChart3, Download, Loader2, Printer } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
-import { triggerDownload } from "~/lib/download";
+import { QueryErrorRow } from "~/components/ui/query-error";
+import { exportCsvFile } from "~/lib/export";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/berichte/abteilungs-statistik")({
@@ -19,9 +20,8 @@ function AbteilungsStatistikPage() {
     queryFn: () => orpc.reports.abteilungStats({ year }),
   });
 
-  async function exportCsv() {
-    const res = await orpc.reports.abteilungStatsExport({ year });
-    triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+  function exportCsv() {
+    return exportCsvFile(() => orpc.reports.abteilungStatsExport({ year }));
   }
 
   const sum = (data.data?.rows ?? []).reduce(
@@ -92,6 +92,8 @@ function AbteilungsStatistikPage() {
                     </span>
                   </td>
                 </tr>
+              ) : data.isError ? (
+                <QueryErrorRow colSpan={4} onRetry={() => data.refetch()} />
               ) : !data.data || data.data.rows.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">

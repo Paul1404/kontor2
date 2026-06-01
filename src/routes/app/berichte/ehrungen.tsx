@@ -5,7 +5,8 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
-import { triggerDownload } from "~/lib/download";
+import { QueryError } from "~/components/ui/query-error";
+import { exportCsvFile } from "~/lib/export";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -30,9 +31,8 @@ function EhrungenPage() {
     );
   }
 
-  async function exportCsv() {
-    const res = await orpc.reports.ehrungenExport({ year, jubilaeen: selected });
-    triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+  function exportCsv() {
+    return exportCsvFile(() => orpc.reports.ehrungenExport({ year, jubilaeen: selected }));
   }
 
   return (
@@ -118,6 +118,8 @@ function EhrungenPage() {
             <Loader2 className="size-5 animate-spin" /> Lade...
           </CardContent>
         </Card>
+      ) : data.isError ? (
+        <QueryError error={data.error} onRetry={() => data.refetch()} />
       ) : !data.data || data.data.groups.every((g) => g.members.length === 0) ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center gap-2 p-12 text-center text-muted-foreground">

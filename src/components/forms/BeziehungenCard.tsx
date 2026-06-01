@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Loader2, Plus, Search, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { formatDate } from "~/lib/format";
@@ -55,13 +56,18 @@ export function BeziehungenCard({
 
   // Per-row pending state — see ContractsCard for the same pattern.
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const remove = useMutation({
     mutationFn: (id: string) => orpc.relationships.remove({ id, removeReciprocal: true }),
     onSuccess: async () => {
       setPendingDeleteId(null);
+      setConfirmTarget(null);
       await refresh();
     },
-    onError: () => setPendingDeleteId(null),
+    onError: () => {
+      setPendingDeleteId(null);
+      setConfirmTarget(null);
+    },
   });
 
   return (
@@ -134,12 +140,7 @@ export function BeziehungenCard({
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => {
-                        if (window.confirm(`Beziehung zu ${name} entfernen?`)) {
-                          setPendingDeleteId(b.id);
-                          remove.mutate(b.id);
-                        }
-                      }}
+                      onClick={() => setConfirmTarget({ id: b.id, name })}
                       disabled={pendingDeleteId === b.id}
                       title="Beziehung entfernen"
                     >
@@ -156,6 +157,23 @@ export function BeziehungenCard({
           </ul>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        onOpenChange={(o) => {
+          if (!o && !remove.isPending) setConfirmTarget(null);
+        }}
+        title="Beziehung entfernen"
+        description={confirmTarget ? `Beziehung zu ${confirmTarget.name} entfernen?` : ""}
+        confirmLabel="Entfernen"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() => {
+          if (confirmTarget) {
+            setPendingDeleteId(confirmTarget.id);
+            remove.mutate(confirmTarget.id);
+          }
+        }}
+      />
     </Card>
   );
 }
@@ -177,6 +195,8 @@ function AddRelationshipForm({
   const [reciprocal, setReciprocal] = useState(true);
   const [notiz, setNotiz] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const kindId = useId();
+  const notizId = useId();
 
   const search = useMutation({
     mutationFn: (query: string) =>
@@ -276,18 +296,24 @@ function AddRelationshipForm({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          <Label htmlFor={kindId} className="text-xs uppercase tracking-wide text-muted-foreground">
             Beziehungsart
           </Label>
           <Input
+            id={kindId}
             value={kind}
             onChange={(e) => setKind(e.target.value)}
             placeholder="z. B. Familienmitglied"
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Notiz</Label>
-          <Input value={notiz} onChange={(e) => setNotiz(e.target.value)} />
+          <Label
+            htmlFor={notizId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Notiz
+          </Label>
+          <Input id={notizId} value={notiz} onChange={(e) => setNotiz(e.target.value)} />
         </div>
       </div>
 
