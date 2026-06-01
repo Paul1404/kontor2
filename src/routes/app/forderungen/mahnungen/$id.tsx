@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, CheckCircle2, Download, Mail, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, Loader2, Mail, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { Input } from "~/components/ui/input";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -16,6 +19,12 @@ function MahnungDetailPage() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
 
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  // The item currently queued for an email preview, or null when the dialog
+  // is closed.
+  const [emailItemId, setEmailItemId] = useState<string | null>(null);
+
   const detail = useQuery({
     queryKey: ["dunning.get", id],
     queryFn: () => orpc.dunning.get({ id }),
@@ -25,6 +34,8 @@ function MahnungDetailPage() {
     mutationFn: (reason: string | null) => orpc.dunning.cancel({ id, reason }),
     onSuccess: () => {
       toast.success("Mahnlauf storniert. Mahnstufen zurückgesetzt.");
+      setCancelOpen(false);
+      setCancelReason("");
       qc.invalidateQueries({ queryKey: ["dunning.get", id] });
       qc.invalidateQueries({ queryKey: ["dunning.list"] });
       qc.invalidateQueries({ queryKey: ["dunning.open"] });
@@ -39,6 +50,22 @@ function MahnungDetailPage() {
       toast.success("Als versendet markiert.");
       qc.invalidateQueries({ queryKey: ["dunning.get", id] });
     },
+  });
+
+  const emailPreview = useQuery({
+    queryKey: ["dunning.emailPreview", emailItemId],
+    queryFn: () => orpc.dunning.emailPreview({ itemId: emailItemId! }),
+    enabled: !!emailItemId,
+  });
+
+  const sendEmail = useMutation({
+    mutationFn: (itemId: string) => orpc.dunning.sendEmail({ itemId }),
+    onSuccess: (r) => {
+      toast.success(`E-Mail gesendet an ${r.to}.`);
+      setEmailItemId(null);
+      qc.invalidateQueries({ queryKey: ["dunning.get", id] });
+    },
+    onError: (e: Error) => toast.error("Versand fehlgeschlagen", { description: e.message }),
   });
 
   async function downloadPdf(itemId: string, filename: string) {
@@ -107,18 +134,7 @@ function MahnungDetailPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                const reason = prompt("Grund für Stornierung (optional)?");
-                if (reason !== null) {
-                  if (
-                    confirm(
-                      "Mahnlauf wirklich stornieren? Die Mahnstufe der betroffenen Posten wird auf die vorherige Stufe zurückgesetzt.",
-                    )
-                  ) {
-                    cancel.mutate(reason.trim() || null);
-                  }
-                }
-              }}
+              onClick={() => setCancelOpen(true)}
               disabled={cancel.isPending}
             >
               <Trash2 className="size-4" /> Stornieren
@@ -166,15 +182,13 @@ function MahnungDetailPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() =>
-                          markSent.mutate({
-                            itemId: i.id,
-                            channel: "email",
-                            sentTo: i.eMail ?? null,
-                          })
+                        onClick={() => setEmailItemId(i.id)}
+                        disabled={!i.recipientEmail}
+                        title={
+                          i.recipientEmail
+                            ? `E-Mail an ${i.recipientEmail}${i.addressedToGuardian ? " (Vertretung)" : ""}`
+                            : "Keine E-Mail hinterlegt"
                         }
-                        disabled={markSent.isPending || !i.eMail}
-                        title={i.eMail ?? "Keine E-Mail hinterlegt"}
                       >
                         <Mail className="size-4" />
                       </Button>
@@ -201,6 +215,70 @@ function MahnungDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={cancelOpen}
+        onOpenChange={(o) => {
+          if (!cancel.isPending) {
+            setCancelOpen(o);
+            if (!o) setCancelReason("");
+          }
+        }}
+        title="Mahnlauf stornieren"
+        description="Die Mahnstufe der betroffenen Posten wird auf die vorherige Stufe zurückgesetzt."
+        confirmLabel="Stornieren"
+        destructive
+        loading={cancel.isPending}
+        onConfirm={() => cancel.mutate(cancelReason.trim() || null)}
+      >
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs text-muted-foreground">Grund (optional)</span>
+          <Input
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="z.B. versehentlich erstellt"
+          />
+        </div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={emailItemId !== null}
+        onOpenChange={(o) => {
+          if (!sendEmail.isPending && !o) setEmailItemId(null);
+        }}
+        title="Mahnung per E-Mail senden"
+        description="So wird die E-Mail mit dem angehängten PDF verschickt."
+        confirmLabel="Jetzt senden"
+        loading={sendEmail.isPending}
+        onConfirm={() => emailItemId && sendEmail.mutate(emailItemId)}
+      >
+        {emailPreview.isLoading ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> Vorschau wird geladen...
+          </div>
+        ) : emailPreview.data ? (
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-[5rem_1fr] gap-x-3 gap-y-1">
+              <span className="text-muted-foreground">An</span>
+              <span className="break-all">{emailPreview.data.to}</span>
+              <span className="text-muted-foreground">Betreff</span>
+              <span>{emailPreview.data.subject}</span>
+              <span className="text-muted-foreground">Anhang</span>
+              <span className="break-all">{emailPreview.data.attachmentName}</span>
+            </div>
+            {emailPreview.data.addressedToGuardian ? (
+              <p className="text-xs text-muted-foreground">
+                Diese Mahnung geht an die gesetzliche Vertretung des Mitglieds.
+              </p>
+            ) : null}
+            <pre className="whitespace-pre-wrap rounded-lg border border-border bg-card p-3 font-sans text-xs leading-relaxed">
+              {emailPreview.data.body}
+            </pre>
+          </div>
+        ) : (
+          <span className="text-muted-foreground">Keine Vorschau verfügbar.</span>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

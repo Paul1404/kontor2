@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import type { DB } from "~/server/db/client";
 import { contractsTable } from "~/server/db/schema/contracts";
 import {
   dunningItemsTable,
@@ -14,12 +15,20 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import {
   isDunningBlocked,
+  loadGuardianConnections,
   loadOpenPostings,
+  type MemberWithDebt,
   mahngebuhrFor,
   planNichtEingezogen,
+  resolveRecipient,
   resolveRecipients,
   sumDecimal,
 } from "~/server/dunning/build-dunning";
+import {
+  buildDunningEmail,
+  type DunningEmailContent,
+  sendDunningEmail,
+} from "~/server/dunning/send-dunning-email";
 import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import { clubLogoDataUri } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
@@ -41,6 +50,109 @@ function addDays(d: Date, days: number): Date {
 
 function toDateString(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Load everything needed to send (or preview) the dunning email for one item:
+ * the item, its member, and the club name. Throws if the item is missing or
+ * the club data is not yet set up.
+ */
+async function loadDunningEmailContext(db: DB, itemId: string) {
+  const [row] = await db
+    .select({
+      itemId: dunningItemsTable.id,
+      level: dunningItemsTable.level,
+      totalDue: dunningItemsTable.totalDue,
+      dueDate: dunningItemsTable.dueDate,
+      sentChannel: dunningItemsTable.sentChannel,
+      pdfBase64: dunningItemsTable.pdfBase64,
+      pdfFilename: dunningItemsTable.pdfFilename,
+      runDate: dunningRunsTable.runDate,
+      memberId: membersTable.id,
+      mitglnr: membersTable.mitglnr,
+      adrNr: membersTable.adrNr,
+      vorname: membersTable.vorname,
+      nachname: membersTable.nachname,
+      kurzname: membersTable.kurzname,
+      firma1: membersTable.firma1,
+      anrede: membersTable.anrede,
+      strasse: membersTable.strasse,
+      hausnummer: membersTable.hausnummer,
+      plz: membersTable.plz,
+      ort: membersTable.ort,
+      eMailName: membersTable.eMailName,
+      mahnSperre: membersTable.mahnSperre,
+      geburtsdatum: membersTable.geburtsdatum,
+      vertreterAnrede: membersTable.vertreterAnrede,
+      vertreterName: membersTable.vertreterName,
+      vertreterStrasse: membersTable.vertreterStrasse,
+      vertreterHausnummer: membersTable.vertreterHausnummer,
+      vertreterPlz: membersTable.vertreterPlz,
+      vertreterOrt: membersTable.vertreterOrt,
+    })
+    .from(dunningItemsTable)
+    .innerJoin(dunningRunsTable, eq(dunningItemsTable.dunningRunId, dunningRunsTable.id))
+    .innerJoin(membersTable, eq(dunningItemsTable.memberId, membersTable.id))
+    .where(eq(dunningItemsTable.id, itemId))
+    .limit(1);
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Mahnung nicht gefunden." });
+
+  const [org] = await db
+    .select({ vereinsname: organizationSettingsTable.vereinsname })
+    .from(organizationSettingsTable)
+    .limit(1);
+  if (!org) throw new ORPCError("PRECONDITION_FAILED", { message: "Vereinsdaten fehlen." });
+
+  // Resolve who the Mahnung is addressed to (member or guardian) as of the run
+  // date, so a minor's mail goes to the guardian's address, mirroring the PDF.
+  const member: MemberWithDebt = {
+    memberId: row.memberId,
+    mitglnr: row.mitglnr,
+    adrNr: row.adrNr,
+    vorname: row.vorname,
+    nachname: row.nachname,
+    kurzname: row.kurzname,
+    firma1: row.firma1,
+    anrede: row.anrede,
+    strasse: row.strasse,
+    hausnummer: row.hausnummer,
+    plz: row.plz,
+    ort: row.ort,
+    eMailName: row.eMailName,
+    mahnSperre: row.mahnSperre,
+    geburtsdatum: row.geburtsdatum,
+    vertreterAnrede: row.vertreterAnrede,
+    vertreterName: row.vertreterName,
+    vertreterStrasse: row.vertreterStrasse,
+    vertreterHausnummer: row.vertreterHausnummer,
+    vertreterPlz: row.vertreterPlz,
+    vertreterOrt: row.vertreterOrt,
+    currentMahnstufe: 0,
+    postings: [],
+    openSum: "0",
+    daysOverdueMax: 0,
+  };
+  const asOf = row.runDate ? new Date(`${row.runDate}T00:00:00Z`) : new Date();
+  const guardians = await loadGuardianConnections(db, [row.memberId]);
+  const resolved = resolveRecipient(member, guardians.get(row.memberId) ?? null, asOf);
+
+  const mitgliedsnummer = row.mitglnr ?? `AdrNr ${row.adrNr}`;
+  const to = resolved.recipientEmail ?? "";
+
+  const content: DunningEmailContent | null = to
+    ? buildDunningEmail({
+        level: row.level as 1 | 2 | 3,
+        to,
+        recipientName: resolved.recipient.name,
+        vereinsname: org.vereinsname,
+        mitgliedsnummer,
+        totalDue: row.totalDue,
+        dueDate: row.dueDate,
+        attachmentName: row.pdfFilename ?? `Mahnung-${mitgliedsnummer}.pdf`,
+      })
+    : null;
+
+  return { row, content, hasEmail: !!to, addressedToGuardian: resolved.guardianSource !== null };
 }
 
 export const dunningRouter = {
@@ -423,7 +535,7 @@ export const dunningRouter = {
       .limit(1);
     if (!run) throw new ORPCError("NOT_FOUND", { message: "Mahnlauf nicht gefunden." });
 
-    const items = await context.db
+    const rows = await context.db
       .select({
         id: dunningItemsTable.id,
         memberId: dunningItemsTable.memberId,
@@ -440,11 +552,84 @@ export const dunningRouter = {
         mitglnr: membersTable.mitglnr,
         adrNr: membersTable.adrNr,
         eMail: membersTable.eMailName,
+        // Extra columns so we can resolve who the Mahnung is addressed to and
+        // surface the effective email (guardian's, for minors) to the UI.
+        vorname: membersTable.vorname,
+        nachname: membersTable.nachname,
+        kurzname: membersTable.kurzname,
+        firma1: membersTable.firma1,
+        anrede: membersTable.anrede,
+        strasse: membersTable.strasse,
+        hausnummer: membersTable.hausnummer,
+        plz: membersTable.plz,
+        ort: membersTable.ort,
+        geburtsdatum: membersTable.geburtsdatum,
+        vertreterAnrede: membersTable.vertreterAnrede,
+        vertreterName: membersTable.vertreterName,
+        vertreterStrasse: membersTable.vertreterStrasse,
+        vertreterHausnummer: membersTable.vertreterHausnummer,
+        vertreterPlz: membersTable.vertreterPlz,
+        vertreterOrt: membersTable.vertreterOrt,
       })
       .from(dunningItemsTable)
       .innerJoin(membersTable, eq(dunningItemsTable.memberId, membersTable.id))
       .where(eq(dunningItemsTable.dunningRunId, input.id))
       .orderBy(membersTable.nachname, membersTable.vorname);
+
+    const asOf = run.runDate ? new Date(`${run.runDate}T00:00:00Z`) : new Date();
+    const guardians = await loadGuardianConnections(
+      context.db,
+      rows.map((r) => r.memberId),
+    );
+    const items = rows.map((r) => {
+      const member: MemberWithDebt = {
+        memberId: r.memberId,
+        mitglnr: r.mitglnr,
+        adrNr: r.adrNr,
+        vorname: r.vorname,
+        nachname: r.nachname,
+        kurzname: r.kurzname,
+        firma1: r.firma1,
+        anrede: r.anrede,
+        strasse: r.strasse,
+        hausnummer: r.hausnummer,
+        plz: r.plz,
+        ort: r.ort,
+        eMailName: r.eMail,
+        mahnSperre: null,
+        geburtsdatum: r.geburtsdatum,
+        vertreterAnrede: r.vertreterAnrede,
+        vertreterName: r.vertreterName,
+        vertreterStrasse: r.vertreterStrasse,
+        vertreterHausnummer: r.vertreterHausnummer,
+        vertreterPlz: r.vertreterPlz,
+        vertreterOrt: r.vertreterOrt,
+        currentMahnstufe: 0,
+        postings: [],
+        openSum: "0",
+        daysOverdueMax: 0,
+      };
+      const resolved = resolveRecipient(member, guardians.get(r.memberId) ?? null, asOf);
+      return {
+        id: r.id,
+        memberId: r.memberId,
+        level: r.level,
+        openSum: r.openSum,
+        mahngebuhr: r.mahngebuhr,
+        totalDue: r.totalDue,
+        dueDate: r.dueDate,
+        sentChannel: r.sentChannel,
+        sentTo: r.sentTo,
+        sentAt: r.sentAt,
+        pdfFilename: r.pdfFilename,
+        memberName: r.memberName,
+        mitglnr: r.mitglnr,
+        adrNr: r.adrNr,
+        eMail: r.eMail,
+        recipientEmail: resolved.recipientEmail,
+        addressedToGuardian: resolved.guardianSource !== null,
+      };
+    });
     return { run, items };
   }),
 
@@ -502,6 +687,80 @@ export const dunningRouter = {
       });
 
       return { ok: true };
+    }),
+
+  /**
+   * Preview the exact email that `sendEmail` would dispatch for one item,
+   * without sending anything. Lets the Vorstand read the recipient, subject
+   * and body before committing to the send.
+   */
+  emailPreview: vorstandProc
+    .input(v.object({ itemId: v.string() }))
+    .handler(async ({ context, input }) => {
+      const { content, hasEmail, row, addressedToGuardian } = await loadDunningEmailContext(
+        context.db,
+        input.itemId,
+      );
+      return {
+        hasEmail,
+        addressedToGuardian,
+        alreadySent: row.sentChannel !== "pending",
+        to: content?.to ?? null,
+        subject: content?.subject ?? null,
+        body: content?.body ?? null,
+        attachmentName: content?.attachmentName ?? row.pdfFilename ?? null,
+      };
+    }),
+
+  /**
+   * Send the dunning email for one item with the rendered PDF attached, then
+   * mark the item as sent via email. Surfaces SMTP failures as an error so the
+   * UI can show what went wrong instead of silently marking it sent.
+   */
+  sendEmail: vorstandProc
+    .input(v.object({ itemId: v.string() }))
+    .handler(async ({ context, input }) => {
+      const { content, hasEmail, row } = await loadDunningEmailContext(context.db, input.itemId);
+      if (!hasEmail || !content) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Für dieses Mitglied ist keine E-Mail-Adresse hinterlegt.",
+        });
+      }
+      if (!row.pdfBase64) {
+        throw new ORPCError("PRECONDITION_FAILED", { message: "Keine PDF-Datei hinterlegt." });
+      }
+
+      const sent = await sendDunningEmail({ content, pdfBase64: row.pdfBase64 });
+      if (!sent.ok) {
+        const message =
+          sent.reason === "smtp_not_configured"
+            ? "SMTP ist nicht konfiguriert. Bitte unter Einstellungen > E-Mail einrichten."
+            : `E-Mail-Versand fehlgeschlagen: ${sent.reason}`;
+        throw new ORPCError("INTERNAL_SERVER_ERROR", { message });
+      }
+
+      await context.db.transaction(async (tx) => {
+        await tx
+          .update(dunningItemsTable)
+          .set({ sentChannel: "email", sentTo: content.to, sentAt: new Date() })
+          .where(eq(dunningItemsTable.id, input.itemId));
+
+        await appendAudit(tx, {
+          entityType: "dunning_item",
+          entityId: input.itemId,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            sentChannel: { before: row.sentChannel, after: "email" },
+            sentTo: { before: null, after: content.to },
+          },
+          requestId: context.requestId ?? null,
+        });
+      });
+
+      return { ok: true, to: content.to };
     }),
 
   /**

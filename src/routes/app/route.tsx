@@ -13,12 +13,14 @@ import { orpc } from "~/lib/orpc";
 export const Route = createFileRoute("/app")({
   // Gate auth at the router layer so unauth'd users never even start
   // rendering the shell. SPA redirect — no full page reload.
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     try {
       const me = await orpc.auth.me();
       return { me };
     } catch {
-      throw redirect({ to: "/login" });
+      // No valid session: send them to login with a note and a way back to
+      // the page they were trying to reach.
+      throw redirect({ to: "/login", search: { expired: true, redirect: location.href } });
     }
   },
   component: AppLayout,

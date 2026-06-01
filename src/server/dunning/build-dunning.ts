@@ -54,6 +54,8 @@ export type AddressBlock = {
   hausnummer: string | null;
   plz: string | null;
   ort: string | null;
+  /** Guardian email, when known. Only used for email dispatch, not the PDF. */
+  email?: string | null;
 };
 
 export type ResolvedRecipient = {
@@ -65,7 +67,19 @@ export type ResolvedRecipient = {
   minorWithoutGuardian: boolean;
   /** Member name shown as "gesetzliche Vertretung von ..." when a guardian. */
   vertretungFor: string | null;
+  /**
+   * Email to send the Mahnung to: the guardian's address when the letter is
+   * addressed to a guardian who has an email on file, otherwise the member's
+   * own. Null when neither has one.
+   */
+  recipientEmail: string | null;
 };
+
+/** Trim to a non-empty email, or null. */
+function cleanEmail(s: string | null | undefined): string | null {
+  const v = (s ?? "").trim();
+  return v.length > 0 ? v : null;
+}
 
 /**
  * Sum a list of decimal strings, returning a string with cent precision.
@@ -336,6 +350,7 @@ function withAddressFallback(guardian: AddressBlock, member: AddressBlock): Addr
     hausnummer: member.hausnummer,
     plz: member.plz,
     ort: member.ort,
+    email: guardian.email,
   };
 }
 
@@ -352,6 +367,7 @@ export function resolveRecipient(
   asOf: Date,
 ): ResolvedRecipient {
   const memberName = memberDisplayName(member);
+  const memberEmail = cleanEmail(member.eMailName);
   const memberAddress: AddressBlock = {
     anrede: member.anrede,
     name: memberName,
@@ -359,6 +375,7 @@ export function resolveRecipient(
     hausnummer: member.hausnummer,
     plz: member.plz,
     ort: member.ort,
+    email: memberEmail,
   };
 
   if (!isMinorAt(member.geburtsdatum, asOf)) {
@@ -368,17 +385,22 @@ export function resolveRecipient(
       guardianSource: null,
       minorWithoutGuardian: false,
       vertretungFor: null,
+      recipientEmail: memberEmail,
     };
   }
 
   const guardianName = guardianConnection?.name.trim() ?? "";
   if (guardianConnection !== null && guardianName.length > 0) {
+    // Prefer the guardian's own email; fall back to the member's so the mail
+    // still reaches the household when the guardian has none on file.
+    const guardianEmail = cleanEmail(guardianConnection.email);
     return {
       recipient: withAddressFallback(guardianConnection, memberAddress),
       isMinor: true,
       guardianSource: "connection",
       minorWithoutGuardian: false,
       vertretungFor: memberName,
+      recipientEmail: guardianEmail ?? memberEmail,
     };
   }
 
@@ -397,6 +419,8 @@ export function resolveRecipient(
       guardianSource: "custom",
       minorWithoutGuardian: false,
       vertretungFor: memberName,
+      // Custom Vertreter fields carry no email, so we use the member's.
+      recipientEmail: memberEmail,
     };
   }
 
@@ -406,6 +430,7 @@ export function resolveRecipient(
     guardianSource: null,
     minorWithoutGuardian: true,
     vertretungFor: null,
+    recipientEmail: memberEmail,
   };
 }
 
@@ -429,6 +454,7 @@ export async function loadGuardianConnections(
       relName: relationshipsTable.name,
       relNachname: relationshipsTable.nachname,
       relAnrede: relationshipsTable.anrede,
+      relEmail: relationshipsTable.email,
       toMemberId: relationshipsTable.toMemberId,
       tVorname: membersTable.vorname,
       tNachname: membersTable.nachname,
@@ -437,6 +463,7 @@ export async function loadGuardianConnections(
       tHausnummer: membersTable.hausnummer,
       tPlz: membersTable.plz,
       tOrt: membersTable.ort,
+      tEmail: membersTable.eMailName,
     })
     .from(relationshipsTable)
     .leftJoin(membersTable, eq(membersTable.id, relationshipsTable.toMemberId))
@@ -453,6 +480,9 @@ export async function loadGuardianConnections(
       [r.tVorname, r.tNachname].filter(Boolean).join(" ").trim() ||
       (r.relName ?? r.relNachname ?? "").trim();
     if (!name) continue;
+    // A linked member contributes its own email; an external contact carries
+    // the relationship's email field.
+    const email = (r.toMemberId ? cleanEmail(r.tEmail) : null) ?? cleanEmail(r.relEmail);
     out.set(r.fromMemberId, {
       anrede: r.tAnrede ?? r.relAnrede ?? null,
       name,
@@ -460,6 +490,7 @@ export async function loadGuardianConnections(
       hausnummer: r.toMemberId ? r.tHausnummer : null,
       plz: r.toMemberId ? r.tPlz : null,
       ort: r.toMemberId ? r.tOrt : null,
+      email,
     });
   }
   return out;

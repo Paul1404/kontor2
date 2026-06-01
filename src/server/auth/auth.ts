@@ -48,7 +48,11 @@ function buildAuth() {
       },
     },
     session: {
-      expiresIn: 60 * 60 * 24 * 30,
+      // Sliding 90-day window: as long as the user is active within 90 days
+      // the session keeps getting extended, so a Vorstand who logs in a few
+      // times a month effectively stays signed in. `updateAge` refreshes the
+      // window once per day of activity.
+      expiresIn: 60 * 60 * 24 * 90,
       updateAge: 60 * 60 * 24,
       cookieCache: { enabled: true, maxAge: 60 * 5 },
     },
