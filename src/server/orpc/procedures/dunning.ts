@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import type { DBOrTx } from "~/server/db/client";
 import { contractsTable } from "~/server/db/schema/contracts";
 import {
   dunningItemsTable,
@@ -20,6 +21,11 @@ import {
   resolveRecipients,
   sumDecimal,
 } from "~/server/dunning/build-dunning";
+import {
+  buildDunningEmail,
+  type DunningEmailContent,
+  sendDunningEmail,
+} from "~/server/dunning/send-dunning-email";
 import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import { clubLogoDataUri } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
@@ -41,6 +47,66 @@ function addDays(d: Date, days: number): Date {
 
 function toDateString(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Load everything needed to send (or preview) the dunning email for one item:
+ * the item, its member, and the club name. Throws if the item is missing or
+ * the club data is not yet set up.
+ */
+async function loadDunningEmailContext(db: DBOrTx, itemId: string) {
+  const [row] = await db
+    .select({
+      itemId: dunningItemsTable.id,
+      level: dunningItemsTable.level,
+      totalDue: dunningItemsTable.totalDue,
+      dueDate: dunningItemsTable.dueDate,
+      sentChannel: dunningItemsTable.sentChannel,
+      pdfBase64: dunningItemsTable.pdfBase64,
+      pdfFilename: dunningItemsTable.pdfFilename,
+      memberId: dunningItemsTable.memberId,
+      eMail: membersTable.eMailName,
+      mitglnr: membersTable.mitglnr,
+      adrNr: membersTable.adrNr,
+      vorname: membersTable.vorname,
+      nachname: membersTable.nachname,
+      kurzname: membersTable.kurzname,
+      firma1: membersTable.firma1,
+    })
+    .from(dunningItemsTable)
+    .innerJoin(membersTable, eq(dunningItemsTable.memberId, membersTable.id))
+    .where(eq(dunningItemsTable.id, itemId))
+    .limit(1);
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Mahnung nicht gefunden." });
+
+  const [org] = await db
+    .select({ vereinsname: organizationSettingsTable.vereinsname })
+    .from(organizationSettingsTable)
+    .limit(1);
+  if (!org) throw new ORPCError("PRECONDITION_FAILED", { message: "Vereinsdaten fehlen." });
+
+  const memberName =
+    [row.vorname, row.nachname].filter(Boolean).join(" ") ||
+    row.kurzname ||
+    row.firma1 ||
+    `Mitglied ${row.mitglnr ?? row.adrNr}`;
+  const mitgliedsnummer = row.mitglnr ?? `AdrNr ${row.adrNr}`;
+  const to = (row.eMail ?? "").trim();
+
+  const content: DunningEmailContent | null = to
+    ? buildDunningEmail({
+        level: row.level as 1 | 2 | 3,
+        to,
+        recipientName: memberName,
+        vereinsname: org.vereinsname,
+        mitgliedsnummer,
+        totalDue: row.totalDue,
+        dueDate: row.dueDate,
+        attachmentName: row.pdfFilename ?? `Mahnung-${mitgliedsnummer}.pdf`,
+      })
+    : null;
+
+  return { row, content, hasEmail: !!to };
 }
 
 export const dunningRouter = {
@@ -502,6 +568,76 @@ export const dunningRouter = {
       });
 
       return { ok: true };
+    }),
+
+  /**
+   * Preview the exact email that `sendEmail` would dispatch for one item,
+   * without sending anything. Lets the Vorstand read the recipient, subject
+   * and body before committing to the send.
+   */
+  emailPreview: vorstandProc
+    .input(v.object({ itemId: v.string() }))
+    .handler(async ({ context, input }) => {
+      const { content, hasEmail, row } = await loadDunningEmailContext(context.db, input.itemId);
+      return {
+        hasEmail,
+        alreadySent: row.sentChannel !== "pending",
+        to: content?.to ?? null,
+        subject: content?.subject ?? null,
+        body: content?.body ?? null,
+        attachmentName: content?.attachmentName ?? row.pdfFilename ?? null,
+      };
+    }),
+
+  /**
+   * Send the dunning email for one item with the rendered PDF attached, then
+   * mark the item as sent via email. Surfaces SMTP failures as an error so the
+   * UI can show what went wrong instead of silently marking it sent.
+   */
+  sendEmail: vorstandProc
+    .input(v.object({ itemId: v.string() }))
+    .handler(async ({ context, input }) => {
+      const { content, hasEmail, row } = await loadDunningEmailContext(context.db, input.itemId);
+      if (!hasEmail || !content) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Für dieses Mitglied ist keine E-Mail-Adresse hinterlegt.",
+        });
+      }
+      if (!row.pdfBase64) {
+        throw new ORPCError("PRECONDITION_FAILED", { message: "Keine PDF-Datei hinterlegt." });
+      }
+
+      const sent = await sendDunningEmail({ content, pdfBase64: row.pdfBase64 });
+      if (!sent.ok) {
+        const message =
+          sent.reason === "smtp_not_configured"
+            ? "SMTP ist nicht konfiguriert. Bitte unter Einstellungen > E-Mail einrichten."
+            : `E-Mail-Versand fehlgeschlagen: ${sent.reason}`;
+        throw new ORPCError("INTERNAL_SERVER_ERROR", { message });
+      }
+
+      await context.db.transaction(async (tx) => {
+        await tx
+          .update(dunningItemsTable)
+          .set({ sentChannel: "email", sentTo: content.to, sentAt: new Date() })
+          .where(eq(dunningItemsTable.id, input.itemId));
+
+        await appendAudit(tx, {
+          entityType: "dunning_item",
+          entityId: input.itemId,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            sentChannel: { before: row.sentChannel, after: "email" },
+            sentTo: { before: null, after: content.to },
+          },
+          requestId: context.requestId ?? null,
+        });
+      });
+
+      return { ok: true, to: content.to };
     }),
 
   /**

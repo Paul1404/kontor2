@@ -211,18 +211,13 @@ export function MahnungDocument({ pkg }: { pkg: MahnungInput }) {
   return (
     <Document title={`${title} ${pkg.member.mitglnr ?? pkg.member.adrNr}`} author={org.vereinsname}>
       <Page size="A4" style={styles.page} wrap>
+        {/* Letterhead: logo plus the club wordmark. The postal address is
+            deliberately not repeated here -- it appears once in the sender
+            line below, which is the return address for window envelopes. */}
         <View style={styles.headerRow}>
-          {org.logoDataUri ? (
-            <Image src={org.logoDataUri} style={styles.logo} />
-          ) : (
-            <Text style={styles.orgName}>{org.vereinsname}</Text>
-          )}
+          {org.logoDataUri ? <Image src={org.logoDataUri} style={styles.logo} /> : <View />}
           <View style={styles.orgBlock}>
             <Text style={styles.orgName}>{org.vereinsname}</Text>
-            {org.anschriftStrasse ? <Text>{org.anschriftStrasse}</Text> : null}
-            {org.anschriftPlz || org.anschriftOrt ? (
-              <Text>{[org.anschriftPlz, org.anschriftOrt].filter(Boolean).join(" ")}</Text>
-            ) : null}
           </View>
         </View>
 

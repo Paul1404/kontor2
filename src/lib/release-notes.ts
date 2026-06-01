@@ -41,6 +41,33 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.7.0",
+    date: "2026-06-01",
+    title: "Mahnungen per E-Mail senden, mit Vorschau",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Mahnungen lassen sich jetzt direkt per E-Mail mit angehängtem PDF versenden. Vor dem Versand zeigt eine Vorschau Empfänger, Betreff und Text.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Vereinsanschrift steht auf dem Mahnschreiben nur noch einmal, in der Absenderzeile über der Empfängeradresse. Der doppelte Briefkopf entfällt.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Das Erstellen und Stornieren eines Mahnlaufs nutzt jetzt den regulären Bestätigungsdialog statt der alten Browser-Abfrage.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Anmeldung bleibt länger bestehen (90 Tage bei Nutzung). Läuft die Sitzung doch ab, führt ein Hinweis zurück zur Anmeldung statt einer Fehlermeldung.",
+      },
+    ],
+  },
+  {
     version: "0.6.0",
     date: "2026-06-01",
     title: "Mahnungen mit Logo, voller IBAN und Vertretung für Minderjährige",

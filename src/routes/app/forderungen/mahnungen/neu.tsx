@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
@@ -28,6 +29,7 @@ function NewDunningRunPage() {
   const [runDate, setRunDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const preview = useQuery({
     queryKey: ["dunning.preview", level, runDate],
@@ -101,8 +103,8 @@ function NewDunningRunPage() {
         </div>
         <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Neuer Mahnlauf</h1>
         <p className="text-sm text-muted-foreground">
-          Erstellt PDFs für alle ausgewählten Empfänger und hebt deren Mahnstufe an. Versand erfolgt
-          weiterhin manuell.
+          Erstellt PDFs für alle ausgewählten Empfänger und hebt deren Mahnstufe an. Der Versand
+          erfolgt danach pro Empfänger per E-Mail oder Brief.
         </p>
       </div>
 
@@ -274,20 +276,43 @@ function NewDunningRunPage() {
           </div>
           <Button
             disabled={selected.size === 0 || commit.isPending}
-            onClick={() => {
-              if (
-                confirm(
-                  `${LEVEL_LABELS[level]} an ${selected.size} Empfänger erstellen?\nDie Mahnstufe wird automatisch erhöht.`,
-                )
-              ) {
-                commit.mutate();
-              }
-            }}
+            onClick={() => setConfirmOpen(true)}
           >
             {commit.isPending ? "Wird erstellt..." : `${LEVEL_LABELS[level]} erstellen`}
           </Button>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(o) => {
+          if (!commit.isPending) setConfirmOpen(o);
+        }}
+        title={`${LEVEL_LABELS[level]} erstellen`}
+        description={`${LEVEL_LABELS[level]} für ${filteredTotals.count} Empfänger erzeugen? Die Mahnstufe der betroffenen Posten wird automatisch erhöht.`}
+        confirmLabel={`${LEVEL_LABELS[level]} erstellen`}
+        loading={commit.isPending}
+        onConfirm={() => commit.mutate()}
+      >
+        <div className="flex flex-col gap-1 text-xs">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Empfänger</span>
+            <span className="tabular-nums">{filteredTotals.count}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Summe offen</span>
+            <span className="tabular-nums">{formatCurrency(filteredTotals.openSum)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Mahngebühren</span>
+            <span className="tabular-nums">{formatCurrency(filteredTotals.fees)}</span>
+          </div>
+          <div className="flex justify-between font-medium">
+            <span>Insgesamt zu zahlen</span>
+            <span className="tabular-nums">{formatCurrency(filteredTotals.totalDue)}</span>
+          </div>
+        </div>
+      </ConfirmDialog>
     </div>
   );
 }

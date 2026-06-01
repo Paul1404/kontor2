@@ -12,11 +12,24 @@ import { signIn } from "~/lib/auth-client";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>): { expired?: boolean; redirect?: string } => ({
+    expired:
+      search.expired === true || search.expired === "1" || search.expired === "true"
+        ? true
+        : undefined,
+    // Only accept in-app paths as a return target, so the redirect can't be
+    // bent into an open redirect to another origin.
+    redirect:
+      typeof search.redirect === "string" && search.redirect.startsWith("/app")
+        ? search.redirect
+        : undefined,
+  }),
   component: LoginPage,
 });
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { expired, redirect } = Route.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +60,7 @@ function LoginPage() {
       setError(result.error.message ?? "Anmeldung fehlgeschlagen.");
       return;
     }
-    navigate({ to: "/app" });
+    navigate({ to: redirect ?? "/app" });
   }
 
   return (
@@ -75,6 +88,11 @@ function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
+            {expired ? (
+              <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.
+              </p>
+            ) : null}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email">E-Mail</Label>
               <Input
