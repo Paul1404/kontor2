@@ -74,49 +74,57 @@ export async function consumePortalToken(
   memberId: string;
 } | null> {
   const hash = sha256(rawToken);
-  const [token] = await db
-    .select()
-    .from(portalTokensTable)
-    .where(
-      and(
-        eq(portalTokensTable.tokenHash, hash),
-        gt(portalTokensTable.expiresAt, new Date()),
-        isNull(portalTokensTable.revokedAt),
-      ),
-    )
-    .limit(1);
-  if (!token) return null;
-  if (!constantEqual(token.tokenHash, hash)) return null;
+  return await db.transaction(async (tx) => {
+    const [token] = await tx
+      .select()
+      .from(portalTokensTable)
+      .where(
+        and(
+          eq(portalTokensTable.tokenHash, hash),
+          gt(portalTokensTable.expiresAt, new Date()),
+          isNull(portalTokensTable.revokedAt),
+          // Single-use: a token that already minted a session can't mint
+          // another. Without this a leaked/forwarded magic link kept
+          // granting fresh 30-day sessions until natural expiry.
+          isNull(portalTokensTable.consumedAt),
+        ),
+      )
+      .limit(1);
+    if (!token) return null;
+    if (!constantEqual(token.tokenHash, hash)) return null;
 
-  const sessionSecret = randomToken(48);
-  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
-  const [session] = await db
-    .insert(portalSessionsTable)
-    .values({
+    // Claim the token atomically before creating the session. The
+    // conditional `consumed_at IS NULL` closes the race where two requests
+    // present the same token concurrently — only one claim succeeds.
+    const claimed = await tx
+      .update(portalTokensTable)
+      .set({ consumedAt: new Date() })
+      .where(and(eq(portalTokensTable.id, token.id), isNull(portalTokensTable.consumedAt)))
+      .returning({ id: portalTokensTable.id });
+    if (claimed.length === 0) return null;
+
+    const sessionSecret = randomToken(48);
+    const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
+    const [session] = await tx
+      .insert(portalSessionsTable)
+      .values({
+        memberId: token.memberId,
+        secretHash: sha256(sessionSecret),
+        expiresAt,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        createdFromTokenId: token.id,
+      })
+      .returning({ id: portalSessionsTable.id });
+    if (!session) throw new Error("portal_sessions insert returned no row");
+
+    const cookieValue = `${session.id}.${sessionSecret}`;
+    return {
+      cookieValue,
+      cookieMaxAgeSeconds: SESSION_TTL_DAYS * 24 * 60 * 60,
       memberId: token.memberId,
-      secretHash: sha256(sessionSecret),
-      expiresAt,
-      ipAddress: meta.ipAddress,
-      userAgent: meta.userAgent,
-      createdFromTokenId: token.id,
-    })
-    .returning({ id: portalSessionsTable.id });
-  if (!session) throw new Error("portal_sessions insert returned no row");
-
-  // Token is single-use once a session is materialised. Subsequent visits
-  // must use the cookie. Revoking the token also prevents replay if the
-  // original mail is leaked later.
-  await db
-    .update(portalTokensTable)
-    .set({ consumedAt: new Date() })
-    .where(eq(portalTokensTable.id, token.id));
-
-  const cookieValue = `${session.id}.${sessionSecret}`;
-  return {
-    cookieValue,
-    cookieMaxAgeSeconds: SESSION_TTL_DAYS * 24 * 60 * 60,
-    memberId: token.memberId,
-  };
+    };
+  });
 }
 
 /**
