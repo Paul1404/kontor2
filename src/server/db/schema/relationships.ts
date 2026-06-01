@@ -1,4 +1,13 @@
-import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { membersTable } from "~/server/db/schema/members";
 
 /**
@@ -29,6 +38,11 @@ export const relationshipsTable = pgTable(
     nachname: text("nachname"),
     art: text("art"),
     artName: text("art_name"),
+    // Marks this connection as the member's legal representative / recipient
+    // for official mail (e.g. Mahnungen for a minor). At most one per
+    // from-member; the dunning workflow addresses the notice to this person
+    // instead of the member when the member is under 18.
+    istVertreter: boolean("ist_vertreter").notNull().default(false),
     rg: text("rg"),
     funktion: text("funktion"),
     post: text("post"),

@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, ne, or, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import { membersTable } from "~/server/db/schema/members";
@@ -22,6 +22,7 @@ const RelationshipPatch = v.object({
   notiz: v.optional(v.nullable(v.string())),
   datVon: v.optional(v.nullable(v.string())),
   datBis: v.optional(v.nullable(v.string())),
+  istVertreter: v.optional(v.boolean()),
 });
 
 export const relationshipsRouter = {
@@ -124,6 +125,22 @@ export const relationshipsRouter = {
         if ("notiz" in input.patch) patch.notiz = input.patch.notiz ?? null;
         if ("datVon" in input.patch) patch.datVon = toDateOrNull(input.patch.datVon, "Datum von");
         if ("datBis" in input.patch) patch.datBis = toDateOrNull(input.patch.datBis, "Datum bis");
+        if ("istVertreter" in input.patch) patch.istVertreter = input.patch.istVertreter ?? false;
+
+        // Only one connection per member can be the Vertreter (the dunning
+        // recipient for a minor). Clear the flag on the member's other
+        // connections before setting it here.
+        if (input.patch.istVertreter === true) {
+          await tx
+            .update(relationshipsTable)
+            .set({ istVertreter: false, updatedAt: new Date() } as never)
+            .where(
+              and(
+                eq(relationshipsTable.fromMemberId, existing.fromMemberId),
+                ne(relationshipsTable.id, input.id),
+              ),
+            );
+        }
 
         await tx
           .update(relationshipsTable)
@@ -143,6 +160,15 @@ export const relationshipsRouter = {
               after:
                 "beziehung" in input.patch ? (input.patch.beziehung ?? null) : existing.beziehung,
             },
+            ...(input.patch.istVertreter !== undefined &&
+            input.patch.istVertreter !== existing.istVertreter
+              ? {
+                  istVertreter: {
+                    before: String(existing.istVertreter),
+                    after: String(input.patch.istVertreter),
+                  },
+                }
+              : {}),
           },
           requestId: context.requestId ?? null,
         });

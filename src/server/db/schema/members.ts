@@ -108,6 +108,15 @@ export const membersTable = pgTable(
     amBrief: text("am_brief"),
     funktion: text("funktion"),
     geburtsdatum: timestamp("geburtsdatum", { withTimezone: false }),
+    // Custom legal representative (gesetzliche Vertretung) for minors, used as
+    // the Mahnung recipient when no connection is flagged as Vertreter. Free
+    // text so it works for guardians who are not themselves in the system.
+    vertreterAnrede: text("vertreter_anrede"),
+    vertreterName: text("vertreter_name"),
+    vertreterStrasse: text("vertreter_strasse"),
+    vertreterHausnummer: text("vertreter_hausnummer"),
+    vertreterPlz: text("vertreter_plz"),
+    vertreterOrt: text("vertreter_ort"),
     iniFile: text("ini_file"),
     benErfass: text("ben_erfass"),
     benAender: text("ben_aender"),

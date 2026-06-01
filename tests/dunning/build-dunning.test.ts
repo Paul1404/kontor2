@@ -1,5 +1,44 @@
 import { describe, expect, it } from "vitest";
-import { mahngebuhrFor, planNichtEingezogen, sumDecimal } from "~/server/dunning/build-dunning";
+import {
+  ageAt,
+  isMinorAt,
+  type MemberWithDebt,
+  mahngebuhrFor,
+  planNichtEingezogen,
+  resolveRecipient,
+  sumDecimal,
+} from "~/server/dunning/build-dunning";
+
+function makeMember(overrides: Partial<MemberWithDebt> = {}): MemberWithDebt {
+  return {
+    memberId: "m1",
+    mitglnr: "100",
+    adrNr: 1,
+    vorname: "Max",
+    nachname: "Muster",
+    kurzname: null,
+    firma1: null,
+    anrede: "Herr",
+    strasse: "Hauptstr.",
+    hausnummer: "1",
+    plz: "97447",
+    ort: "Untereuerheim",
+    eMailName: null,
+    mahnSperre: null,
+    geburtsdatum: null,
+    vertreterAnrede: null,
+    vertreterName: null,
+    vertreterStrasse: null,
+    vertreterHausnummer: null,
+    vertreterPlz: null,
+    vertreterOrt: null,
+    currentMahnstufe: 0,
+    postings: [],
+    openSum: "0",
+    daysOverdueMax: 0,
+    ...overrides,
+  };
+}
 
 describe("sumDecimal", () => {
   it("adds in integer cents to avoid float drift", () => {
@@ -51,5 +90,84 @@ describe("planNichtEingezogen", () => {
     for (const status of ["open", "returned", "paid", "cancelled"]) {
       expect(planNichtEingezogen({ status, amount: "10.00" })).toBeNull();
     }
+  });
+});
+
+describe("ageAt / isMinorAt", () => {
+  const asOf = new Date(Date.UTC(2026, 5, 1)); // 2026-06-01
+
+  it("computes whole-year age and respects the birthday", () => {
+    expect(ageAt("2008-06-01", asOf)).toBe(18); // birthday reached
+    expect(ageAt("2008-06-02", asOf)).toBe(17); // birthday tomorrow
+    expect(ageAt(new Date(Date.UTC(2000, 0, 1)), asOf)).toBe(26);
+  });
+
+  it("returns null for missing or invalid dates", () => {
+    expect(ageAt(null, asOf)).toBeNull();
+    expect(ageAt("not-a-date", asOf)).toBeNull();
+  });
+
+  it("treats turning 18 on the run date as an adult", () => {
+    expect(isMinorAt("2008-06-01", asOf)).toBe(false);
+    expect(isMinorAt("2008-06-02", asOf)).toBe(true);
+    expect(isMinorAt(null, asOf)).toBe(false); // unknown age is not a minor
+  });
+});
+
+describe("resolveRecipient", () => {
+  const asOf = new Date(Date.UTC(2026, 5, 1));
+  const minorBirth = "2012-01-01"; // 14 years old
+
+  it("addresses adults directly", () => {
+    const r = resolveRecipient(makeMember({ geburtsdatum: "1990-01-01" }), null, asOf);
+    expect(r.isMinor).toBe(false);
+    expect(r.guardianSource).toBeNull();
+    expect(r.recipient.name).toBe("Max Muster");
+    expect(r.vertretungFor).toBeNull();
+  });
+
+  it("prefers a flagged connection for minors and falls back to the member address", () => {
+    const r = resolveRecipient(
+      makeMember({ geburtsdatum: minorBirth }),
+      {
+        anrede: "Frau",
+        name: "Erika Muster",
+        strasse: null,
+        hausnummer: null,
+        plz: null,
+        ort: null,
+      },
+      asOf,
+    );
+    expect(r.guardianSource).toBe("connection");
+    expect(r.recipient.name).toBe("Erika Muster");
+    expect(r.recipient.ort).toBe("Untereuerheim"); // inherited from the minor
+    expect(r.vertretungFor).toBe("Max Muster");
+    expect(r.minorWithoutGuardian).toBe(false);
+  });
+
+  it("uses custom Vertreter fields when no connection is flagged", () => {
+    const r = resolveRecipient(
+      makeMember({
+        geburtsdatum: minorBirth,
+        vertreterName: "Hans Vormund",
+        vertreterStrasse: "Nebenweg",
+        vertreterPlz: "97000",
+        vertreterOrt: "Schweinfurt",
+      }),
+      null,
+      asOf,
+    );
+    expect(r.guardianSource).toBe("custom");
+    expect(r.recipient.name).toBe("Hans Vormund");
+    expect(r.recipient.ort).toBe("Schweinfurt"); // its own address wins
+  });
+
+  it("flags minors with no guardian and still addresses the member", () => {
+    const r = resolveRecipient(makeMember({ geburtsdatum: minorBirth }), null, asOf);
+    expect(r.isMinor).toBe(true);
+    expect(r.guardianSource).toBeNull();
+    expect(r.minorWithoutGuardian).toBe(true);
+    expect(r.recipient.name).toBe("Max Muster");
   });
 });

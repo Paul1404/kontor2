@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ShieldAlert } from "lucide-react";
+import { ArrowLeft, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -167,6 +167,17 @@ function NewDunningRunPage() {
         </Card>
       ) : null}
 
+      {preview.data && preview.data.totals.minorsWithoutGuardian > 0 ? (
+        <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0" />
+          <span>
+            {preview.data.totals.minorsWithoutGuardian} minderjährige(s) Mitglied(er) ohne
+            hinterlegte gesetzliche Vertretung. Die Mahnung würde direkt an das Mitglied gehen.
+            Hinterlege eine Vertretung über die Beziehungen oder die Mitglieds-Stammdaten.
+          </span>
+        </div>
+      ) : null}
+
       <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>Empfänger {preview.data ? `(${preview.data.items.length})` : ""}</CardTitle>
@@ -212,9 +223,20 @@ function NewDunningRunPage() {
                         #{i.mitglnr ?? i.adrNr}
                       </span>
                       {!i.hasAddress ? <Badge variant="warning">Anschrift fehlt</Badge> : null}
+                      {i.minorWithoutGuardian ? (
+                        <Badge variant="warning">Minderjährig ohne Vertretung</Badge>
+                      ) : i.guardianSource ? (
+                        <Badge
+                          className="gap-1"
+                          title="Wird an die gesetzliche Vertretung adressiert"
+                        >
+                          <ShieldCheck className="size-3" /> An Vertretung
+                        </Badge>
+                      ) : null}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {i.postings.length} offene(r) Posten
+                      {i.guardianSource && i.recipientName ? <> · an {i.recipientName}</> : null}
                       {i.eMail ? <> · {i.eMail}</> : null}
                     </p>
                   </div>

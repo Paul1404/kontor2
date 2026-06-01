@@ -34,6 +34,12 @@ export type StammdatenValues = {
   aktivPasiv: "A" | "P" | "";
   iban1: string;
   abwKontoInh: string;
+  vertreterAnrede: string;
+  vertreterName: string;
+  vertreterStrasse: string;
+  vertreterHausnummer: string;
+  vertreterPlz: string;
+  vertreterOrt: string;
   notes: string;
 };
 
@@ -62,6 +68,12 @@ export const EMPTY_STAMM: StammdatenValues = {
   aktivPasiv: "",
   iban1: "",
   abwKontoInh: "",
+  vertreterAnrede: "",
+  vertreterName: "",
+  vertreterStrasse: "",
+  vertreterHausnummer: "",
+  vertreterPlz: "",
+  vertreterOrt: "",
   notes: "",
 };
 
@@ -142,6 +154,12 @@ export function buildInitialValues(
       | "",
     iban1: ((member.iban1 as string | null | undefined) ?? "").replace(/\s+/g, "").toUpperCase(),
     abwKontoInh: (member.abwKontoInh as string) ?? "",
+    vertreterAnrede: (member.vertreterAnrede as string) ?? "",
+    vertreterName: (member.vertreterName as string) ?? "",
+    vertreterStrasse: (member.vertreterStrasse as string) ?? "",
+    vertreterHausnummer: (member.vertreterHausnummer as string) ?? "",
+    vertreterPlz: (member.vertreterPlz as string) ?? "",
+    vertreterOrt: (member.vertreterOrt as string) ?? "",
     notes: (member.notes as string) ?? "",
   };
 }
@@ -184,6 +202,12 @@ export function buildPatch(
     out.geschlecht = values.geschlecht;
   }
   out.abwKontoInh = nullable(values.abwKontoInh);
+  out.vertreterAnrede = nullable(values.vertreterAnrede);
+  out.vertreterName = nullable(values.vertreterName);
+  out.vertreterStrasse = nullable(values.vertreterStrasse);
+  out.vertreterHausnummer = nullable(values.vertreterHausnummer);
+  out.vertreterPlz = nullable(values.vertreterPlz);
+  out.vertreterOrt = nullable(values.vertreterOrt);
   out.notes = nullable(values.notes);
   const normIban = values.iban1.replace(/\s+/g, "").toUpperCase();
   if (normIban !== initialIban) {
@@ -447,6 +471,58 @@ export function MemberStammdatenForm({
               <Input
                 value={values.abwKontoInh}
                 onChange={(e) => update("abwKontoInh", e.target.value)}
+              />
+            </FormField>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Gesetzliche Vertretung</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-x-4 gap-y-4 text-sm sm:grid-cols-2">
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              Empfänger für Mahnungen, wenn das Mitglied minderjährig ist. Eine als Vertretung
+              markierte Beziehung hat Vorrang. Diese Felder greifen nur, wenn keine Beziehung
+              markiert ist.
+            </p>
+            <FormField label="Anrede">
+              <Input
+                value={values.vertreterAnrede}
+                onChange={(e) => update("vertreterAnrede", e.target.value)}
+                placeholder="Herr / Frau"
+              />
+            </FormField>
+            <FormField label="Name">
+              <Input
+                value={values.vertreterName}
+                onChange={(e) => update("vertreterName", e.target.value)}
+                placeholder="Vor- und Nachname"
+              />
+            </FormField>
+            <FormField label="Straße">
+              <Input
+                value={values.vertreterStrasse}
+                onChange={(e) => update("vertreterStrasse", e.target.value)}
+                placeholder="leer = Adresse des Mitglieds"
+              />
+            </FormField>
+            <FormField label="Hausnummer">
+              <Input
+                value={values.vertreterHausnummer}
+                onChange={(e) => update("vertreterHausnummer", e.target.value)}
+              />
+            </FormField>
+            <FormField label="PLZ">
+              <Input
+                value={values.vertreterPlz}
+                onChange={(e) => update("vertreterPlz", e.target.value)}
+              />
+            </FormField>
+            <FormField label="Ort">
+              <Input
+                value={values.vertreterOrt}
+                onChange={(e) => update("vertreterOrt", e.target.value)}
               />
             </FormField>
           </CardContent>

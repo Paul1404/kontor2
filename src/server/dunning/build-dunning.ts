@@ -3,6 +3,7 @@ import type { DB } from "~/server/db/client";
 import { sepaReturnsTable } from "~/server/db/schema/dunning";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
+import { relationshipsTable } from "~/server/db/schema/relationships";
 
 export type OpenPosting = {
   sollStellungId: string;
@@ -25,16 +26,45 @@ export type MemberWithDebt = {
   nachname: string | null;
   kurzname: string | null;
   firma1: string | null;
+  anrede: string | null;
   strasse: string | null;
   hausnummer: string | null;
   plz: string | null;
   ort: string | null;
   eMailName: string | null;
   mahnSperre: string | null;
+  geburtsdatum: Date | string | null;
+  vertreterAnrede: string | null;
+  vertreterName: string | null;
+  vertreterStrasse: string | null;
+  vertreterHausnummer: string | null;
+  vertreterPlz: string | null;
+  vertreterOrt: string | null;
   currentMahnstufe: number;
   postings: OpenPosting[];
   openSum: string;
   daysOverdueMax: number;
+};
+
+/** A postal address block as it appears on the Mahnung. */
+export type AddressBlock = {
+  anrede: string | null;
+  name: string;
+  strasse: string | null;
+  hausnummer: string | null;
+  plz: string | null;
+  ort: string | null;
+};
+
+export type ResolvedRecipient = {
+  /** Who the letter is addressed to (the member, or their guardian). */
+  recipient: AddressBlock;
+  isMinor: boolean;
+  guardianSource: "connection" | "custom" | null;
+  /** A minor with no guardian resolved: still addressed to the member. */
+  minorWithoutGuardian: boolean;
+  /** Member name shown as "gesetzliche Vertretung von ..." when a guardian. */
+  vertretungFor: string | null;
 };
 
 /**
@@ -140,12 +170,20 @@ export async function loadOpenPostings(
       nachname: membersTable.nachname,
       kurzname: membersTable.kurzname,
       firma1: membersTable.firma1,
+      anrede: membersTable.anrede,
       strasse: membersTable.strasse,
       hausnummer: membersTable.hausnummer,
       plz: membersTable.plz,
       ort: membersTable.ort,
       eMailName: membersTable.eMailName,
       mahnSperre: membersTable.mahnSperre,
+      geburtsdatum: membersTable.geburtsdatum,
+      vertreterAnrede: membersTable.vertreterAnrede,
+      vertreterName: membersTable.vertreterName,
+      vertreterStrasse: membersTable.vertreterStrasse,
+      vertreterHausnummer: membersTable.vertreterHausnummer,
+      vertreterPlz: membersTable.vertreterPlz,
+      vertreterOrt: membersTable.vertreterOrt,
     })
     .from(sollStellungenTable)
     .innerJoin(membersTable, eq(sollStellungenTable.memberId, membersTable.id))
@@ -208,12 +246,20 @@ export async function loadOpenPostings(
         nachname: row.nachname,
         kurzname: row.kurzname,
         firma1: row.firma1,
+        anrede: row.anrede,
         strasse: row.strasse,
         hausnummer: row.hausnummer,
         plz: row.plz,
         ort: row.ort,
         eMailName: row.eMailName,
         mahnSperre: row.mahnSperre,
+        geburtsdatum: row.geburtsdatum,
+        vertreterAnrede: row.vertreterAnrede,
+        vertreterName: row.vertreterName,
+        vertreterStrasse: row.vertreterStrasse,
+        vertreterHausnummer: row.vertreterHausnummer,
+        vertreterPlz: row.vertreterPlz,
+        vertreterOrt: row.vertreterOrt,
         currentMahnstufe: 0,
         postings: [],
         openSum: "0",
@@ -238,6 +284,202 @@ export async function loadOpenPostings(
     if (ln !== 0) return ln;
     return (a.vorname ?? "").localeCompare(b.vorname ?? "", "de");
   });
+}
+
+/** Age in whole years at `asOf`, or null when the birthdate is missing/invalid. */
+export function ageAt(birth: Date | string | null | undefined, asOf: Date): number | null {
+  if (!birth) return null;
+  const b = birth instanceof Date ? birth : new Date(birth);
+  if (!Number.isFinite(b.getTime())) return null;
+  let age = asOf.getUTCFullYear() - b.getUTCFullYear();
+  const monthDelta = asOf.getUTCMonth() - b.getUTCMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && asOf.getUTCDate() < b.getUTCDate())) {
+    age -= 1;
+  }
+  return age;
+}
+
+/** True when the member is under 18 at `asOf` (false if birthdate unknown). */
+export function isMinorAt(birth: Date | string | null | undefined, asOf: Date): boolean {
+  const age = ageAt(birth, asOf);
+  return age !== null && age < 18;
+}
+
+type MemberLike = {
+  vorname: string | null;
+  nachname: string | null;
+  kurzname: string | null;
+  firma1: string | null;
+  mitglnr?: string | null;
+  adrNr?: number;
+};
+
+export function memberDisplayName(m: MemberLike): string {
+  const full = [m.vorname, m.nachname].filter(Boolean).join(" ").trim();
+  if (full) return full;
+  return m.kurzname ?? m.firma1 ?? `Mitglied ${m.mitglnr ?? m.adrNr ?? ""}`.trim();
+}
+
+/**
+ * Use the guardian's own postal address when it has one, otherwise fall back
+ * to the member's address. Guardians usually live at the same address as the
+ * minor, so this keeps the letter deliverable even for connection-based
+ * guardians (relationships store no postal address of their own).
+ */
+function withAddressFallback(guardian: AddressBlock, member: AddressBlock): AddressBlock {
+  const hasOwn = !!(guardian.strasse || guardian.plz || guardian.ort);
+  if (hasOwn) return guardian;
+  return {
+    anrede: guardian.anrede,
+    name: guardian.name,
+    strasse: member.strasse,
+    hausnummer: member.hausnummer,
+    plz: member.plz,
+    ort: member.ort,
+  };
+}
+
+/**
+ * Decide who a Mahnung is addressed to. Adults (and members with no birthdate)
+ * are addressed directly. Minors are addressed to their legal representative:
+ * a connection flagged as Vertreter wins, then the custom Vertreter fields on
+ * the member; if neither exists the member is addressed directly and flagged
+ * via `minorWithoutGuardian` so the UI can warn before sending.
+ */
+export function resolveRecipient(
+  member: MemberWithDebt,
+  guardianConnection: AddressBlock | null,
+  asOf: Date,
+): ResolvedRecipient {
+  const memberName = memberDisplayName(member);
+  const memberAddress: AddressBlock = {
+    anrede: member.anrede,
+    name: memberName,
+    strasse: member.strasse,
+    hausnummer: member.hausnummer,
+    plz: member.plz,
+    ort: member.ort,
+  };
+
+  if (!isMinorAt(member.geburtsdatum, asOf)) {
+    return {
+      recipient: memberAddress,
+      isMinor: false,
+      guardianSource: null,
+      minorWithoutGuardian: false,
+      vertretungFor: null,
+    };
+  }
+
+  const guardianName = guardianConnection?.name.trim() ?? "";
+  if (guardianConnection !== null && guardianName.length > 0) {
+    return {
+      recipient: withAddressFallback(guardianConnection, memberAddress),
+      isMinor: true,
+      guardianSource: "connection",
+      minorWithoutGuardian: false,
+      vertretungFor: memberName,
+    };
+  }
+
+  if (member.vertreterName?.trim()) {
+    const custom: AddressBlock = {
+      anrede: member.vertreterAnrede,
+      name: member.vertreterName.trim(),
+      strasse: member.vertreterStrasse,
+      hausnummer: member.vertreterHausnummer,
+      plz: member.vertreterPlz,
+      ort: member.vertreterOrt,
+    };
+    return {
+      recipient: withAddressFallback(custom, memberAddress),
+      isMinor: true,
+      guardianSource: "custom",
+      minorWithoutGuardian: false,
+      vertretungFor: memberName,
+    };
+  }
+
+  return {
+    recipient: memberAddress,
+    isMinor: true,
+    guardianSource: null,
+    minorWithoutGuardian: true,
+    vertretungFor: null,
+  };
+}
+
+/**
+ * Load the connection flagged as Vertreter for each of the given members and
+ * resolve it to an address block. When the target is itself a member we use
+ * its postal address; external contacts contribute only a name (the address
+ * falls back to the member's in `resolveRecipient`). First flag per member
+ * wins, so callers should keep at most one `istVertreter` per from-member.
+ */
+export async function loadGuardianConnections(
+  db: DB,
+  memberIds: string[],
+): Promise<Map<string, AddressBlock>> {
+  const out = new Map<string, AddressBlock>();
+  if (memberIds.length === 0) return out;
+
+  const rows = await db
+    .select({
+      fromMemberId: relationshipsTable.fromMemberId,
+      relName: relationshipsTable.name,
+      relNachname: relationshipsTable.nachname,
+      relAnrede: relationshipsTable.anrede,
+      toMemberId: relationshipsTable.toMemberId,
+      tVorname: membersTable.vorname,
+      tNachname: membersTable.nachname,
+      tAnrede: membersTable.anrede,
+      tStrasse: membersTable.strasse,
+      tHausnummer: membersTable.hausnummer,
+      tPlz: membersTable.plz,
+      tOrt: membersTable.ort,
+    })
+    .from(relationshipsTable)
+    .leftJoin(membersTable, eq(membersTable.id, relationshipsTable.toMemberId))
+    .where(
+      and(
+        inArray(relationshipsTable.fromMemberId, memberIds),
+        eq(relationshipsTable.istVertreter, true),
+      ),
+    );
+
+  for (const r of rows) {
+    if (out.has(r.fromMemberId)) continue; // first flag wins
+    const name =
+      [r.tVorname, r.tNachname].filter(Boolean).join(" ").trim() ||
+      (r.relName ?? r.relNachname ?? "").trim();
+    if (!name) continue;
+    out.set(r.fromMemberId, {
+      anrede: r.tAnrede ?? r.relAnrede ?? null,
+      name,
+      strasse: r.toMemberId ? r.tStrasse : null,
+      hausnummer: r.toMemberId ? r.tHausnummer : null,
+      plz: r.toMemberId ? r.tPlz : null,
+      ort: r.toMemberId ? r.tOrt : null,
+    });
+  }
+  return out;
+}
+
+/** Resolve recipients for a batch of members in one query. */
+export async function resolveRecipients(
+  db: DB,
+  members: MemberWithDebt[],
+  asOf: Date,
+): Promise<Map<string, ResolvedRecipient>> {
+  const guardians = await loadGuardianConnections(
+    db,
+    members.map((m) => m.memberId),
+  );
+  const out = new Map<string, ResolvedRecipient>();
+  for (const m of members) {
+    out.set(m.memberId, resolveRecipient(m, guardians.get(m.memberId) ?? null, asOf));
+  }
+  return out;
 }
 
 void ne;

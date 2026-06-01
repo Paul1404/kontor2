@@ -1,10 +1,26 @@
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 
 const styles = StyleSheet.create({
   page: { padding: 50, fontSize: 10, fontFamily: "Helvetica", color: "#111", lineHeight: 1.4 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
-  sender: { fontSize: 8, color: "#555" },
-  recipient: { marginTop: 12, marginBottom: 36 },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 18,
+  },
+  logo: { height: 52, objectFit: "contain" },
+  orgBlock: { alignItems: "flex-end", fontSize: 8, color: "#555", maxWidth: 220 },
+  orgName: { fontFamily: "Helvetica-Bold", fontSize: 10, color: "#111", marginBottom: 2 },
+  senderLine: {
+    fontSize: 7,
+    color: "#777",
+    borderBottomWidth: 0.5,
+    borderColor: "#ccc",
+    paddingBottom: 2,
+    marginBottom: 4,
+  },
+  recipient: { marginTop: 4, marginBottom: 36 },
+  vertretung: { fontSize: 8, color: "#555" },
   meta: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
   metaItem: { fontSize: 9 },
   h1: { fontSize: 16, fontFamily: "Helvetica-Bold", marginBottom: 8 },
@@ -87,11 +103,15 @@ export type MahnungInput = {
     anschriftStrasse: string | null;
     anschriftPlz: string | null;
     anschriftOrt: string | null;
-    vereinsIbanLast4: string;
+    /** Full club IBAN. Shown in full so the member can actually pay. */
+    vereinsIban: string;
     vereinsBic: string;
     vereinsBankname: string | null;
     glaeubigerId: string;
+    /** Club logo as a data URI, or null to render without one. */
+    logoDataUri: string | null;
   };
+  /** The member the dues belong to (drives Mitgliedsnummer + Verwendungszweck). */
   member: {
     mitglnr: string | null;
     adrNr: number;
@@ -99,11 +119,17 @@ export type MahnungInput = {
     nachname: string | null;
     kurzname: string | null;
     firma1: string | null;
+  };
+  /** Who the letter is addressed to (the member, or their legal guardian). */
+  recipient: {
+    anrede: string | null;
+    name: string;
     strasse: string | null;
     hausnummer: string | null;
     plz: string | null;
     ort: string | null;
-    anrede: string | null;
+    /** Set when the recipient is a guardian: name of the member they represent. */
+    vertretungFor: string | null;
   };
   postings: MahnungPosting[];
   openSum: string;
@@ -141,51 +167,73 @@ function fmtMoney(s: string): string {
   return n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function memberDisplayName(m: MahnungInput["member"]): string {
-  const trimmed = [m.vorname, m.nachname].filter(Boolean).join(" ").trim();
-  if (trimmed) return trimmed;
-  return m.kurzname ?? m.firma1 ?? `Mitglied ${m.mitglnr ?? m.adrNr}`;
+/** Group an IBAN into blocks of four for readability. */
+function fmtIban(s: string): string {
+  const clean = (s ?? "").replace(/\s+/g, "").toUpperCase();
+  return clean.replace(/(.{4})/g, "$1 ").trim();
 }
 
-function anredeFor(m: MahnungInput["member"]): string {
-  if (m.anrede === "Herr") return "Sehr geehrter Herr";
-  if (m.anrede === "Frau") return "Sehr geehrte Frau";
+function subjectName(m: MahnungInput["member"]): string {
+  const full = [m.vorname, m.nachname].filter(Boolean).join(" ").trim();
+  return full || m.kurzname || m.firma1 || `Mitglied ${m.mitglnr ?? m.adrNr}`;
+}
+
+function salutation(r: MahnungInput["recipient"]): string {
+  if (r.anrede === "Herr") return `Sehr geehrter Herr ${lastWord(r.name)}`;
+  if (r.anrede === "Frau") return `Sehr geehrte Frau ${lastWord(r.name)}`;
   return "Sehr geehrte Damen und Herren";
 }
 
+function lastWord(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts[parts.length - 1] ?? name;
+}
+
 export function MahnungDocument({ pkg }: { pkg: MahnungInput }) {
+  const org = pkg.organization;
   const senderLine = [
-    pkg.organization.vereinsname,
-    pkg.organization.anschriftStrasse,
-    [pkg.organization.anschriftPlz, pkg.organization.anschriftOrt].filter(Boolean).join(" "),
+    org.vereinsname,
+    org.anschriftStrasse,
+    [org.anschriftPlz, org.anschriftOrt].filter(Boolean).join(" "),
   ]
     .filter(Boolean)
     .join(" · ");
 
   const title = LEVEL_TITLES[pkg.level];
-  const memberName = memberDisplayName(pkg.member);
-  const anrede = anredeFor(pkg.member);
-  const recipient = [
-    [pkg.member.vorname, pkg.member.nachname].filter(Boolean).join(" "),
-    [pkg.member.strasse, pkg.member.hausnummer].filter(Boolean).join(" "),
-    [pkg.member.plz, pkg.member.ort].filter(Boolean).join(" "),
+  const subject = subjectName(pkg.member);
+  const r = pkg.recipient;
+  const recipientLines = [
+    r.name,
+    [r.strasse, r.hausnummer].filter(Boolean).join(" "),
+    [r.plz, r.ort].filter(Boolean).join(" "),
   ].filter(Boolean);
 
   return (
-    <Document
-      title={`${title} ${pkg.member.mitglnr ?? pkg.member.adrNr}`}
-      author={pkg.organization.vereinsname}
-    >
+    <Document title={`${title} ${pkg.member.mitglnr ?? pkg.member.adrNr}`} author={org.vereinsname}>
       <Page size="A4" style={styles.page} wrap>
         <View style={styles.headerRow}>
-          <Text style={styles.sender}>{senderLine}</Text>
-          <Text style={styles.sender}>{pkg.organization.vereinsname}</Text>
+          {org.logoDataUri ? (
+            <Image src={org.logoDataUri} style={styles.logo} />
+          ) : (
+            <Text style={styles.orgName}>{org.vereinsname}</Text>
+          )}
+          <View style={styles.orgBlock}>
+            <Text style={styles.orgName}>{org.vereinsname}</Text>
+            {org.anschriftStrasse ? <Text>{org.anschriftStrasse}</Text> : null}
+            {org.anschriftPlz || org.anschriftOrt ? (
+              <Text>{[org.anschriftPlz, org.anschriftOrt].filter(Boolean).join(" ")}</Text>
+            ) : null}
+          </View>
         </View>
 
         <View style={styles.recipient}>
-          {recipient.map((line, i) => (
+          <Text style={styles.senderLine}>{senderLine}</Text>
+          {recipientLines.map((line, i) => (
             <Text key={String(i)}>{line}</Text>
           ))}
+          {r.vertretungFor ? (
+            <Text style={styles.vertretung}>gesetzliche Vertretung von {r.vertretungFor}</Text>
+          ) : null}
         </View>
 
         <View style={styles.meta}>
@@ -197,9 +245,12 @@ export function MahnungDocument({ pkg }: { pkg: MahnungInput }) {
 
         <Text style={styles.h1}>{title}</Text>
 
-        <Text style={styles.intro}>
-          {anrede} {pkg.member.nachname ?? memberName},
-        </Text>
+        <Text style={styles.intro}>{salutation(r)},</Text>
+        {r.vertretungFor ? (
+          <Text style={styles.intro}>
+            als gesetzliche Vertretung von {r.vertretungFor} erhalten Sie dieses Schreiben.
+          </Text>
+        ) : null}
         <Text style={styles.intro}>
           {LEVEL_INTROS[pkg.level]} {fmtDate(pkg.dueDate)} zu begleichen.
         </Text>
@@ -247,28 +298,26 @@ export function MahnungDocument({ pkg }: { pkg: MahnungInput }) {
           <Text style={{ marginBottom: 4, fontFamily: "Helvetica-Bold" }}>Bankverbindung</Text>
           <View style={styles.paymentRow}>
             <Text style={styles.paymentKey}>Empfänger</Text>
-            <Text style={styles.paymentValue}>{pkg.organization.vereinsname}</Text>
+            <Text style={styles.paymentValue}>{org.vereinsname}</Text>
           </View>
           <View style={styles.paymentRow}>
             <Text style={styles.paymentKey}>IBAN</Text>
-            <Text style={styles.paymentValue}>
-              **** **** **** **** {pkg.organization.vereinsIbanLast4}
-            </Text>
+            <Text style={styles.paymentValue}>{fmtIban(org.vereinsIban)}</Text>
           </View>
           <View style={styles.paymentRow}>
             <Text style={styles.paymentKey}>BIC</Text>
-            <Text style={styles.paymentValue}>{pkg.organization.vereinsBic}</Text>
+            <Text style={styles.paymentValue}>{org.vereinsBic}</Text>
           </View>
-          {pkg.organization.vereinsBankname ? (
+          {org.vereinsBankname ? (
             <View style={styles.paymentRow}>
               <Text style={styles.paymentKey}>Bank</Text>
-              <Text style={styles.paymentValue}>{pkg.organization.vereinsBankname}</Text>
+              <Text style={styles.paymentValue}>{org.vereinsBankname}</Text>
             </View>
           ) : null}
           <View style={styles.paymentRow}>
             <Text style={styles.paymentKey}>Verwendung</Text>
             <Text style={styles.paymentValue}>
-              {title} · Mitgliedsnr {pkg.member.mitglnr ?? pkg.member.adrNr}
+              {title} · {subject} · Mitgliedsnr {pkg.member.mitglnr ?? pkg.member.adrNr}
             </Text>
           </View>
         </View>
@@ -278,12 +327,12 @@ export function MahnungDocument({ pkg }: { pkg: MahnungInput }) {
         </View>
 
         <Text style={{ marginTop: 18 }}>Mit freundlichen Grüßen</Text>
-        <Text style={{ marginTop: 24 }}>{pkg.organization.vereinsname}</Text>
+        <Text style={{ marginTop: 24 }}>{org.vereinsname}</Text>
 
         <Text
           style={styles.footer}
           render={({ pageNumber, totalPages }) =>
-            `${pkg.organization.vereinsname} · Gläubiger-ID ${pkg.organization.glaeubigerId} · Seite ${pageNumber}/${totalPages}`
+            `${org.vereinsname} · Gläubiger-ID ${org.glaeubigerId} · Seite ${pageNumber}/${totalPages}`
           }
           fixed
         />
