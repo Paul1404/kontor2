@@ -4,7 +4,9 @@ import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
+import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { slugify } from "~/server/importer/abteilung-splitter";
+import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
 import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import {
   CACHE_NS,
@@ -289,6 +291,14 @@ export const abteilungenRouter = {
         if (!existing) {
           throw new ORPCError("NOT_FOUND", { message: "Mitgliedschaft nicht gefunden." });
         }
+
+        // Enforce the configurable Kündigungsfrist when an Austritt date is set
+        // or changed. No-op when the feature is disabled.
+        if (input.austrittsdatum && input.austrittsdatum !== existing.austrittsdatum) {
+          const [settings] = await tx.select().from(organizationSettingsTable).limit(1);
+          assertCancellationAllowed(settings, new Date(`${input.austrittsdatum}T00:00:00Z`));
+        }
+
         await tx
           .update(memberAbteilungenTable)
           .set({ austrittsdatum: input.austrittsdatum })

@@ -4,6 +4,8 @@ import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { membersTable } from "~/server/db/schema/members";
+import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
+import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
 import { vorstandProc } from "~/server/orpc/base";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
@@ -78,6 +80,10 @@ export const contractsRouter = {
           throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
         }
         const patch = buildPatch(input.patch);
+        if (patch.gekuendZum instanceof Date) {
+          const [settings] = await tx.select().from(organizationSettingsTable).limit(1);
+          assertCancellationAllowed(settings, patch.gekuendZum);
+        }
         const [row] = await tx
           .insert(contractsTable)
           .values({
@@ -123,6 +129,13 @@ export const contractsRouter = {
           throw new ORPCError("NOT_FOUND", { message: "Vertrag nicht gefunden." });
         }
         const patch = buildPatch(input.patch);
+        if (
+          patch.gekuendZum instanceof Date &&
+          patch.gekuendZum.getTime() !== existing.gekuendZum?.getTime()
+        ) {
+          const [settings] = await tx.select().from(organizationSettingsTable).limit(1);
+          assertCancellationAllowed(settings, patch.gekuendZum);
+        }
         const projected: Record<string, unknown> = {
           ...(existing as Record<string, unknown>),
           ...patch,

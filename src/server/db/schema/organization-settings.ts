@@ -1,4 +1,4 @@
-import { integer, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
 import { encryptedText } from "~/server/db/types";
 
@@ -32,6 +32,23 @@ export const organizationSettingsTable = pgTable("organization_settings", {
   sepaReturnFee: numeric("sepa_return_fee", { precision: 19, scale: 2 }).notNull().default("0"),
   /** Zahlungsfrist in Tagen ab Mahndatum. */
   mahnFristTage: integer("mahn_frist_tage").notNull().default(14),
+  /**
+   * Beitragsberechnung: "voll" = ganzer Jahresbeitrag unabhängig vom Ein-/
+   * Austrittsdatum, "anteilig" = nach tatsächlichem Mitgliedszeitraum im
+   * Abrechnungsjahr. Default "voll" entspricht dem bisherigen Verhalten.
+   */
+  beitragModus: text("beitrag_modus").notNull().default("voll"),
+  /** Granularität der anteiligen Berechnung: "monat" oder "tag". */
+  anteilEinheit: text("anteil_einheit").notNull().default("monat"),
+  /**
+   * Kündigungsfrist aktiv? Wenn false (Default), ist Ein- und Austritt zu
+   * jedem beliebigen Datum erlaubt -- keine Fristprüfung.
+   */
+  kuendigungsfristAktiv: boolean("kuendigungsfrist_aktiv").notNull().default(false),
+  /** Kündigungsfrist in Tagen ab heute (frühester Austrittstermin). 0 = sofort. */
+  kuendigungsfristTage: integer("kuendigungsfrist_tage").notNull().default(0),
+  /** Kündigung nur zum Monatsende zulässig. */
+  kuendigungZumMonatsende: boolean("kuendigung_zum_monatsende").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
 });

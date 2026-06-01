@@ -5,6 +5,7 @@ import { contractsTable } from "~/server/db/schema/contracts";
 import { feeRunItemsTable } from "~/server/db/schema/fee-runs";
 import type { Member } from "~/server/db/schema/members";
 import { membersTable } from "~/server/db/schema/members";
+import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import type { SepaMandate } from "~/server/db/schema/sepa";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { selectMandate, sequenceTypeFor } from "~/server/sepa/select-mandate";
@@ -27,8 +28,10 @@ export type PreviewCandidate = {
   artName: string | null;
   baseAmount: string; // contracts.betrag, decimal string
   aufnahmegeb: string; // 0 if not added
-  amount: string; // baseAmount + aufnahmegeb
+  amount: string; // (baseAmount * prorationFactor) + aufnahmegeb
   includesAufnahmegebuhr: boolean;
+  prorationFactor: number; // 1 = full year (no proration applied)
+  prorationLabel: string | null; // e.g. "9/12 Monate"; null when full year
   mandateOptions: MandateSummary[];
   chosenMandateId: string;
   sequenceType: "FRST" | "RCUR" | "OOFF" | "FNAL";
@@ -75,6 +78,11 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
   const { billingYear, mandateOverrides = {} } = params;
   const yearStart = new Date(Date.UTC(billingYear, 0, 1));
   const yearEnd = new Date(Date.UTC(billingYear, 11, 31, 23, 59, 59));
+
+  // Billing mode. Absent settings row → flat full-year (current behaviour).
+  const [settings] = await db.select().from(organizationSettingsTable).limit(1);
+  const modus: BeitragModus = settings?.beitragModus === "anteilig" ? "anteilig" : "voll";
+  const einheit: AnteilEinheit = settings?.anteilEinheit === "tag" ? "tag" : "monat";
 
   const candidates: PreviewCandidate[] = [];
   const excluded: PreviewExclusion[] = [];
@@ -198,7 +206,23 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
 
     const aufnRaw = parseAmount(contract.aufnahmegeb);
     const includeAufn = aufnRaw > 0 && !aufnGesehen.has(contract.id);
-    const totalCents = toCents(baseAmount) + (includeAufn ? toCents(aufnRaw) : 0n);
+
+    // Anteilige Berechnung: nur der Jahresbeitrag wird gekürzt, die
+    // Aufnahmegebühr bleibt unangetastet und wird weiterhin nur einmal erhoben.
+    const proration = computeProration({
+      start: contract.vertragBegin ?? member.eintritt ?? null,
+      end:
+        contract.vertragEnde ??
+        contract.gekuendZum ??
+        member.austritt ??
+        member.verstorbenAm ??
+        null,
+      year: billingYear,
+      modus,
+      einheit,
+    });
+    const baseCents = applyFactor(toCents(baseAmount), proration.factor);
+    const totalCents = baseCents + (includeAufn ? toCents(aufnRaw) : 0n);
 
     const warnings: string[] = [];
     if (sel.conflict) {
@@ -218,10 +242,12 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
       vertragNr: contract.vertragNr,
       art: contract.art,
       artName: contract.artName,
-      baseAmount: centsToAmount(toCents(baseAmount)),
+      baseAmount: centsToAmount(baseCents),
       aufnahmegeb: includeAufn ? centsToAmount(toCents(aufnRaw)) : "0.00",
       amount: centsToAmount(totalCents),
       includesAufnahmegebuhr: includeAufn,
+      prorationFactor: proration.factor,
+      prorationLabel: proration.label,
       mandateOptions: sel.options.map(mandateSummary),
       chosenMandateId: sel.chosen.id,
       sequenceType,
@@ -299,6 +325,69 @@ function debtorNameFor(m: Member, c: Contract): string {
   // pays for a juvenile member.
   if (c.abwKontoInh && c.abwKontoInh.trim().length > 0) return c.abwKontoInh.trim();
   return displayName(m);
+}
+
+export type BeitragModus = "voll" | "anteilig";
+export type AnteilEinheit = "monat" | "tag";
+
+export type ProrationResult = {
+  /** Fraction of the annual fee to charge, 0..1. */
+  factor: number;
+  /** Human label for the preview, or null when the full year is charged. */
+  label: string | null;
+};
+
+function daysInYear(year: number): number {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365;
+}
+
+/** Inclusive whole-day difference between two UTC dates. */
+function dayDiffInclusive(from: Date, to: Date): number {
+  const ms = Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate());
+  const msFrom = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate());
+  return Math.floor((ms - msFrom) / 86_400_000) + 1;
+}
+
+/**
+ * Compute the share of the annual fee a contract is due for the given billing
+ * year. `modus === "voll"` always returns factor 1 (current behaviour). For
+ * "anteilig", the active interval [start, end] is clamped to the year and
+ * measured either by calendar months touched (any active day counts the whole
+ * month) or by inclusive day count.
+ */
+export function computeProration(opts: {
+  start: Date | null;
+  end: Date | null;
+  year: number;
+  modus: BeitragModus;
+  einheit: AnteilEinheit;
+}): ProrationResult {
+  if (opts.modus === "voll") return { factor: 1, label: null };
+
+  const yearStart = new Date(Date.UTC(opts.year, 0, 1));
+  const yearEnd = new Date(Date.UTC(opts.year, 11, 31));
+  const from = opts.start && opts.start > yearStart ? opts.start : yearStart;
+  const to = opts.end && opts.end < yearEnd ? opts.end : yearEnd;
+  if (to < from) return { factor: 0, label: "0 (außerhalb des Jahres)" };
+
+  if (opts.einheit === "monat") {
+    const months = to.getUTCMonth() - from.getUTCMonth() + 1;
+    if (months >= 12) return { factor: 1, label: null };
+    return { factor: months / 12, label: `${months}/12 Monate` };
+  }
+
+  const total = daysInYear(opts.year);
+  const active = dayDiffInclusive(from, to);
+  if (active >= total) return { factor: 1, label: null };
+  return { factor: active / total, label: `${active}/${total} Tage` };
+}
+
+/** Multiply cents by a 0..1 factor with cent precision (banker-free rounding). */
+function applyFactor(cents: bigint, factor: number): bigint {
+  if (factor >= 1) return cents;
+  if (factor <= 0) return 0n;
+  const scaled = BigInt(Math.round(factor * 1_000_000));
+  return (cents * scaled) / 1_000_000n;
 }
 
 function parseAmount(s: string | null | undefined): number {

@@ -38,6 +38,11 @@ function VereinsdatenPage() {
     mahngebuhr3: "10",
     sepaReturnFee: "0",
     mahnFristTage: 14,
+    beitragModus: "voll" as "voll" | "anteilig",
+    anteilEinheit: "monat" as "monat" | "tag",
+    kuendigungsfristAktiv: false,
+    kuendigungsfristTage: 0,
+    kuendigungZumMonatsende: false,
   });
   const [msg, setMsg] = useState<Msg | null>(null);
 
@@ -59,6 +64,11 @@ function VereinsdatenPage() {
         mahngebuhr3: cfg.data.mahngebuhr3 ?? "10",
         sepaReturnFee: cfg.data.sepaReturnFee ?? "0",
         mahnFristTage: cfg.data.mahnFristTage ?? 14,
+        beitragModus: cfg.data.beitragModus === "anteilig" ? "anteilig" : "voll",
+        anteilEinheit: cfg.data.anteilEinheit === "tag" ? "tag" : "monat",
+        kuendigungsfristAktiv: cfg.data.kuendigungsfristAktiv ?? false,
+        kuendigungsfristTage: cfg.data.kuendigungsfristTage ?? 0,
+        kuendigungZumMonatsende: cfg.data.kuendigungZumMonatsende ?? false,
       });
     }
   }, [cfg.data]);
@@ -81,6 +91,11 @@ function VereinsdatenPage() {
         mahngebuhr3: normalizeMoney(form.mahngebuhr3),
         sepaReturnFee: normalizeMoney(form.sepaReturnFee),
         mahnFristTage: form.mahnFristTage,
+        beitragModus: form.beitragModus,
+        anteilEinheit: form.anteilEinheit,
+        kuendigungsfristAktiv: form.kuendigungsfristAktiv,
+        kuendigungsfristTage: form.kuendigungsfristTage,
+        kuendigungZumMonatsende: form.kuendigungZumMonatsende,
       }),
     onSuccess: () => {
       setMsg({ kind: "ok", text: "Vereinsdaten gespeichert." });
@@ -254,6 +269,93 @@ function VereinsdatenPage() {
 
             <div className="md:col-span-2">
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Beitragsberechnung und Kündigung
+              </h3>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <Field
+                  label="Beitragsberechnung"
+                  hint="Voll = ganzer Jahresbeitrag. Anteilig = nach Mitgliedszeitraum im Jahr."
+                >
+                  <Select
+                    value={form.beitragModus}
+                    onChange={(e) =>
+                      setForm({ ...form, beitragModus: e.target.value as "voll" | "anteilig" })
+                    }
+                  >
+                    <option value="voll">Voller Jahresbeitrag</option>
+                    <option value="anteilig">Anteilig nach Mitgliedszeitraum</option>
+                  </Select>
+                </Field>
+                {form.beitragModus === "anteilig" ? (
+                  <Field
+                    label="Anteilige Berechnung"
+                    hint="Monatsgenau zählt angefangene Monate, taggenau zählt Tage."
+                  >
+                    <Select
+                      value={form.anteilEinheit}
+                      onChange={(e) =>
+                        setForm({ ...form, anteilEinheit: e.target.value as "monat" | "tag" })
+                      }
+                    >
+                      <option value="monat">Monatsgenau</option>
+                      <option value="tag">Taggenau</option>
+                    </Select>
+                  </Field>
+                ) : null}
+                <Field
+                  label="Kündigungsfrist aktiv"
+                  hint="Aus = Ein- und Austritt zu jedem Datum erlaubt."
+                >
+                  <Select
+                    value={form.kuendigungsfristAktiv ? "ja" : "nein"}
+                    onChange={(e) =>
+                      setForm({ ...form, kuendigungsfristAktiv: e.target.value === "ja" })
+                    }
+                  >
+                    <option value="nein">Aus (jederzeit kündbar)</option>
+                    <option value="ja">An</option>
+                  </Select>
+                </Field>
+                {form.kuendigungsfristAktiv ? (
+                  <>
+                    <Field
+                      label="Kündigungsfrist in Tagen"
+                      hint="Frühester Austrittstermin ab heute. 0 = sofort."
+                    >
+                      <Input
+                        type="number"
+                        min={0}
+                        max={365}
+                        value={form.kuendigungsfristTage}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            kuendigungsfristTage: Number(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </Field>
+                    <Field
+                      label="Nur zum Monatsende"
+                      hint="Austritt nur am letzten Tag eines Monats zulässig."
+                    >
+                      <Select
+                        value={form.kuendigungZumMonatsende ? "ja" : "nein"}
+                        onChange={(e) =>
+                          setForm({ ...form, kuendigungZumMonatsende: e.target.value === "ja" })
+                        }
+                      >
+                        <option value="nein">Nein</option>
+                        <option value="ja">Ja</option>
+                      </Select>
+                    </Field>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Anschrift
               </h3>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -301,6 +403,17 @@ function VereinsdatenPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function Select({ className, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      className={`flex h-10 w-full rounded-lg border border-input bg-card px-3 py-1 text-sm text-foreground shadow-soft transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50${className ? ` ${className}` : ""}`}
+      {...props}
+    >
+      {children}
+    </select>
   );
 }
 
