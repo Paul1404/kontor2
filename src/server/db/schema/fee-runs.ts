@@ -37,6 +37,10 @@ export const sollStellungStatusEnum = pgEnum("soll_stellung_status", [
   "paid",
   "returned",
   "cancelled",
+  // SEPA direct debit submitted to the bank and presumed collected (the bank
+  // only reports failures, via Rücklastschrift). Not dunnable; a recorded
+  // return flips it back to `returned`.
+  "eingezogen",
 ]);
 
 /**

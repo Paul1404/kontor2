@@ -1,0 +1,1 @@
+ALTER TYPE "public"."soll_stellung_status" ADD VALUE 'eingezogen';

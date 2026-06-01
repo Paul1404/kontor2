@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import { contractsTable } from "~/server/db/schema/contracts";
@@ -18,7 +18,7 @@ import {
   mahngebuhrFor,
   sumDecimal,
 } from "~/server/dunning/build-dunning";
-import { authedProc, vorstandProc } from "~/server/orpc/base";
+import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { MahnungDocument, type MahnungInput } from "~/server/pdf/templates/mahnung";
 
@@ -546,6 +546,130 @@ export const dunningRouter = {
       });
 
       return { count: result.changed, skipped: result.skipped };
+    }),
+
+  /**
+   * One-off reconciliation for the legacy backlog: postings imported from
+   * Linear (and any pre-fix app run) sit at `status = "open"` even though the
+   * direct debit was collected years ago, so the Mahnwesen treats them as
+   * debt. This previews how many `open` direct-debit postings up to and
+   * including `throughYear` would be marked `eingezogen`.
+   *
+   * Only postings whose contract pays by direct debit (`lastschrift = 'J'`)
+   * are touched. Invoice payers stay `open`, because for them a missing
+   * payment really is unknown.
+   */
+  settleHistoricalPreview: adminProc
+    .input(
+      v.object({
+        throughYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const rows = await context.db
+        .select({
+          billingYear: sollStellungenTable.billingYear,
+          openAmount: sollStellungenTable.openAmount,
+        })
+        .from(sollStellungenTable)
+        .innerJoin(contractsTable, eq(sollStellungenTable.contractId, contractsTable.id))
+        .where(
+          and(
+            eq(sollStellungenTable.status, "open"),
+            lte(sollStellungenTable.billingYear, input.throughYear),
+            sql`${sollStellungenTable.openAmount}::numeric > 0`,
+            sql`upper(coalesce(${contractsTable.lastschrift}, '')) = 'J'`,
+          ),
+        );
+
+      const byYear = new Map<number, { count: number; cents: number }>();
+      let cents = 0;
+      for (const r of rows) {
+        const c = Math.round(Number.parseFloat(r.openAmount) * 100);
+        cents += c;
+        const e = byYear.get(r.billingYear) ?? { count: 0, cents: 0 };
+        e.count += 1;
+        e.cents += c;
+        byYear.set(r.billingYear, e);
+      }
+
+      return {
+        count: rows.length,
+        openSum: (cents / 100).toFixed(2),
+        byYear: [...byYear.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .map(([year, v]) => ({ year, count: v.count, openSum: (v.cents / 100).toFixed(2) })),
+      };
+    }),
+
+  /**
+   * Commit the legacy reconciliation previewed by `settleHistoricalPreview`.
+   * `expectedCount` guards against the set changing between preview and
+   * commit. Writes a single summary audit entry rather than one per posting.
+   */
+  settleHistorical: adminProc
+    .input(
+      v.object({
+        throughYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
+        expectedCount: v.pipe(v.number(), v.integer(), v.minValue(0)),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const result = await context.db.transaction(async (tx) => {
+        const matching = await tx
+          .select({ id: sollStellungenTable.id, amount: sollStellungenTable.amount })
+          .from(sollStellungenTable)
+          .innerJoin(contractsTable, eq(sollStellungenTable.contractId, contractsTable.id))
+          .where(
+            and(
+              eq(sollStellungenTable.status, "open"),
+              lte(sollStellungenTable.billingYear, input.throughYear),
+              sql`${sollStellungenTable.openAmount}::numeric > 0`,
+              sql`upper(coalesce(${contractsTable.lastschrift}, '')) = 'J'`,
+            ),
+          );
+
+        if (matching.length !== input.expectedCount) {
+          throw new ORPCError("CONFLICT", {
+            message: `Daten haben sich geändert seit der Vorschau (jetzt ${matching.length} Posten). Bitte erneut prüfen.`,
+          });
+        }
+        if (matching.length === 0) return { count: 0 };
+
+        const ids = matching.map((m) => m.id);
+        let centsSettled = 0;
+        for (const m of matching) centsSettled += Math.round(Number.parseFloat(m.amount) * 100);
+
+        await tx
+          .update(sollStellungenTable)
+          .set({
+            status: "eingezogen",
+            paidAmount: sql`${sollStellungenTable.amount}`,
+            openAmount: "0",
+            updatedAt: new Date(),
+          })
+          .where(inArray(sollStellungenTable.id, ids));
+
+        await appendAudit(tx, {
+          entityType: "soll_stellung",
+          entityId: `historical-settle-through-${input.throughYear}`,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            status: { before: "open", after: "eingezogen" },
+            throughYear: { before: null, after: input.throughYear },
+            count: { before: null, after: matching.length },
+            settledSum: { before: null, after: (centsSettled / 100).toFixed(2) },
+          },
+          requestId: context.requestId ?? null,
+        });
+
+        return { count: matching.length };
+      });
+
+      return result;
     }),
 
   cancel: vorstandProc

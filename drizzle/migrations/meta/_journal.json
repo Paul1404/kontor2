@@ -78,6 +78,13 @@
       "when": 1780328268654,
       "tag": "0010_gray_the_captain",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1780329691620,
+      "tag": "0011_aromatic_goblin_queen",
+      "breakpoints": true
     }
   ]
 }
