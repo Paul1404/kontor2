@@ -23,3 +23,22 @@ export const smtpConfigTable = pgTable("smtp_config", {
 });
 
 export type SmtpConfig = typeof smtpConfigTable.$inferSelect;
+
+/**
+ * Single-row authentication / session configuration. Lets an admin tune how
+ * long a login stays valid without redeploying. The values feed better-auth's
+ * `session.expiresIn` (lifetime) and `session.updateAge` (sliding-refresh
+ * interval); see `src/server/auth/session-config.ts` for how they are loaded
+ * and applied live. `id` is constrained to literal `1`.
+ */
+export const authSettingsTable = pgTable("auth_settings", {
+  id: integer("id").primaryKey().notNull().default(1),
+  /** Session lifetime in days. */
+  sessionExpiresInDays: integer("session_expires_in_days").notNull().default(90),
+  /** Sliding-window refresh interval in hours. */
+  sessionUpdateAgeHours: integer("session_update_age_hours").notNull().default(24),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+});
+
+export type AuthSettings = typeof authSettingsTable.$inferSelect;

@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.8.0",
+    date: "2026-06-02",
+    title: "Anmeldung bleibt nach Schließen des Browsers bestehen",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Nach dem Schließen und erneuten Öffnen der Seite wurde man bisher abgemeldet. Die Sitzung bleibt jetzt bestehen, weil das Anmelde-Cookie beim ersten Laden der Seite serverseitig korrekt mitgelesen wird.",
+      },
+      {
+        category: "feature",
+        description:
+          "Admins können die Sitzungsdauer und das Verlängerungsintervall unter Benutzer einstellen. Die Änderung gilt sofort für neue Anmeldungen, ohne neuen Deploy.",
+      },
+    ],
+  },
+  {
     version: "0.7.0",
     date: "2026-06-01",
     title: "Mahnungen per E-Mail senden, mit Vorschau",

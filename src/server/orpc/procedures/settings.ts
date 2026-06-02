@@ -1,10 +1,31 @@
 import { ORPCError } from "@orpc/server";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
+import { invalidateAuth } from "~/server/auth/auth";
 import { sendTestMail } from "~/server/auth/send-invite";
+import {
+  SESSION_DEFAULTS,
+  SESSION_LIMITS,
+  setSessionConfigCache,
+} from "~/server/auth/session-config";
 import { inspectEncryptedData, reencryptAllData } from "~/server/crypto/reencrypt";
-import { smtpConfigTable } from "~/server/db/schema/settings";
+import { authSettingsTable, smtpConfigTable } from "~/server/db/schema/settings";
 import { adminProc } from "~/server/orpc/base";
+
+const SessionSettingsInput = v.object({
+  sessionExpiresInDays: v.pipe(
+    v.number(),
+    v.integer(),
+    v.minValue(SESSION_LIMITS.expiresInDays.min),
+    v.maxValue(SESSION_LIMITS.expiresInDays.max),
+  ),
+  sessionUpdateAgeHours: v.pipe(
+    v.number(),
+    v.integer(),
+    v.minValue(SESSION_LIMITS.updateAgeHours.min),
+    v.maxValue(SESSION_LIMITS.updateAgeHours.max),
+  ),
+});
 
 const SmtpInput = v.object({
   host: v.pipe(v.string(), v.minLength(1)),
@@ -19,6 +40,60 @@ const SmtpInput = v.object({
 });
 
 export const settingsRouter = {
+  /** Current session window. Falls back to defaults when no row exists yet. */
+  getSessionSettings: adminProc.input(v.void()).handler(async ({ context }) => {
+    const [row] = await context.db.select().from(authSettingsTable).limit(1);
+    return {
+      sessionExpiresInDays: row?.sessionExpiresInDays ?? SESSION_DEFAULTS.expiresInDays,
+      sessionUpdateAgeHours: row?.sessionUpdateAgeHours ?? SESSION_DEFAULTS.updateAgeHours,
+      limits: SESSION_LIMITS,
+    };
+  }),
+
+  updateSessionSettings: adminProc
+    .input(SessionSettingsInput)
+    .handler(async ({ context, input }) => {
+      // A refresh interval longer than the lifetime would never fire, so the
+      // session would silently never extend. Reject that combination.
+      if (input.sessionUpdateAgeHours > input.sessionExpiresInDays * 24) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Verlängerungsintervall darf die Sitzungsdauer nicht überschreiten.",
+        });
+      }
+      await context.db.transaction(async (tx) => {
+        const [existing] = await tx.select().from(authSettingsTable).limit(1);
+        const next = {
+          sessionExpiresInDays: input.sessionExpiresInDays,
+          sessionUpdateAgeHours: input.sessionUpdateAgeHours,
+          updatedAt: new Date(),
+          updatedBy: context.session!.user.id,
+        };
+        if (!existing) {
+          await tx.insert(authSettingsTable).values({ id: 1, ...next });
+        } else {
+          await tx.update(authSettingsTable).set(next);
+        }
+        await appendAudit(tx, {
+          entityType: "auth_settings",
+          entityId: "1",
+          action: existing ? "update" : "create",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: diff(existing ?? null, next),
+          requestId: context.requestId ?? null,
+        });
+      });
+      // Apply live: refresh the in-memory cache and drop the memoized auth
+      // instance so the next request rebuilds better-auth with the new window.
+      setSessionConfigCache({
+        expiresInDays: input.sessionExpiresInDays,
+        updateAgeHours: input.sessionUpdateAgeHours,
+      });
+      invalidateAuth();
+      return { ok: true };
+    }),
+
   getSmtp: adminProc.input(v.void()).handler(async ({ context }) => {
     const rows = await context.db.select().from(smtpConfigTable).limit(1);
     const row = rows[0];

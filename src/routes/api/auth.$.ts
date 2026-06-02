@@ -2,8 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { auth } from "~/server/auth/auth";
 import { ensureBootstrapAdmin } from "~/server/auth/bootstrap";
 import { guardAdminPluginRequest } from "~/server/auth/last-admin-guard";
+import { ensureSessionConfigLoaded } from "~/server/auth/session-config";
 
 const handle = async ({ request }: { request: Request }) => {
+  await ensureSessionConfigLoaded();
   await ensureBootstrapAdmin();
   // Block last-admin-locking POSTs to the better-auth admin plugin
   // endpoints (set-user-banned / remove-user / set-role) before they reach

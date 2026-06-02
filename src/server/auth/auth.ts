@@ -2,12 +2,14 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
+import { getSessionConfig } from "~/server/auth/session-config";
 import { db } from "~/server/db/client";
 import * as schema from "~/server/db/schema";
 import { env } from "~/server/env";
 import { redis } from "~/server/redis/client";
 
 function buildAuth() {
+  const sessionConfig = getSessionConfig();
   return betterAuth({
     baseURL: env().BETTER_AUTH_URL,
     secret: env().betterAuthSecret,
@@ -48,12 +50,14 @@ function buildAuth() {
       },
     },
     session: {
-      // Sliding 90-day window: as long as the user is active within 90 days
+      // Sliding window whose length is admin-configurable (Benutzer page ->
+      // session-config.ts). As long as the user is active within `expiresIn`
       // the session keeps getting extended, so a Vorstand who logs in a few
       // times a month effectively stays signed in. `updateAge` refreshes the
-      // window once per day of activity.
-      expiresIn: 60 * 60 * 24 * 90,
-      updateAge: 60 * 60 * 24,
+      // window once per interval of activity. Defaults: 90-day lifetime,
+      // refreshed once per day.
+      expiresIn: sessionConfig.expiresInDays * 24 * 60 * 60,
+      updateAge: sessionConfig.updateAgeHours * 60 * 60,
       cookieCache: { enabled: true, maxAge: 60 * 5 },
     },
     plugins: [admin(), tanstackStartCookies()],
@@ -65,6 +69,15 @@ let authInstance: ReturnType<typeof buildAuth> | undefined;
 export function auth(): ReturnType<typeof buildAuth> {
   if (!authInstance) authInstance = buildAuth();
   return authInstance;
+}
+
+/**
+ * Drop the memoized instance so the next `auth()` call rebuilds better-auth.
+ * Used after the session window changes (see session-config.ts) to apply the
+ * new lifetime without a redeploy.
+ */
+export function invalidateAuth(): void {
+  authInstance = undefined;
 }
 
 export type Session = NonNullable<

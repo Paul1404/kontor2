@@ -1,5 +1,6 @@
 import { auth, type Session } from "~/server/auth/auth";
 import { ensureBootstrapAdmin } from "~/server/auth/bootstrap";
+import { ensureSessionConfigLoaded } from "~/server/auth/session-config";
 import { type DB, db } from "~/server/db/client";
 import { logger } from "~/server/lib/logger";
 import { startSnapshotScheduler } from "~/server/snapshots/scheduler";
@@ -27,6 +28,9 @@ export async function createContext(request: Request): Promise<AppContext> {
       });
     }
   }
+  // Load the persisted session window before the first `auth()` build so
+  // better-auth is configured with the admin-set lifetime, not the defaults.
+  await ensureSessionConfigLoaded();
   await ensureBootstrapAdmin();
   const session = await auth().api.getSession({ headers: request.headers });
   return {
