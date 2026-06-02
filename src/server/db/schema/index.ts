@@ -3,6 +3,7 @@ export * from "./attachments";
 export * from "./audit";
 export * from "./auth";
 export * from "./bestandserhebungen";
+export * from "./cancellations";
 export * from "./contracts";
 export * from "./dsgvo";
 export * from "./dunning";

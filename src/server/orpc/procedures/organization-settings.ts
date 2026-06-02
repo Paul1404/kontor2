@@ -32,6 +32,10 @@ const UpdateInput = v.object({
     0,
   ),
   kuendigungZumMonatsende: v.optional(v.boolean(), false),
+  kontaktEmail: v.optional(v.nullable(v.string()), null),
+  kontaktTelefon: v.optional(v.nullable(v.string()), null),
+  datenschutzUrl: v.optional(v.nullable(v.string()), null),
+  satzungUrl: v.optional(v.nullable(v.string()), null),
 });
 
 export const organizationSettingsRouter = {
@@ -82,6 +86,10 @@ export const organizationSettingsRouter = {
       kuendigungsfristAktiv: input.kuendigungsfristAktiv,
       kuendigungsfristTage: input.kuendigungsfristTage,
       kuendigungZumMonatsende: input.kuendigungZumMonatsende,
+      kontaktEmail: input.kontaktEmail,
+      kontaktTelefon: input.kontaktTelefon,
+      datenschutzUrl: input.datenschutzUrl,
+      satzungUrl: input.satzungUrl,
       updatedAt: new Date(),
       updatedBy: context.session!.user.id,
     };

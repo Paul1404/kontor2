@@ -49,6 +49,14 @@ export const organizationSettingsTable = pgTable("organization_settings", {
   kuendigungsfristTage: integer("kuendigungsfrist_tage").notNull().default(0),
   /** Kündigung nur zum Monatsende zulässig. */
   kuendigungZumMonatsende: boolean("kuendigung_zum_monatsende").notNull().default(false),
+  /**
+   * Kontakt- und Rechtsangaben für Briefe (z. B. Austrittsbestätigung). Alle
+   * optional; fehlende Werte werden im Dokument weggelassen.
+   */
+  kontaktEmail: text("kontakt_email"),
+  kontaktTelefon: text("kontakt_telefon"),
+  datenschutzUrl: text("datenschutz_url"),
+  satzungUrl: text("satzung_url"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
 });

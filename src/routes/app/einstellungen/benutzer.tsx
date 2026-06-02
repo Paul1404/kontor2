@@ -1,13 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, Eye, Loader2, ShieldCheck, UserPlus, Users, XCircle } from "lucide-react";
-import { useState } from "react";
+import {
+  CheckCircle2,
+  Clock,
+  Eye,
+  Loader2,
+  Save,
+  ShieldCheck,
+  UserPlus,
+  Users,
+  XCircle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { QueryErrorRow } from "~/components/ui/query-error";
+import { QueryError, QueryErrorRow } from "~/components/ui/query-error";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/einstellungen/benutzer")({
@@ -49,6 +59,31 @@ function UsersPage() {
       qc.invalidateQueries({ queryKey: ["users"] });
     },
     onError: (err) => setMsg({ kind: "error", text: (err as Error).message }),
+  });
+
+  const sessionSettings = useQuery({
+    queryKey: ["sessionSettings"],
+    queryFn: () => orpc.settings.getSessionSettings(),
+  });
+  const [sessionForm, setSessionForm] = useState<{ days: string; hours: string } | null>(null);
+  const [sessionMsg, setSessionMsg] = useState<Msg | null>(null);
+  useEffect(() => {
+    if (sessionSettings.data && !sessionForm) {
+      setSessionForm({
+        days: String(sessionSettings.data.sessionExpiresInDays),
+        hours: String(sessionSettings.data.sessionUpdateAgeHours),
+      });
+    }
+  }, [sessionSettings.data, sessionForm]);
+
+  const saveSession = useMutation({
+    mutationFn: (input: { sessionExpiresInDays: number; sessionUpdateAgeHours: number }) =>
+      orpc.settings.updateSessionSettings(input),
+    onSuccess: () => {
+      setSessionMsg({ kind: "ok", text: "Sitzungseinstellungen gespeichert." });
+      qc.invalidateQueries({ queryKey: ["sessionSettings"] });
+    },
+    onError: (err) => setSessionMsg({ kind: "error", text: (err as Error).message }),
   });
 
   return (
@@ -236,6 +271,94 @@ function UsersPage() {
               </tbody>
             </table>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="size-5 text-muted-foreground" />
+            Sitzungen
+          </CardTitle>
+          <CardDescription>
+            Wie lange eine Anmeldung gültig bleibt. Die Änderung gilt für neue Anmeldungen, laufende
+            Sitzungen behalten ihre bereits vergebene Gültigkeit.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {sessionSettings.isError ? (
+            <QueryError onRetry={() => sessionSettings.refetch()} error={sessionSettings.error} />
+          ) : !sessionForm ? (
+            <p className="text-sm text-muted-foreground">Wird geladen…</p>
+          ) : (
+            <form
+              className="flex flex-wrap items-end gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSessionMsg(null);
+                saveSession.mutate({
+                  sessionExpiresInDays: Number(sessionForm.days),
+                  sessionUpdateAgeHours: Number(sessionForm.hours),
+                });
+              }}
+            >
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="session-days">Sitzungsdauer (Tage)</Label>
+                <Input
+                  id="session-days"
+                  type="number"
+                  required
+                  min={sessionSettings.data?.limits.expiresInDays.min}
+                  max={sessionSettings.data?.limits.expiresInDays.max}
+                  value={sessionForm.days}
+                  onChange={(e) => setSessionForm({ ...sessionForm, days: e.target.value })}
+                  className="w-44"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="session-hours">Verlängerungsintervall (Stunden)</Label>
+                <Input
+                  id="session-hours"
+                  type="number"
+                  required
+                  min={sessionSettings.data?.limits.updateAgeHours.min}
+                  max={sessionSettings.data?.limits.updateAgeHours.max}
+                  value={sessionForm.hours}
+                  onChange={(e) => setSessionForm({ ...sessionForm, hours: e.target.value })}
+                  className="w-56"
+                />
+              </div>
+              <Button type="submit" disabled={saveSession.isPending}>
+                {saveSession.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
+                )}
+                Speichern
+              </Button>
+            </form>
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            Innerhalb der Sitzungsdauer wird die Anmeldung bei Aktivität automatisch verlängert. Das
+            Verlängerungsintervall legt fest, wie oft das geschieht. Es darf die Sitzungsdauer nicht
+            überschreiten.
+          </p>
+          {sessionMsg ? (
+            <div
+              className={`mt-4 flex items-start gap-2 rounded-lg border p-3 text-sm shadow-soft ${
+                sessionMsg.kind === "ok"
+                  ? "border-success/30 bg-success/10"
+                  : "border-destructive/30 bg-destructive/10"
+              }`}
+            >
+              {sessionMsg.kind === "ok" ? (
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+              ) : (
+                <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+              )}
+              <span className="break-words">{sessionMsg.text}</span>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

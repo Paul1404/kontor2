@@ -46,6 +46,27 @@ export function presignUpload(opts: {
   );
 }
 
+/**
+ * Upload bytes generated on the server (e.g. a rendered PDF) directly. Unlike
+ * `presignUpload`, which hands the browser a URL to PUT to, this writes from
+ * within the request handler.
+ */
+export async function putObject(opts: {
+  key: string;
+  body: Buffer;
+  contentType: string;
+}): Promise<void> {
+  await s3Client().send(
+    new PutObjectCommand({
+      Bucket: bucket(),
+      Key: opts.key,
+      Body: opts.body,
+      ContentType: opts.contentType,
+      ContentLength: opts.body.byteLength,
+    }),
+  );
+}
+
 export function presignDownload(opts: {
   key: string;
   filename?: string;
