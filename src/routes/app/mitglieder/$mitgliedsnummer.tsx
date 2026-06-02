@@ -13,6 +13,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { AbteilungenCard } from "~/components/forms/AbteilungenCard";
 import { AttachmentsCard } from "~/components/forms/AttachmentsCard";
+import { AustrittsbestaetigungCard } from "~/components/forms/AustrittsbestaetigungCard";
 import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
 import { DsgvoCard } from "~/components/forms/DsgvoCard";
@@ -392,6 +393,13 @@ function MemberDetailPage() {
         memberId={member.id}
         mitgliedsnummer={mitgliedsnummer}
         anhaenge={anhaenge}
+        canEdit={canEdit}
+      />
+
+      <AustrittsbestaetigungCard
+        memberId={member.id}
+        member={member as unknown as Record<string, unknown>}
+        abteilungen={abteilungen}
         canEdit={canEdit}
       />
 

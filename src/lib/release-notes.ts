@@ -55,6 +55,16 @@ export const RELEASES: Release[] = [
         description:
           "Admins können die Sitzungsdauer und das Verlängerungsintervall unter Benutzer einstellen. Die Änderung gilt sofort für neue Anmeldungen, ohne neuen Deploy.",
       },
+      {
+        category: "feature",
+        description:
+          "Auf der Mitgliederseite lässt sich eine Austrittsbestätigung als PDF erstellen. Das Mitglied wird vorausgefüllt, ein abweichender Empfänger und eine Familienmitgliedschaft sind möglich. Erstellte Schreiben werden archiviert und können erneut geöffnet werden.",
+      },
+      {
+        category: "feature",
+        description:
+          "Unter Vereinsdaten lassen sich Kontakt-E-Mail, Telefon und die Links zu Datenschutzerklärung und Satzung hinterlegen. Sie erscheinen im Datenschutzhinweis der Briefe.",
+      },
     ],
   },
   {

@@ -43,6 +43,10 @@ function VereinsdatenPage() {
     kuendigungsfristAktiv: false,
     kuendigungsfristTage: 0,
     kuendigungZumMonatsende: false,
+    kontaktEmail: "",
+    kontaktTelefon: "",
+    datenschutzUrl: "",
+    satzungUrl: "",
   });
   const [msg, setMsg] = useState<Msg | null>(null);
 
@@ -69,6 +73,10 @@ function VereinsdatenPage() {
         kuendigungsfristAktiv: cfg.data.kuendigungsfristAktiv ?? false,
         kuendigungsfristTage: cfg.data.kuendigungsfristTage ?? 0,
         kuendigungZumMonatsende: cfg.data.kuendigungZumMonatsende ?? false,
+        kontaktEmail: cfg.data.kontaktEmail ?? "",
+        kontaktTelefon: cfg.data.kontaktTelefon ?? "",
+        datenschutzUrl: cfg.data.datenschutzUrl ?? "",
+        satzungUrl: cfg.data.satzungUrl ?? "",
       });
     }
   }, [cfg.data]);
@@ -96,6 +104,10 @@ function VereinsdatenPage() {
         kuendigungsfristAktiv: form.kuendigungsfristAktiv,
         kuendigungsfristTage: form.kuendigungsfristTage,
         kuendigungZumMonatsende: form.kuendigungZumMonatsende,
+        kontaktEmail: form.kontaktEmail || null,
+        kontaktTelefon: form.kontaktTelefon || null,
+        datenschutzUrl: form.datenschutzUrl || null,
+        satzungUrl: form.satzungUrl || null,
       }),
     onSuccess: () => {
       setMsg({ kind: "ok", text: "Vereinsdaten gespeichert." });
@@ -384,6 +396,47 @@ function VereinsdatenPage() {
                   <Input
                     value={form.anschriftOrt}
                     onChange={(e) => setForm({ ...form, anschriftOrt: e.target.value })}
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Kontakt und Briefangaben
+              </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Erscheinen im Datenschutzhinweis von Briefen wie der Austrittsbestätigung. Leere
+                Felder werden weggelassen.
+              </p>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <Field label="Kontakt E-Mail">
+                  <Input
+                    type="email"
+                    value={form.kontaktEmail}
+                    onChange={(e) => setForm({ ...form, kontaktEmail: e.target.value })}
+                    placeholder="info@verein.de"
+                  />
+                </Field>
+                <Field label="Kontakt Telefon">
+                  <Input
+                    value={form.kontaktTelefon}
+                    onChange={(e) => setForm({ ...form, kontaktTelefon: e.target.value })}
+                    placeholder="09729/432"
+                  />
+                </Field>
+                <Field label="Datenschutzerklärung URL">
+                  <Input
+                    value={form.datenschutzUrl}
+                    onChange={(e) => setForm({ ...form, datenschutzUrl: e.target.value })}
+                    placeholder="https://verein.de/datenschutz"
+                  />
+                </Field>
+                <Field label="Vereinssatzung URL">
+                  <Input
+                    value={form.satzungUrl}
+                    onChange={(e) => setForm({ ...form, satzungUrl: e.target.value })}
+                    placeholder="https://verein.de/satzung"
                   />
                 </Field>
               </div>
