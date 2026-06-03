@@ -437,6 +437,15 @@ export const membersRouter = {
               toMitglnr: membersTable.mitglnr,
               toVorname: membersTable.vorname,
               toNachname: membersTable.nachname,
+              // Target address + birthday so the Austrittsbestätigung can
+              // pull a Zahler/Vertreter recipient or a family member straight
+              // from a relationship instead of retyping it.
+              toAnrede: membersTable.anrede,
+              toStrasse: membersTable.strasse,
+              toHausnummer: membersTable.hausnummer,
+              toPlz: membersTable.plz,
+              toOrt: membersTable.ort,
+              toGeburtsdatum: membersTable.geburtsdatum,
             })
             .from(relationshipsTable)
             .leftJoin(membersTable, eq(membersTable.id, relationshipsTable.toMemberId))
@@ -516,6 +525,53 @@ export const membersRouter = {
         .from(abteilungenTable)
         .orderBy(asc(abteilungenTable.name)),
     ),
+  ),
+
+  /**
+   * Counts by status for the Mitglieder overview strip. Buckets mirror the
+   * list's status filter (aktiv includes passiv, exited/deceased excluded
+   * from both) so a click on a stat maps 1:1 to a filter. Soft-deleted rows
+   * are excluded everywhere. Cached short-term in the dashboard namespace,
+   * which is invalidated whenever a member changes.
+   */
+  stats: authedProc.input(v.void()).handler(async ({ context }) =>
+    cached(CACHE_NS.dashboard, "members-stats", 120, async () => {
+      const notDeleted = isNull(membersTable.deletedAt);
+      const lebt = and(
+        notDeleted,
+        isNull(membersTable.austritt),
+        isNull(membersTable.verstorbenAm),
+      );
+      const [[total], [aktiv], [passiv], [ausgetreten], [verstorben], [kontakte]] =
+        await Promise.all([
+          context.db.select({ c: count() }).from(membersTable).where(notDeleted),
+          context.db.select({ c: count() }).from(membersTable).where(lebt),
+          context.db
+            .select({ c: count() })
+            .from(membersTable)
+            .where(and(lebt, eq(membersTable.aktivPasiv, "P"))),
+          context.db
+            .select({ c: count() })
+            .from(membersTable)
+            .where(and(notDeleted, isNotNull(membersTable.austritt))),
+          context.db
+            .select({ c: count() })
+            .from(membersTable)
+            .where(and(notDeleted, isNotNull(membersTable.verstorbenAm))),
+          context.db
+            .select({ c: count() })
+            .from(membersTable)
+            .where(and(notDeleted, isNull(membersTable.mitglnr))),
+        ]);
+      return {
+        total: total?.c ?? 0,
+        aktiv: aktiv?.c ?? 0,
+        passiv: passiv?.c ?? 0,
+        ausgetreten: ausgetreten?.c ?? 0,
+        verstorben: verstorben?.c ?? 0,
+        kontakte: kontakte?.c ?? 0,
+      };
+    }),
   ),
 
   update: vorstandProc
