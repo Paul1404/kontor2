@@ -1,4 +1,4 @@
-import { boolean, index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
 import { membersTable } from "~/server/db/schema/members";
 
@@ -21,7 +21,7 @@ export const cancellationLettersTable = pgTable(
   {
     id: text("id").primaryKey(),
     /** The member the letter was generated for. Null if the member is later purged. */
-    memberId: text("member_id").references(() => membersTable.id, { onDelete: "set null" }),
+    memberId: uuid("member_id").references(() => membersTable.id, { onDelete: "set null" }),
     /** Display name snapshot, e.g. "Mustermann, Erika" or "... (Familie)". */
     displayName: text("display_name").notNull(),
     austrittDatum: text("austritt_datum").notNull(),

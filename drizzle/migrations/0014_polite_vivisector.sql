@@ -1,6 +1,6 @@
 CREATE TABLE "cancellation_letters" (
 	"id" text PRIMARY KEY NOT NULL,
-	"member_id" text,
+	"member_id" uuid,
 	"display_name" text NOT NULL,
 	"austritt_datum" text NOT NULL,
 	"mitgliedsnummer" text,
