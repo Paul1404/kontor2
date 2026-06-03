@@ -41,6 +41,38 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.9.0",
+    date: "2026-06-03",
+    title: "Austrittsbestätigung denkt mit, Mitgliederseiten aufgeräumt",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Austrittsbestätigung übernimmt jetzt mehr aus dem Mitglied selbst. Abteilungen werden als Auswahl aus den tatsächlichen Mitgliedschaften angeboten, ein Freitext bleibt möglich.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Der abweichende Empfänger lässt sich direkt aus den Beziehungen übernehmen. Zahler und gesetzliche Vertretung stehen mit Adresse zur Auswahl, statt sie erneut zu tippen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Familienmitglieder für ein gemeinsames Schreiben werden aus den Beziehungen vorgeschlagen und mit Geburtsdatum und Mitgliedsnummer vorausgefüllt.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Mitglied-Seite ist in Reiter gegliedert: Übersicht, Beiträge & SEPA, Dokumente und Verlauf. Der Status des Mitglieds steht jetzt direkt neben dem Namen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Über der Mitgliederliste zeigt eine Übersicht die Anzahl nach Status. Ein Klick darauf setzt den passenden Filter.",
+      },
+    ],
+  },
+  {
     version: "0.8.1",
     date: "2026-06-03",
     title: "Auslieferung der Austrittsbestätigungen repariert",

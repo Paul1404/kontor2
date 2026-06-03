@@ -142,6 +142,8 @@ function MembersListPage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => orpc.auth.me() });
   const canEdit = me.data?.role === "vorstand" || me.data?.role === "admin";
 
+  const stats = useQuery({ queryKey: ["members.stats"], queryFn: () => orpc.members.stats() });
+
   const list = useQuery({
     queryKey: ["members.list", { ...search, pageSize }],
     queryFn: () => orpc.members.list({ ...search, pageSize }),
@@ -368,7 +370,7 @@ function MembersListPage() {
     setBulkBusy(true);
     try {
       const res = await orpc.members.bulk({ memberIds: ids, action });
-      await Promise.all([list.refetch(), abteilungen.refetch()]);
+      await Promise.all([list.refetch(), abteilungen.refetch(), stats.refetch()]);
       clearSelection();
       const skippedNote = res.skipped > 0 ? ` (${res.skipped} übersprungen)` : "";
       toast.success(`${res.changed} ${successVerb}${skippedNote}`);
@@ -459,6 +461,13 @@ function MembersListPage() {
           ) : null}
         </div>
       </div>
+
+      <MemberStatsStrip
+        stats={stats.data}
+        loading={stats.isLoading}
+        activeStatus={search.status}
+        onPick={(status) => updateSearch({ status })}
+      />
 
       {views.length > 0 || hasFilter ? (
         <div className="flex flex-wrap items-center gap-2">
@@ -966,6 +975,76 @@ function MembersListPage() {
           if (confirm) void confirm.run();
         }}
       />
+    </div>
+  );
+}
+
+type MemberStats = {
+  total: number;
+  aktiv: number;
+  passiv: number;
+  ausgetreten: number;
+  verstorben: number;
+  kontakte: number;
+};
+
+function MemberStatsStrip({
+  stats,
+  loading,
+  activeStatus,
+  onPick,
+}: {
+  stats: MemberStats | undefined;
+  loading: boolean;
+  activeStatus: Status;
+  onPick: (status: Status) => void;
+}) {
+  const tiles: { key: Status; label: string; value: number; dot: string }[] = [
+    { key: "alle", label: "Gesamt", value: stats?.total ?? 0, dot: "bg-muted-foreground/40" },
+    { key: "aktiv", label: "Aktiv", value: stats?.aktiv ?? 0, dot: "bg-success" },
+    { key: "passiv", label: "Passiv", value: stats?.passiv ?? 0, dot: "bg-muted-foreground/60" },
+    {
+      key: "ausgetreten",
+      label: "Ausgetreten",
+      value: stats?.ausgetreten ?? 0,
+      dot: "bg-warning",
+    },
+    {
+      key: "verstorben",
+      label: "Verstorben",
+      value: stats?.verstorben ?? 0,
+      dot: "bg-muted-foreground/60",
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      {tiles.map((t) => {
+        const active = activeStatus === t.key;
+        return (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => onPick(t.key)}
+            aria-pressed={active}
+            className={`flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors ${
+              active
+                ? "border-primary/40 bg-primary/5"
+                : "border-border bg-card hover:border-ring/40 hover:bg-muted/30"
+            }`}
+          >
+            <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <span className={`size-2 rounded-full ${t.dot}`} aria-hidden />
+              {t.label}
+            </span>
+            {loading ? (
+              <span className="h-7 w-12 animate-pulse rounded bg-muted" />
+            ) : (
+              <span className="text-2xl font-semibold tabular-nums leading-none">{t.value}</span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

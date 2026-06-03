@@ -6,9 +6,13 @@ import {
   ChevronDown,
   Contact,
   Copy,
+  FileText,
+  History,
   KeyRound,
   Pencil,
   Trash2,
+  User,
+  Wallet,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AbteilungenCard } from "~/components/forms/AbteilungenCard";
@@ -25,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { CopyButton } from "~/components/ui/copy-button";
 import { Skeleton } from "~/components/ui/skeleton";
+import { Tabs } from "~/components/ui/tabs";
 import { toast } from "~/components/ui/toaster";
 import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/audit-labels";
 import { formatLand } from "~/lib/country";
@@ -44,6 +49,7 @@ function MemberDetailPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [tab, setTab] = useState("uebersicht");
 
   const me = useQuery({ queryKey: ["me"], queryFn: () => orpc.auth.me() });
   const detail = useQuery({
@@ -154,6 +160,7 @@ function MemberDetailPage() {
           </Link>
           <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
             {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")}
+            <MemberStatusBadge member={member} />
             {!member.mitglnr ? (
               <Badge variant="outline" title="Zahlt für ein Mitglied, ist aber selbst keines">
                 Kontakt
@@ -269,180 +276,213 @@ function MemberDetailPage() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Stammdaten</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-            <Field label="Anrede" value={member.anrede} />
-            <Field
-              label="Geburtsdatum & Alter"
-              value={formatBirthdayWithAge(member.geburtsdatum)}
-            />
-            <Field label="Geschlecht" value={formatGeschlecht(member.geschlecht)} />
-            <Field label="Funktion" value={member.funktion} />
-            <Field label="Firma" value={member.firma1} />
-            <Field
-              label="Adresse"
-              value={[
-                `${member.strasse ?? ""} ${member.hausnummer ?? ""}`.trim(),
-                member.adresszusatz ?? "",
-                `${member.plz ?? ""} ${member.ort ?? ""}`.trim(),
-              ]
-                .filter(Boolean)
-                .join("\n")}
-              href={buildMapsUrl(member)}
-            />
-            <Field label="Land" value={formatLand(member.land)} />
-            <Field
-              label="Telefon"
-              value={member.telefon1}
-              copyValue={member.telefon1}
-              href={buildTelHref(member.telefon1)}
-            />
-            <Field
-              label="Mobil"
-              value={member.telefon2}
-              copyValue={member.telefon2}
-              href={buildTelHref(member.telefon2)}
-            />
-            <Field
-              label="E-Mail"
-              value={member.eMailName}
-              copyValue={member.eMailName}
-              href={buildMailtoHref(member.eMailName)}
-            />
-            <Field label="Website" value={member.www} href={buildWebsiteHref(member.www)} />
-            <Field label="Eintritt" value={formatDate(member.eintritt)} />
-            <Field label="Austritt" value={formatDate(member.austritt)} />
-            <Field label="Spender" value={member.spender === "J" ? "Ja" : "Nein"} />
-          </CardContent>
-        </Card>
+      <Tabs
+        items={[
+          { value: "uebersicht", label: "Übersicht", icon: User },
+          { value: "beitraege", label: "Beiträge & SEPA", icon: Wallet, count: vertraege.length },
+          { value: "dokumente", label: "Dokumente", icon: FileText, count: anhaenge.length },
+          { value: "verlauf", label: "Verlauf", icon: History, count: audit.length },
+        ]}
+        value={tab}
+        onValueChange={setTab}
+      />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Bankverbindung</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 text-sm">
-            <Field
-              label="IBAN"
-              value={formatIbanGrouped(member.iban1)}
-              copyValue={member.iban1 ? (member.iban1 as string).replace(/\s+/g, "") : null}
-              mono
-            />
-            <Field label="Bank" value={bankDisplay} />
-            <Field label="BIC" value={bicDisplay} copyValue={bicDisplay} mono />
-            <Field label="Kontoinhaber" value={member.abwKontoInh} />
-            {ibanInfo ? (
-              <p className="text-xs text-muted-foreground">
-                Bank und BIC werden aus der IBAN abgeleitet (Quelle: Bundesbank BLZ-Verzeichnis).
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
-      </div>
+      {tab === "uebersicht" ? (
+        <div role="tabpanel" className="flex flex-col gap-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Stammdaten</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                <Field label="Anrede" value={member.anrede} />
+                <Field
+                  label="Geburtsdatum & Alter"
+                  value={formatBirthdayWithAge(member.geburtsdatum)}
+                />
+                <Field label="Geschlecht" value={formatGeschlecht(member.geschlecht)} />
+                <Field label="Funktion" value={member.funktion} />
+                <Field label="Firma" value={member.firma1} />
+                <Field
+                  label="Adresse"
+                  value={[
+                    `${member.strasse ?? ""} ${member.hausnummer ?? ""}`.trim(),
+                    member.adresszusatz ?? "",
+                    `${member.plz ?? ""} ${member.ort ?? ""}`.trim(),
+                  ]
+                    .filter(Boolean)
+                    .join("\n")}
+                  href={buildMapsUrl(member)}
+                />
+                <Field label="Land" value={formatLand(member.land)} />
+                <Field
+                  label="Telefon"
+                  value={member.telefon1}
+                  copyValue={member.telefon1}
+                  href={buildTelHref(member.telefon1)}
+                />
+                <Field
+                  label="Mobil"
+                  value={member.telefon2}
+                  copyValue={member.telefon2}
+                  href={buildTelHref(member.telefon2)}
+                />
+                <Field
+                  label="E-Mail"
+                  value={member.eMailName}
+                  copyValue={member.eMailName}
+                  href={buildMailtoHref(member.eMailName)}
+                />
+                <Field label="Website" value={member.www} href={buildWebsiteHref(member.www)} />
+                <Field label="Eintritt" value={formatDate(member.eintritt)} />
+                <Field label="Austritt" value={formatDate(member.austritt)} />
+                <Field label="Spender" value={member.spender === "J" ? "Ja" : "Nein"} />
+              </CardContent>
+            </Card>
 
-      {member.notes ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Notizen</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-line text-sm text-foreground">{member.notes}</p>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Bankverbindung</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3 text-sm">
+                <Field
+                  label="IBAN"
+                  value={formatIbanGrouped(member.iban1)}
+                  copyValue={member.iban1 ? (member.iban1 as string).replace(/\s+/g, "") : null}
+                  mono
+                />
+                <Field label="Bank" value={bankDisplay} />
+                <Field label="BIC" value={bicDisplay} copyValue={bicDisplay} mono />
+                <Field label="Kontoinhaber" value={member.abwKontoInh} />
+                {ibanInfo ? (
+                  <p className="text-xs text-muted-foreground">
+                    Bank und BIC werden aus der IBAN abgeleitet (Quelle: Bundesbank
+                    BLZ-Verzeichnis).
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          </div>
+
+          {member.notes ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Notizen</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="whitespace-pre-line text-sm text-foreground">{member.notes}</p>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          <AbteilungenCard
+            memberId={member.id}
+            mitgliedsnummer={mitgliedsnummer}
+            abteilungen={abteilungen as never}
+            canEdit={canEdit}
+          />
+
+          <BeziehungenCard
+            memberId={member.id}
+            mitgliedsnummer={mitgliedsnummer}
+            beziehungen={beziehungen as never}
+            canEdit={canEdit}
+          />
+        </div>
       ) : null}
 
-      <AbteilungenCard
-        memberId={member.id}
-        mitgliedsnummer={mitgliedsnummer}
-        abteilungen={abteilungen as never}
-        canEdit={canEdit}
-      />
+      {tab === "beitraege" ? (
+        <div role="tabpanel" className="flex flex-col gap-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ContractsCard
+              memberId={member.id}
+              mitgliedsnummer={mitgliedsnummer}
+              vertraege={vertraege as never}
+              canEdit={canEdit}
+            />
+            <SepaCard
+              memberId={member.id}
+              mitgliedsnummer={mitgliedsnummer}
+              mandate={sepa as never}
+              canEdit={canEdit}
+            />
+          </div>
 
-      <BeziehungenCard
-        memberId={member.id}
-        mitgliedsnummer={mitgliedsnummer}
-        beziehungen={beziehungen as never}
-        canEdit={canEdit}
-      />
+          <SollstellungenCard
+            rows={sollstellungen as never}
+            mitgliedsnummer={mitgliedsnummer}
+            canEdit={canEdit}
+          />
+        </div>
+      ) : null}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <ContractsCard
-          memberId={member.id}
-          mitgliedsnummer={mitgliedsnummer}
-          vertraege={vertraege as never}
-          canEdit={canEdit}
-        />
-        <SepaCard
-          memberId={member.id}
-          mitgliedsnummer={mitgliedsnummer}
-          mandate={sepa as never}
-          canEdit={canEdit}
-        />
-      </div>
+      {tab === "dokumente" ? (
+        <div role="tabpanel" className="flex flex-col gap-6">
+          <AttachmentsCard
+            memberId={member.id}
+            mitgliedsnummer={mitgliedsnummer}
+            anhaenge={anhaenge}
+            canEdit={canEdit}
+          />
 
-      <SollstellungenCard
-        rows={sollstellungen as never}
-        mitgliedsnummer={mitgliedsnummer}
-        canEdit={canEdit}
-      />
+          <AustrittsbestaetigungCard
+            memberId={member.id}
+            member={member as unknown as Record<string, unknown>}
+            abteilungen={abteilungen}
+            beziehungen={beziehungen as never}
+            canEdit={canEdit}
+          />
+        </div>
+      ) : null}
 
-      <AttachmentsCard
-        memberId={member.id}
-        mitgliedsnummer={mitgliedsnummer}
-        anhaenge={anhaenge}
-        canEdit={canEdit}
-      />
+      {tab === "verlauf" ? (
+        <div role="tabpanel" className="flex flex-col gap-6">
+          <SnapshotsTab
+            memberId={member.id}
+            mitgliedsnummer={mitgliedsnummer}
+            canRestore={canEdit}
+          />
 
-      <AustrittsbestaetigungCard
-        memberId={member.id}
-        member={member as unknown as Record<string, unknown>}
-        abteilungen={abteilungen}
-        canEdit={canEdit}
-      />
+          <DsgvoCard
+            memberId={member.id}
+            memberSlug={mitgliedsnummer}
+            canManage={canEdit}
+            isAdmin={me.data?.role === "admin"}
+          />
 
-      <SnapshotsTab memberId={member.id} mitgliedsnummer={mitgliedsnummer} canRestore={canEdit} />
-
-      <DsgvoCard
-        memberId={member.id}
-        memberSlug={mitgliedsnummer}
-        canManage={canEdit}
-        isAdmin={me.data?.role === "admin"}
-      />
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Audit Log</CardTitle>
-          <Link
-            to="/app/audit"
-            search={{
-              q: "",
-              actorEmail: "",
-              action: "",
-              entityType: "member",
-              entityId: member.id,
-              from: "",
-              to: "",
-            }}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            Vollständige Historie →
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {audit.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Keine Änderungen protokolliert.</p>
-          ) : (
-            <ul className="flex flex-col divide-y text-sm">
-              {audit.map((entry) => (
-                <AuditEntry key={entry.id} entry={entry} />
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Audit Log</CardTitle>
+              <Link
+                to="/app/audit"
+                search={{
+                  q: "",
+                  actorEmail: "",
+                  action: "",
+                  entityType: "member",
+                  entityId: member.id,
+                  from: "",
+                  to: "",
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Vollständige Historie →
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {audit.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Keine Änderungen protokolliert.</p>
+              ) : (
+                <ul className="flex flex-col divide-y text-sm">
+                  {audit.map((entry) => (
+                    <AuditEntry key={entry.id} entry={entry} />
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -566,6 +606,25 @@ function formatBirthdayWithAge(value: string | Date | null | undefined): string 
     (now.getMonth() === d.getMonth() && now.getDate() < d.getDate());
   if (beforeBirthday) age -= 1;
   return `${formatted} · ${age} Jahre`;
+}
+
+function MemberStatusBadge({
+  member,
+}: {
+  member: {
+    austritt?: string | Date | null;
+    verstorbenAm?: string | Date | null;
+    aktivPasiv?: string | null;
+    mitglnr?: string | null;
+  };
+}) {
+  // Kontakte (no Mitgliedsnummer) carry their own badge in the header; a
+  // membership status would be misleading for them.
+  if (!member.mitglnr) return null;
+  if (member.verstorbenAm) return <Badge variant="secondary">Verstorben</Badge>;
+  if (member.austritt) return <Badge variant="warning">Ausgetreten</Badge>;
+  if (member.aktivPasiv === "P") return <Badge variant="secondary">Passiv</Badge>;
+  return <Badge variant="success">Aktiv</Badge>;
 }
 
 function formatGeschlecht(value: string | null | undefined): string {
