@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.8.1",
+    date: "2026-06-03",
+    title: "Auslieferung der Austrittsbestätigungen repariert",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die vorherige Version ließ sich nicht ausliefern, weil eine Datenbankänderung für Austrittsbestätigungen nicht zum Datentyp der Mitglieder-ID passte. Das ist korrigiert, das Speichern erstellter Schreiben funktioniert jetzt.",
+      },
+    ],
+  },
+  {
     version: "0.8.0",
     date: "2026-06-02",
     title: "Anmeldung bleibt nach Schließen des Browsers bestehen",

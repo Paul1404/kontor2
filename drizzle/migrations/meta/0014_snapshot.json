@@ -1146,7 +1146,7 @@
         },
         "member_id": {
           "name": "member_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
