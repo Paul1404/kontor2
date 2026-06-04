@@ -48,7 +48,7 @@ export const RELEASES: Release[] = [
       {
         category: "improvement",
         description:
-          "Der Kulanz-Brief trägt auf dem Abschnitt jetzt eine Rücksendeadresse, damit die unterschriebene Kündigungsbestätigung ein Ziel hat. Ist unter Vereinsdaten eine Kontakt-E-Mail hinterlegt, wird zusätzlich die Rücksendung per E-Mail angeboten.",
+          "Der Kulanz-Brief enthält die Kündigungsbestätigung jetzt als eigene zweite Seite mit Rücksendeadresse, Unterschriftsfeld und Datum, damit sie direkt zurückgeschickt werden kann. Ist unter Vereinsdaten eine Kontakt-E-Mail hinterlegt, wird zusätzlich die Rücksendung per E-Mail angeboten.",
       },
       {
         category: "internal",

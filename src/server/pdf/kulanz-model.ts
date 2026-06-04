@@ -194,7 +194,7 @@ export function buildKulanzLetterModel(input: KulanzLetterInput): KulanzLetterMo
 
   const kulanz =
     `Falls Sie Ihre Mitgliedschaft nicht fortführen möchten, bieten wir Ihnen aus Kulanz eine Sonderkündigung an. ` +
-    `Senden Sie uns dazu die untenstehende Kündigungsbestätigung unterschrieben bis zum ${deadline} zurück. ` +
+    `Füllen Sie dazu die Kündigungsbestätigung auf der zweiten Seite aus und senden Sie sie uns unterschrieben bis zum ${deadline} zurück. ` +
     `In diesem Fall verzichten wir auf die offene Forderung und beenden Ihre Mitgliedschaft.`;
 
   const postings: KulanzPostingRow[] = input.postings.map((p) => ({
