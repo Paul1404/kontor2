@@ -1,230 +1,248 @@
 # SVUWV
 
-Vereinsverwaltung for SV 1945 Untereuerheim e.V. Replaces the legacy "Linear
-Webverein" desktop software. Internal admin tool, German UI.
+Vereinsverwaltung for SV 1945 Untereuerheim e.V. It replaces the legacy
+"Linear Webverein" desktop software with a single web app that runs the whole
+back office: members, contributions, SEPA, dunning, a self-service portal,
+DSGVO tooling, reports and an audit trail. Internal admin tool, German UI.
 
-## What it does
+## At a glance
+
+Eight feature sets, one app:
+
+- **Member management** -- a lossless mirror of the legacy database with full
+  CRUD, attachments, relationships and vCard export.
+- **Beitragsläufe** -- SEPA direct-debit billing that emits real
+  pain.008.001.02 XML.
+- **Forderungen & Mahnwesen** -- open-item tracking, SEPA return handling and a
+  three-stage dunning workflow with PDF letters.
+- **Mitgliederportal** -- magic-link self-service with a Vorstand review queue
+  for member-proposed changes.
+- **DSGVO** -- Art. 15 Auskunft, Art. 17 Löschung with legal retention policy,
+  and an append-only consent log, all reproducible and audited.
+- **Berichte** -- birthday, honours, statistics, finance and the DOSB-style
+  Bestandserhebung, every one of them CSV- and print-ready.
+- **Import & ingest** -- one pipeline for both a 50 MB Linear `mysqldump` and a
+  live HMAC-signed JSON push.
+- **Snapshots & audit** -- nightly versioning with field-level restore and a
+  searchable record of every change.
+
+## Technical feats
+
+The parts that took real engineering, not just CRUD:
+
+- **Lossless legacy mirror.** All 247 columns of Linear's `adresse` table map
+  onto `members` without truncation. `bit(1)` flags become real booleans,
+  single-letter status codes stay text because that is what they are, and
+  historical tables (`mgsolln`, `mgartdat`, `lastprot`, `sportarten`, ...) are
+  carried over rather than thrown away.
+- **One secret, derived keyring.** You set a single `APP_SECRET` (32-byte hex).
+  Everything else -- the better-auth signing key, the data-at-rest encryption
+  key, the SVUMS push HMAC -- is derived from it with HKDF-SHA256. IBANs and
+  SMTP passwords are AES-256-GCM encrypted at rest through a transparent
+  `encryptedText` Drizzle column type. A keyring keeps rotated-out keys
+  readable, so an `APP_SECRET` rotation plus a re-encrypt pass never strands
+  existing ciphertext.
+- **Standards-correct SEPA.** The pain.008.001.02 writer splits FRST and RCUR
+  into separate `<PmtInf>` blocks per Bundesbank rules, finalising a run flips
+  its mandates FRST to RCUR for the next cycle, and money is summed in integer
+  cents end to end to avoid float drift.
+- **Reproducible legal documents.** DSGVO exports compute a deterministic
+  SHA-256 over a canonical serialization, recorded in `dsgvo_requests` so an
+  export can be reproduced and verified later. The Bestandserhebung is archived
+  with the same kind of fingerprint so a reprint never silently diverges.
+  Generated letters (Mahnung, Austrittsbestätigung, Kulanz) follow the DIN 5008
+  business-letter standard and carry sequential document numbers.
+- **One ingest path, two front doors.** A 50 MB SQL upload and a live JSON push
+  share the same mapper and write pipeline. Re-imports are idempotent: a unique
+  index on Linear's GUID dedupes runs, and historical Sollstellungen are folded
+  by summing per Vertrag and Jahr so the existing constraint holds.
+- **Defence in depth on auth.** Every protected oRPC procedure checks its role
+  server-side through a hierarchical gate (`admin` ⊃ `vorstand` ⊃ `readonly`);
+  route guards are never trusted alone. A last-admin guard intercepts the
+  better-auth admin endpoints so no operator can lock everyone out of the
+  building from the inside.
+- **Safe nightly snapshots.** Versioning runs in-process, skips unchanged rows
+  and takes a Postgres advisory lock so multiple replicas never collide. It can
+  be moved to an external scheduler with one env var.
+
+## Feature sets in detail
 
 ### Members
-- Lossless mirror of the Linear `adresse` schema. All 247 columns map onto
-  the `members` table without truncation. Linear's `bit(1)` flags become
-  proper booleans. The single-letter status codes (`A`, `P`, `N`) stay as
-  text because that's what they actually are.
-- IBANs are AES-256-GCM encrypted at rest with a keyring (`APP_SECRET` plus
-  optional `APP_SECRET_PREV` for rotation). Clients only ever see the last
-  four digits.
+
+- Lossless mirror of the Linear `adresse` schema (247 columns), IBANs
+  AES-256-GCM encrypted at rest, clients only ever see the last four digits.
 - Full CRUD with edit, create, soft-delete and undelete.
 - Many-to-many Abteilungen with per-Abteilung Eintritts- and Austrittsdaten.
-- Verknüpfungen (Familienbeziehungen) imported from Linear and editable in the
-  UI.
-- Kontakt entries (Zahlende ohne eigene Mitgliedschaft) imported from
-  Linear are first-class. They open from the list and from Beziehungen,
-  fall back to `AdrNr` when there is no Mitgliedsnummer, and get a "Kontakt"
-  badge so they're not mistaken for members. Admin-only filter surfaces
-  orphan Kontakte without any relationship as candidates for cleanup.
-- Per-member file attachments via S3. Signed URLs, PDF/PNG/JPEG only, 10 MB
-  cap.
-- vCard 3.0 export per member. Works with iOS Contacts and macOS Contacts
-  without complaints.
-- Clickable phone, email and address fields. `tel:`, `mailto:`, maps link.
+- Verknüpfungen (Familienbeziehungen) imported from Linear and editable.
+- Kontakt entries (Zahlende ohne eigene Mitgliedschaft) are first-class. They
+  fall back to `AdrNr` when there is no Mitgliedsnummer and get a "Kontakt"
+  badge. An admin-only filter surfaces orphan Kontakte for cleanup.
+- Per-member file attachments via S3. Signed URLs, PDF/PNG/JPEG only, 10 MB cap.
+- vCard 3.0 export per member. Works with iOS and macOS Contacts.
+- Clickable phone, email and address (`tel:`, `mailto:`, maps link).
 - DSGVO panel on the member detail page links straight to Auskunft, Löschung
   and Einwilligungs-Log for that person.
 
 ### Beitragsläufe
+
 - Wizard that selects active mandates for a billing year, picks the right
-  Beitragsart for each member, and assembles a draft Beitragslauf.
-- Generates valid pain.008.001.02 XML. FRST and RCUR transactions live in
-  separate `<PmtInf>` blocks per Bundesbank rules.
-- Stornieren is supported. A finalised run flips its mandates from FRST to
-  RCUR for the next cycle.
-- Per-Beitragsart amounts and Sollstellung view on member detail.
+  Beitragsart per member and assembles a draft run.
+- Generates valid pain.008.001.02 XML, FRST and RCUR in separate `<PmtInf>`
+  blocks per Bundesbank rules.
+- Stornieren is supported. A finalised run flips its mandates from FRST to RCUR
+  for the next cycle.
+- Per-Beitragsart amounts and Sollstellung view on member detail. Proration and
+  Kündigungsfrist are configurable.
 
 ### Forderungen, Mahnwesen, SEPA-Rückläufer
-- Forderungen-Dashboard. Open Sollstellungen grouped per member, filterable
-  by Mahnstufe, batch "mark as paid" for cash and Überweisung payments.
+
+- Forderungen-Dashboard. Open Sollstellungen grouped per member, filterable by
+  Mahnstufe, batch "mark as paid" for cash and Überweisung.
 - SEPA-Rückläufer erfassen. Pick a committed `fee_run_item`, attach an
   R-Transaction reason code (AC04, AM04, MS03, ...) and optional
   Rücklastschriftgebühr. Reopens the matching Sollstellung as `returned`.
 - Mahnläufe in three escalation levels (Erinnerung, 1. Mahnung, 2. Mahnung).
-  Wizard picks eligible members, computes Mahngebühren per Stufe (configurable
-  under Vereinsdaten), renders one PDF per member and bumps `mahnstufe` on
-  the touched Sollstellungen.
+  Configurable Mahngebühren per Stufe, one PDF per member, `mahnstufe` bumped on
+  the touched Sollstellungen. Minors are addressed to their legal
+  representative; the run warns when none is on file. Mahnungen can also be sent
+  by email with a preview.
 - Mahnsperre auf Mitgliedsebene wird respektiert. Stornieren eines Mahnlaufs
   rollt die Mahnstufe zurück.
+- Kulanz-Brief. A payment reminder that also offers a goodwill Sonderkündigung:
+  pay, or return the attached signed Kündigungsbestätigung and the open claim is
+  waived.
 
 ### Mitgliederportal (Self-Service)
-- Magic-link Login per Mitglied. Admin issues a single-use token from the
-  member detail page; the link is mailed via the existing SMTP config and
-  spawns a 30-day cookie session on first use.
-- Members see their Stammdaten (read-only) and can propose changes to
-  Anrede, Name, Anschrift, Telefon, E-Mail.
-- Changes land as `portal_change_requests` (status pending). Vorstand
-  reviews them under "Portal-Anfragen" and either applies the whole set,
-  picks individual fields, or rejects with notes. Applied changes write
-  through to `members` with a full audit entry.
+
+- Magic-link login per member. Admin issues a single-use token from the member
+  detail page; the link is mailed via the existing SMTP config and spawns a
+  30-day cookie session on first use.
+- Members see their Stammdaten read-only and can propose changes to Anrede,
+  Name, Anschrift, Telefon, E-Mail.
+- Changes land as `portal_change_requests` (pending). Vorstand reviews them
+  under "Portal-Anfragen" and applies the whole set, picks individual fields, or
+  rejects with notes. Applied changes write through to `members` with an audit
+  entry.
 
 ### DSGVO
-- Auskunft nach Art. 15. Per-member dossier as JSON and PDF with masked
-  IBANs and 24-hour-signed S3 download links for every attachment.
-  Deterministic SHA-256 over the canonical serialization, recorded in
-  `dsgvo_requests` so an export can be reproduced and verified later.
-- Löschung nach Art. 17 with an explicit pseudonymisation policy per
-  column. Financial and SEPA-mandate fields are preserved per §147 AO
-  (10 Jahre) and SEPA Rulebook (14 Monate). Two-step: a preview shows the
-  before/after diff plus the earliest legal erasure date. Execution
-  requires Admin role, plus an explicit override and a written reason when
-  the retention window has not expired.
-- Einwilligungs-Log. Append-only history per consent type
-  (Datenverarbeitung, Foto/Name, Newsletter, Vereinszeitung) with free-text
-  evidence. The latest row per type is the current state.
-- Anfragen-Ticketing. Auskunfts- und Löschanfragen werden zentral
-  verwaltet; die 30-Tage-Frist nach Art. 12 (3) DSGVO wird automatisch
-  berechnet.
+
+- Auskunft nach Art. 15. Per-member dossier as JSON and PDF with masked IBANs
+  and 24-hour-signed S3 download links. A deterministic SHA-256 over the
+  canonical serialization is recorded in `dsgvo_requests` so an export can be
+  reproduced and verified later.
+- Löschung nach Art. 17 with an explicit pseudonymisation policy per column.
+  Financial and SEPA-mandate fields are preserved per §147 AO (10 Jahre) and
+  SEPA Rulebook (14 Monate). Two-step: a preview shows the before/after diff
+  plus the earliest legal erasure date. Execution requires Admin role plus an
+  explicit override and written reason when the retention window has not expired.
+- Einwilligungs-Log. Append-only history per consent type (Datenverarbeitung,
+  Foto/Name, Newsletter, Vereinszeitung) with free-text evidence.
+- Anfragen-Ticketing. Auskunfts- und Löschanfragen zentral verwaltet; die
+  30-Tage-Frist nach Art. 12 (3) DSGVO wird automatisch berechnet.
 
 ### Reports (Berichte)
-- Geburtstagsliste with month and runden Geburtstag filters.
-- Ehrungen (10/25/40/50/60/70 Jahre Mitgliedschaft) with year selector.
+
+- Geburtstagsliste with month and runden-Geburtstag filters.
+- Ehrungen (10/25/40/50/60/70 Jahre) with year selector.
 - Abteilungs-Statistik. Mitglieder je Abteilung, Altersverteilung, Geschlecht.
 - Finanzbericht. Sollstellungen aggregated by Beitragsart.
-- Bestandserhebung zum Stichtag. Pro Abteilung × Geschlecht × LSB-Altersgruppe
-  (0-6, 7-14, 15-18, 19-26, 27-40, 41-60, 61+, unbekannt). Mehrfach-
-  mitgliedschaften zählen mehrfach wie vom DOSB vorgegeben. CSV-Export plus
-  Unterschriften-PDF für den Vorstand. Jede erzeugte Erhebung wird mit
-  SHA-256-Fingerprint archiviert, damit Nachdrucke nicht abweichen.
+- Bestandserhebung zum Stichtag. Pro Abteilung × Geschlecht × LSB-Altersgruppe.
+  Mehrfachmitgliedschaften zählen mehrfach wie vom DOSB vorgegeben. CSV-Export
+  plus Unterschriften-PDF. Each run is archived with a SHA-256 fingerprint so
+  reprints do not diverge.
 - Every report exports to CSV and has a print-friendly view.
 
 ### Import and ingest
-- Linear Webverein `mysqldump` upload. Up to 50 MB. Parses the dump in
-  process, splits multi-row inserts, decodes MySQL escapes.
+
+- Linear Webverein `mysqldump` upload up to 50 MB. Parsed in process, multi-row
+  inserts split, MySQL escapes decoded, written in batches with live progress.
 - SVUMS push compatibility. `POST /api/ingest/svums` accepts the same record
-  shape (`AdrNr`, `MITGLNR`, `Anrede`, etc.) so the mapper is shared between
-  SQL upload and JSON push.
-- Both paths write through the same ingest pipeline. Diffs land in the audit
-  log and trigger a pre-import snapshot.
-- Historische Tabellen werden mitgenommen, nicht weggeworfen:
-  - `mgsolln` becomes Sollstellungen with `source='linear_import'`. The
-    `(AdrNr, Jahr, VertragNr, Art, Zeitraum)` PK is aggregated by summing
-    `Betrag/Bezahlt/Offen` per Vertrag + Jahr so the existing unique
-    constraint holds. Linear's first-row GUID is preserved on
-    `linear_guid` and used as the join key against `lastprots.SollGUID`.
-  - `mgartdat` populates a `fee_type_price_history` lookup so reports can
-    resolve the effective Beitragsart-Preis per Monat.
-  - `sportarten` and `fachverbaende` are loaded into `linear_sport_types`
-    and `linear_federations` lookups for later Abteilungs-Picklists.
-  - `lastprot` / `lastproth` become `legacy_sepa_runs` with the raw
-    pain.008 XML preserved verbatim; `archived=true` distinguishes the
-    purged journal. `lastprots` / `lastprotsh` map to
-    `legacy_sepa_run_items` and link runs to historical Sollstellungen
-    via GUID.
-  - Re-imports are idempotent: the `fee_runs_linear_guid_uk` unique
-    index dedupes on Linear's GUID.
-  - Linear's `pass` table (BENUTZER/PASSWORT/UI-prefs of the desktop
-    app) is intentionally not imported. better-auth owns user accounts.
+  shape so the mapper is shared between SQL upload and JSON push.
+- Both paths write through the same ingest pipeline. Diffs land in the audit log
+  and trigger a pre-import snapshot.
+- Historical tables are carried over, not discarded:
+  - `mgsolln` becomes Sollstellungen (`source='linear_import'`), aggregated by
+    summing `Betrag/Bezahlt/Offen` per Vertrag + Jahr. Linear's GUID is kept on
+    `linear_guid` and used to join `lastprots.SollGUID`.
+  - `mgartdat` populates `fee_type_price_history` so reports resolve the
+    effective Beitragsart-Preis per Monat.
+  - `sportarten` and `fachverbaende` load into `linear_sport_types` and
+    `linear_federations` for Abteilungs-Picklists.
+  - `lastprot` / `lastproth` become `legacy_sepa_runs` with the raw pain.008 XML
+    preserved verbatim; `lastprots` / `lastprotsh` map to `legacy_sepa_run_items`.
+  - Re-imports are idempotent via the `fee_runs_linear_guid_uk` unique index.
+  - Linear's `pass` table (desktop UI prefs) is intentionally not imported.
+    better-auth owns user accounts.
 
-### Snapshots
+### Snapshots and audit
+
 - Automatic nightly snapshot of every member at 02:30 local time. Skips
-  unchanged rows.
-- Manual snapshot button from the admin page.
-- Pre-import snapshot before any SQL upload or SVUMS push lands.
+  unchanged rows. Manual button plus a pre-import snapshot before any upload.
 - Granular restore. Pick a member, pick a snapshot, see the field-level diff,
-  restore the whole row or individual fields.
-- Postgres advisory lock keeps multiple replicas from running the snapshot
-  at the same time.
-
-### Audit log
-- Every member change is recorded with actor, source (UI, import, SVUMS,
-  system), before/after JSON and a human-readable summary.
-- Full-text search over actor, member number, summary and field name.
-- Filter by source, date range, member.
-- Adjustable page size.
+  restore the whole row or individual fields. A Postgres advisory lock keeps
+  replicas from colliding.
+- Audit log. Every change records actor, source (UI, import, SVUMS, system),
+  before/after JSON and a human-readable summary. Full-text search over actor,
+  member number, summary and field name; filter by source, date and member.
 
 ### Auth and access
+
 - better-auth with `tanstackStartCookies`. Email + password.
-- Invite-only signup. Admin sends an invite link with a single-use token.
-  A partially-failed acceptance can be retried instead of permanently
-  blocking the address.
-- Three roles: Admin, Vorstand, Readonly. Every protected oRPC procedure
-  checks role server-side. Route guards alone are not trusted.
-- First-run bootstrap admin from `SVUWV_BOOTSTRAP_ADMIN_EMAIL` and
-  `SVUWV_BOOTSTRAP_ADMIN_PASSWORD` when the user table is empty. If those
-  env vars are not set, the very first request is redirected to `/setup`
-  for an interactive first-admin form.
-- Last-admin guard. The better-auth admin endpoints
-  (`set-user-banned`, `remove-user`, `set-role`) are intercepted before
-  they can leave the instance with zero active admins. No operator can
-  lock the building from the inside.
-- SMTP settings configurable from the admin UI. SNI hostname is sent and
-  there's a toggle to skip cert verification for in-house MTAs with self-signed
-  certs. The "Test mail" button accepts the inline form values, so a new
-  config can be validated before it's saved.
+- Invite-only signup with single-use tokens. A partially-failed acceptance can
+  be retried instead of permanently blocking the address.
+- Three roles: Admin, Vorstand, Readonly. Every protected oRPC procedure checks
+  role server-side.
+- First-run bootstrap admin from env, or an interactive `/setup` form when the
+  user table is empty and no env is set.
+- Last-admin guard. The better-auth admin endpoints (`set-user-banned`,
+  `remove-user`, `set-role`) are intercepted before they can leave the instance
+  with zero active admins.
+- SMTP configurable from the admin UI, with SNI hostname, a self-signed-cert
+  toggle and a "Test mail" button that validates a config before it is saved.
 
 ### Admin
+
 - CRUD for Abteilungen, Beitragsarten, Benutzer, SMTP, Vereinsdaten.
 - Snapshot run history with bytes, member counts and trigger reason.
-- Verschlüsselung. Inspect the active keyring (current key + fallbacks)
-  and run "Daten neu verschlüsseln" after an `APP_SECRET` rotation. v1
-  ciphertexts stay readable via per-key fallback; failures are logged
-  instead of silently dropped.
-- Danger zone (`/app/admin/erweitert`, admin-only). Four cards with live
-  counts and type-to-confirm dialogs: delete orphan Kontakte, purge
-  soft-deleted members older than N days, trim the audit log older than
-  N days, and a double-confirm "wipe everything" that resets
-  members/contracts/sepa/snapshots/audit but keeps users, Abteilungen,
-  Beitragsarten and settings. Every execution writes a `danger_zone`
-  audit row before it runs.
-
-### Dashboard
-- Mitgliederzahl, Neue und Austritte im Monat, Mitglieder je Abteilung.
+- Verschlüsselung. Inspect the active keyring and run "Daten neu verschlüsseln"
+  after an `APP_SECRET` rotation. v1 ciphertexts stay readable via per-key
+  fallback.
+- Danger zone (admin-only). Live-count cards with type-to-confirm dialogs:
+  delete orphan Kontakte, purge old soft-deleted members, trim the audit log,
+  and a double-confirm "wipe everything" that keeps users, Abteilungen,
+  Beitragsarten and settings. Every execution writes a `danger_zone` audit row
+  first.
 
 ### UI niceties
-- Command palette (`⌘K` or `Ctrl K`). Searches members live with a Redis-backed
-  cache.
-- Keyboard shortcuts. `?` opens the cheatsheet. `g d`, `g m`, `g a`, `g b`,
-  `g s` for navigation. `n` for new member, `e` to edit.
-- Sortable member list with column state synced into the URL. Pasting a link
-  reproduces the exact view.
-- Mobile drawer navigation. Hamburger button, slide-in sidebar, backdrop
-  click and Escape close it. Body scroll is locked while open. iOS Safari
-  won't zoom on input focus (16px minimum below `sm`), grids that were
-  fixed two-column collapse to one, and `safe-area-inset-bottom` is
-  honoured on the bottom edge.
-- Route-level error boundaries. The shell stays visible on child-route
-  errors and shows an `ErrorPanel` with retry plus collapsible technical
-  details. Unknown routes get a `NotFoundPanel` with a back link instead
-  of a bare 404. Skeleton placeholders replace "Wird geladen…" on the
-  dashboard, list, detail, edit and audit views.
-- Subtle motion on dialogs and toasts (fade + zoom, slide-in). Respects
-  `prefers-reduced-motion`. The confirm dialog autofocuses the confirm
-  button so Enter submits. Destructive actions use a
-  type-to-confirm dialog where the user has to type a fixed German phrase
-  (the wipe action requires two).
-- Einklappbare "So funktioniert es"-Erklärungen auf komplexen Admin-Seiten
-  (Portal-Anfragen, Benutzer, Mahnstufen, Mahnläufe, Beitragsläufe,
-  Beitragsarten, Ehrungen, Finanzbericht, Linear-Import). Standardmäßig
-  zugeklappt, damit sie erfahrene Nutzer nicht stören.
-- Version chip in the sidebar footer and on the login / setup pages. One
-  click opens a "Was ist neu"-Dialog with the curated release log grouped
-  by Neu / Behoben / Verbessert / Breaking / Intern. An unread dot lights
-  up whenever the bundled `CURRENT_VERSION` differs from the one the
-  browser previously acknowledged.
-- Light and dark theme.
-- SV Untereuerheim crest as favicon. Full icon set (SVG, ICO, PNG variants,
-  apple-touch, web manifest).
+
+- Command palette (`⌘K` / `Ctrl K`) with a Redis-backed live member search.
+- Keyboard shortcuts. `?` opens the cheatsheet; `g d/m/a/b/s` navigate, `n` new
+  member, `e` edit.
+- Sortable member list with column state synced into the URL.
+- Mobile drawer navigation with body-scroll lock, safe-area insets and no iOS
+  zoom on input focus.
+- Route-level error boundaries with retry, a NotFoundPanel for unknown routes,
+  and skeleton placeholders while loading.
+- Subtle, `prefers-reduced-motion`-aware motion. Destructive actions use a
+  type-to-confirm dialog.
+- Version chip in the sidebar and on login/setup. One click opens a "Was ist
+  neu" dialog from the curated release log, with an unread dot per new version.
+- Light and dark theme. Full favicon set built from the SV Untereuerheim crest.
 
 ## Stack
 
-TanStack Start (Vite), TanStack Router, TanStack Query, TanStack Form,
-oRPC v1, better-auth, Drizzle ORM, Valibot, PostgreSQL, Redis, S3, Bun,
-Tailwind v4, shadcn-style components, lucide-react, Vitest, Biome.
+TanStack Start (Vite), TanStack Router, TanStack Query, TanStack Form, oRPC v1,
+better-auth, Drizzle ORM, Valibot, PostgreSQL, Redis, S3, Bun, Tailwind v4,
+shadcn-style components, lucide-react, Vitest, Biome.
 
 ## Architecture
 
 One TanStack Start app does both SSR and client. Vite builds it into
 `dist/server` and `dist/client`. In production `scripts/serve.ts` wraps the
-built server handler on `Bun.serve`, serves static assets from `dist/client`
-and `public` with a 1-day cache, runs a startup preflight, and adds security
-headers plus a Content-Security-Policy to every HTML response. Railway
-terminates TLS in front of it.
+built server handler on `Bun.serve`, serves static assets from `dist/client` and
+`public` with a 1-day cache, runs a startup preflight, and adds security headers
+plus a Content-Security-Policy to every HTML response. Railway terminates TLS in
+front of it.
 
 ### Request lifecycle
 
@@ -236,12 +254,11 @@ terminates TLS in front of it.
 3. Data and mutations go through oRPC, mounted at `/api/rpc/$`. The browser
    talks to it through an isomorphic `@orpc/tanstack-query` client so the same
    calls work during SSR and after hydration.
-4. Every procedure runs through one middleware chain: `observability` (times
-   the call, logs the outcome once with a request id) then a role gate. That
-   gives four entrypoints in `src/server/orpc/base.ts`: `publicProc`,
-   `authedProc`, `vorstandProc`, `adminProc`. Roles are hierarchical
-   (`admin` ⊃ `vorstand` ⊃ `readonly`) and checked server-side on every call,
-   never by route guards alone.
+4. Every procedure runs through one middleware chain: `observability` (times the
+   call, logs the outcome once with a request id) then a role gate. That gives
+   four entrypoints in `src/server/orpc/base.ts`: `publicProc`, `authedProc`,
+   `vorstandProc`, `adminProc`. Roles are hierarchical (`admin` ⊃ `vorstand` ⊃
+   `readonly`) and checked server-side on every call.
 5. `createContext` builds the per-request context (Drizzle handle, better-auth
    session, headers, request id), ensures the bootstrap admin exists, and lazily
    starts the snapshot scheduler.
@@ -257,10 +274,9 @@ terminates TLS in front of it.
   procedures so it stays testable:
   - `importer/` -- Linear `mysqldump` ingest. `sql-tokenizer.ts` splits the
     dump, `linear-mapper.ts` maps raw columns, `aggregate-mgsolln.ts` folds
-    historical Sollstellungen, `ingest-pipeline.ts` is the shared write path
-    for both SQL upload and SVUMS push.
-  - `sepa/` -- `build-fee-run.ts`, `select-mandate.ts`, `pain008.ts` (the
-    pain.008.001.02 writer), `iban.ts`, `direct-debit.ts`.
+    historical Sollstellungen, `ingest-pipeline.ts` is the shared write path.
+  - `sepa/` -- `build-fee-run.ts`, `select-mandate.ts`, `pain008.ts`, `iban.ts`,
+    `direct-debit.ts`.
   - `dunning/`, `dsgvo/` (`auskunft`, `erasure`, `policy`), `reports/`,
     `verbandsmeldung/` (Bestandserhebung), `snapshots/`, `audit/`.
   - `pdf/` -- `@react-pdf/renderer` templates and a render wrapper.
@@ -294,8 +310,8 @@ message.
 
 The nightly member snapshot runs in-process. It initialises lazily inside
 `createContext`, so `serve.ts` fires one self-request on boot to make sure the
-timer is installed even on a fresh container with no traffic. A Postgres
-advisory lock keeps multiple replicas from running it at once. Set
+timer is installed even on a fresh container with no traffic. A Postgres advisory
+lock keeps multiple replicas from running it at once. Set
 `SNAPSHOT_CRON_DISABLED=1` and drive it externally via the HMAC-protected
 `POST /api/cron/snapshots` route instead.
 
@@ -333,14 +349,13 @@ The first user is created from `SVUWV_BOOTSTRAP_ADMIN_EMAIL` and
 bun test
 ```
 
-Covers the SQL importer (incl. phase-2 mgsolln aggregation and a
-real-dump smoke test against `reference/linear/datesicherung.sql`),
-ingest HMAC, SEPA mandate selection, pain.008 output, IBAN normalisation,
-encryption keyring round-trip across `APP_SECRET` rotations, last-admin
-guard request shape, DSGVO policy, Bestandserhebung age buckets,
-snapshot diff and restore, audit diffing, report calculations, vCard
-output, BLZ lookup, and the release-notes invariants (newest-first, no
-duplicate versions, `CURRENT_VERSION` stays in sync with
+Covers the SQL importer (incl. phase-2 mgsolln aggregation and a real-dump smoke
+test against `reference/linear/datesicherung.sql`), ingest HMAC, SEPA mandate
+selection, pain.008 output, IBAN normalisation, encryption keyring round-trip
+across `APP_SECRET` rotations, last-admin guard request shape, DSGVO policy,
+Bestandserhebung age buckets, snapshot diff and restore, audit diffing, report
+calculations, vCard output, BLZ lookup, and the release-notes invariants
+(newest-first, no duplicate versions, `CURRENT_VERSION` in sync with
 `package.json`).
 
 ## Deploy
@@ -358,24 +373,24 @@ Manually set:
 - `APP_SECRET`. 32-byte hex. Every other secret (better-auth signing key,
   data-at-rest key, SVUMS push HMAC) is derived from this via HKDF-SHA256.
   See `bun scripts/print-derived-secrets.ts`.
-- `APP_SECRET_PREV`. Optional. Previous APP_SECRET(s), comma-separated, kept
-  in the keyring during a rotation so existing encrypted rows stay readable.
-  Rotation: set this to the current secret, generate a new `APP_SECRET`,
-  deploy, run Einstellungen > Verschlüsselung > Re-encrypt, then unset.
+- `APP_SECRET_PREV`. Optional. Previous APP_SECRET(s), comma-separated, kept in
+  the keyring during a rotation so existing encrypted rows stay readable.
+  Rotation: set this to the current secret, generate a new `APP_SECRET`, deploy,
+  run Einstellungen > Verschlüsselung > Re-encrypt, then unset.
 - `BETTER_AUTH_URL`. Public URL of the deployment.
-- `SVUWV_BOOTSTRAP_ADMIN_EMAIL`, `SVUWV_BOOTSTRAP_ADMIN_PASSWORD`. Optional,
-  only used on the very first boot. If unset, the first request to the app
-  is redirected to `/setup` where a first admin can be created interactively.
+- `SVUWV_BOOTSTRAP_ADMIN_EMAIL`, `SVUWV_BOOTSTRAP_ADMIN_PASSWORD`. Optional, only
+  used on the very first boot. If unset, the first request is redirected to
+  `/setup` where a first admin can be created interactively.
 
-`railway.toml` runs `bun run db:migrate:prod` before each deploy and points
-the healthcheck at `/api/health`. Migrations are applied with a runtime-only
-migrator. `drizzle-kit` stays a dev dependency and does not ship in the
-runtime image.
+`railway.toml` runs `bun run db:migrate:prod` before each deploy and points the
+healthcheck at `/api/health`. Migrations are applied with a runtime-only
+migrator. `drizzle-kit` stays a dev dependency and does not ship in the runtime
+image.
 
 The nightly snapshot scheduler runs in-process by default. To move it to an
 external scheduler (Railway Cron, GitHub Actions, etc.), set
-`SNAPSHOT_CRON_DISABLED=1` and hit `POST /api/cron/snapshots` with the same
-HMAC headers used for SVUMS push.
+`SNAPSHOT_CRON_DISABLED=1` and hit `POST /api/cron/snapshots` with the same HMAC
+headers used for SVUMS push.
 
 ## Environment
 
@@ -388,13 +403,13 @@ See [`.env.example`](.env.example).
 - `X-SVUMS-Timestamp: <unix-seconds>`
 - `X-SVUMS-Signature: hex(HMAC_SHA256(svumsPushSecret, timestamp + "." + raw_body))`
 
-Body keys: `batch`, `members`, `feeTypes`, `contracts`, `sepaMandates`.
-Each member record uses the raw Linear column names so the same mapper
-handles both SQL upload and JSON push.
+Body keys: `batch`, `members`, `feeTypes`, `contracts`, `sepaMandates`. Each
+member record uses the raw Linear column names so the same mapper handles both
+SQL upload and JSON push.
 
-Replay protection: signatures are nonce-deduplicated in Redis for 10
-minutes. Requests with a timestamp skew greater than the allowed window are
-rejected before the body is parsed.
+Replay protection: signatures are nonce-deduplicated in Redis for 10 minutes.
+Requests with a timestamp skew greater than the allowed window are rejected
+before the body is parsed.
 
 ## License
 
