@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.15.2",
+    date: "2026-06-04",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Der Docker-Build auf Railway lief wegen eines fehlerhaften Cache-Eintrags nicht durch. Der Paket-Cache hat jetzt eine feste Kennung, sodass Deployments wieder bauen.",
+      },
+    ],
+  },
+  {
     version: "0.15.1",
     date: "2026-06-04",
     changes: [
