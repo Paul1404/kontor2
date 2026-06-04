@@ -217,9 +217,10 @@ function KulanzLetterPage({
 /**
  * Dedicated response page: a self-contained Kündigungsbestätigung the member
  * fills in, signs and returns. The Verein address sits at the top as the
- * return recipient (so it shows through a window envelope), and the member can
- * instead reply by email when a contact mailbox is configured. No tear-off
- * line -- the response is its own sheet.
+ * return recipient (so it shows through a window envelope). Returning this form
+ * is not the only way: when a contact mailbox is configured the member can
+ * instead send a formless email, which counts as a cancellation on its own. No
+ * tear-off line -- the response is its own sheet.
  */
 function KulanzResponsePage({
   club,
@@ -265,8 +266,10 @@ function KulanzResponsePage({
 
       {club.rueckantwort.email ? (
         <Text style={[styles.para, styles.responseEmail]}>
-          Alternativ können Sie diese Kündigungsbestätigung unterschrieben und eingescannt per
-          E-Mail an {club.rueckantwort.email} senden.
+          Sie müssen dieses Formular nicht zurücksenden. Eine formlose E-Mail an{" "}
+          {club.rueckantwort.email} mit Ihrem Namen und Ihrer Mitgliedsnummer gilt ebenso als
+          Kündigung. Wenn Sie möchten, senden Sie die unterschriebene Kündigungsbestätigung per Post
+          oder eingescannt per E-Mail.
         </Text>
       ) : null}
 

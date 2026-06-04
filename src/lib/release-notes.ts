@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.13.1",
+    date: "2026-06-04",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Auf der Kündigungsbestätigung im Kulanz-Brief steht jetzt deutlich, dass eine formlose E-Mail mit Name und Mitgliedsnummer ebenso als Kündigung gilt. Das Formular muss nicht zwingend zurückgeschickt werden.",
+      },
+    ],
+  },
+  {
     version: "0.13.0",
     date: "2026-06-04",
     title: "Dokumentnummern auf allen erzeugten Schreiben",
