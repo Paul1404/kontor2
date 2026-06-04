@@ -1,29 +1,7 @@
-import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { LetterPage } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
-  page: { padding: 50, fontSize: 10, fontFamily: "Helvetica", color: "#111", lineHeight: 1.4 },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 18,
-  },
-  logo: { height: 52, objectFit: "contain" },
-  orgBlock: { alignItems: "flex-end", fontSize: 8, color: "#555", maxWidth: 220 },
-  orgName: { fontFamily: "Helvetica-Bold", fontSize: 10, color: "#111", marginBottom: 2 },
-  senderLine: {
-    fontSize: 7,
-    color: "#777",
-    borderBottomWidth: 0.5,
-    borderColor: "#ccc",
-    paddingBottom: 2,
-    marginBottom: 4,
-  },
-  recipient: { marginTop: 4, marginBottom: 36 },
-  vertretung: { fontSize: 8, color: "#555" },
-  meta: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
-  metaItem: { fontSize: 9 },
-  h1: { fontSize: 16, fontFamily: "Helvetica-Bold", marginBottom: 8 },
   intro: { marginBottom: 10 },
   table: { marginVertical: 10, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: "#999" },
   tableHeader: {
@@ -72,18 +50,6 @@ const styles = StyleSheet.create({
   paymentRow: { flexDirection: "row", marginBottom: 2 },
   paymentKey: { width: 110, color: "#555" },
   paymentValue: { flex: 1, fontFamily: "Helvetica-Bold" },
-  footer: {
-    position: "absolute",
-    bottom: 28,
-    left: 50,
-    right: 50,
-    borderTopWidth: 0.5,
-    borderColor: "#bbb",
-    paddingTop: 6,
-    fontSize: 7,
-    color: "#777",
-    textAlign: "center",
-  },
 });
 
 type MahnungPosting = {
@@ -210,37 +176,20 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
 
   return (
     <Document title={`${title} ${docRef}`} author={org.vereinsname}>
-      <Page size="A4" style={styles.page} wrap>
-        {/* Letterhead: logo plus the club wordmark. The postal address is
-            deliberately not repeated here -- it appears once in the sender
-            line below, which is the return address for window envelopes. */}
-        <View style={styles.headerRow}>
-          {org.logoDataUri ? <Image src={org.logoDataUri} style={styles.logo} /> : <View />}
-          <View style={styles.orgBlock}>
-            <Text style={styles.orgName}>{org.vereinsname}</Text>
-          </View>
-        </View>
-
-        <View style={styles.recipient}>
-          <Text style={styles.senderLine}>{senderLine}</Text>
-          {recipientLines.map((line, i) => (
-            <Text key={String(i)}>{line}</Text>
-          ))}
-          {r.vertretungFor ? (
-            <Text style={styles.vertretung}>gesetzliche Vertretung von {r.vertretungFor}</Text>
-          ) : null}
-        </View>
-
-        <View style={styles.meta}>
-          <Text style={styles.metaItem}>
-            Mitgliedsnummer: {pkg.member.mitglnr ?? `AdrNr ${pkg.member.adrNr}`}
-          </Text>
-          <Text style={styles.metaItem}>Dokument: {docRef}</Text>
-          <Text style={styles.metaItem}>Datum: {fmtDate(pkg.runDate)}</Text>
-        </View>
-
-        <Text style={styles.h1}>{title}</Text>
-
+      <LetterPage
+        logoDataUri={org.logoDataUri}
+        orgName={org.vereinsname}
+        returnLine={senderLine}
+        recipientLines={recipientLines}
+        recipientNote={r.vertretungFor ? `gesetzliche Vertretung von ${r.vertretungFor}` : null}
+        infoRows={[
+          { label: "Mitgliedsnummer", value: pkg.member.mitglnr ?? `AdrNr ${pkg.member.adrNr}` },
+          { label: "Dokument", value: docRef },
+          { label: "Datum", value: fmtDate(pkg.runDate) },
+        ]}
+        subject={title}
+        footerText={`${org.vereinsname} · Dokument ${docRef} · Gläubiger-ID ${org.glaeubigerId}`}
+      >
         <Text style={styles.intro}>{salutation(r)},</Text>
         {r.vertretungFor ? (
           <Text style={styles.intro}>
@@ -324,15 +273,7 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
 
         <Text style={{ marginTop: 18 }}>Mit freundlichen Grüßen</Text>
         <Text style={{ marginTop: 24 }}>{org.vereinsname}</Text>
-
-        <Text
-          style={styles.footer}
-          render={({ pageNumber, totalPages }) =>
-            `${org.vereinsname} · Dokument ${docRef} · Gläubiger-ID ${org.glaeubigerId} · Seite ${pageNumber}/${totalPages}`
-          }
-          fixed
-        />
-      </Page>
+      </LetterPage>
     </Document>
   );
 }

@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.15.0",
+    date: "2026-06-04",
+    title: "Briefe im DIN-5008-Format",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Mahnung, Austrittsbestätigung und Kulanz-Brief folgen jetzt dem Geschäftsbrief-Standard DIN 5008. Das Anschriftfeld sitzt an der richtigen Stelle für Fensterumschläge, darüber steht die Rücksendeangabe, rechts ein Informationsblock mit Datum, Dokumentnummer und Mitgliedsnummer. Dazu kommen eine fette Betreffzeile, feste Ränder sowie Falz- und Lochmarken am linken Rand.",
+      },
+    ],
+  },
+  {
     version: "0.14.0",
     date: "2026-06-04",
     title: "Eigene E-Mail für Mitgliedschaftsangelegenheiten",

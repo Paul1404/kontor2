@@ -1,31 +1,9 @@
-import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { Fragment } from "react";
 import type { KulanzClubModel, KulanzLetterModel } from "~/server/pdf/kulanz-model";
+import { LetterPage } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
-  page: { padding: 50, fontSize: 10, fontFamily: "Helvetica", color: "#111", lineHeight: 1.4 },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 18,
-  },
-  logo: { height: 52, objectFit: "contain" },
-  orgBlock: { alignItems: "flex-end", maxWidth: 220 },
-  orgName: { fontFamily: "Helvetica-Bold", fontSize: 10, color: "#111" },
-  recipient: { marginTop: 4, marginBottom: 30 },
-  senderLine: {
-    fontSize: 7,
-    color: "#777",
-    borderBottomWidth: 0.5,
-    borderColor: "#ccc",
-    paddingBottom: 2,
-    marginBottom: 4,
-  },
-  vertretung: { fontSize: 8, color: "#555" },
-  meta: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
-  metaItem: { fontSize: 9 },
-  h1: { fontSize: 16, fontFamily: "Helvetica-Bold", marginBottom: 8 },
   para: { marginBottom: 10 },
   table: { marginVertical: 10, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: "#999" },
   tableHeader: {
@@ -56,16 +34,16 @@ const styles = StyleSheet.create({
   c2: { flex: 2.4 },
   c3: { flex: 1, textAlign: "right" },
   kulanzBox: {
-    marginTop: 12,
-    padding: 10,
+    marginTop: 10,
+    padding: 9,
     backgroundColor: "#f0fdf4",
     borderLeftWidth: 2,
     borderColor: "#16a34a",
     fontSize: 9.5,
   },
   paymentBox: {
-    marginTop: 12,
-    padding: 10,
+    marginTop: 10,
+    padding: 9,
     borderWidth: 0.5,
     borderColor: "#999",
     fontSize: 9.5,
@@ -83,18 +61,6 @@ const styles = StyleSheet.create({
     color: "#555",
   },
   responseEmail: { marginTop: 22, color: "#555" },
-  footer: {
-    position: "absolute",
-    bottom: 28,
-    left: 50,
-    right: 50,
-    borderTopWidth: 0.5,
-    borderColor: "#bbb",
-    paddingTop: 6,
-    fontSize: 7,
-    color: "#777",
-    textAlign: "center",
-  },
 });
 
 export type KulanzDocumentProps = {
@@ -103,6 +69,10 @@ export type KulanzDocumentProps = {
   /** Human-readable document reference for this run, e.g. "KS-2026-0001". */
   docRef: string;
 };
+
+function footerText(club: KulanzClubModel, docRef: string): string {
+  return `${club.vereinsname} · Dokument ${docRef} · Gläubiger-ID ${club.glaeubigerId}`;
+}
 
 function KulanzLetterPage({
   club,
@@ -114,32 +84,22 @@ function KulanzLetterPage({
   docRef: string;
 }) {
   return (
-    <Page size="A4" style={styles.page} wrap>
-      <View style={styles.headerRow}>
-        {club.logoDataUri ? <Image src={club.logoDataUri} style={styles.logo} /> : <View />}
-        <View style={styles.orgBlock}>
-          <Text style={styles.orgName}>{club.vereinsname}</Text>
-        </View>
-      </View>
-
-      <View style={styles.recipient}>
-        <Text style={styles.senderLine}>{club.senderLine}</Text>
-        {letter.recipientLines.map((line, i) => (
-          <Text key={String(i)}>{line}</Text>
-        ))}
-        {letter.vertretungFor ? (
-          <Text style={styles.vertretung}>gesetzliche Vertretung von {letter.vertretungFor}</Text>
-        ) : null}
-      </View>
-
-      <View style={styles.meta}>
-        <Text style={styles.metaItem}>Mitgliedsnummer: {letter.mitgliedsnummer}</Text>
-        <Text style={styles.metaItem}>Dokument: {docRef}</Text>
-        <Text style={styles.metaItem}>Datum: {letter.datum}</Text>
-      </View>
-
-      <Text style={styles.h1}>Zahlungserinnerung</Text>
-
+    <LetterPage
+      logoDataUri={club.logoDataUri}
+      orgName={club.vereinsname}
+      returnLine={club.senderLine}
+      recipientLines={letter.recipientLines}
+      recipientNote={
+        letter.vertretungFor ? `gesetzliche Vertretung von ${letter.vertretungFor}` : null
+      }
+      infoRows={[
+        { label: "Mitgliedsnummer", value: letter.mitgliedsnummer },
+        { label: "Dokument", value: docRef },
+        { label: "Datum", value: letter.datum },
+      ]}
+      subject="Zahlungserinnerung"
+      footerText={footerText(club, docRef)}
+    >
       <Text style={styles.para}>{letter.salutation}</Text>
       {letter.vertretungFor ? (
         <Text style={styles.para}>
@@ -206,21 +166,19 @@ function KulanzLetterPage({
         {letter.kulanzEmail ? <Text style={{ marginTop: 6 }}>{letter.kulanzEmail}</Text> : null}
       </View>
 
-      <Text style={{ marginTop: 16 }}>Mit freundlichen Grüßen</Text>
-      <Text style={{ marginTop: 20 }}>{club.vereinsname}</Text>
-
-      <Footer club={club} docRef={docRef} />
-    </Page>
+      <Text style={{ marginTop: 12 }}>Mit freundlichen Grüßen</Text>
+      <Text style={{ marginTop: 16 }}>{club.vereinsname}</Text>
+    </LetterPage>
   );
 }
 
 /**
  * Dedicated response page: a self-contained Kündigungsbestätigung the member
- * fills in, signs and returns. The Verein address sits at the top as the
- * return recipient (so it shows through a window envelope). Returning this form
- * is not the only way: when a contact mailbox is configured the member can
- * instead send a formless email, which counts as a cancellation on its own. No
- * tear-off line -- the response is its own sheet.
+ * fills in, signs and returns. The Verein sits in the address field as the
+ * recipient (so it shows through a window envelope when folded), with the
+ * member as the Rücksendeangabe above it. Returning this form is not the only
+ * way: when a contact mailbox is configured the member can instead send a
+ * formless email, which counts as a cancellation on its own.
  */
 function KulanzResponsePage({
   club,
@@ -232,29 +190,19 @@ function KulanzResponsePage({
   docRef: string;
 }) {
   return (
-    <Page size="A4" style={styles.page}>
-      <View style={styles.headerRow}>
-        {club.logoDataUri ? <Image src={club.logoDataUri} style={styles.logo} /> : <View />}
-        <View style={styles.orgBlock}>
-          <Text style={styles.orgName}>{club.vereinsname}</Text>
-        </View>
-      </View>
-
-      <View style={styles.recipient}>
-        <Text style={styles.senderLine}>Rücksendung an</Text>
-        {club.rueckantwort.adresseLines.map((line, i) => (
-          <Text key={String(i)}>{line}</Text>
-        ))}
-      </View>
-
-      <View style={styles.meta}>
-        <Text style={styles.metaItem}>Mitgliedsnummer: {letter.mitgliedsnummer}</Text>
-        <Text style={styles.metaItem}>Dokument: {docRef}</Text>
-        <Text style={styles.metaItem}>Datum: {letter.datum}</Text>
-      </View>
-
-      <Text style={styles.h1}>Kündigungsbestätigung</Text>
-
+    <LetterPage
+      logoDataUri={club.logoDataUri}
+      orgName={club.vereinsname}
+      returnLine={letter.recipientLines.join(" · ")}
+      recipientLines={club.rueckantwort.adresseLines}
+      infoRows={[
+        { label: "Mitgliedsnummer", value: letter.mitgliedsnummer },
+        { label: "Dokument", value: docRef },
+        { label: "Datum", value: letter.datum },
+      ]}
+      subject="Kündigungsbestätigung"
+      footerText={footerText(club, docRef)}
+    >
       <Text style={styles.para}>{letter.slip.intro}</Text>
       <Text style={styles.para}>{letter.slip.memberLine}</Text>
       <Text style={styles.para}>Kündigung zum:</Text>
@@ -272,21 +220,7 @@ function KulanzResponsePage({
           oder eingescannt per E-Mail.
         </Text>
       ) : null}
-
-      <Footer club={club} docRef={docRef} />
-    </Page>
-  );
-}
-
-function Footer({ club, docRef }: { club: KulanzClubModel; docRef: string }) {
-  return (
-    <Text
-      style={styles.footer}
-      render={({ pageNumber, totalPages }) =>
-        `${club.vereinsname} · Dokument ${docRef} · Gläubiger-ID ${club.glaeubigerId} · Seite ${pageNumber}/${totalPages}`
-      }
-      fixed
-    />
+    </LetterPage>
   );
 }
 

@@ -19,6 +19,10 @@ export type CancellationFamilyMemberInput = {
 export type CancellationClub = {
   vereinsname: string;
   ort: string;
+  /** Postal address for the DIN 5008 return line above the recipient. */
+  anschriftStrasse?: string | null;
+  anschriftPlz?: string | null;
+  anschriftOrt?: string | null;
   kontaktEmail: string | null;
   kontaktTelefon: string | null;
   datenschutzUrl: string | null;
