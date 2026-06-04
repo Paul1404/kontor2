@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { verifySignature } from "~/server/crypto/hmac";
 import { env } from "~/server/env";
+import { logger } from "~/server/lib/logger";
 import { rateLimit } from "~/server/redis/client";
 import { runNightlySnapshot } from "~/server/snapshots/scheduler";
 
@@ -54,7 +55,12 @@ async function handle({ request }: { request: Request }): Promise<Response> {
       bytesTotal: result.bytesTotal,
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: "internal", message: (err as Error).message }), {
+    // Log the detail server-side; never echo the raw exception text back to
+    // the caller.
+    logger.error("cron.snapshots.failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return new Response(JSON.stringify({ error: "internal" }), {
       status: 500,
       headers: { "content-type": "application/json" },
     });

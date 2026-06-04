@@ -10,7 +10,7 @@ import {
   Inbox,
   ShieldAlert,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -50,6 +50,15 @@ function ForderungenPage() {
       toast.error("Konnte nicht aktualisiert werden", { description: e.message });
     },
   });
+
+  // Clear the paid-selection whenever the Mahnstufe filter changes. The
+  // previously selected postings scroll out of the now-different result set,
+  // and the floating "als bezahlt markieren" button must never act on rows
+  // the user can no longer see.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only reset on filter change
+  useEffect(() => {
+    setSelected(new Set());
+  }, [stufeFilter]);
 
   function toggle(id: string) {
     setSelected((prev) => {

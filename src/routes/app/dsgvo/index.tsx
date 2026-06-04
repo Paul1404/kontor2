@@ -123,6 +123,12 @@ function DsgvoIndexPage() {
             <tbody className="divide-y divide-border">
               {list.isError ? (
                 <QueryErrorRow colSpan={6} onRetry={() => list.refetch()} />
+              ) : list.isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    Wird geladen...
+                  </td>
+                </tr>
               ) : (list.data?.rows ?? []).length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
@@ -146,7 +152,9 @@ function DsgvoIndexPage() {
                       {r.memberId ? (
                         <Link
                           to="/app/mitglieder/$mitgliedsnummer"
-                          params={{ mitgliedsnummer: r.memberMitglnr ?? r.memberId }}
+                          params={{
+                            mitgliedsnummer: r.memberMitglnr ?? String(r.memberAdrNr ?? r.memberId),
+                          }}
                           className="text-foreground hover:underline"
                         >
                           {r.memberVorname} {r.memberNachname}{" "}

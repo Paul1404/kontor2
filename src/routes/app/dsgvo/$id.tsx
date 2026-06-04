@@ -61,7 +61,9 @@ function DsgvoDetailPage() {
             {data.memberId ? (
               <Link
                 to="/app/mitglieder/$mitgliedsnummer"
-                params={{ mitgliedsnummer: data.memberMitglnr ?? data.memberId }}
+                params={{
+                  mitgliedsnummer: data.memberMitglnr ?? String(data.memberAdrNr ?? data.memberId),
+                }}
                 className="text-brand hover:underline"
               >
                 {data.memberVorname} {data.memberNachname} #{data.memberMitglnr ?? "—"}

@@ -66,11 +66,17 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
     conditions.push(isNotNull(membersTable.verstorbenAm) as never);
   }
   if (input.status === "aktiv") {
+    // Mirror the members list: an explicit "aktiv" status means not exited and
+    // not deceased, enforced directly so it stays correct even when
+    // `includeAusgetretene` is set. Otherwise exited members leak into the
+    // "aktiv" CSV and the export disagrees with the on-screen list.
+    conditions.push(isNull(membersTable.austritt) as never);
     conditions.push(isNull(membersTable.verstorbenAm) as never);
   }
   if (input.status === "passiv") {
     conditions.push(
       eq(membersTable.aktivPasiv, "P") as never,
+      isNull(membersTable.austritt) as never,
       isNull(membersTable.verstorbenAm) as never,
     );
   }
@@ -280,6 +286,13 @@ async function loadFinanzbericht(
   db: AppContext["db"],
   input: v.InferOutput<typeof YearInput>,
 ): Promise<FinanzberichtData> {
+  // Exclude postings of soft-deleted members (both the app `deletedAt` and the
+  // legacy Linear `geloscht`), so the Finanzbericht matches every other report.
+  const notDeleted = and(
+    isNull(membersTable.deletedAt),
+    sql`coalesce(${membersTable.geloscht}, false) = false`,
+  );
+
   const totalsRows = await db
     .select({
       billed: sql<string>`coalesce(sum(${sollStellungenTable.amount}), 0)::text`,
@@ -288,7 +301,8 @@ async function loadFinanzbericht(
       count: sql<number>`count(*)::int`,
     })
     .from(sollStellungenTable)
-    .where(eq(sollStellungenTable.billingYear, input.year));
+    .innerJoin(membersTable, eq(membersTable.id, sollStellungenTable.memberId))
+    .where(and(eq(sollStellungenTable.billingYear, input.year), notDeleted));
   const totals = totalsRows[0] ?? { billed: "0", paid: "0", open: "0", count: 0 };
 
   const perAbteilung = await db
@@ -300,9 +314,10 @@ async function loadFinanzbericht(
       count: sql<number>`count(*)::int`,
     })
     .from(sollStellungenTable)
+    .innerJoin(membersTable, eq(membersTable.id, sollStellungenTable.memberId))
     .innerJoin(contractsTable, eq(contractsTable.id, sollStellungenTable.contractId))
     .leftJoin(feeTypesTable, eq(feeTypesTable.art, contractsTable.art))
-    .where(eq(sollStellungenTable.billingYear, input.year))
+    .where(and(eq(sollStellungenTable.billingYear, input.year), notDeleted))
     .groupBy(feeTypesTable.abteilung)
     .orderBy(sql`coalesce(${feeTypesTable.abteilung}, '(ohne Abteilung)')`);
 
@@ -318,9 +333,10 @@ async function loadFinanzbericht(
       count: sql<number>`count(*)::int`,
     })
     .from(sollStellungenTable)
+    .innerJoin(membersTable, eq(membersTable.id, sollStellungenTable.memberId))
     .innerJoin(contractsTable, eq(contractsTable.id, sollStellungenTable.contractId))
     .leftJoin(feeTypesTable, eq(feeTypesTable.art, contractsTable.art))
-    .where(eq(sollStellungenTable.billingYear, input.year))
+    .where(and(eq(sollStellungenTable.billingYear, input.year), notDeleted))
     .groupBy(contractsTable.art, feeTypesTable.bezeichnung, contractsTable.artName)
     .orderBy(asc(contractsTable.art));
 

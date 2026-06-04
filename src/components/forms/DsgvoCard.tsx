@@ -315,7 +315,7 @@ function ErasureSection({ memberId, memberSlug }: { memberId: string; memberSlug
             {diff.length === 0 ? (
               <tr>
                 <td colSpan={3} className="px-2 py-3 text-center text-muted-foreground">
-                  Keine zu löschenden Daten vorhanden — Mitglied bereits anonymisiert.
+                  Keine zu löschenden Daten vorhanden. Mitglied bereits anonymisiert.
                 </td>
               </tr>
             ) : (

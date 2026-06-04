@@ -22,7 +22,7 @@ import { Switch } from "~/components/ui/switch";
 import { toast } from "~/components/ui/toaster";
 import { cn } from "~/lib/cn";
 import { triggerDownloadBase64 } from "~/lib/download";
-import { formatDateTime } from "~/lib/format";
+import { formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 type MemberLike = Record<string, unknown>;
@@ -728,7 +728,8 @@ export function AustrittsbestaetigungCard({
                     ) : null}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    Austritt zum {row.austrittDatum} · erstellt {formatDateTime(row.createdAt)}
+                    Austritt zum {formatDate(row.austrittDatum)} · erstellt{" "}
+                    {formatDateTime(row.createdAt)}
                   </span>
                 </div>
                 <Button

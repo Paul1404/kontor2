@@ -61,6 +61,9 @@ export const dsgvoRouter = {
             memberVorname: membersTable.vorname,
             memberNachname: membersTable.nachname,
             memberMitglnr: membersTable.mitglnr,
+            // Legacy Kontakte have no mitglnr; the member link falls back to
+            // the numeric adrNr, which the detail route resolves.
+            memberAdrNr: membersTable.adrNr,
           })
           .from(dsgvoRequestsTable)
           .leftJoin(membersTable, eq(membersTable.id, dsgvoRequestsTable.memberId))
@@ -93,6 +96,7 @@ export const dsgvoRouter = {
           memberVorname: membersTable.vorname,
           memberNachname: membersTable.nachname,
           memberMitglnr: membersTable.mitglnr,
+          memberAdrNr: membersTable.adrNr,
         })
         .from(dsgvoRequestsTable)
         .leftJoin(membersTable, eq(membersTable.id, dsgvoRequestsTable.memberId))

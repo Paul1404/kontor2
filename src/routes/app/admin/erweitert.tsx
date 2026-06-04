@@ -21,12 +21,15 @@ import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/admin/erweitert")({
   beforeLoad: async () => {
+    let me: Awaited<ReturnType<typeof orpc.auth.me>>;
     try {
-      const me = await orpc.auth.me();
-      if (me.role !== "admin") throw redirect({ to: "/app" });
+      me = await orpc.auth.me();
     } catch {
       throw redirect({ to: "/login" });
     }
+    // Keep this redirect out of the try: a logged-in non-admin must land back
+    // in the app, not get bounced to the login screen by the catch above.
+    if (me.role !== "admin") throw redirect({ to: "/app" });
   },
   component: DangerZonePage,
 });
