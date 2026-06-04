@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ExternalLink,
   FileText,
+  HeartHandshake,
   Inbox,
   ShieldAlert,
 } from "lucide-react";
@@ -80,6 +81,12 @@ function ForderungenPage() {
             <Button variant="outline" size="sm">
               <FileText className="size-4" />
               Mahnläufe
+            </Button>
+          </Link>
+          <Link to="/app/forderungen/kulanz">
+            <Button variant="outline" size="sm">
+              <HeartHandshake className="size-4" />
+              Kulanz-Brief
             </Button>
           </Link>
           <Link to="/app/forderungen/mahnungen/neu">

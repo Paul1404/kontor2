@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.10.0",
+    date: "2026-06-04",
+    title: "Zahlungserinnerung mit Sonderkündigung aus Kulanz",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neuer Sammelbrief unter Forderungen: eine Zahlungserinnerung, die zugleich aus Kulanz eine Sonderkündigung anbietet. Das Mitglied kann zahlen oder die beigelegte Kündigungsbestätigung unterschrieben zurücksenden, dann wird auf die offene Forderung verzichtet.",
+      },
+      {
+        category: "feature",
+        description:
+          "Jedes Schreiben enthält unten eine abtrennbare Kündigungsbestätigung mit Name, Mitgliedsnummer und Unterschriftsfeld. Alle Briefe eines Laufs liegen in einem gemeinsamen PDF zum Ausdrucken.",
+      },
+      {
+        category: "feature",
+        description:
+          "Die Empfängerliste zeigt standardmäßig nur Mitglieder ohne E-Mail-Adresse, da der Brief für den Postweg gedacht ist. Frühere Sammelbriefe lassen sich erneut herunterladen.",
+      },
+    ],
+  },
+  {
     version: "0.9.0",
     date: "2026-06-03",
     title: "Austrittsbestätigung denkt mit, Mitgliederseiten aufgeräumt",
