@@ -10,7 +10,7 @@ WORKDIR /app
 # re-downloaded on every deploy.
 FROM base AS builder
 COPY package.json bun.lock ./
-RUN --mount=type=cache,target=/root/.bun/install/cache \
+RUN --mount=type=cache,id=bun-cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
 COPY . .
 RUN bun run build
@@ -19,7 +19,7 @@ RUN bun run build
 # so these packages were already fetched in the builder stage.
 FROM base AS prod-deps
 COPY package.json bun.lock ./
-RUN --mount=type=cache,target=/root/.bun/install/cache \
+RUN --mount=type=cache,id=bun-cache,target=/root/.bun/install/cache \
     bun install --production --frozen-lockfile
 
 # Runtime: built output plus production node_modules only. No node toolchain --
