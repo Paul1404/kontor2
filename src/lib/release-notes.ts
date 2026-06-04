@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.11.0",
+    date: "2026-06-04",
+    title: "Antwortmöglichkeiten im Kulanz-Brief und sauberere Lastschrift-Erkennung",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Der Kulanz-Brief trägt auf dem Abschnitt jetzt eine Rücksendeadresse, damit die unterschriebene Kündigungsbestätigung ein Ziel hat. Ist unter Vereinsdaten eine Kontakt-E-Mail hinterlegt, wird zusätzlich die Rücksendung per E-Mail angeboten.",
+      },
+      {
+        category: "internal",
+        description:
+          "Ob ein Vertrag per Lastschrift zahlt, wird jetzt einmalig beim Import als Feld gespeichert statt bei jeder Abfrage neu aus den Altsystem-Spalten abgeleitet. Die mitgelieferte Migration füllt bestehende Verträge automatisch.",
+      },
+    ],
+  },
+  {
     version: "0.10.2",
     date: "2026-06-04",
     title: "Korrekturen an Berichten, Forderungen und Verlinkungen",

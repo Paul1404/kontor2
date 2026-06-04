@@ -70,21 +70,40 @@ describe("kulanzSalutation", () => {
 });
 
 describe("buildKulanzClubModel", () => {
+  const clubInput = {
+    vereinsname: "SV Untereuerheim",
+    anschriftStrasse: "Sportplatz 1",
+    anschriftPlz: "97447",
+    anschriftOrt: "Untereuerheim",
+    kontaktEmail: "mitgliedschaft@sv-untereuerheim.de",
+    vereinsIban: "DE89370400440532013000",
+    vereinsBic: "COBADEFFXXX",
+    vereinsBankname: "Sparkasse",
+    glaeubigerId: "DE00ZZZ00000000000",
+    logoDataUri: null,
+  };
+
   it("builds a sender line and formats the IBAN", () => {
-    const club = buildKulanzClubModel({
-      vereinsname: "SV Untereuerheim",
-      anschriftStrasse: "Sportplatz 1",
-      anschriftPlz: "97447",
-      anschriftOrt: "Untereuerheim",
-      vereinsIban: "DE89370400440532013000",
-      vereinsBic: "COBADEFFXXX",
-      vereinsBankname: "Sparkasse",
-      glaeubigerId: "DE00ZZZ00000000000",
-      logoDataUri: null,
-    });
+    const club = buildKulanzClubModel(clubInput);
     expect(club.senderLine).toBe("SV Untereuerheim · Sportplatz 1 · 97447 Untereuerheim");
     expect(club.bank.iban).toBe("DE89 3704 0044 0532 0130 00");
     expect(club.bank.empfaenger).toBe("SV Untereuerheim");
+  });
+
+  it("builds a return address and email so the tear-off slip has a destination", () => {
+    const club = buildKulanzClubModel(clubInput);
+    expect(club.rueckantwort.adresseLines).toEqual([
+      "SV Untereuerheim",
+      "Sportplatz 1",
+      "97447 Untereuerheim",
+    ]);
+    expect(club.rueckantwort.email).toBe("mitgliedschaft@sv-untereuerheim.de");
+  });
+
+  it("omits the email line when no contact mailbox is configured", () => {
+    const club = buildKulanzClubModel({ ...clubInput, kontaktEmail: null });
+    expect(club.rueckantwort.email).toBeNull();
+    expect(club.rueckantwort.adresseLines).toContain("SV Untereuerheim");
   });
 });
 

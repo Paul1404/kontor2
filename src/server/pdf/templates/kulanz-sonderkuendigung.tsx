@@ -91,6 +91,9 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: "#555",
   },
+  rueckantwort: { marginTop: 16, fontSize: 8.5 },
+  rueckantwortLabel: { fontFamily: "Helvetica-Bold", marginBottom: 2 },
+  rueckantwortEmail: { marginTop: 4, color: "#555" },
   footer: {
     position: "absolute",
     bottom: 28,
@@ -216,6 +219,19 @@ function KulanzLetterPage({ club, letter }: { club: KulanzClubModel; letter: Kul
           <Text style={styles.slipField}>Ort, Datum</Text>
           <Text style={styles.slipField}>Unterschrift</Text>
         </View>
+        {club.rueckantwort.adresseLines.length > 0 || club.rueckantwort.email ? (
+          <View style={styles.rueckantwort}>
+            <Text style={styles.rueckantwortLabel}>Bitte zurücksenden an:</Text>
+            {club.rueckantwort.adresseLines.map((line, i) => (
+              <Text key={String(i)}>{line}</Text>
+            ))}
+            {club.rueckantwort.email ? (
+              <Text style={styles.rueckantwortEmail}>
+                oder unterschrieben eingescannt per E-Mail an {club.rueckantwort.email}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
       <Text
