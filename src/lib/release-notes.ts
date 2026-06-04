@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.16.0",
+    date: "2026-06-04",
+    title: "Mitglied austreten und Eintritt mit Assistent",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neuer Austritt in einem Schritt: Über die Schaltfläche Austritt auf der Mitgliedsseite wird das Austrittsdatum auf das Mitglied und zugleich auf alle offenen Abteilungs-Mitgliedschaften, laufenden Verträge und aktiven SEPA-Mandate übertragen. Auf Wunsch wird das Mitglied auf passiv gesetzt und die Mandate werden widerrufen. Offene Forderungen werden im Dialog angezeigt, aber nicht storniert. Danach kann direkt die Austrittsbestätigung erstellt werden.",
+      },
+      {
+        category: "feature",
+        description:
+          "Austritt rückgängig: Ein versehentlicher oder rückgängig zu machender Austritt lässt sich mit einem Klick zurücknehmen. Es werden genau die Datensätze wieder geöffnet, die der Austritt zum selben Datum geschlossen hat.",
+      },
+      {
+        category: "feature",
+        description:
+          "Geführte Neuanlage: Ein neues Mitglied wird jetzt in zwei Schritten angelegt. Zuerst die Stammdaten, dann Abteilungen, optional ein Beitrag und ein SEPA-Mandat. Alles wird gemeinsam gespeichert.",
+      },
+    ],
+  },
+  {
     version: "0.15.2",
     date: "2026-06-04",
     changes: [

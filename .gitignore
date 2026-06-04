@@ -31,3 +31,9 @@ tsconfig.tsbuildinfo
 # stray TanStack routeTree artifact generated at the wrong path during build;
 # the real one lives at src/routes/routeTree.gen.ts.
 /src/routeTree.gen.ts
+
+# Real Linear backups contain member PII and must never be committed. Only the
+# schema-only reference (reference/linear/schema.sql) belongs in git.
+/reference/linear/datesicherung.sql
+/reference/linear/*.dump
+/reference/linear/*.backup
