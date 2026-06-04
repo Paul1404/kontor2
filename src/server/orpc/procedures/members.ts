@@ -218,8 +218,10 @@ export const membersRouter = {
       );
     }
 
-    // Hide soft-deleted members from the normal list view.
+    // Hide soft-deleted members from the normal list view. Both flags: the
+    // app's `deletedAt` and the legacy Linear `geloscht` set on imported rows.
     conditions.push(isNull(membersTable.deletedAt) as never);
+    conditions.push(sql`coalesce(${membersTable.geloscht}, false) = false` as never);
 
     // "Verwaiste Kontakte" filter: Kontakt (no mitglnr) AND no relationship
     // pointing to or from this row. Used by admins to find Linear-import
@@ -474,17 +476,19 @@ export const membersRouter = {
         ]);
 
       // The IBAN columns are AES-256-GCM ciphertext at rest but our custom
-      // drizzle type decrypts on read. We expose iban1 in clear (the page
-      // is gated to authed users; vorstand sees the full IBAN). iban2/iban3
-      // are unused in the UI today, so drop their ciphertexts.
+      // drizzle type decrypts on read. iban2/iban3 are unused in the UI today,
+      // so drop their plaintext outright.
       const { iban2, iban3, ...stamm } = m;
       void iban2;
       void iban3;
 
-      // Hide the audit trail from readonly viewers: revealing who edited
-      // what when is operational metadata the vorstand owns.
+      // Readonly viewers get neither the cleartext IBAN nor the audit trail:
+      // the full account number is financial PII the vorstand owns, and the
+      // masked `iban1Last4` already covers what the page needs to show them.
       const role = (context.session?.user.role as string | undefined) ?? "readonly";
-      const visibleAudit = role === "readonly" ? [] : audit;
+      const isReadonly = role === "readonly";
+      if (isReadonly) stamm.iban1 = null;
+      const visibleAudit = isReadonly ? [] : audit;
 
       // Count of incoming relationships (others who point at this member)
       // — needed alongside outgoing `beziehungen` to detect orphan
@@ -536,7 +540,10 @@ export const membersRouter = {
    */
   stats: authedProc.input(v.void()).handler(async ({ context }) =>
     cached(CACHE_NS.dashboard, "members-stats", 120, async () => {
-      const notDeleted = isNull(membersTable.deletedAt);
+      const notDeleted = and(
+        isNull(membersTable.deletedAt),
+        sql`coalesce(${membersTable.geloscht}, false) = false`,
+      );
       const lebt = and(
         notDeleted,
         isNull(membersTable.austritt),

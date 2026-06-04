@@ -75,6 +75,7 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
     );
   }
   conditions.push(isNull(membersTable.deletedAt) as never);
+  conditions.push(sql`coalesce(${membersTable.geloscht}, false) = false` as never);
   if (input.q.trim()) {
     const like = `%${input.q.trim()}%`;
     conditions.push(
@@ -116,6 +117,7 @@ async function loadGeburtstage(
     isNull(membersTable.austritt) as never,
     isNull(membersTable.verstorbenAm) as never,
     isNull(membersTable.deletedAt) as never,
+    sql`coalesce(${membersTable.geloscht}, false) = false` as never,
     sql`${monthExpr} = ${input.month}` as never,
   ];
 
@@ -177,6 +179,7 @@ async function loadEhrungen(
   const conditions = [
     isNotNull(membersTable.eintritt) as never,
     isNull(membersTable.deletedAt) as never,
+    sql`coalesce(${membersTable.geloscht}, false) = false` as never,
     inArray(
       sql<number>`extract(year from ${membersTable.eintritt})::int`,
       jubilaeen.map((j) => input.year - j),
@@ -406,7 +409,13 @@ export const reportsRouter = {
           aktivPasiv: membersTable.aktivPasiv,
         })
         .from(membersTable)
-        .where(and(inArray(membersTable.id, ids), isNull(membersTable.deletedAt)))
+        .where(
+          and(
+            inArray(membersTable.id, ids),
+            isNull(membersTable.deletedAt),
+            sql`coalesce(${membersTable.geloscht}, false) = false`,
+          ),
+        )
         .orderBy(asc(membersTable.nachname), asc(membersTable.vorname));
       const stamp = new Date().toISOString().slice(0, 10);
       return {

@@ -256,6 +256,35 @@ export const sepaReturnsRouter = {
           .set({ returnedAt: null, returnReasonCode: null })
           .where(eq(feeRunItemsTable.id, row.feeRunItemId));
       }
+
+      // Restore the Sollstellung the return had reopened. Creating a return
+      // forces the posting to returned/open; undoing it must put it back to
+      // the collected state (eingezogen, fully paid) so it does not linger in
+      // the dunning pipeline. Only do this if no other return still reopens
+      // the same posting, and only while it is still in `returned` state so we
+      // never clobber a status the vorstand changed in the meantime.
+      if (row.sollStellungId) {
+        const [otherReturns] = await tx
+          .select({ c: count() })
+          .from(sepaReturnsTable)
+          .where(eq(sepaReturnsTable.sollStellungId, row.sollStellungId));
+        if ((otherReturns?.c ?? 0) === 0) {
+          await tx
+            .update(sollStellungenTable)
+            .set({
+              status: "eingezogen",
+              paidAmount: sql`${sollStellungenTable.amount}`,
+              openAmount: "0",
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(sollStellungenTable.id, row.sollStellungId),
+                eq(sollStellungenTable.status, "returned"),
+              ),
+            );
+        }
+      }
       await appendAudit(tx, {
         entityType: "sepa_return",
         entityId: input.id,

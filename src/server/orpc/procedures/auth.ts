@@ -90,13 +90,17 @@ export const authRouter = {
         }
         if (existing.role === input.role) return;
 
-        // Refuse the demotion if it would leave zero admins. We check
-        // *other* admins (excluding the target user) inside the same tx.
+        // Refuse the demotion if it would leave zero usable admins. We count
+        // *other* admins (excluding the target) inside the same tx, and skip
+        // banned ones: a banned admin can't act, so it must not keep the last
+        // active admin demotable. Mirrors the better-auth last-admin guard.
         if (existing.role === "admin" && input.role !== "admin") {
           const [row] = await tx
             .select({ c: count() })
             .from(users)
-            .where(and(eq(users.role, "admin"), ne(users.id, input.userId)));
+            .where(
+              and(eq(users.role, "admin"), ne(users.id, input.userId), eq(users.banned, false)),
+            );
           if ((row?.c ?? 0) === 0) {
             throw new ORPCError("CONFLICT", {
               message: "Letzten Administrator kann nicht degradieren.",
