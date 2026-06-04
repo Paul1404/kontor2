@@ -33,7 +33,6 @@ import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import { clubLogoDataUri } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { MahnungDocument, type MahnungInput } from "~/server/pdf/templates/mahnung";
-import { directDebitSql } from "~/server/sepa/direct-debit";
 
 const Level = v.picklist([1, 2, 3] as const);
 
@@ -946,9 +945,9 @@ export const dunningRouter = {
    * debt. This previews how many `open` direct-debit postings up to and
    * including `throughYear` would be marked `eingezogen`.
    *
-   * Only postings whose contract pays by direct debit are touched (see
-   * `paysByDirectDebit`: blank `lastschrift` counts as direct debit, the way
-   * Linear stores it). Invoice payers (`aufRechnung = 'J'`) stay `open`,
+   * Only postings whose contract pays by direct debit are touched (the
+   * `contracts.is_direct_debit` flag, normalized at import time from Linear's
+   * blank-means-direct-debit `lastschrift`). Invoice payers stay `open`,
    * because for them a missing payment really is unknown.
    */
   settleHistoricalPreview: adminProc
@@ -970,7 +969,7 @@ export const dunningRouter = {
             eq(sollStellungenTable.status, "open"),
             lte(sollStellungenTable.billingYear, input.throughYear),
             sql`${sollStellungenTable.openAmount}::numeric > 0`,
-            directDebitSql(contractsTable.lastschrift, contractsTable.aufRechnung),
+            eq(contractsTable.isDirectDebit, true),
           ),
         );
 
@@ -1017,7 +1016,7 @@ export const dunningRouter = {
               eq(sollStellungenTable.status, "open"),
               lte(sollStellungenTable.billingYear, input.throughYear),
               sql`${sollStellungenTable.openAmount}::numeric > 0`,
-              directDebitSql(contractsTable.lastschrift, contractsTable.aufRechnung),
+              eq(contractsTable.isDirectDebit, true),
             ),
           );
 

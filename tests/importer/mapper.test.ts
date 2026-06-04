@@ -73,6 +73,23 @@ describe("mapContractRow / mapSepaRow", () => {
     expect(c?.betrag).toBe("12.5");
   });
 
+  it("normalizes is_direct_debit at the edge from Linear's lastschrift/aufRechnung", () => {
+    // Blank lastschrift = direct debit (Linear's default for the common case).
+    expect(mapContractRow({ AdrNr: 1, VertragNr: "V1", Art: 5 })?.isDirectDebit).toBe(true);
+    // Explicit "J" = direct debit.
+    expect(
+      mapContractRow({ AdrNr: 1, VertragNr: "V1", Art: 5, Lastschrift: "J" })?.isDirectDebit,
+    ).toBe(true);
+    // Explicit non-"J" = not direct debit.
+    expect(
+      mapContractRow({ AdrNr: 1, VertragNr: "V1", Art: 5, Lastschrift: "N" })?.isDirectDebit,
+    ).toBe(false);
+    // Invoice payer (aufRechnung = "J") is never direct debit, blank lastschrift or not.
+    expect(
+      mapContractRow({ AdrNr: 1, VertragNr: "V1", Art: 5, AufRechnung: "J" })?.isDirectDebit,
+    ).toBe(false);
+  });
+
   it("sepa requires AdrNr and MandatsNr", () => {
     expect(mapSepaRow({ AdrNr: 1 })).toBeNull();
     const s = mapSepaRow({

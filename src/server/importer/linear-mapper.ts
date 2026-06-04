@@ -18,6 +18,7 @@ import {
   coerceInt,
   coerceStr,
 } from "~/server/importer/sql-tokenizer";
+import { paysByDirectDebit } from "~/server/sepa/direct-debit";
 
 export type LinearRow = Record<string, Cell>;
 
@@ -350,6 +351,8 @@ export function mapContractRow(d: LinearRow): Record<string, unknown> | null {
   const vertragNr = coerceStr(d.VertragNr ?? null, 20);
   const art = coerceInt(d.Art ?? null);
   if (adrNr === null || !vertragNr || art === null) return null;
+  const lastschrift = coerceStr(d.Lastschrift ?? null, 1);
+  const aufRechnung = coerceStr(d.AufRechnung ?? null, 4);
   return {
     adrNr,
     vertragNr,
@@ -370,7 +373,11 @@ export function mapContractRow(d: LinearRow): Record<string, unknown> | null {
     frueGekuendZum: coerceDate(d.FrueGekuendZum ?? null),
     autoVerlZahl: coerceInt(d.AutoVerlZahl ?? null),
     autoVerlZeit: coerceStr(d.AutoVerlZeit ?? null, 10),
-    aufRechnung: coerceStr(d.AufRechnung ?? null, 4),
+    aufRechnung,
+    // Normalize Linear's blank-means-direct-debit quirk once, here at the
+    // edge, so runtime queries read a plain boolean instead of reinterpreting
+    // `lastschrift`/`aufRechnung` themselves.
+    isDirectDebit: paysByDirectDebit(lastschrift, aufRechnung),
     anteilig: coerceStr(d.Anteilig ?? null, 1),
     multipl: coerceInt(d.Multipl ?? null),
     steuer: coerceStr(d.Steuer ?? null, 1),
@@ -379,7 +386,7 @@ export function mapContractRow(d: LinearRow): Record<string, unknown> | null {
     verwZw2: coerceStr(d.VerwZw2 ?? null, 60),
     verwZw3: coerceStr(d.VerwZw3 ?? null, 60),
     verwZw4: coerceStr(d.VerwZw4 ?? null, 60),
-    lastschrift: coerceStr(d.Lastschrift ?? null, 1),
+    lastschrift,
     blzV: coerceStr(d.BLZ_V ?? null, 15),
     bankV: coerceStr(d.Bank_V ?? null, 60),
     kontoV: coerceStr(d.Konto_V ?? null, 15),
