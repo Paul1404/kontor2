@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.15.1",
+    date: "2026-06-04",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Schnellere und zuverlässigere Deployments: Der Docker-Build nutzt jetzt einen Paket-Cache, baut auf einer fest gepinnten Bun-Version und die Datenbank-Migration beim Deploy läuft unter Bun statt Node.",
+      },
+    ],
+  },
+  {
     version: "0.15.0",
     date: "2026-06-04",
     title: "Briefe im DIN-5008-Format",

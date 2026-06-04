@@ -38,3 +38,24 @@ jobs:
 
       - name: Build
         run: bun run build
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build the production image (no push) so a broken Dockerfile fails here
+      # instead of at deploy time. The GitHub Actions cache persists the Bun
+      # install and build layers between runs.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
