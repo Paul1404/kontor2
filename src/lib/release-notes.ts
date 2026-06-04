@@ -53,7 +53,7 @@ export const RELEASES: Release[] = [
       {
         category: "improvement",
         description:
-          "Jeder erzeugte Sammelbrief bekommt eine eindeutige Dokumentnummer (zum Beispiel KS-2026-0001). Sie steht im PDF, in der Liste der früheren Schreiben und im Dateinamen beim Download, damit sich zwei Briefe vom selben Tag nicht mehr verwechseln lassen.",
+          "Jeder erzeugte Sammelbrief bekommt eine eindeutige Dokumentnummer (zum Beispiel KS-2026-0001). Sie ist auf jeder Seite des Briefs aufgedruckt und steht zusätzlich in der Liste der früheren Schreiben und im Dateinamen beim Download, damit sich zwei Briefe vom selben Tag nicht mehr verwechseln lassen.",
       },
     ],
   },

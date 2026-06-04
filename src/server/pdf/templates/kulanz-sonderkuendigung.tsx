@@ -104,7 +104,15 @@ export type KulanzDocumentProps = {
   docRef: string;
 };
 
-function KulanzLetterPage({ club, letter }: { club: KulanzClubModel; letter: KulanzLetterModel }) {
+function KulanzLetterPage({
+  club,
+  letter,
+  docRef,
+}: {
+  club: KulanzClubModel;
+  letter: KulanzLetterModel;
+  docRef: string;
+}) {
   return (
     <Page size="A4" style={styles.page} wrap>
       <View style={styles.headerRow}>
@@ -126,6 +134,7 @@ function KulanzLetterPage({ club, letter }: { club: KulanzClubModel; letter: Kul
 
       <View style={styles.meta}>
         <Text style={styles.metaItem}>Mitgliedsnummer: {letter.mitgliedsnummer}</Text>
+        <Text style={styles.metaItem}>Dokument: {docRef}</Text>
         <Text style={styles.metaItem}>Datum: {letter.datum}</Text>
       </View>
 
@@ -200,7 +209,7 @@ function KulanzLetterPage({ club, letter }: { club: KulanzClubModel; letter: Kul
       <Text style={{ marginTop: 16 }}>Mit freundlichen Grüßen</Text>
       <Text style={{ marginTop: 20 }}>{club.vereinsname}</Text>
 
-      <Footer club={club} />
+      <Footer club={club} docRef={docRef} />
     </Page>
   );
 }
@@ -215,9 +224,11 @@ function KulanzLetterPage({ club, letter }: { club: KulanzClubModel; letter: Kul
 function KulanzResponsePage({
   club,
   letter,
+  docRef,
 }: {
   club: KulanzClubModel;
   letter: KulanzLetterModel;
+  docRef: string;
 }) {
   return (
     <Page size="A4" style={styles.page}>
@@ -237,6 +248,7 @@ function KulanzResponsePage({
 
       <View style={styles.meta}>
         <Text style={styles.metaItem}>Mitgliedsnummer: {letter.mitgliedsnummer}</Text>
+        <Text style={styles.metaItem}>Dokument: {docRef}</Text>
         <Text style={styles.metaItem}>Datum: {letter.datum}</Text>
       </View>
 
@@ -258,17 +270,17 @@ function KulanzResponsePage({
         </Text>
       ) : null}
 
-      <Footer club={club} />
+      <Footer club={club} docRef={docRef} />
     </Page>
   );
 }
 
-function Footer({ club }: { club: KulanzClubModel }) {
+function Footer({ club, docRef }: { club: KulanzClubModel; docRef: string }) {
   return (
     <Text
       style={styles.footer}
       render={({ pageNumber, totalPages }) =>
-        `${club.vereinsname} · Gläubiger-ID ${club.glaeubigerId} · Seite ${pageNumber}/${totalPages}`
+        `${club.vereinsname} · Dokument ${docRef} · Gläubiger-ID ${club.glaeubigerId} · Seite ${pageNumber}/${totalPages}`
       }
       fixed
     />
@@ -285,8 +297,8 @@ export function KulanzSonderkuendigungDocument({ club, letters, docRef }: Kulanz
         // Each recipient gets two pages: the cover letter and a ready-to-return
         // Kündigungsbestätigung.
         <Fragment key={String(i)}>
-          <KulanzLetterPage club={club} letter={letter} />
-          <KulanzResponsePage club={club} letter={letter} />
+          <KulanzLetterPage club={club} letter={letter} docRef={docRef} />
+          <KulanzResponsePage club={club} letter={letter} docRef={docRef} />
         </Fragment>
       ))}
     </Document>
