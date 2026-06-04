@@ -100,6 +100,8 @@ const styles = StyleSheet.create({
 export type KulanzDocumentProps = {
   club: KulanzClubModel;
   letters: KulanzLetterModel[];
+  /** Human-readable document reference for this run, e.g. "KS-2026-0001". */
+  docRef: string;
 };
 
 function KulanzLetterPage({ club, letter }: { club: KulanzClubModel; letter: KulanzLetterModel }) {
@@ -192,6 +194,7 @@ function KulanzLetterPage({ club, letter }: { club: KulanzClubModel; letter: Kul
 
       <View style={styles.kulanzBox}>
         <Text>{letter.kulanz}</Text>
+        {letter.kulanzEmail ? <Text style={{ marginTop: 6 }}>{letter.kulanzEmail}</Text> : null}
       </View>
 
       <Text style={{ marginTop: 16 }}>Mit freundlichen Grüßen</Text>
@@ -272,10 +275,10 @@ function Footer({ club }: { club: KulanzClubModel }) {
   );
 }
 
-export function KulanzSonderkuendigungDocument({ club, letters }: KulanzDocumentProps) {
+export function KulanzSonderkuendigungDocument({ club, letters, docRef }: KulanzDocumentProps) {
   return (
     <Document
-      title={`Zahlungserinnerung (Kulanz) · ${letters.length} Schreiben`}
+      title={`Zahlungserinnerung (Kulanz) ${docRef} · ${letters.length} Schreiben`}
       author={club.vereinsname}
     >
       {letters.map((letter, i) => (

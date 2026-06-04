@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.12.0",
+    date: "2026-06-04",
+    title: "Kündigung per E-Mail und eindeutige Dokumentnummern",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Der Kulanz-Brief bietet jetzt zusätzlich an, die Kündigung formlos per E-Mail an die hinterlegte Kontaktadresse zu schicken, statt die unterschriebene Kündigungsbestätigung zurückzusenden. Die Adresse wird aus den Vereinsdaten übernommen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Jeder erzeugte Sammelbrief bekommt eine eindeutige Dokumentnummer (zum Beispiel KS-2026-0001). Sie steht im PDF, in der Liste der früheren Schreiben und im Dateinamen beim Download, damit sich zwei Briefe vom selben Tag nicht mehr verwechseln lassen.",
+      },
+    ],
+  },
+  {
     version: "0.11.0",
     date: "2026-06-04",
     title: "Antwortmöglichkeiten im Kulanz-Brief und sauberere Lastschrift-Erkennung",

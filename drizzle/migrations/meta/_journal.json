@@ -127,6 +127,13 @@
       "when": 1780599377729,
       "tag": "0017_backfill_contract_is_direct_debit",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1780600849037,
+      "tag": "0018_aspiring_daredevil",
+      "breakpoints": true
     }
   ]
 }
