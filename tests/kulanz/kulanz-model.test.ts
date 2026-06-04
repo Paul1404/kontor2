@@ -25,12 +25,14 @@ const baseLetter = {
       falligkeitsdatum: "2024-03-01",
       description: "Beitrag (Aktiv)",
       openAmount: "30.00",
+      rueckgebuhr: "0.00",
     },
     {
       billingYear: 2025,
       falligkeitsdatum: "2025-03-01",
       description: "Beitrag (Aktiv)",
       openAmount: "30.00",
+      rueckgebuhr: "0.00",
     },
   ],
   openSum: "60.00",
@@ -104,6 +106,25 @@ describe("buildKulanzLetterModel", () => {
       offen: "30,00 €",
     });
     expect(m.openSum).toBe("60,00 €");
+    expect(m.rueckgebuhr).toBeNull();
+  });
+
+  it("surfaces SEPA return fees as a separate line so the rows reconcile with the total", () => {
+    // 30,00 Beitrag + 3,00 R-Gebühr on the first posting, 30,00 on the second:
+    // openSum upstream already folds the fee in (63,00). The fee must show as
+    // its own line so the visible rows add up to the printed total.
+    const m = buildKulanzLetterModel({
+      ...baseLetter,
+      postings: [
+        { ...baseLetter.postings[0]!, rueckgebuhr: "3.00" },
+        { ...baseLetter.postings[1]!, rueckgebuhr: "0.00" },
+      ],
+      openSum: "63.00",
+    });
+    expect(m.postings.map((p) => p.offen)).toEqual(["30,00 €", "30,00 €"]);
+    expect(m.rueckgebuhr).toBe("3,00 €");
+    // 30,00 + 30,00 + 3,00 fee = 63,00 total shown.
+    expect(m.openSum).toBe("63,00 €");
   });
 
   it("builds the tear-off slip with member identity and club name", () => {

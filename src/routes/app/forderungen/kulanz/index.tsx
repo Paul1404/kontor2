@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Download, FileText, HeartHandshake, MailX } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Download, FileText, HeartHandshake, MailX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -66,14 +66,20 @@ function KulanzPage() {
 
   const download = useMutation({
     mutationFn: (id: string) => orpc.kulanz.download({ id }),
-    onSuccess: (r) => window.open(r.url, "_blank"),
+    onSuccess: (r) => window.open(r.url, "_blank", "noopener"),
     onError: (e: Error) => toast.error("Download fehlgeschlagen", { description: e.message }),
   });
 
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
   const filteredTotals = useMemo(() => {
-    if (!preview.data) return { count: 0, openSum: "0" };
+    if (!preview.data) return { count: 0, openSum: "0", noAddress: 0 };
     const picked = preview.data.items.filter((i) => selected.has(i.memberId));
-    return { count: picked.length, openSum: sumDec(picked.map((i) => i.openSum)) };
+    return {
+      count: picked.length,
+      openSum: sumDec(picked.map((i) => i.openSum)),
+      noAddress: picked.filter((i) => !i.hasAddress).length,
+    };
   }, [preview.data, selected]);
 
   function toggleAll() {
@@ -140,13 +146,29 @@ function KulanzPage() {
             onChange={(e) => setOnlyWithoutEmail(e.target.checked)}
           />
           <Field label="Frist (Zahlung oder Kündigung)">
-            <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+            <Input
+              type="date"
+              min={today}
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+            />
             <span className="text-xs text-muted-foreground">
               Leer lassen, um die Standardfrist aus den Vereinsdaten zu verwenden.
             </span>
           </Field>
         </CardContent>
       </Card>
+
+      {filteredTotals.noAddress > 0 ? (
+        <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <span>
+            {filteredTotals.noAddress} ausgewählte(s) Mitglied(er) ohne hinterlegte Anschrift. Diese
+            Schreiben lassen sich nicht per Post zustellen. Pflegen Sie die Adresse oder wählen Sie
+            die Mitglieder ab.
+          </span>
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -166,7 +188,9 @@ function KulanzPage() {
             <p className="text-sm text-muted-foreground">Wird geladen...</p>
           ) : !preview.data || preview.data.items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Keine passenden Mitglieder mit offenen Beiträgen.
+              {onlyWithoutEmail
+                ? "Keine Mitglieder mit offenen Beiträgen ohne E-Mail-Adresse. Schalten Sie den Filter oben aus, um alle mit offenen Beiträgen zu sehen."
+                : "Keine Mitglieder mit offenen Beiträgen."}
             </p>
           ) : (
             <ul className="divide-y">

@@ -199,6 +199,7 @@ export const kulanzRouter = {
               falligkeitsdatum: p.falligkeitsdatum,
               description: descBySoll.get(p.sollStellungId) ?? `Mitgliedsbeitrag ${p.billingYear}`,
               openAmount: p.openAmount,
+              rueckgebuhr: p.rueckgebuhr,
             })),
             openSum: m.openSum,
             runDate: runDateStr,

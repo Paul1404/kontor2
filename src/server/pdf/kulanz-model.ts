@@ -15,6 +15,8 @@ export type KulanzPosting = {
   falligkeitsdatum: string;
   description: string;
   openAmount: string;
+  /** SEPA return fee already folded into the member's openSum, if any. */
+  rueckgebuhr: string;
 };
 
 export type KulanzClubInput = {
@@ -85,6 +87,8 @@ export type KulanzLetterModel = {
   kulanz: string;
   verwendungszweck: string;
   postings: KulanzPostingRow[];
+  /** Combined SEPA return fees as a separate line, or null when there are none. */
+  rueckgebuhr: string | null;
   openSum: string;
   deadline: string;
   /** Tear-off Kündigungsbestätigung response slip. */
@@ -179,6 +183,13 @@ export function buildKulanzLetterModel(input: KulanzLetterInput): KulanzLetterMo
     offen: `${fmtKulanzMoney(p.openAmount)} €`,
   }));
 
+  // SEPA return fees are folded into the member's openSum upstream, but the
+  // posting rows only show the Beitrag. Surface the combined fee as its own
+  // line so the visible rows reconcile with the printed total.
+  let feeCents = 0;
+  for (const p of input.postings) feeCents += Math.round(Number.parseFloat(p.rueckgebuhr) * 100);
+  const rueckgebuhr = feeCents > 0 ? `${fmtKulanzMoney((feeCents / 100).toFixed(2))} €` : null;
+
   return {
     recipientLines,
     vertretungFor: r.vertretungFor,
@@ -189,6 +200,7 @@ export function buildKulanzLetterModel(input: KulanzLetterInput): KulanzLetterMo
     kulanz,
     verwendungszweck: `Mitgliedsbeitrag · ${input.member.name} · Mitgliedsnr ${input.member.mitgliedsnummer}`,
     postings,
+    rueckgebuhr,
     openSum: `${fmtKulanzMoney(input.openSum)} €`,
     deadline,
     slip: {

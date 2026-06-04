@@ -158,6 +158,13 @@ function KulanzLetterPage({ club, letter }: { club: KulanzClubModel; letter: Kul
             <Text style={styles.c3}>{p.offen}</Text>
           </View>
         ))}
+        {letter.rueckgebuhr ? (
+          <View style={styles.tableRow} wrap={false}>
+            <Text style={styles.c1}> </Text>
+            <Text style={styles.c2}>SEPA-Rücklastgebühr</Text>
+            <Text style={styles.c3}>{letter.rueckgebuhr}</Text>
+          </View>
+        ) : null}
         <View style={styles.totalsRow}>
           <Text style={styles.c1}> </Text>
           <Text style={styles.c2}>Offener Gesamtbetrag</Text>
