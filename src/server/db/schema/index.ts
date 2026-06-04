@@ -11,6 +11,7 @@ export * from "./fee-runs";
 export * from "./fee-type-history";
 export * from "./fee-types";
 export * from "./import-batches";
+export * from "./kulanz";
 export * from "./legacy-sepa";
 export * from "./linear-lookups";
 export * from "./members";

@@ -12,6 +12,7 @@ import { dunningRouter } from "~/server/orpc/procedures/dunning";
 import { feeRunsRouter } from "~/server/orpc/procedures/fee-runs";
 import { feeTypesRouter } from "~/server/orpc/procedures/fee-types";
 import { importRouter } from "~/server/orpc/procedures/import";
+import { kulanzRouter } from "~/server/orpc/procedures/kulanz";
 import { membersRouter } from "~/server/orpc/procedures/members";
 import { organizationSettingsRouter } from "~/server/orpc/procedures/organization-settings";
 import { portalRouter } from "~/server/orpc/procedures/portal";
@@ -33,6 +34,7 @@ export const appRouter = {
   sepa: sepaRouter,
   sepaReturns: sepaReturnsRouter,
   dunning: dunningRouter,
+  kulanz: kulanzRouter,
   dashboard: dashboardRouter,
   audit: auditRouter,
   attachments: attachmentsRouter,

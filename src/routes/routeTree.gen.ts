@@ -54,6 +54,7 @@ import { Route as ApiFilesIdRouteImport } from './api/files.$id'
 import { Route as ApiCronSnapshotsRouteImport } from './api/cron.snapshots'
 import { Route as ApiAuthSplatRouteImport } from './api/auth.$'
 import { Route as AppForderungenMahnungenIndexRouteImport } from './app/forderungen/mahnungen/index'
+import { Route as AppForderungenKulanzIndexRouteImport } from './app/forderungen/kulanz/index'
 import { Route as AppMitgliederMitgliedsnummerBearbeitenRouteImport } from './app/mitglieder/$mitgliedsnummer_.bearbeiten'
 import { Route as AppForderungenMahnungenNeuRouteImport } from './app/forderungen/mahnungen/neu'
 import { Route as AppForderungenMahnungenIdRouteImport } from './app/forderungen/mahnungen/$id'
@@ -292,6 +293,12 @@ const AppForderungenMahnungenIndexRoute =
     path: '/forderungen/mahnungen/',
     getParentRoute: () => AppRouteRoute,
   } as any)
+const AppForderungenKulanzIndexRoute =
+  AppForderungenKulanzIndexRouteImport.update({
+    id: '/forderungen/kulanz/',
+    path: '/forderungen/kulanz/',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 const AppMitgliederMitgliedsnummerBearbeitenRoute =
   AppMitgliederMitgliedsnummerBearbeitenRouteImport.update({
     id: '/mitglieder/$mitgliedsnummer_/bearbeiten',
@@ -365,6 +372,7 @@ export interface FileRoutesByFullPath {
   '/app/forderungen/mahnungen/$id': typeof AppForderungenMahnungenIdRoute
   '/app/forderungen/mahnungen/neu': typeof AppForderungenMahnungenNeuRoute
   '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
+  '/app/forderungen/kulanz/': typeof AppForderungenKulanzIndexRoute
   '/app/forderungen/mahnungen/': typeof AppForderungenMahnungenIndexRoute
 }
 export interface FileRoutesByTo {
@@ -414,6 +422,7 @@ export interface FileRoutesByTo {
   '/app/forderungen/mahnungen/$id': typeof AppForderungenMahnungenIdRoute
   '/app/forderungen/mahnungen/neu': typeof AppForderungenMahnungenNeuRoute
   '/app/mitglieder/$mitgliedsnummer/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
+  '/app/forderungen/kulanz': typeof AppForderungenKulanzIndexRoute
   '/app/forderungen/mahnungen': typeof AppForderungenMahnungenIndexRoute
 }
 export interface FileRoutesById {
@@ -466,6 +475,7 @@ export interface FileRoutesById {
   '/app/forderungen/mahnungen/$id': typeof AppForderungenMahnungenIdRoute
   '/app/forderungen/mahnungen/neu': typeof AppForderungenMahnungenNeuRoute
   '/app/mitglieder/$mitgliedsnummer_/bearbeiten': typeof AppMitgliederMitgliedsnummerBearbeitenRoute
+  '/app/forderungen/kulanz/': typeof AppForderungenKulanzIndexRoute
   '/app/forderungen/mahnungen/': typeof AppForderungenMahnungenIndexRoute
 }
 export interface FileRouteTypes {
@@ -519,6 +529,7 @@ export interface FileRouteTypes {
     | '/app/forderungen/mahnungen/$id'
     | '/app/forderungen/mahnungen/neu'
     | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
+    | '/app/forderungen/kulanz/'
     | '/app/forderungen/mahnungen/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -568,6 +579,7 @@ export interface FileRouteTypes {
     | '/app/forderungen/mahnungen/$id'
     | '/app/forderungen/mahnungen/neu'
     | '/app/mitglieder/$mitgliedsnummer/bearbeiten'
+    | '/app/forderungen/kulanz'
     | '/app/forderungen/mahnungen'
   id:
     | '__root__'
@@ -619,6 +631,7 @@ export interface FileRouteTypes {
     | '/app/forderungen/mahnungen/$id'
     | '/app/forderungen/mahnungen/neu'
     | '/app/mitglieder/$mitgliedsnummer_/bearbeiten'
+    | '/app/forderungen/kulanz/'
     | '/app/forderungen/mahnungen/'
   fileRoutesById: FileRoutesById
 }
@@ -956,6 +969,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppForderungenMahnungenIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/forderungen/kulanz/': {
+      id: '/app/forderungen/kulanz/'
+      path: '/forderungen/kulanz'
+      fullPath: '/app/forderungen/kulanz/'
+      preLoaderRoute: typeof AppForderungenKulanzIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/mitglieder/$mitgliedsnummer_/bearbeiten': {
       id: '/app/mitglieder/$mitgliedsnummer_/bearbeiten'
       path: '/mitglieder/$mitgliedsnummer/bearbeiten'
@@ -1018,6 +1038,7 @@ interface AppRouteRouteChildren {
   AppForderungenMahnungenIdRoute: typeof AppForderungenMahnungenIdRoute
   AppForderungenMahnungenNeuRoute: typeof AppForderungenMahnungenNeuRoute
   AppMitgliederMitgliedsnummerBearbeitenRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRoute
+  AppForderungenKulanzIndexRoute: typeof AppForderungenKulanzIndexRoute
   AppForderungenMahnungenIndexRoute: typeof AppForderungenMahnungenIndexRoute
 }
 
@@ -1053,6 +1074,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppForderungenMahnungenNeuRoute: AppForderungenMahnungenNeuRoute,
   AppMitgliederMitgliedsnummerBearbeitenRoute:
     AppMitgliederMitgliedsnummerBearbeitenRoute,
+  AppForderungenKulanzIndexRoute: AppForderungenKulanzIndexRoute,
   AppForderungenMahnungenIndexRoute: AppForderungenMahnungenIndexRoute,
 }
 
