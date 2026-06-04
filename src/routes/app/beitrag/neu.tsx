@@ -429,7 +429,7 @@ function ExcludedList(props: { excluded: PreviewData["excluded"] }) {
           Ausgeschlossen ({props.excluded.length})
         </CardTitle>
         <CardDescription>
-          Diese Verträge werden nicht abgerechnet -- nur zur Information.
+          Diese Verträge werden nicht abgerechnet. Nur zur Information.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">

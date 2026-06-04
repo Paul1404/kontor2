@@ -16,6 +16,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { InfoBox } from "~/components/ui/info-box";
+import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -185,6 +186,8 @@ function ForderungenPage() {
         <CardContent>
           {open.isLoading ? (
             <p className="text-sm text-muted-foreground">Wird geladen...</p>
+          ) : open.isError ? (
+            <QueryError onRetry={() => open.refetch()} />
           ) : !open.data || open.data.members.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Keine offenen Posten für diesen Filter. Schön.

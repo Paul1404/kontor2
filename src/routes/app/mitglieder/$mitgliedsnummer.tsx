@@ -176,7 +176,7 @@ function MemberDetailPage() {
               </>
             ) : (
               <>
-                Kein Mitglied – nur Zahler/Kontakt
+                Kein Mitglied, nur Zahler/Kontakt
                 <span className="text-muted-foreground/50">·</span>
               </>
             )}
@@ -261,7 +261,7 @@ function MemberDetailPage() {
             <p className="font-medium text-foreground">Verwaister Kontakt</p>
             <p className="text-muted-foreground">
               Dieser Eintrag hat keine Mitgliedsnummer und keine verknüpften Beziehungen. Kontakte
-              sollten immer einem Mitglied über eine Beziehung zugeordnet sein – sonst sind sie
+              sollten immer einem Mitglied über eine Beziehung zugeordnet sein. Sonst sind sie
               vermutlich Altlasten aus dem Linear-Import.
             </p>
             {canEdit && me.data?.role === "admin" ? (

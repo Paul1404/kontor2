@@ -5,7 +5,9 @@ import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
+import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -15,19 +17,20 @@ export const Route = createFileRoute("/app/forderungen/ruecklaeufer")({
 });
 
 const REASON_OPTIONS = [
-  { code: "AM04", label: "AM04 – Konto ohne Deckung" },
-  { code: "MD06", label: "MD06 – Erstattung vom Schuldner verlangt" },
-  { code: "AC04", label: "AC04 – Konto geschlossen" },
-  { code: "AC06", label: "AC06 – Konto gesperrt" },
-  { code: "MS02", label: "MS02 – Widerspruch durch Schuldner" },
-  { code: "MS03", label: "MS03 – kein Grund angegeben" },
-  { code: "MD01", label: "MD01 – kein gültiges Mandat" },
-  { code: "RR01", label: "RR01 – Name/Anschrift fehlt" },
+  { code: "AM04", label: "AM04: Konto ohne Deckung" },
+  { code: "MD06", label: "MD06: Erstattung vom Schuldner verlangt" },
+  { code: "AC04", label: "AC04: Konto geschlossen" },
+  { code: "AC06", label: "AC06: Konto gesperrt" },
+  { code: "MS02", label: "MS02: Widerspruch durch Schuldner" },
+  { code: "MS03", label: "MS03: kein Grund angegeben" },
+  { code: "MD01", label: "MD01: kein gültiges Mandat" },
+  { code: "RR01", label: "RR01: Name/Anschrift fehlt" },
 ];
 
 function RuecklaeuferPage() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const list = useQuery({
     queryKey: ["sepaReturns.list"],
@@ -81,6 +84,8 @@ function RuecklaeuferPage() {
         <CardContent>
           {list.isLoading ? (
             <p className="text-sm text-muted-foreground">Wird geladen...</p>
+          ) : list.isError ? (
+            <QueryError onRetry={() => list.refetch()} />
           ) : !list.data || list.data.rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">Bisher keine Rückläufer erfasst.</p>
           ) : (
@@ -116,10 +121,9 @@ function RuecklaeuferPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      if (confirm("Diesen Rückläufer wirklich entfernen?")) deleteOne.mutate(r.id);
-                    }}
+                    onClick={() => setConfirmDeleteId(r.id)}
                     disabled={deleteOne.isPending}
+                    aria-label="Rückläufer rückgängig machen"
                     title="Rückläufer rückgängig machen"
                   >
                     <Trash2 className="size-4" />
@@ -130,6 +134,23 @@ function RuecklaeuferPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(o) => {
+          if (!o) setConfirmDeleteId(null);
+        }}
+        title="Rückläufer entfernen?"
+        description="Die Sollstellung wird auf den eingezogenen Stand zurückgesetzt."
+        confirmLabel="Entfernen"
+        destructive
+        loading={deleteOne.isPending}
+        onConfirm={() => {
+          if (!confirmDeleteId) return;
+          deleteOne.mutate(confirmDeleteId);
+          setConfirmDeleteId(null);
+        }}
+      />
     </div>
   );
 }
@@ -295,11 +316,12 @@ function CreateForm({ onDone }: { onDone: () => void }) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    // biome-ignore lint/a11y/noLabelWithoutControl: the control is passed in as `children`, so the label wraps and is implicitly associated.
+    <label className="flex flex-col gap-1.5">
       <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       {children}
-    </div>
+    </label>
   );
 }

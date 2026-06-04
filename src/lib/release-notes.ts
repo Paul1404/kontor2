@@ -41,6 +41,43 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.10.1",
+    date: "2026-06-04",
+    title: "Korrekturen an Listen, Sichtbarkeit und Dialogen",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Im Altsystem gelöschte Mitglieder tauchen nicht mehr in der Mitgliederliste, den Zählern, den Geburtstags- und Ehrungslisten oder den CSV-Exporten auf.",
+      },
+      {
+        category: "fix",
+        description:
+          "Konten mit Nur-Lese-Recht sehen die vollständige IBAN eines Mitglieds nicht mehr. Die maskierte Anzeige der letzten vier Stellen bleibt.",
+      },
+      {
+        category: "fix",
+        description:
+          "Wird ein SEPA-Rückläufer rückgängig gemacht, wird die Sollstellung wieder auf eingezogen gesetzt und verschwindet aus dem Mahnlauf.",
+      },
+      {
+        category: "fix",
+        description:
+          "Dokumente gelöschter Mitglieder lassen sich nicht mehr über einen direkten Link herunterladen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Schlägt das Laden einer Seite fehl, erscheint jetzt ein Hinweis mit Schaltfläche zum erneuten Versuchen statt einer leeren Liste.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Löschen und andere endgültige Aktionen fragen über einen einheitlichen Dialog nach, nicht mehr über ein Browser-Fenster.",
+      },
+    ],
+  },
+  {
     version: "0.10.0",
     date: "2026-06-04",
     title: "Zahlungserinnerung mit Sonderkündigung aus Kulanz",

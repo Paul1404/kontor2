@@ -888,7 +888,7 @@ function MembersListPage() {
                         {m.mitglnr ?? (
                           <span
                             className="text-muted-foreground/60"
-                            title="Kein Mitglied – nur Zahler/Kontakt"
+                            title="Kein Mitglied, nur Zahler/Kontakt"
                           >
                             —
                           </span>

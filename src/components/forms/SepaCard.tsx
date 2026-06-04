@@ -195,8 +195,8 @@ function AddMandateForm({
             onChange={(e) => setTyp(e.target.value)}
             className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
           >
-            <option value="CORE">CORE — Privatpersonen (Standard)</option>
-            <option value="B2B">B2B — Firmenkunden</option>
+            <option value="CORE">CORE: Privatpersonen (Standard)</option>
+            <option value="B2B">B2B: Firmenkunden</option>
           </select>
           <p className="text-xs text-muted-foreground">
             CORE für Mitglieder mit Privatkonto. B2B nur, wenn das Konto auf eine Firma läuft und

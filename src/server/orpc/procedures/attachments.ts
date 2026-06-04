@@ -1,11 +1,37 @@
 import { ORPCError } from "@orpc/server";
-import { and, eq, lt } from "drizzle-orm";
+import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import { db } from "~/server/db/client";
 import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
 import { membersTable } from "~/server/db/schema/members";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { deleteObject, presignDownload, presignUpload } from "~/server/s3/client";
+
+/**
+ * Resolve an attachment for download, but only if its parent member is still
+ * live. An attachment of a soft-deleted or DSGVO-erased member must never be
+ * presignable, even with a valid id. Shared by the oRPC procedure and the
+ * /api/files/:id redirect route so both enforce the same rule. Returns null
+ * when the attachment is missing or its member is gone.
+ */
+export async function loadDownloadableAttachment(
+  id: string,
+): Promise<{ s3Key: string; filename: string } | null> {
+  const [row] = await db()
+    .select({ s3Key: attachmentsTable.s3Key, filename: attachmentsTable.filename })
+    .from(attachmentsTable)
+    .innerJoin(membersTable, eq(membersTable.id, attachmentsTable.memberId))
+    .where(
+      and(
+        eq(attachmentsTable.id, id),
+        isNull(membersTable.deletedAt),
+        sql`coalesce(${membersTable.geloscht}, false) = false`,
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
 
 const ALLOWED_MIME = new Set(["application/pdf", "image/png", "image/jpeg"]);
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -188,13 +214,8 @@ export const attachmentsRouter = {
    */
   getSignedDownloadUrl: authedProc
     .input(v.object({ id: v.string() }))
-    .handler(async ({ context, input }) => {
-      const rows = await context.db
-        .select()
-        .from(attachmentsTable)
-        .where(eq(attachmentsTable.id, input.id))
-        .limit(1);
-      const att = rows[0];
+    .handler(async ({ input }) => {
+      const att = await loadDownloadableAttachment(input.id);
       if (!att) throw new ORPCError("NOT_FOUND", { message: "Anhang nicht gefunden." });
       const url = await presignDownload({
         key: att.s3Key,

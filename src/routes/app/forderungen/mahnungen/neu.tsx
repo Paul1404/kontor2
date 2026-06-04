@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
+import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -119,9 +120,9 @@ function NewDunningRunPage() {
               onChange={(e) => setLevel(Number.parseInt(e.target.value, 10) as 1 | 2 | 3)}
               className="h-9 rounded-lg border border-input bg-card px-3 text-sm shadow-soft"
             >
-              <option value="1">1 – Erinnerung</option>
-              <option value="2">2 – 1. Mahnung</option>
-              <option value="3">3 – 2. Mahnung</option>
+              <option value="1">1: Erinnerung</option>
+              <option value="2">2: 1. Mahnung</option>
+              <option value="3">3: 2. Mahnung</option>
             </select>
           </Field>
           <Field label="Lauf-Datum">
@@ -196,6 +197,8 @@ function NewDunningRunPage() {
         <CardContent>
           {preview.isLoading ? (
             <p className="text-sm text-muted-foreground">Wird geladen...</p>
+          ) : preview.isError ? (
+            <QueryError onRetry={() => preview.refetch()} />
           ) : !preview.data || preview.data.items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Keine Empfänger für Stufe {level}. Für die nächste Stufe ist erst eine niedrigere
@@ -319,12 +322,13 @@ function NewDunningRunPage() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    // biome-ignore lint/a11y/noLabelWithoutControl: the control is passed in as `children`, so the label wraps and is implicitly associated.
+    <label className="flex flex-col gap-1.5">
       <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       {children}
-    </div>
+    </label>
   );
 }
 
