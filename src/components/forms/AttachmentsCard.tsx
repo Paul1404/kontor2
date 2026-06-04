@@ -3,6 +3,7 @@ import { Loader2, Paperclip, Trash2, Upload } from "lucide-react";
 import { type ChangeEvent, type DragEvent, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -31,6 +32,7 @@ export function AttachmentsCard({
   const qc = useQueryClient();
   const [dragging, setDragging] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Attachment | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadingName, setUploadingName] = useState<string | null>(null);
 
@@ -184,13 +186,9 @@ export function AttachmentsCard({
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => {
-                        if (window.confirm(`Anhang "${a.filename}" löschen?`)) {
-                          setPendingDeleteId(a.id);
-                          remove.mutate(a.id);
-                        }
-                      }}
+                      onClick={() => setConfirmDelete(a)}
                       disabled={isDeleting}
+                      aria-label={`Anhang "${a.filename}" löschen`}
                       title="Anhang löschen"
                     >
                       {isDeleting ? (
@@ -206,6 +204,25 @@ export function AttachmentsCard({
           </ul>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onOpenChange={(o) => {
+          if (!o) setConfirmDelete(null);
+        }}
+        title="Anhang löschen?"
+        description={
+          confirmDelete ? `"${confirmDelete.filename}" wird dauerhaft entfernt.` : undefined
+        }
+        confirmLabel="Löschen"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() => {
+          if (!confirmDelete) return;
+          setPendingDeleteId(confirmDelete.id);
+          remove.mutate(confirmDelete.id);
+          setConfirmDelete(null);
+        }}
+      />
     </Card>
   );
 }

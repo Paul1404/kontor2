@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
+import { QueryError } from "~/components/ui/query-error";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "~/components/ui/toaster";
 import { triggerDownloadBase64 } from "~/lib/download";
@@ -186,6 +187,8 @@ function KulanzPage() {
         <CardContent>
           {preview.isLoading ? (
             <p className="text-sm text-muted-foreground">Wird geladen...</p>
+          ) : preview.isError ? (
+            <QueryError onRetry={() => preview.refetch()} />
           ) : !preview.data || preview.data.items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {onlyWithoutEmail
@@ -308,9 +311,10 @@ function KulanzPage() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    // biome-ignore lint/a11y/noLabelWithoutControl: the control is passed in as `children`, so the label wraps and is implicitly associated.
+    <label className="flex flex-col gap-1.5">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       {children}
-    </div>
+    </label>
   );
 }

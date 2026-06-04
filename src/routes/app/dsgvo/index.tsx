@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { CheckCircle2, Clock, FileText, ShieldCheck, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent } from "~/components/ui/card";
+import { QueryErrorRow } from "~/components/ui/query-error";
 import { formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -120,7 +121,9 @@ function DsgvoIndexPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {(list.data?.rows ?? []).length === 0 ? (
+              {list.isError ? (
+                <QueryErrorRow colSpan={6} onRetry={() => list.refetch()} />
+              ) : (list.data?.rows ?? []).length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                     Keine Anfragen. Auskünfte werden auf der Mitgliederseite ausgelöst.

@@ -5,8 +5,10 @@ import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
+import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
 import { formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -116,6 +118,8 @@ function PortalRequestsPage() {
         <CardContent>
           {list.isLoading ? (
             <p className="text-sm text-muted-foreground">Wird geladen...</p>
+          ) : list.isError ? (
+            <QueryError onRetry={() => list.refetch()} />
           ) : !list.data || list.data.rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">Keine Anfragen für diesen Filter.</p>
           ) : (
@@ -142,6 +146,7 @@ function RequestRow({ row, onAction }: { row: Row; onAction: () => void }) {
   const fields = Object.keys(payload);
   const [picked, setPicked] = useState<Set<string>>(() => new Set(fields));
   const [notes, setNotes] = useState("");
+  const [confirmReject, setConfirmReject] = useState(false);
 
   const review = useMutation({
     mutationFn: (mode: "apply" | "reject") =>
@@ -255,12 +260,23 @@ function RequestRow({ row, onAction }: { row: Row; onAction: () => void }) {
           <Button
             variant="outline"
             disabled={review.isPending}
-            onClick={() => {
-              if (confirm("Anfrage komplett ablehnen?")) review.mutate("reject");
-            }}
+            onClick={() => setConfirmReject(true)}
           >
             <X className="size-4" /> Ablehnen
           </Button>
+          <ConfirmDialog
+            open={confirmReject}
+            onOpenChange={setConfirmReject}
+            title="Anfrage ablehnen?"
+            description="Die vorgeschlagenen Änderungen werden verworfen und nicht übernommen."
+            confirmLabel="Ablehnen"
+            destructive
+            loading={review.isPending}
+            onConfirm={() => {
+              review.mutate("reject");
+              setConfirmReject(false);
+            }}
+          />
         </div>
       ) : (
         <p className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground">

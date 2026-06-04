@@ -233,7 +233,7 @@ function AddContractForm({
               {options.map((f) => (
                 <option key={f.art} value={f.art}>
                   {f.bezeichnung ?? `Art ${f.art}`}
-                  {f.betrag1 ? ` — ${formatCurrency(f.betrag1)}` : ""}
+                  {f.betrag1 ? ` (${formatCurrency(f.betrag1)})` : ""}
                 </option>
               ))}
             </select>

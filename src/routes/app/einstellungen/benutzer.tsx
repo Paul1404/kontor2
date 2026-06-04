@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -33,6 +34,11 @@ function UsersPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "vorstand" | "readonly">("readonly");
   const [msg, setMsg] = useState<Msg | null>(null);
+  const [pendingDowngrade, setPendingDowngrade] = useState<{
+    userId: string;
+    email: string;
+    next: "vorstand" | "readonly";
+  } | null>(null);
 
   const invite = useMutation({
     mutationFn: () => orpc.auth.invite({ email, role }),
@@ -246,13 +252,8 @@ function UsersPage() {
                             title={isSelf ? "Eigene Rolle kann nicht geändert werden." : undefined}
                             onChange={(e) => {
                               const next = e.target.value as "admin" | "vorstand" | "readonly";
-                              if (
-                                u.role === "admin" &&
-                                next !== "admin" &&
-                                !window.confirm(
-                                  `${u.email} wirklich von Administrator auf ${next} herabsetzen?`,
-                                )
-                              ) {
+                              if (u.role === "admin" && next !== "admin") {
+                                setPendingDowngrade({ userId: u.id, email: u.email, next });
                                 return;
                               }
                               setRoleMutation.mutate({ userId: u.id, role: next });
@@ -361,6 +362,27 @@ function UsersPage() {
           ) : null}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={pendingDowngrade !== null}
+        onOpenChange={(o) => {
+          if (!o) setPendingDowngrade(null);
+        }}
+        title="Administrator herabsetzen?"
+        description={
+          pendingDowngrade
+            ? `${pendingDowngrade.email} verliert die Administratorrechte und wird zu ${pendingDowngrade.next === "vorstand" ? "Vorstand" : "Readonly"}.`
+            : undefined
+        }
+        confirmLabel="Herabsetzen"
+        destructive
+        loading={setRoleMutation.isPending}
+        onConfirm={() => {
+          if (!pendingDowngrade) return;
+          setRoleMutation.mutate({ userId: pendingDowngrade.userId, role: pendingDowngrade.next });
+          setPendingDowngrade(null);
+        }}
+      />
     </div>
   );
 }

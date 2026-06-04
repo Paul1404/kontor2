@@ -4,7 +4,6 @@ import { type FormEvent, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { LAND_OPTIONS } from "~/lib/country";
 import { orpc } from "~/lib/orpc";
@@ -558,9 +557,10 @@ function FormField({
   full?: boolean;
 }) {
   return (
-    <div className={`flex flex-col gap-1.5 ${full ? "sm:col-span-2" : ""}`}>
-      <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>
+    // biome-ignore lint/a11y/noLabelWithoutControl: the field control is passed in as `children`, so the label wraps it and is implicitly associated.
+    <label className={`flex flex-col gap-1.5 ${full ? "sm:col-span-2" : ""}`}>
+      <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
       {children}
-    </div>
+    </label>
   );
 }

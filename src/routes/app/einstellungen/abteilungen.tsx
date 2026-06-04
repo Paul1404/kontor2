@@ -5,8 +5,10 @@ import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { QueryError } from "~/components/ui/query-error";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/einstellungen/abteilungen")({
@@ -39,6 +41,7 @@ function AbteilungenSettingsPage() {
   const [editDraft, setEditDraft] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
 
   const create = useMutation({
     mutationFn: () => orpc.abteilungen.create({ name: newName.trim() }),
@@ -133,6 +136,10 @@ function AbteilungenSettingsPage() {
                 <Loader2 className="size-4 animate-spin" /> Wird geladen…
               </span>
             </li>
+          ) : list.isError ? (
+            <li className="px-4 py-6">
+              <QueryError onRetry={() => list.refetch()} />
+            </li>
           ) : !list.data || list.data.length === 0 ? (
             <li className="px-4 py-8 text-center text-muted-foreground">Noch keine Abteilungen.</li>
           ) : (
@@ -207,6 +214,7 @@ function AbteilungenSettingsPage() {
                               setEditDraft(a.name);
                               setActionError(null);
                             }}
+                            aria-label={`Abteilung "${a.name}" umbenennen`}
                             title="Umbenennen"
                           >
                             <Pencil className="size-4" />
@@ -214,12 +222,9 @@ function AbteilungenSettingsPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => {
-                              if (window.confirm(`Abteilung "${a.name}" löschen?`)) {
-                                remove.mutate(a.id);
-                              }
-                            }}
+                            onClick={() => setConfirmDelete({ id: a.id, name: a.name })}
                             disabled={!canDelete || remove.isPending}
+                            aria-label={`Abteilung "${a.name}" löschen`}
                             title={canDelete ? "Löschen" : "Erst alle Mitgliedschaften entfernen"}
                           >
                             <Trash2
@@ -244,6 +249,23 @@ function AbteilungenSettingsPage() {
           )}
         </ul>
       </Card>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onOpenChange={(o) => {
+          if (!o) setConfirmDelete(null);
+        }}
+        title="Abteilung löschen?"
+        description={confirmDelete ? `"${confirmDelete.name}" wird dauerhaft entfernt.` : undefined}
+        confirmLabel="Löschen"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() => {
+          if (!confirmDelete) return;
+          remove.mutate(confirmDelete.id);
+          setConfirmDelete(null);
+        }}
+      />
     </div>
   );
 }
@@ -279,26 +301,29 @@ function AbteilungDetailsForm({
 
   return (
     <div className="mt-3 grid grid-cols-1 gap-3 rounded-lg border border-border bg-muted/30 p-3 md:grid-cols-2">
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Sportart</Label>
+      {/* biome-ignore lint/a11y/noLabelWithoutControl: each label wraps its Input below and is implicitly associated. */}
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">Sportart</span>
         <Input
           value={sportart}
           onChange={(e) => setSportart(e.target.value)}
           placeholder="z. B. Fußball"
         />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Verband</Label>
+      </label>
+      {/* biome-ignore lint/a11y/noLabelWithoutControl: each label wraps its Input below and is implicitly associated. */}
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">Verband</span>
         <Input
           value={verbandName}
           onChange={(e) => setVerbandName(e.target.value)}
           placeholder="z. B. Bayerischer Fußball-Verband e.V."
         />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Verband-Nr.</Label>
+      </label>
+      {/* biome-ignore lint/a11y/noLabelWithoutControl: each label wraps its Input below and is implicitly associated. */}
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">Verband-Nr.</span>
         <Input value={verbandNr} onChange={(e) => setVerbandNr(e.target.value)} />
-      </div>
+      </label>
       <label className="flex items-center gap-2 self-end text-sm">
         <input
           type="checkbox"
