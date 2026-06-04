@@ -158,6 +158,7 @@ export const kulanzRouter = {
         anschriftStrasse: org.anschriftStrasse,
         anschriftPlz: org.anschriftPlz,
         anschriftOrt: org.anschriftOrt,
+        kontaktEmail: org.kontaktEmail,
         vereinsIban: org.vereinsIban,
         vereinsBic: org.vereinsBic,
         vereinsBankname: org.vereinsBankname,

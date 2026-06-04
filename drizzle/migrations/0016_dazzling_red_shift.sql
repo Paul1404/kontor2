@@ -1,0 +1,1 @@
+ALTER TABLE "contracts" ADD COLUMN "is_direct_debit" boolean DEFAULT false NOT NULL;

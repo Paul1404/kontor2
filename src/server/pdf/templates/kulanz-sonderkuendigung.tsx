@@ -1,4 +1,5 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Fragment } from "react";
 import type { KulanzClubModel, KulanzLetterModel } from "~/server/pdf/kulanz-model";
 
 const styles = StyleSheet.create({
@@ -72,17 +73,7 @@ const styles = StyleSheet.create({
   paymentRow: { flexDirection: "row", marginBottom: 2 },
   paymentKey: { width: 110, color: "#555" },
   paymentValue: { flex: 1, fontFamily: "Helvetica-Bold" },
-  slip: {
-    marginTop: 26,
-    borderTopWidth: 1,
-    borderColor: "#999",
-    borderStyle: "dashed",
-    paddingTop: 12,
-  },
-  slipHint: { fontSize: 7.5, color: "#777", marginBottom: 8 },
-  slipTitle: { fontSize: 12, fontFamily: "Helvetica-Bold", marginBottom: 6 },
-  slipLine: { marginBottom: 8 },
-  slipFieldRow: { flexDirection: "row", marginTop: 14, gap: 18 },
+  slipFieldRow: { flexDirection: "row", marginTop: 28, gap: 18 },
   slipField: {
     flex: 1,
     borderTopWidth: 0.5,
@@ -91,6 +82,7 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: "#555",
   },
+  responseEmail: { marginTop: 22, color: "#555" },
   footer: {
     position: "absolute",
     bottom: 28,
@@ -205,27 +197,78 @@ function KulanzLetterPage({ club, letter }: { club: KulanzClubModel; letter: Kul
       <Text style={{ marginTop: 16 }}>Mit freundlichen Grüßen</Text>
       <Text style={{ marginTop: 20 }}>{club.vereinsname}</Text>
 
-      {/* Tear-off Kündigungsbestätigung: the member signs and mails it back. */}
-      <View style={styles.slip} wrap={false}>
-        <Text style={styles.slipHint}>Bitte hier abtrennen und unterschrieben zurücksenden.</Text>
-        <Text style={styles.slipTitle}>Kündigungsbestätigung</Text>
-        <Text style={styles.slipLine}>{letter.slip.intro}</Text>
-        <Text style={styles.slipLine}>{letter.slip.memberLine}</Text>
-        <Text>Kündigung zum:</Text>
-        <View style={styles.slipFieldRow}>
-          <Text style={styles.slipField}>Ort, Datum</Text>
-          <Text style={styles.slipField}>Unterschrift</Text>
+      <Footer club={club} />
+    </Page>
+  );
+}
+
+/**
+ * Dedicated response page: a self-contained Kündigungsbestätigung the member
+ * fills in, signs and returns. The Verein address sits at the top as the
+ * return recipient (so it shows through a window envelope), and the member can
+ * instead reply by email when a contact mailbox is configured. No tear-off
+ * line -- the response is its own sheet.
+ */
+function KulanzResponsePage({
+  club,
+  letter,
+}: {
+  club: KulanzClubModel;
+  letter: KulanzLetterModel;
+}) {
+  return (
+    <Page size="A4" style={styles.page}>
+      <View style={styles.headerRow}>
+        {club.logoDataUri ? <Image src={club.logoDataUri} style={styles.logo} /> : <View />}
+        <View style={styles.orgBlock}>
+          <Text style={styles.orgName}>{club.vereinsname}</Text>
         </View>
       </View>
 
-      <Text
-        style={styles.footer}
-        render={({ pageNumber, totalPages }) =>
-          `${club.vereinsname} · Gläubiger-ID ${club.glaeubigerId} · Seite ${pageNumber}/${totalPages}`
-        }
-        fixed
-      />
+      <View style={styles.recipient}>
+        <Text style={styles.senderLine}>Rücksendung an</Text>
+        {club.rueckantwort.adresseLines.map((line, i) => (
+          <Text key={String(i)}>{line}</Text>
+        ))}
+      </View>
+
+      <View style={styles.meta}>
+        <Text style={styles.metaItem}>Mitgliedsnummer: {letter.mitgliedsnummer}</Text>
+        <Text style={styles.metaItem}>Datum: {letter.datum}</Text>
+      </View>
+
+      <Text style={styles.h1}>Kündigungsbestätigung</Text>
+
+      <Text style={styles.para}>{letter.slip.intro}</Text>
+      <Text style={styles.para}>{letter.slip.memberLine}</Text>
+      <Text style={styles.para}>Kündigung zum:</Text>
+
+      <View style={styles.slipFieldRow}>
+        <Text style={styles.slipField}>Ort, Datum</Text>
+        <Text style={styles.slipField}>Unterschrift</Text>
+      </View>
+
+      {club.rueckantwort.email ? (
+        <Text style={[styles.para, styles.responseEmail]}>
+          Alternativ können Sie diese Kündigungsbestätigung unterschrieben und eingescannt per
+          E-Mail an {club.rueckantwort.email} senden.
+        </Text>
+      ) : null}
+
+      <Footer club={club} />
     </Page>
+  );
+}
+
+function Footer({ club }: { club: KulanzClubModel }) {
+  return (
+    <Text
+      style={styles.footer}
+      render={({ pageNumber, totalPages }) =>
+        `${club.vereinsname} · Gläubiger-ID ${club.glaeubigerId} · Seite ${pageNumber}/${totalPages}`
+      }
+      fixed
+    />
   );
 }
 
@@ -236,7 +279,12 @@ export function KulanzSonderkuendigungDocument({ club, letters }: KulanzDocument
       author={club.vereinsname}
     >
       {letters.map((letter, i) => (
-        <KulanzLetterPage key={String(i)} club={club} letter={letter} />
+        // Each recipient gets two pages: the cover letter and a ready-to-return
+        // Kündigungsbestätigung.
+        <Fragment key={String(i)}>
+          <KulanzLetterPage club={club} letter={letter} />
+          <KulanzResponsePage club={club} letter={letter} />
+        </Fragment>
       ))}
     </Document>
   );

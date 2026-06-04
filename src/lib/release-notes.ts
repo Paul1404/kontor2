@@ -41,6 +41,70 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.11.0",
+    date: "2026-06-04",
+    title: "Antwortmöglichkeiten im Kulanz-Brief und sauberere Lastschrift-Erkennung",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Der Kulanz-Brief enthält die Kündigungsbestätigung jetzt als eigene zweite Seite mit Rücksendeadresse, Unterschriftsfeld und Datum, damit sie direkt zurückgeschickt werden kann. Ist unter Vereinsdaten eine Kontakt-E-Mail hinterlegt, wird zusätzlich die Rücksendung per E-Mail angeboten.",
+      },
+      {
+        category: "internal",
+        description:
+          "Ob ein Vertrag per Lastschrift zahlt, wird jetzt einmalig beim Import als Feld gespeichert statt bei jeder Abfrage neu aus den Altsystem-Spalten abgeleitet. Die mitgelieferte Migration füllt bestehende Verträge automatisch.",
+      },
+    ],
+  },
+  {
+    version: "0.10.2",
+    date: "2026-06-04",
+    title: "Korrekturen an Berichten, Forderungen und Verlinkungen",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Der Finanzbericht zählt keine Sollstellungen gelöschter Mitglieder mehr mit. Summen und Anzahlen stimmen jetzt mit den übrigen Berichten überein.",
+      },
+      {
+        category: "fix",
+        description:
+          "Wird ein Beitragslauf storniert, werden zwischenzeitlich zurückgebuchte Sollstellungen nicht mehr überschrieben. Ein SEPA-Rückläufer bleibt als offene Forderung im Mahnwesen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Der CSV-Export mit Status aktiv oder passiv enthält keine ausgetretenen Mitglieder mehr und stimmt mit der Mitgliederliste überein.",
+      },
+      {
+        category: "fix",
+        description:
+          "DSGVO-Anfragen von Kontakten ohne Mitgliedsnummer verlinken jetzt korrekt auf das Mitglied statt auf eine Fehlerseite.",
+      },
+      {
+        category: "fix",
+        description:
+          "Der erweiterte Admin-Bereich schickt angemeldete Nutzer ohne Adminrecht zurück in die App statt auf die Anmeldeseite.",
+      },
+      {
+        category: "fix",
+        description:
+          "Beim Wechsel der Mahnstufe in den Forderungen wird die Auswahl zurückgesetzt, damit nicht versehentlich ausgeblendete Posten als bezahlt markiert werden.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die DSGVO-Liste zeigt beim Laden einen Hinweis statt kurz fälschlich keine Anfragen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Bisherige Austrittsbestätigungen zeigen das Austrittsdatum jetzt im deutschen Format.",
+      },
+    ],
+  },
+  {
     version: "0.10.1",
     date: "2026-06-04",
     title: "Korrekturen an Listen, Sichtbarkeit und Dialogen",

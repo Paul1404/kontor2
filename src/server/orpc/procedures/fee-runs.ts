@@ -498,10 +498,19 @@ export const feeRunsRouter = {
           .where(eq(feeRunItemsTable.feeRunId, input.id));
         const sollIds = items.map((i) => i.sollStellungId).filter((id): id is string => id != null);
         if (sollIds.length > 0) {
+          // Only revert postings still in the `eingezogen` state this run put
+          // them in. A posting that has since been returned (Rücklastschrift ->
+          // `returned`), paid, or otherwise touched must not be clobbered back
+          // to `cancelled`, or a real open debt silently leaves the Mahnwesen.
           await tx
             .update(sollStellungenTable)
             .set({ status: "cancelled", updatedAt: new Date() })
-            .where(inArray(sollStellungenTable.id, sollIds));
+            .where(
+              and(
+                inArray(sollStellungenTable.id, sollIds),
+                eq(sollStellungenTable.status, "eingezogen"),
+              ),
+            );
         }
 
         await appendAudit(tx, {

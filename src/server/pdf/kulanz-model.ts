@@ -24,6 +24,8 @@ export type KulanzClubInput = {
   anschriftStrasse: string | null;
   anschriftPlz: string | null;
   anschriftOrt: string | null;
+  /** Contact address members reply to (e.g. mitgliedschaft@verein.de). */
+  kontaktEmail: string | null;
   vereinsIban: string;
   vereinsBic: string;
   vereinsBankname: string | null;
@@ -41,6 +43,16 @@ export type KulanzClubModel = {
     iban: string;
     bic: string;
     bankname: string | null;
+  };
+  /**
+   * Where the member sends the signed Kündigungsbestätigung. Without this the
+   * tear-off slip has no destination. `adresseLines` is the postal address;
+   * `email` offers the faster digital route when the Verein has a contact
+   * mailbox configured.
+   */
+  rueckantwort: {
+    adresseLines: string[];
+    email: string | null;
   };
 };
 
@@ -144,6 +156,13 @@ export function buildKulanzClubModel(input: KulanzClubInput): KulanzClubModel {
     .filter(Boolean)
     .join(" · ");
 
+  const adresseLines = [
+    input.vereinsname,
+    input.anschriftStrasse,
+    [input.anschriftPlz, input.anschriftOrt].filter(Boolean).join(" "),
+  ].filter((l): l is string => (l ?? "").trim() !== "");
+  const email = input.kontaktEmail?.trim() ? input.kontaktEmail.trim() : null;
+
   return {
     vereinsname: input.vereinsname,
     senderLine,
@@ -155,6 +174,7 @@ export function buildKulanzClubModel(input: KulanzClubInput): KulanzClubModel {
       bic: input.vereinsBic,
       bankname: input.vereinsBankname,
     },
+    rueckantwort: { adresseLines, email },
   };
 }
 
@@ -174,7 +194,7 @@ export function buildKulanzLetterModel(input: KulanzLetterInput): KulanzLetterMo
 
   const kulanz =
     `Falls Sie Ihre Mitgliedschaft nicht fortführen möchten, bieten wir Ihnen aus Kulanz eine Sonderkündigung an. ` +
-    `Senden Sie uns dazu die untenstehende Kündigungsbestätigung unterschrieben bis zum ${deadline} zurück. ` +
+    `Füllen Sie dazu die Kündigungsbestätigung auf der zweiten Seite aus und senden Sie sie uns unterschrieben bis zum ${deadline} zurück. ` +
     `In diesem Fall verzichten wir auf die offene Forderung und beenden Ihre Mitgliedschaft.`;
 
   const postings: KulanzPostingRow[] = input.postings.map((p) => ({

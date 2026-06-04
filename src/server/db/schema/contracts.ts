@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   numeric,
@@ -51,6 +52,14 @@ export const contractsTable = pgTable(
     verwZw3: text("verw_zw3"),
     verwZw4: text("verw_zw4"),
     lastschrift: text("lastschrift"),
+    /**
+     * Normalized "does this contract pay by SEPA direct debit?", derived once
+     * at import time from Linear's `lastschrift` + `aufRechnung` (blank
+     * `lastschrift` means direct debit in Linear). The raw columns above stay
+     * as provenance; runtime code reads this boolean and never reinterprets
+     * the Linear quirk. See `paysByDirectDebit` in `~/server/sepa/direct-debit`.
+     */
+    isDirectDebit: boolean("is_direct_debit").notNull().default(false),
     blzV: text("blz_v"),
     bankV: text("bank_v"),
     kontoV: text("konto_v"),
