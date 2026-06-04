@@ -54,6 +54,12 @@ export const organizationSettingsTable = pgTable("organization_settings", {
    * optional; fehlende Werte werden im Dokument weggelassen.
    */
   kontaktEmail: text("kontakt_email"),
+  /**
+   * Postfach für Mitgliedschaftsangelegenheiten (z. B. mitgliedschaft@verein.de).
+   * Hierhin gehen formlose Kündigungen aus dem Kulanz-Brief und der Kontakt auf
+   * der Austrittsbestätigung. Leer: es wird auf `kontaktEmail` zurückgegriffen.
+   */
+  mitgliedschaftEmail: text("mitgliedschaft_email"),
   kontaktTelefon: text("kontakt_telefon"),
   datenschutzUrl: text("datenschutz_url"),
   satzungUrl: text("satzung_url"),

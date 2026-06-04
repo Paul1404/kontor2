@@ -41,9 +41,15 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
-    version: "0.13.1",
+    version: "0.14.0",
     date: "2026-06-04",
+    title: "Eigene E-Mail für Mitgliedschaftsangelegenheiten",
     changes: [
+      {
+        category: "feature",
+        description:
+          "Unter Vereinsdaten lässt sich jetzt zusätzlich zur allgemeinen Kontakt E-Mail eine eigene Mitgliedschaft E-Mail hinterlegen (zum Beispiel mitgliedschaft@verein.de). Kündigungen aus dem Kulanz-Brief und der Kontakt auf der Austrittsbestätigung gehen an diese Adresse. Ist sie leer, wird wie bisher die allgemeine Kontakt E-Mail verwendet.",
+      },
       {
         category: "improvement",
         description:

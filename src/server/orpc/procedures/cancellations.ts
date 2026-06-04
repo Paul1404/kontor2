@@ -92,7 +92,9 @@ export const cancellationsRouter = {
       club: {
         vereinsname: org.vereinsname,
         ort: org.anschriftOrt ?? "",
-        kontaktEmail: org.kontaktEmail,
+        // Membership questions go to mitgliedschaft@ when configured, else the
+        // general contact address.
+        kontaktEmail: org.mitgliedschaftEmail ?? org.kontaktEmail,
         kontaktTelefon: org.kontaktTelefon,
         datenschutzUrl: org.datenschutzUrl,
         satzungUrl: org.satzungUrl,

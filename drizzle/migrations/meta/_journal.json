@@ -141,6 +141,13 @@
       "when": 1780601710905,
       "tag": "0019_yellow_squadron_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1780602800205,
+      "tag": "0020_lying_sally_floyd",
+      "breakpoints": true
     }
   ]
 }

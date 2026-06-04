@@ -44,6 +44,7 @@ function VereinsdatenPage() {
     kuendigungsfristTage: 0,
     kuendigungZumMonatsende: false,
     kontaktEmail: "",
+    mitgliedschaftEmail: "",
     kontaktTelefon: "",
     datenschutzUrl: "",
     satzungUrl: "",
@@ -74,6 +75,7 @@ function VereinsdatenPage() {
         kuendigungsfristTage: cfg.data.kuendigungsfristTage ?? 0,
         kuendigungZumMonatsende: cfg.data.kuendigungZumMonatsende ?? false,
         kontaktEmail: cfg.data.kontaktEmail ?? "",
+        mitgliedschaftEmail: cfg.data.mitgliedschaftEmail ?? "",
         kontaktTelefon: cfg.data.kontaktTelefon ?? "",
         datenschutzUrl: cfg.data.datenschutzUrl ?? "",
         satzungUrl: cfg.data.satzungUrl ?? "",
@@ -105,6 +107,7 @@ function VereinsdatenPage() {
         kuendigungsfristTage: form.kuendigungsfristTage,
         kuendigungZumMonatsende: form.kuendigungZumMonatsende,
         kontaktEmail: form.kontaktEmail || null,
+        mitgliedschaftEmail: form.mitgliedschaftEmail || null,
         kontaktTelefon: form.kontaktTelefon || null,
         datenschutzUrl: form.datenschutzUrl || null,
         satzungUrl: form.satzungUrl || null,
@@ -416,6 +419,17 @@ function VereinsdatenPage() {
                     value={form.kontaktEmail}
                     onChange={(e) => setForm({ ...form, kontaktEmail: e.target.value })}
                     placeholder="info@verein.de"
+                  />
+                </Field>
+                <Field
+                  label="Mitgliedschaft E-Mail"
+                  hint="Für Kündigungen aus dem Kulanz-Brief und den Kontakt auf der Austrittsbestätigung. Leer: es wird die Kontakt E-Mail verwendet."
+                >
+                  <Input
+                    type="email"
+                    value={form.mitgliedschaftEmail}
+                    onChange={(e) => setForm({ ...form, mitgliedschaftEmail: e.target.value })}
+                    placeholder="mitgliedschaft@verein.de"
                   />
                 </Field>
                 <Field label="Kontakt Telefon">
