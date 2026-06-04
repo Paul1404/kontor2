@@ -7,10 +7,12 @@ WORKDIR /app
 
 # Install all dependencies (incl. dev) and build. The cache mount keeps Bun's
 # global package cache between builds, so unchanged dependencies are not
-# re-downloaded on every deploy.
+# re-downloaded on every deploy. Railway's builder requires the cache id to be
+# prefixed with s/<service-id>-; the literal UUID is required because build args
+# are not expanded inside the mount id. Service: svuwv (production).
 FROM base AS builder
 COPY package.json bun.lock ./
-RUN --mount=type=cache,id=bun-cache,target=/root/.bun/install/cache \
+RUN --mount=type=cache,id=s/83b908ee-38bf-4cc4-bc5e-0e02252c9f4f-bun-cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
 COPY . .
 RUN bun run build
@@ -19,7 +21,7 @@ RUN bun run build
 # so these packages were already fetched in the builder stage.
 FROM base AS prod-deps
 COPY package.json bun.lock ./
-RUN --mount=type=cache,id=bun-cache,target=/root/.bun/install/cache \
+RUN --mount=type=cache,id=s/83b908ee-38bf-4cc4-bc5e-0e02252c9f4f-bun-cache,target=/root/.bun/install/cache \
     bun install --production --frozen-lockfile
 
 # Runtime: built output plus production node_modules only. No node toolchain --
