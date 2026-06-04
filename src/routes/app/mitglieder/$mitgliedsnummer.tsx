@@ -9,7 +9,9 @@ import {
   FileText,
   History,
   KeyRound,
+  LogOut,
   Pencil,
+  RotateCcw,
   Trash2,
   User,
   Wallet,
@@ -17,6 +19,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { AbteilungenCard } from "~/components/forms/AbteilungenCard";
 import { AttachmentsCard } from "~/components/forms/AttachmentsCard";
+import { AustrittDialog } from "~/components/forms/AustrittDialog";
 import { AustrittsbestaetigungCard } from "~/components/forms/AustrittsbestaetigungCard";
 import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
@@ -49,6 +52,7 @@ function MemberDetailPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmAustritt, setConfirmAustritt] = useState(false);
   const [tab, setTab] = useState("uebersicht");
 
   const me = useQuery({ queryKey: ["me"], queryFn: () => orpc.auth.me() });
@@ -66,6 +70,19 @@ function MemberDetailPage() {
     },
     onError: (err) =>
       toast.error("Löschen fehlgeschlagen", {
+        description: err instanceof Error ? err.message : String(err),
+      }),
+  });
+
+  const reactivate = useMutation({
+    mutationFn: (memberId: string) => orpc.members.reactivate({ memberId }),
+    onSuccess: async () => {
+      toast.success("Austritt rückgängig gemacht");
+      await qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
+      await qc.invalidateQueries({ queryKey: ["members.list"] });
+    },
+    onError: (err) =>
+      toast.error("Reaktivierung fehlgeschlagen", {
         description: err instanceof Error ? err.message : String(err),
       }),
   });
@@ -231,6 +248,22 @@ function MemberDetailPage() {
           {canEdit ? (
             <PortalAccessButton memberId={detail.data!.member.id} email={member.eMailName} />
           ) : null}
+          {canEdit && member.mitglnr && !member.verstorbenAm ? (
+            member.austritt ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => reactivate.mutate(member.id)}
+                disabled={reactivate.isPending}
+              >
+                <RotateCcw className="size-4" /> Austritt rückgängig
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setConfirmAustritt(true)}>
+                <LogOut className="size-4" /> Austritt
+              </Button>
+            )
+          ) : null}
           {canEdit ? (
             <Button variant="outline" size="sm" onClick={() => setConfirmDelete(true)}>
               <Trash2 className="size-4 text-destructive" /> Löschen
@@ -252,6 +285,24 @@ function MemberDetailPage() {
         destructive
         loading={softDelete.isPending}
         onConfirm={() => softDelete.mutate(member.id)}
+      />
+
+      <AustrittDialog
+        open={confirmAustritt}
+        onOpenChange={setConfirmAustritt}
+        memberId={member.id}
+        memberName={memberDisplayName}
+        abteilungen={abteilungen}
+        vertraege={vertraege}
+        sepa={sepa}
+        sollstellungen={sollstellungen}
+        onLeft={async () => {
+          await qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
+          await qc.invalidateQueries({ queryKey: ["members.list"] });
+          // Surface the Austrittsbestätigung so the operator can issue it
+          // right after the cascade.
+          setTab("dokumente");
+        }}
       />
 
       {isOrphanKontakt ? (

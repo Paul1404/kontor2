@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql }
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
+import { withUniqueRetry } from "~/server/db/retry";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { attachmentsTable } from "~/server/db/schema/attachments";
 import { auditLogTable } from "~/server/db/schema/audit";
@@ -13,6 +14,11 @@ import { organizationSettingsTable } from "~/server/db/schema/organization-setti
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
+import {
+  planAustrittCascade,
+  planReactivateCascade,
+  toIsoDay,
+} from "~/server/lib/member-lifecycle";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import {
   CACHE_NS,
@@ -29,6 +35,8 @@ const StatusSchema = v.picklist(["aktiv", "passiv", "ausgetreten", "verstorben",
 
 const SortBySchema = v.picklist(["nachname", "mitglnr", "ort", "email", "eintritt"]);
 const SortDirSchema = v.picklist(["asc", "desc"]);
+
+const DateStringInput = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
 
 const ListInput = v.object({
   q: v.optional(v.string(), ""),
@@ -113,6 +121,20 @@ function normalizeIban(value: string | null | undefined): string | null {
   return clean.length > 0 ? clean : null;
 }
 
+/** Validate and normalize a German-or-dot decimal Betrag string, or null. */
+function validateBetragString(value: string | null | undefined, field: string): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.replace(",", ".");
+  if (!/^-?\d+(\.\d+)?$/.test(normalized)) {
+    throw new ORPCError("VALIDATION_FAILED", {
+      message: `Ungültiger Betrag im Feld "${field}": ${value}`,
+    });
+  }
+  return normalized;
+}
+
 /**
  * Translate the curated Stammdaten payload into a partial DB-row object,
  * coercing date strings to `Date` and computing `iban1Last4` when the IBAN
@@ -180,6 +202,41 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
 
   return patch;
 }
+
+/** A leave (Austritt) cascade request. */
+const AustrittInput = v.object({
+  memberId: v.pipe(v.string(), v.uuid()),
+  austrittDatum: DateStringInput,
+  /** "verstorben" stamps verstorbenAm instead of austritt and skips the Frist. */
+  reason: v.optional(v.picklist(["austritt", "verstorben"]), "austritt"),
+  setPassiv: v.optional(v.boolean(), true),
+  revokeSepa: v.optional(v.boolean(), true),
+  /** Restrict the department closing; null/omitted closes all open ones. */
+  abteilungIds: v.optional(v.nullable(v.array(v.string())), null),
+});
+
+/** One department assignment for the onboarding wizard. */
+const OnboardAbteilung = v.object({
+  abteilungId: v.pipe(v.string(), v.uuid()),
+  eintrittsdatum: v.optional(v.nullable(DateStringInput)),
+});
+
+/** Optional first contract created during onboarding. */
+const OnboardContract = v.object({
+  art: v.pipe(v.number(), v.integer()),
+  artName: v.optional(v.nullable(v.string())),
+  vertragNr: v.optional(v.nullable(v.string())),
+  betrag: v.optional(v.nullable(v.string())),
+  vertragBegin: v.optional(v.nullable(DateStringInput)),
+  sollstellung: v.optional(v.nullable(v.string())),
+});
+
+/** Optional first SEPA mandate created during onboarding. */
+const OnboardSepa = v.object({
+  mandatsNr: v.optional(v.nullable(v.string())),
+  unterschriftDatum: v.optional(v.nullable(DateStringInput)),
+  gueltigAb: v.optional(v.nullable(DateStringInput)),
+});
 
 export const membersRouter = {
   list: authedProc.input(ListInput).handler(async ({ context, input }) => {
@@ -1067,5 +1124,447 @@ export const membersRouter = {
         .orderBy(asc(membersTable.nachname), asc(membersTable.vorname))
         .limit(input.limit);
       return { rows };
+    }),
+
+  /**
+   * Let a member leave the club in one action. Stamps the leave date on the
+   * member and cascades it to every still-open department membership, open
+   * contract and (optionally) active SEPA mandate, so the member's records
+   * end up internally consistent instead of half-closed. Reversible via
+   * `reactivate`. Pure decision logic lives in `~/server/lib/member-lifecycle`.
+   */
+  austritt: vorstandProc.input(AustrittInput).handler(async ({ context, input }) => {
+    const austrittTs = new Date(`${input.austrittDatum}T00:00:00Z`);
+    const today = new Date();
+
+    const result = await context.db.transaction(async (tx) => {
+      const [member] = await tx
+        .select()
+        .from(membersTable)
+        .where(eq(membersTable.id, input.memberId))
+        .limit(1);
+      if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+
+      // Kündigungsfrist applies to a voluntary Austritt, not to recording a
+      // death (which is typically backdated).
+      if (input.reason === "austritt") {
+        const [settings] = await tx.select().from(organizationSettingsTable).limit(1);
+        assertCancellationAllowed(settings, austrittTs);
+      }
+
+      const [abteilungen, contracts, sepa] = await Promise.all([
+        tx
+          .select({
+            abteilungId: memberAbteilungenTable.abteilungId,
+            eintrittsdatum: memberAbteilungenTable.eintrittsdatum,
+            austrittsdatum: memberAbteilungenTable.austrittsdatum,
+          })
+          .from(memberAbteilungenTable)
+          .where(eq(memberAbteilungenTable.memberId, input.memberId)),
+        tx
+          .select({ id: contractsTable.id, gekuendZum: contractsTable.gekuendZum })
+          .from(contractsTable)
+          .where(eq(contractsTable.memberId, input.memberId)),
+        tx
+          .select({
+            id: sepaMandatesTable.id,
+            isDeleted: sepaMandatesTable.isDeleted,
+            widerrufenAm: sepaMandatesTable.widerrufenAm,
+          })
+          .from(sepaMandatesTable)
+          .where(eq(sepaMandatesTable.memberId, input.memberId)),
+      ]);
+
+      const plan = planAustrittCascade({
+        austrittDatum: input.austrittDatum,
+        abteilungen,
+        contracts,
+        sepa,
+        revokeSepa: input.revokeSepa,
+        abteilungIds: input.abteilungIds,
+      });
+
+      // Member row: stamp the leave date and flip to passive.
+      const memberSet: Record<string, unknown> = { updatedAt: today };
+      if (input.reason === "verstorben") {
+        memberSet.verstorbenAm = austrittTs;
+      } else {
+        memberSet.austritt = austrittTs;
+      }
+      if (input.setPassiv) memberSet.aktivPasiv = "P";
+      await tx
+        .update(membersTable)
+        .set(memberSet as never)
+        .where(eq(membersTable.id, input.memberId));
+
+      // Department memberships: close the open ones on the leave date.
+      for (const a of plan.abteilungClose) {
+        await tx
+          .update(memberAbteilungenTable)
+          .set({ austrittsdatum: input.austrittDatum })
+          .where(
+            and(
+              eq(memberAbteilungenTable.memberId, input.memberId),
+              eq(memberAbteilungenTable.abteilungId, a.abteilungId),
+              eq(memberAbteilungenTable.eintrittsdatum, a.eintrittsdatum),
+            ),
+          );
+      }
+
+      // Contracts: terminate to the leave date; record the notice date only
+      // when it is not already set.
+      if (plan.contractClose.length > 0) {
+        await tx
+          .update(contractsTable)
+          .set({
+            gekuendZum: austrittTs,
+            vertragEnde: austrittTs,
+            gekuendAm: sql`coalesce(${contractsTable.gekuendAm}, ${austrittTs})`,
+            updatedAt: today,
+          } as never)
+          .where(inArray(contractsTable.id, plan.contractClose));
+      }
+
+      // SEPA mandates: revoke as of the leave date so no further debits run.
+      if (plan.sepaRevoke.length > 0) {
+        await tx
+          .update(sepaMandatesTable)
+          .set({ widerrufenAm: austrittTs, gultigBis: austrittTs, updatedAt: today } as never)
+          .where(inArray(sepaMandatesTable.id, plan.sepaRevoke));
+      }
+
+      const auditId = await appendAudit(tx, {
+        entityType: "member",
+        entityId: input.memberId,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: {
+          [input.reason === "verstorben" ? "verstorbenAm" : "austritt"]: {
+            before: input.reason === "verstorben" ? member.verstorbenAm : member.austritt,
+            after: input.austrittDatum,
+          },
+          austrittKaskade: {
+            before: null,
+            after: {
+              abteilungen: plan.abteilungClose.length,
+              vertraege: plan.contractClose.length,
+              sepaMandate: plan.sepaRevoke.length,
+            },
+          },
+        },
+        requestId: context.requestId ?? null,
+      });
+      await takeMemberSnapshot(tx, input.memberId, {
+        trigger: "mutation",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        auditId,
+      });
+
+      return {
+        mitglnr: member.mitglnr,
+        abteilungen: plan.abteilungClose.length,
+        vertraege: plan.contractClose.length,
+        sepaMandate: plan.sepaRevoke.length,
+      };
+    });
+
+    await invalidateMemberCaches();
+    return { ok: true, ...result };
+  }),
+
+  /**
+   * Reverse an Austritt: clear the leave date on the member and reopen exactly
+   * the dependent rows that the matching cascade closed (identified by the
+   * shared leave day). Rows closed on a different day stay closed.
+   */
+  reactivate: vorstandProc
+    .input(v.object({ memberId: v.pipe(v.string(), v.uuid()) }))
+    .handler(async ({ context, input }) => {
+      const result = await context.db.transaction(async (tx) => {
+        const [member] = await tx
+          .select()
+          .from(membersTable)
+          .where(eq(membersTable.id, input.memberId))
+          .limit(1);
+        if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        const day = toIsoDay(member.austritt);
+        if (!day) {
+          throw new ORPCError("VALIDATION_FAILED", {
+            message: "Mitglied ist nicht ausgetreten.",
+          });
+        }
+
+        const [abteilungen, contracts, sepa] = await Promise.all([
+          tx
+            .select({
+              abteilungId: memberAbteilungenTable.abteilungId,
+              eintrittsdatum: memberAbteilungenTable.eintrittsdatum,
+              austrittsdatum: memberAbteilungenTable.austrittsdatum,
+            })
+            .from(memberAbteilungenTable)
+            .where(eq(memberAbteilungenTable.memberId, input.memberId)),
+          tx
+            .select({
+              id: contractsTable.id,
+              gekuendZum: contractsTable.gekuendZum,
+              vertragEnde: contractsTable.vertragEnde,
+            })
+            .from(contractsTable)
+            .where(eq(contractsTable.memberId, input.memberId)),
+          tx
+            .select({
+              id: sepaMandatesTable.id,
+              widerrufenAm: sepaMandatesTable.widerrufenAm,
+              gultigBis: sepaMandatesTable.gultigBis,
+            })
+            .from(sepaMandatesTable)
+            .where(eq(sepaMandatesTable.memberId, input.memberId)),
+        ]);
+
+        const plan = planReactivateCascade({
+          austrittDatum: day,
+          abteilungen,
+          contracts,
+          sepa,
+        });
+
+        const now = new Date();
+        await tx
+          .update(membersTable)
+          .set({ austritt: null, aktivPasiv: "A", updatedAt: now } as never)
+          .where(eq(membersTable.id, input.memberId));
+
+        for (const a of plan.abteilungReopen) {
+          await tx
+            .update(memberAbteilungenTable)
+            .set({ austrittsdatum: null })
+            .where(
+              and(
+                eq(memberAbteilungenTable.memberId, input.memberId),
+                eq(memberAbteilungenTable.abteilungId, a.abteilungId),
+                eq(memberAbteilungenTable.eintrittsdatum, a.eintrittsdatum),
+              ),
+            );
+        }
+        for (const c of plan.contractReopen) {
+          await tx
+            .update(contractsTable)
+            .set({
+              gekuendZum: null,
+              gekuendAm: null,
+              ...(c.clearVertragEnde ? { vertragEnde: null } : {}),
+              updatedAt: now,
+            } as never)
+            .where(eq(contractsTable.id, c.id));
+        }
+        for (const s of plan.sepaReopen) {
+          await tx
+            .update(sepaMandatesTable)
+            .set({
+              widerrufenAm: null,
+              ...(s.clearGultigBis ? { gultigBis: null } : {}),
+              updatedAt: now,
+            } as never)
+            .where(eq(sepaMandatesTable.id, s.id));
+        }
+
+        const auditId = await appendAudit(tx, {
+          entityType: "member",
+          entityId: input.memberId,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            austritt: { before: day, after: null },
+            reaktivierung: {
+              before: null,
+              after: {
+                abteilungen: plan.abteilungReopen.length,
+                vertraege: plan.contractReopen.length,
+                sepaMandate: plan.sepaReopen.length,
+              },
+            },
+          },
+          requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, input.memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
+        });
+
+        return { mitglnr: member.mitglnr };
+      });
+
+      await invalidateMemberCaches();
+      return { ok: true, ...result };
+    }),
+
+  /**
+   * Guided new-member entry: create the member and, in the same transaction,
+   * assign departments and optionally a first contract and SEPA mandate. A
+   * skipped step just leaves that part empty; the member is always valid.
+   */
+  onboard: vorstandProc
+    .input(
+      v.object({
+        mitglnr: v.optional(v.nullable(v.string())),
+        patch: StammdatenInput,
+        abteilungen: v.optional(v.array(OnboardAbteilung), []),
+        contract: v.optional(v.nullable(OnboardContract), null),
+        sepa: v.optional(v.nullable(OnboardSepa), null),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const patch = buildMemberPatch(input.patch);
+      if (!patch.nachname && !patch.vorname) {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: "Vor- oder Nachname ist erforderlich.",
+        });
+      }
+
+      const actorId = context.session!.user.id;
+      const actorEmail = context.session!.user.email;
+      const eintrittIso = patch.eintritt instanceof Date ? toIsoDay(patch.eintritt) : null;
+      const fallbackEintritt = eintrittIso ?? new Date().toISOString().slice(0, 10);
+
+      const result = await withUniqueRetry(() =>
+        context.db.transaction(async (tx) => {
+          const [maxRow] = await tx
+            .select({
+              maxAdrNr: sql<number>`coalesce(max(${membersTable.adrNr}), 0)::int`,
+              maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitglnr}, '\\D', '', 'g'), '')::int), 0)::int`,
+            })
+            .from(membersTable);
+          const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
+          const nextMitglnr =
+            input.mitglnr && input.mitglnr.trim().length > 0
+              ? input.mitglnr.trim()
+              : String((maxRow?.maxMitglnrInt ?? 0) + 1);
+
+          const [dupe] = await tx
+            .select({ id: membersTable.id })
+            .from(membersTable)
+            .where(eq(membersTable.mitglnr, nextMitglnr))
+            .limit(1);
+          if (dupe) {
+            throw new ORPCError("CONFLICT", {
+              message: `Mitgliedsnummer ${nextMitglnr} ist bereits vergeben.`,
+            });
+          }
+
+          const now = new Date();
+          const [inserted] = await tx
+            .insert(membersTable)
+            .values({
+              ...(patch as Record<string, unknown>),
+              adrNr: nextAdrNr,
+              mitglnr: nextMitglnr,
+              createdAt: now,
+              updatedAt: now,
+            } as never)
+            .returning({ id: membersTable.id, mitglnr: membersTable.mitglnr });
+          if (!inserted) {
+            throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
+          }
+
+          // Departments. Validate the ids up front so a bad one fails clean
+          // instead of as an opaque FK error.
+          const abteilungIds = [...new Set(input.abteilungen.map((a) => a.abteilungId))];
+          if (abteilungIds.length > 0) {
+            const found = await tx
+              .select({ id: abteilungenTable.id })
+              .from(abteilungenTable)
+              .where(inArray(abteilungenTable.id, abteilungIds));
+            if (found.length !== abteilungIds.length) {
+              throw new ORPCError("NOT_FOUND", { message: "Abteilung nicht gefunden." });
+            }
+            for (const a of input.abteilungen) {
+              await tx
+                .insert(memberAbteilungenTable)
+                .values({
+                  memberId: inserted.id,
+                  abteilungId: a.abteilungId,
+                  eintrittsdatum: a.eintrittsdatum ?? fallbackEintritt,
+                })
+                .onConflictDoNothing();
+            }
+          }
+
+          // Optional first contract.
+          if (input.contract) {
+            await tx.insert(contractsTable).values({
+              memberId: inserted.id,
+              adrNr: nextAdrNr,
+              mitglNr: inserted.mitglnr ?? nextMitglnr,
+              vertragNr:
+                input.contract.vertragNr && input.contract.vertragNr.trim().length > 0
+                  ? input.contract.vertragNr.trim()
+                  : "1",
+              art: input.contract.art,
+              artName: input.contract.artName ?? null,
+              betrag: validateBetragString(input.contract.betrag, "Betrag"),
+              sollstellung: input.contract.sollstellung ?? null,
+              vertragBegin: toDateOrNull(
+                input.contract.vertragBegin ?? eintrittIso,
+                "Vertragsbeginn",
+              ),
+            } as never);
+          }
+
+          // Optional first SEPA mandate.
+          if (input.sepa) {
+            await tx.insert(sepaMandatesTable).values({
+              memberId: inserted.id,
+              adrNr: nextAdrNr,
+              mandatsNr:
+                input.sepa.mandatsNr && input.sepa.mandatsNr.trim().length > 0
+                  ? input.sepa.mandatsNr.trim()
+                  : "M1",
+              angelegtAm: now,
+              unterschriftDatum: toDateOrNull(input.sepa.unterschriftDatum, "Unterschriftsdatum"),
+              gueltigAb: toDateOrNull(input.sepa.gueltigAb ?? eintrittIso, "Gültig ab"),
+            } as never);
+          }
+
+          const auditId = await appendAudit(tx, {
+            entityType: "member",
+            entityId: inserted.id,
+            action: "create",
+            source: "ui",
+            actorId,
+            actorEmail,
+            changes: diff(null, {
+              ...patch,
+              adrNr: nextAdrNr,
+              mitglnr: nextMitglnr,
+              abteilungen: input.abteilungen.length,
+              vertrag: input.contract ? 1 : 0,
+              sepaMandat: input.sepa ? 1 : 0,
+            }),
+            requestId: context.requestId ?? null,
+          });
+          await takeMemberSnapshot(tx, inserted.id, {
+            trigger: "mutation",
+            actorId,
+            actorEmail,
+            auditId,
+          });
+
+          return {
+            id: inserted.id,
+            mitglnr: inserted.mitglnr ?? nextMitglnr,
+            adrNr: nextAdrNr,
+          };
+        }),
+      );
+
+      await invalidateMemberCaches();
+      return result;
     }),
 };
