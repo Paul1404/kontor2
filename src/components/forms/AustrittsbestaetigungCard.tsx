@@ -728,8 +728,8 @@ export function AustrittsbestaetigungCard({
                     ) : null}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    Austritt zum {formatDate(row.austrittDatum)} · erstellt{" "}
-                    {formatDateTime(row.createdAt)}
+                    {row.docRef ? `${row.docRef} · ` : ""}Austritt zum{" "}
+                    {formatDate(row.austrittDatum)} · erstellt {formatDateTime(row.createdAt)}
                   </span>
                 </div>
                 <Button

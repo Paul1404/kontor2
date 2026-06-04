@@ -189,7 +189,7 @@ function lastWord(name: string): string {
   return parts[parts.length - 1] ?? name;
 }
 
-export function MahnungDocument({ pkg }: { pkg: MahnungInput }) {
+export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: string }) {
   const org = pkg.organization;
   const senderLine = [
     org.vereinsname,
@@ -209,7 +209,7 @@ export function MahnungDocument({ pkg }: { pkg: MahnungInput }) {
   ].filter(Boolean);
 
   return (
-    <Document title={`${title} ${pkg.member.mitglnr ?? pkg.member.adrNr}`} author={org.vereinsname}>
+    <Document title={`${title} ${docRef}`} author={org.vereinsname}>
       <Page size="A4" style={styles.page} wrap>
         {/* Letterhead: logo plus the club wordmark. The postal address is
             deliberately not repeated here -- it appears once in the sender
@@ -235,6 +235,7 @@ export function MahnungDocument({ pkg }: { pkg: MahnungInput }) {
           <Text style={styles.metaItem}>
             Mitgliedsnummer: {pkg.member.mitglnr ?? `AdrNr ${pkg.member.adrNr}`}
           </Text>
+          <Text style={styles.metaItem}>Dokument: {docRef}</Text>
           <Text style={styles.metaItem}>Datum: {fmtDate(pkg.runDate)}</Text>
         </View>
 
@@ -327,7 +328,7 @@ export function MahnungDocument({ pkg }: { pkg: MahnungInput }) {
         <Text
           style={styles.footer}
           render={({ pageNumber, totalPages }) =>
-            `${org.vereinsname} · Gläubiger-ID ${org.glaeubigerId} · Seite ${pageNumber}/${totalPages}`
+            `${org.vereinsname} · Dokument ${docRef} · Gläubiger-ID ${org.glaeubigerId} · Seite ${pageNumber}/${totalPages}`
           }
           fixed
         />

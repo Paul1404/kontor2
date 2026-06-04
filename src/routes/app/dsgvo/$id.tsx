@@ -84,6 +84,11 @@ function DsgvoDetailPage() {
           <Field icon={<CheckCircle2 className="size-4" />} label="Abgeschlossen">
             {data.completedAt ? formatDateTime(data.completedAt) : "—"}
           </Field>
+          {data.docRef ? (
+            <Field icon={<Hash className="size-4" />} label="Dokument">
+              <span className="font-mono text-xs">{data.docRef}</span>
+            </Field>
+          ) : null}
           {data.deliverableSha256 ? (
             <Field icon={<Hash className="size-4" />} label="SHA-256">
               <span className="font-mono text-xs break-all">{data.deliverableSha256}</span>

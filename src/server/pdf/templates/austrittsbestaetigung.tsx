@@ -40,15 +40,15 @@ const styles = StyleSheet.create({
   signLine: { marginTop: 18, fontSize: 9 },
 });
 
-export type AustrittsbestaetigungProps = { model: CancellationModel };
+export type AustrittsbestaetigungProps = { model: CancellationModel; docRef: string };
 
-export function AustrittsbestaetigungDocument({ model }: AustrittsbestaetigungProps) {
+export function AustrittsbestaetigungDocument({ model, docRef }: AustrittsbestaetigungProps) {
   const { club, recipient } = model;
   const contact = club.kontaktEmail || club.kontaktTelefon;
   const hasLinks = Boolean(club.datenschutzUrl || club.satzungUrl);
 
   return (
-    <Document title={`Austrittsbestaetigung ${model.displayName}`}>
+    <Document title={`Austrittsbestaetigung ${docRef}`}>
       <Page size="A4" style={styles.page}>
         <View style={styles.headerRow}>
           <Text style={styles.clubName}>{club.vereinsname}</Text>
@@ -62,7 +62,10 @@ export function AustrittsbestaetigungDocument({ model }: AustrittsbestaetigungPr
           {recipient.plzOrt ? <Text>{recipient.plzOrt}</Text> : null}
         </View>
 
-        <Text style={styles.meta}>{model.ortDatum}</Text>
+        <View style={styles.meta}>
+          <Text>{model.ortDatum}</Text>
+          <Text>Dokument: {docRef}</Text>
+        </View>
 
         <Text style={styles.subject}>{model.subject}</Text>
 

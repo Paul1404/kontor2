@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import { allocateDocRef } from "~/server/db/doc-ref";
 import {
   consentTypeEnum,
   dsgvoConsentLogTable,
@@ -91,6 +92,7 @@ export const dsgvoRouter = {
           deadline: dsgvoRequestsTable.deadline,
           completedAt: dsgvoRequestsTable.completedAt,
           notes: dsgvoRequestsTable.notes,
+          docRef: dsgvoRequestsTable.docRef,
           deliverableSha256: dsgvoRequestsTable.deliverableSha256,
           deliverableSizeBytes: dsgvoRequestsTable.deliverableSizeBytes,
           memberVorname: membersTable.vorname,
@@ -130,10 +132,11 @@ export const dsgvoRouter = {
       if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
 
       const { pkg, sha256, byteSize } = await buildAuskunftsPackage(context.db, input.memberId);
-      const pdf = await renderPdfBase64(AuskunftDocument({ pkg }));
+      const now = new Date();
+      const docRef = await allocateDocRef(context.db, "DS", now.getUTCFullYear());
+      const pdf = await renderPdfBase64(AuskunftDocument({ pkg, docRef }));
 
       const actor = context.session?.user;
-      const now = new Date();
       // Request record + audit entry are written atomically so an export is
       // never logged as delivered without its audit row (or vice versa).
       const created = await context.db.transaction(async (tx) => {
@@ -150,6 +153,7 @@ export const dsgvoRouter = {
             completedAt: now,
             completedBy: actor?.id ?? null,
             notes: input.notes || null,
+            docRef,
             deliverableSha256: sha256,
             deliverableSizeBytes: byteSize,
           })
@@ -171,16 +175,16 @@ export const dsgvoRouter = {
         return row;
       });
 
-      const stamp = now.toISOString().slice(0, 10);
       const slug = (member.mitglnr ?? member.id.slice(0, 8)).replace(/[^a-z0-9]/gi, "");
       return {
         requestId: created?.id,
+        docRef,
         json: {
-          filename: `dsgvo-auskunft-${slug}-${stamp}.json`,
+          filename: `dsgvo-auskunft-${docRef}-${slug}.json`,
           content: JSON.stringify(pkg, null, 2),
         },
         pdf: {
-          filename: `dsgvo-auskunft-${slug}-${stamp}.pdf`,
+          filename: `dsgvo-auskunft-${docRef}-${slug}.pdf`,
           base64: pdf.base64,
         },
         sha256,

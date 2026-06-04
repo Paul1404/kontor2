@@ -76,13 +76,18 @@ export function BestandserhebungDocument({
   data: BestandserhebungBreakdown;
   vereinsname: string;
 }) {
+  // A Bestandserhebung is identified by its Stichtag, not a running counter:
+  // the same Stichtag must always carry the same reference, however often it
+  // is exported.
+  const docRef = `BE-${data.stichtag}`;
   return (
-    <Document title={`Bestandserhebung ${data.stichtag} – ${vereinsname}`} author="SVUWV">
+    <Document title={`Bestandserhebung ${docRef} · ${vereinsname}`} author="SVUWV">
       <Page size="A4" style={styles.page} wrap>
         <Text style={styles.h1}>Bestandserhebung</Text>
         <Text style={styles.meta}>
-          {vereinsname} · Stichtag {new Date(data.stichtag).toLocaleDateString("de-DE")} ·
-          Mitglieder gesamt: {data.grandTotal}
+          Dokument {docRef} · {vereinsname} · Stichtag{" "}
+          {new Date(data.stichtag).toLocaleDateString("de-DE")} · Mitglieder gesamt:{" "}
+          {data.grandTotal}
         </Text>
 
         <Text style={styles.sectionTitle}>Übersicht je Abteilung</Text>
@@ -135,7 +140,7 @@ export function BestandserhebungDocument({
         <Text
           style={styles.footer}
           render={({ pageNumber, totalPages }) =>
-            `Bestandserhebung ${data.stichtag} · Seite ${pageNumber} von ${totalPages}`
+            `Bestandserhebung ${docRef} · Seite ${pageNumber} von ${totalPages}`
           }
           fixed
         />

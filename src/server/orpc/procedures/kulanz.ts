@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { desc, eq, inArray, like, sql } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import { allocateDocRef } from "~/server/db/doc-ref";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { type KulanzRecipientSnapshot, kulanzLettersTable } from "~/server/db/schema/kulanz";
@@ -217,15 +218,9 @@ export const kulanzRouter = {
         });
       }
 
-      // Per-year sequence so every run carries a unique, human-readable
-      // reference (KS-2026-0001) instead of being indistinguishable from
-      // another run with the same date and recipient count.
-      const year = runDateStr.slice(0, 4);
-      const [seqRow] = await context.db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(kulanzLettersTable)
-        .where(like(kulanzLettersTable.runDate, `${year}-%`));
-      const docRef = `KS-${year}-${String((seqRow?.count ?? 0) + 1).padStart(4, "0")}`;
+      // Allocate a unique, human-readable reference (KS-2026-0001) so every run
+      // is distinguishable from another with the same date and recipient count.
+      const docRef = await allocateDocRef(context.db, "KS", Number(runDateStr.slice(0, 4)));
 
       const { base64 } = await renderPdfBase64(
         KulanzSonderkuendigungDocument({ club, letters, docRef }),

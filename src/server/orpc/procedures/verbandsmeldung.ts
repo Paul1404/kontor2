@@ -119,7 +119,7 @@ export const verbandsmeldungRouter = {
     const vereinsname = await loadVereinsname(context.db);
     const pdf = await renderPdfBase64(BestandserhebungDocument({ data, vereinsname }));
     return {
-      filename: `bestandserhebung-${input.stichtag}.pdf`,
+      filename: `Bestandserhebung-BE-${input.stichtag}.pdf`,
       base64: pdf.base64,
     };
   }),

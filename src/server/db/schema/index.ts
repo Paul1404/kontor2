@@ -5,6 +5,7 @@ export * from "./auth";
 export * from "./bestandserhebungen";
 export * from "./cancellations";
 export * from "./contracts";
+export * from "./document-sequences";
 export * from "./dsgvo";
 export * from "./dunning";
 export * from "./fee-runs";
