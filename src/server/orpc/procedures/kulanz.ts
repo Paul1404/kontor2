@@ -153,13 +153,18 @@ export const kulanzRouter = {
           : [];
       const descBySoll = new Map(descRows.map((r) => [r.sollId, r.artName ?? r.vertragNr]));
 
+      // Cancellations are a membership matter: route them to the dedicated
+      // mitgliedschaft@ mailbox when set, otherwise fall back to the general
+      // contact address so the offer never points at a dead end.
+      const mitgliedschaftEmail = org.mitgliedschaftEmail ?? org.kontaktEmail;
+
       const recipients = await resolveRecipients(context.db, eligible, runDate);
       const club = buildKulanzClubModel({
         vereinsname: org.vereinsname,
         anschriftStrasse: org.anschriftStrasse,
         anschriftPlz: org.anschriftPlz,
         anschriftOrt: org.anschriftOrt,
-        kontaktEmail: org.kontaktEmail,
+        kontaktEmail: mitgliedschaftEmail,
         vereinsIban: org.vereinsIban,
         vereinsBic: org.vereinsBic,
         vereinsBankname: org.vereinsBankname,
@@ -207,7 +212,7 @@ export const kulanzRouter = {
             runDate: runDateStr,
             deadlineDate: deadlineStr,
             vereinsname: org.vereinsname,
-            kontaktEmail: org.kontaktEmail,
+            kontaktEmail: mitgliedschaftEmail,
           }),
         );
         snapshot.push({

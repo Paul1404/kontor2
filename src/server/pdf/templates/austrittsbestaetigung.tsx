@@ -1,24 +1,8 @@
-import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { CancellationModel } from "~/server/pdf/cancellation-model";
-
-const ACCENT = "#b91c1c";
+import { LetterPage } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
-  page: { padding: 50, fontSize: 10, fontFamily: "Helvetica", color: "#1a1a1a", lineHeight: 1.45 },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    borderBottomWidth: 2,
-    borderColor: ACCENT,
-    paddingBottom: 10,
-    marginBottom: 22,
-  },
-  clubName: { fontFamily: "Helvetica-Bold", fontSize: 15, color: ACCENT },
-  logo: { height: 52, objectFit: "contain" },
-  recipient: { marginBottom: 26, lineHeight: 1.5 },
-  meta: { textAlign: "right", marginBottom: 24, fontSize: 9.5, color: "#555" },
-  subject: { fontFamily: "Helvetica-Bold", fontSize: 12, marginBottom: 16 },
   para: { marginBottom: 12, textAlign: "left" },
   detailBox: {
     borderWidth: 0.5,
@@ -47,28 +31,41 @@ export function AustrittsbestaetigungDocument({ model, docRef }: Austrittsbestae
   const contact = club.kontaktEmail || club.kontaktTelefon;
   const hasLinks = Boolean(club.datenschutzUrl || club.satzungUrl);
 
+  const returnLine =
+    [
+      club.vereinsname,
+      club.anschriftStrasse,
+      [club.anschriftPlz, club.anschriftOrt].filter(Boolean).join(" "),
+    ]
+      .filter(Boolean)
+      .join(" · ") || `${club.vereinsname} · ${club.ort}`;
+  const recipientLines = [
+    recipient.anredeZeile,
+    recipient.name,
+    recipient.strasse,
+    recipient.plzOrt,
+  ].filter((l) => l.trim() !== "");
+  // ortDatum reads "Ort, den DD.MM.YYYY"; the info block only needs the date.
+  const datum = model.ortDatum.replace(/^.*?,\s*den\s*/, "");
+  const infoRows = [
+    ...(model.member.mitgliedsnummer
+      ? [{ label: "Mitgliedsnummer", value: model.member.mitgliedsnummer }]
+      : []),
+    { label: "Dokument", value: docRef },
+    { label: "Datum", value: datum },
+  ];
+
   return (
     <Document title={`Austrittsbestaetigung ${docRef}`}>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.headerRow}>
-          <Text style={styles.clubName}>{club.vereinsname}</Text>
-          {club.logoDataUri ? <Image src={club.logoDataUri} style={styles.logo} /> : null}
-        </View>
-
-        <View style={styles.recipient}>
-          {recipient.anredeZeile ? <Text>{recipient.anredeZeile}</Text> : null}
-          <Text>{recipient.name}</Text>
-          {recipient.strasse ? <Text>{recipient.strasse}</Text> : null}
-          {recipient.plzOrt ? <Text>{recipient.plzOrt}</Text> : null}
-        </View>
-
-        <View style={styles.meta}>
-          <Text>{model.ortDatum}</Text>
-          <Text>Dokument: {docRef}</Text>
-        </View>
-
-        <Text style={styles.subject}>{model.subject}</Text>
-
+      <LetterPage
+        logoDataUri={club.logoDataUri}
+        orgName={club.vereinsname}
+        returnLine={returnLine}
+        recipientLines={recipientLines}
+        infoRows={infoRows}
+        subject={model.subject}
+        footerText={`${club.vereinsname} · Dokument ${docRef}`}
+      >
         <Text style={styles.para}>{model.anrede}</Text>
         <Text style={styles.para}>{model.bodyIntro}</Text>
 
@@ -167,7 +164,7 @@ export function AustrittsbestaetigungDocument({ model, docRef }: Austrittsbestae
           <Text>{model.closing}</Text>
           <Text style={styles.signLine}>Mitgliederverwaltung, {club.vereinsname}</Text>
         </View>
-      </Page>
+      </LetterPage>
     </Document>
   );
 }

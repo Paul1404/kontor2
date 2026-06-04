@@ -1,0 +1,201 @@
+import { Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import type { ReactNode } from "react";
+
+/**
+ * Shared DIN 5008 (Form B) business-letter scaffold for the mailed letters
+ * (Mahnung, Austrittsbestätigung, Kulanz-Brief). It fixes the geometry the
+ * German norm requires so the documents fold and show through a DIN-lang window
+ * envelope:
+ *
+ *   - Schriftrand: 25 mm links, 20 mm rechts.
+ *   - Anschriftfeld: oben 45 mm, links 25 mm, 85 mm breit, 40 mm hoch, mit
+ *     kleiner Rücksendeangabe darüber.
+ *   - Informationsblock rechts (Datum, Dokument, Mitgliedsnummer).
+ *   - Betreffzeile fett, Textbereich ab 98,46 mm.
+ *   - Falzmarken bei 87 mm und 192 mm, Lochmarke bei 148,5 mm.
+ *   - Fußzeile auf jeder Seite.
+ *
+ * Document-specific content (tables, payment boxes, slips) lives in the callers
+ * and is passed in as `children`; this file owns only the letter frame. Kept
+ * free of em/en dashes per the house style.
+ */
+
+/** Millimetre to PDF point (1 mm = 72/25.4 pt). react-pdf styles are in pt. */
+export const mm = (value: number): number => (value * 72) / 25.4;
+
+const styles = StyleSheet.create({
+  // The letterhead, address field, info block, fold marks and footer are placed
+  // in absolute millimetres from the paper edge (react-pdf measures `top` from
+  // the page edge, not the padding box). The page padding only governs flowing
+  // body text: a 25 mm top so continuation pages keep a proper margin, and a
+  // bottom reserve so text never collides with the Fußzeile. Page 1 pushes its
+  // first line down to the DIN reference line via a lead spacer in the body.
+  page: {
+    paddingTop: mm(25),
+    paddingBottom: mm(18),
+    fontSize: 10,
+    fontFamily: "Helvetica",
+    color: "#111",
+    lineHeight: 1.4,
+  },
+  // Briefkopf: logo left, club wordmark right, within the 45 mm header band.
+  header: {
+    position: "absolute",
+    top: mm(12),
+    left: mm(25),
+    right: mm(20),
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  logo: { height: mm(15), objectFit: "contain" },
+  orgName: { fontFamily: "Helvetica-Bold", fontSize: 11, color: "#111", textAlign: "right" },
+  // Anschriftfeld (DIN 676 Form B): 85 x 40 mm at 45/25 mm.
+  addressField: {
+    position: "absolute",
+    top: mm(45),
+    left: mm(25),
+    width: mm(85),
+    height: mm(40),
+  },
+  returnLine: {
+    fontSize: 7,
+    color: "#777",
+    borderBottomWidth: 0.5,
+    borderColor: "#bbb",
+    paddingBottom: 2,
+    marginBottom: 8,
+  },
+  recipientLine: { fontSize: 10, lineHeight: 1.3 },
+  recipientNote: { fontSize: 8, color: "#555", marginTop: 2 },
+  // Informationsblock, right-aligned column ending at the right margin.
+  infoBlock: {
+    position: "absolute",
+    top: mm(50),
+    left: mm(125),
+    width: mm(65),
+  },
+  infoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 2 },
+  infoLabel: { fontSize: 8, color: "#666" },
+  infoValue: { fontSize: 9, fontFamily: "Helvetica-Bold", textAlign: "right" },
+  // Textbereich: 25 mm left / 20 mm right margins. The lead spacer drops the
+  // first line to the DIN reference line (98,46 mm) on page 1 only; on the page
+  // padding (25 mm) carries continuation pages.
+  body: { marginLeft: mm(25), marginRight: mm(20) },
+  lead: { height: mm(98.46) - mm(25) },
+  subject: { fontFamily: "Helvetica-Bold", fontSize: 11, marginBottom: mm(6) },
+  // Falz- und Lochmarken at the very left edge.
+  foldMark: {
+    position: "absolute",
+    left: 0,
+    width: mm(5),
+    height: 0.6,
+    backgroundColor: "#999",
+  },
+  holeMark: {
+    position: "absolute",
+    left: 0,
+    width: mm(7),
+    height: 0.6,
+    backgroundColor: "#999",
+  },
+  footer: {
+    position: "absolute",
+    bottom: mm(8),
+    left: mm(25),
+    right: mm(20),
+    borderTopWidth: 0.5,
+    borderColor: "#bbb",
+    paddingTop: 5,
+    fontSize: 7,
+    color: "#777",
+    textAlign: "center",
+  },
+});
+
+function FoldAndHoleMarks() {
+  return (
+    <>
+      <View style={[styles.foldMark, { top: mm(87) }]} fixed />
+      <View style={[styles.holeMark, { top: mm(148.5) }]} fixed />
+      <View style={[styles.foldMark, { top: mm(192) }]} fixed />
+    </>
+  );
+}
+
+export type LetterInfoRow = { label: string; value: string };
+
+export type LetterPageProps = {
+  logoDataUri: string | null;
+  orgName: string;
+  /** Rücksendeangabe shown small above the recipient, e.g. "Verein · Straße · PLZ Ort". */
+  returnLine: string;
+  recipientLines: string[];
+  /** Small note under the address (e.g. legal-guardian line), or null. */
+  recipientNote?: string | null;
+  infoRows: LetterInfoRow[];
+  /** Betreffzeile (no "Betreff:" prefix per DIN 5008). */
+  subject: string;
+  /** Fußzeilen-Text without the page number; the frame appends "Seite x/y". */
+  footerText: string;
+  children: ReactNode;
+};
+
+/**
+ * One DIN 5008 letter page. Callers wrap one or more of these in a `<Document>`.
+ * The address field, info block and letterhead render on the first page only;
+ * the fold marks and footer repeat on every page.
+ */
+export function LetterPage({
+  logoDataUri,
+  orgName,
+  returnLine,
+  recipientLines,
+  recipientNote,
+  infoRows,
+  subject,
+  footerText,
+  children,
+}: LetterPageProps) {
+  return (
+    <Page size="A4" style={styles.page} wrap>
+      <FoldAndHoleMarks />
+
+      <View style={styles.header}>
+        {logoDataUri ? <Image src={logoDataUri} style={styles.logo} /> : <View />}
+        <Text style={styles.orgName}>{orgName}</Text>
+      </View>
+
+      <View style={styles.addressField}>
+        <Text style={styles.returnLine}>{returnLine}</Text>
+        {recipientLines.map((line, i) => (
+          <Text key={String(i)} style={styles.recipientLine}>
+            {line}
+          </Text>
+        ))}
+        {recipientNote ? <Text style={styles.recipientNote}>{recipientNote}</Text> : null}
+      </View>
+
+      <View style={styles.infoBlock}>
+        {infoRows.map((row, i) => (
+          <View key={String(i)} style={styles.infoRow}>
+            <Text style={styles.infoLabel}>{row.label}</Text>
+            <Text style={styles.infoValue}>{row.value}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.body}>
+        <View style={styles.lead} />
+        <Text style={styles.subject}>{subject}</Text>
+        {children}
+      </View>
+
+      <Text
+        style={styles.footer}
+        render={({ pageNumber, totalPages }) => `${footerText} · Seite ${pageNumber}/${totalPages}`}
+        fixed
+      />
+    </Page>
+  );
+}

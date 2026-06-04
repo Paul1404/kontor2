@@ -1,19 +1,30 @@
 # syntax=docker/dockerfile:1.7
 
-FROM oven/bun:1-slim AS builder
+# Pinned Bun base shared by every stage. Dependabot (docker ecosystem) bumps it.
+# Pinning keeps builds reproducible and the install cache stable across deploys.
+FROM oven/bun:1.3.11-slim AS base
 WORKDIR /app
-COPY package.json bun.lock* bun.lockb* ./
-RUN bun install --frozen-lockfile || bun install
+
+# Install all dependencies (incl. dev) and build. The cache mount keeps Bun's
+# global package cache between builds, so unchanged dependencies are not
+# re-downloaded on every deploy.
+FROM base AS builder
+COPY package.json bun.lock ./
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile
 COPY . .
 RUN bun run build
 
-FROM oven/bun:1-slim AS prod-deps
-WORKDIR /app
-COPY package.json bun.lock* bun.lockb* ./
-RUN bun install --production --frozen-lockfile || bun install --production
+# Production-only dependencies for the slim runtime. Shares the same Bun cache,
+# so these packages were already fetched in the builder stage.
+FROM base AS prod-deps
+COPY package.json bun.lock ./
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --production --frozen-lockfile
 
-FROM oven/bun:1-slim AS runner
-WORKDIR /app
+# Runtime: built output plus production node_modules only. No node toolchain --
+# everything (server, migrator, scheduler) runs under Bun.
+FROM base AS runner
 ENV NODE_ENV=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public

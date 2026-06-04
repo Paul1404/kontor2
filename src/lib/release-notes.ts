@@ -41,6 +41,46 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.15.1",
+    date: "2026-06-04",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Schnellere und zuverlässigere Deployments: Der Docker-Build nutzt jetzt einen Paket-Cache, baut auf einer fest gepinnten Bun-Version und die Datenbank-Migration beim Deploy läuft unter Bun statt Node.",
+      },
+    ],
+  },
+  {
+    version: "0.15.0",
+    date: "2026-06-04",
+    title: "Briefe im DIN-5008-Format",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Mahnung, Austrittsbestätigung und Kulanz-Brief folgen jetzt dem Geschäftsbrief-Standard DIN 5008. Das Anschriftfeld sitzt an der richtigen Stelle für Fensterumschläge, darüber steht die Rücksendeangabe, rechts ein Informationsblock mit Datum, Dokumentnummer und Mitgliedsnummer. Dazu kommen eine fette Betreffzeile, feste Ränder sowie Falz- und Lochmarken am linken Rand.",
+      },
+    ],
+  },
+  {
+    version: "0.14.0",
+    date: "2026-06-04",
+    title: "Eigene E-Mail für Mitgliedschaftsangelegenheiten",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Unter Vereinsdaten lässt sich jetzt zusätzlich zur allgemeinen Kontakt E-Mail eine eigene Mitgliedschaft E-Mail hinterlegen (zum Beispiel mitgliedschaft@verein.de). Kündigungen aus dem Kulanz-Brief und der Kontakt auf der Austrittsbestätigung gehen an diese Adresse. Ist sie leer, wird wie bisher die allgemeine Kontakt E-Mail verwendet.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Auf der Kündigungsbestätigung im Kulanz-Brief steht jetzt deutlich, dass eine formlose E-Mail mit Name und Mitgliedsnummer ebenso als Kündigung gilt. Das Formular muss nicht zwingend zurückgeschickt werden.",
+      },
+    ],
+  },
+  {
     version: "0.13.0",
     date: "2026-06-04",
     title: "Dokumentnummern auf allen erzeugten Schreiben",
