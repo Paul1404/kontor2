@@ -1,4 +1,13 @@
-import { boolean, index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
 import { membersTable } from "~/server/db/schema/members";
 
@@ -22,6 +31,8 @@ export const cancellationLettersTable = pgTable(
     id: text("id").primaryKey(),
     /** The member the letter was generated for. Null if the member is later purged. */
     memberId: uuid("member_id").references(() => membersTable.id, { onDelete: "set null" }),
+    /** Unique, printed document reference, e.g. "AU-2026-0042". */
+    docRef: text("doc_ref"),
     /** Display name snapshot, e.g. "Mustermann, Erika" or "... (Familie)". */
     displayName: text("display_name").notNull(),
     austrittDatum: text("austritt_datum").notNull(),
@@ -40,7 +51,10 @@ export const cancellationLettersTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
   },
-  (t) => [index("cancellation_letters_member_idx").on(t.memberId)],
+  (t) => [
+    index("cancellation_letters_member_idx").on(t.memberId),
+    uniqueIndex("cancellation_letters_doc_ref_idx").on(t.docRef),
+  ],
 );
 
 export type CancellationLetter = typeof cancellationLettersTable.$inferSelect;

@@ -78,18 +78,15 @@ const MEMBER_FIELD_LABELS: Array<[string, string]> = [
   ["bank1", "Bank"],
 ];
 
-export function AuskunftDocument({ pkg }: { pkg: AuskunftsPackage }) {
+export function AuskunftDocument({ pkg, docRef }: { pkg: AuskunftsPackage; docRef: string }) {
   const member = pkg.member;
   return (
-    <Document
-      title={`DSGVO-Auskunft Mitglied ${pkg.generatedFor.mitglnr ?? pkg.generatedFor.memberId}`}
-      author="SVUWV"
-    >
+    <Document title={`DSGVO-Auskunft ${docRef}`} author="SVUWV">
       <Page size="A4" style={styles.page} wrap>
         <Text style={styles.h1}>Auskunft nach Art. 15 DSGVO</Text>
         <Text style={styles.meta}>
-          Erstellt am {new Date(pkg.generatedAt).toLocaleString("de-DE")} · Mitglied{" "}
-          {pkg.generatedFor.mitglnr ?? "—"} · Datei-Hash siehe Begleitschreiben
+          Dokument {docRef} · Erstellt am {new Date(pkg.generatedAt).toLocaleString("de-DE")} ·
+          Mitglied {pkg.generatedFor.mitglnr ?? "—"} · Datei-Hash siehe Begleitschreiben
         </Text>
 
         <View style={styles.notice}>
@@ -252,7 +249,7 @@ export function AuskunftDocument({ pkg }: { pkg: AuskunftsPackage }) {
         <Text
           style={styles.footer}
           render={({ pageNumber, totalPages }) =>
-            `SVUWV · DSGVO-Auskunft · Seite ${pageNumber} von ${totalPages}`
+            `SVUWV · DSGVO-Auskunft ${docRef} · Seite ${pageNumber} von ${totalPages}`
           }
           fixed
         />

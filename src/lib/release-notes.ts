@@ -41,6 +41,40 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.13.0",
+    date: "2026-06-04",
+    title: "Dokumentnummern auf allen erzeugten Schreiben",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Mahnung, Austrittsbestätigung, DSGVO-Auskunft und Bestandserhebung tragen jetzt wie der Kulanz-Brief eine eindeutige Dokumentnummer. Sie ist auf dem Dokument aufgedruckt und steht im Dateinamen beim Download. Bei der Mitgliederliste und der DSGVO-Anfrage wird sie zusätzlich angezeigt.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Nummern werden zentral vergeben (Format zum Beispiel MA-2026-0042 oder AU-2026-0042), je Dokumentart und Jahr fortlaufend. Die Bestandserhebung wird über ihren Stichtag eindeutig benannt (BE-2026-12-31).",
+      },
+    ],
+  },
+  {
+    version: "0.12.0",
+    date: "2026-06-04",
+    title: "Kündigung per E-Mail und eindeutige Dokumentnummern",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Der Kulanz-Brief bietet jetzt zusätzlich an, die Kündigung formlos per E-Mail an die hinterlegte Kontaktadresse zu schicken, statt die unterschriebene Kündigungsbestätigung zurückzusenden. Die Adresse wird aus den Vereinsdaten übernommen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Jeder erzeugte Sammelbrief bekommt eine eindeutige Dokumentnummer (zum Beispiel KS-2026-0001). Sie ist auf jeder Seite des Briefs aufgedruckt und steht zusätzlich in der Liste der früheren Schreiben und im Dateinamen beim Download, damit sich zwei Briefe vom selben Tag nicht mehr verwechseln lassen.",
+      },
+    ],
+  },
+  {
     version: "0.11.0",
     date: "2026-06-04",
     title: "Antwortmöglichkeiten im Kulanz-Brief und sauberere Lastschrift-Erkennung",

@@ -55,7 +55,7 @@ function KulanzPage() {
       }),
     onSuccess: (r) => {
       triggerDownloadBase64(r.filename, r.base64, "application/pdf");
-      toast.success(`Sammelbrief erstellt: ${r.recipientCount} Schreiben.`);
+      toast.success(`${r.docRef} erstellt: ${r.recipientCount} Schreiben.`);
       setConfirmOpen(false);
       qc.invalidateQueries({ queryKey: ["kulanz.list"] });
     },
@@ -271,9 +271,10 @@ function KulanzPage() {
                   <div className="flex min-w-0 flex-col gap-0.5">
                     <span className="flex items-center gap-2 font-medium">
                       <FileText className="size-4 text-muted-foreground" />
-                      {h.recipientCount} Schreiben
+                      {h.docRef ?? `${h.recipientCount} Schreiben`}
                     </span>
                     <span className="text-xs text-muted-foreground">
+                      {h.docRef ? `${h.recipientCount} Schreiben · ` : ""}
                       {formatDate(h.runDate)} · Frist {formatDate(h.deadlineDate)} · offen{" "}
                       {formatCurrency(h.totalOpen)}
                     </span>

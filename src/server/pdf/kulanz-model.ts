@@ -81,6 +81,8 @@ export type KulanzLetterInput = {
   /** Payment deadline (ISO yyyy-mm-dd). */
   deadlineDate: string;
   vereinsname: string;
+  /** Contact mailbox for a formless cancellation by email, or null. */
+  kontaktEmail: string | null;
 };
 
 export type KulanzPostingRow = {
@@ -97,6 +99,11 @@ export type KulanzLetterModel = {
   datum: string;
   intro: string;
   kulanz: string;
+  /**
+   * Offer to cancel by a formless email instead of returning the signed slip,
+   * or null when no contact mailbox is configured.
+   */
+  kulanzEmail: string | null;
   verwendungszweck: string;
   postings: KulanzPostingRow[];
   /** Combined SEPA return fees as a separate line, or null when there are none. */
@@ -197,6 +204,13 @@ export function buildKulanzLetterModel(input: KulanzLetterInput): KulanzLetterMo
     `Füllen Sie dazu die Kündigungsbestätigung auf der zweiten Seite aus und senden Sie sie uns unterschrieben bis zum ${deadline} zurück. ` +
     `In diesem Fall verzichten wir auf die offene Forderung und beenden Ihre Mitgliedschaft.`;
 
+  const email = input.kontaktEmail?.trim();
+  const kulanzEmail = email
+    ? `Schneller geht es per E-Mail an ${email}. Schreiben Sie uns bis zum ${deadline} formlos, ` +
+      `dass Sie Ihre Mitgliedschaft beenden möchten, und nennen Sie Ihren Namen und Ihre Mitgliedsnummer. ` +
+      `Dann benötigen wir die unterschriebene Kündigungsbestätigung nicht.`
+    : null;
+
   const postings: KulanzPostingRow[] = input.postings.map((p) => ({
     jahrFaellig: `${p.billingYear} · ${fmtKulanzDate(p.falligkeitsdatum)}`,
     bezeichnung: p.description,
@@ -218,6 +232,7 @@ export function buildKulanzLetterModel(input: KulanzLetterInput): KulanzLetterMo
     datum: fmtKulanzDate(input.runDate),
     intro,
     kulanz,
+    kulanzEmail,
     verwendungszweck: `Mitgliedsbeitrag · ${input.member.name} · Mitgliedsnr ${input.member.mitgliedsnummer}`,
     postings,
     rueckgebuhr,

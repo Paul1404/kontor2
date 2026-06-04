@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
@@ -108,6 +109,8 @@ export const dunningItemsTable = pgTable(
       .notNull()
       .references(() => membersTable.id, { onDelete: "restrict" }),
     level: integer("level").notNull(),
+    /** Unique, printed document reference, e.g. "MA-2026-0042". */
+    docRef: text("doc_ref"),
     /** UUIDs of the involved soll_stellungen, JSON-encoded text array. */
     sollIdsJson: text("soll_ids_json").notNull().default("[]"),
     /** Posting items in the same JSON shape used for the PDF. */
@@ -126,6 +129,7 @@ export const dunningItemsTable = pgTable(
   (t) => [
     index("dunning_items_run_idx").on(t.dunningRunId),
     index("dunning_items_member_idx").on(t.memberId),
+    uniqueIndex("dunning_items_doc_ref_idx").on(t.docRef),
   ],
 );
 

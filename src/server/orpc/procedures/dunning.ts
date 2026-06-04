@@ -3,6 +3,7 @@ import { and, count, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import type { DB } from "~/server/db/client";
+import { allocateDocRef } from "~/server/db/doc-ref";
 import { contractsTable } from "~/server/db/schema/contracts";
 import {
   dunningItemsTable,
@@ -371,6 +372,7 @@ export const dunningRouter = {
         // Render PDFs + collect item values.
         const itemValues: NewDunningItem[] = [];
         const touchedSollIds: string[] = [];
+        const refYear = Number(toDateString(runDate).slice(0, 4));
 
         for (const m of eligible) {
           const postings = m.postings.map((p) => ({
@@ -433,13 +435,15 @@ export const dunningRouter = {
             totalDue,
           };
 
-          const { base64 } = await renderPdfBase64(MahnungDocument({ pkg: pdfInput }));
-          const filename = `Mahnung-${m.mitglnr ?? m.adrNr}-${toDateString(runDate)}.pdf`;
+          const docRef = await allocateDocRef(tx, "MA", refYear);
+          const { base64 } = await renderPdfBase64(MahnungDocument({ pkg: pdfInput, docRef }));
+          const filename = `Mahnung-${docRef}-${m.mitglnr ?? m.adrNr}.pdf`;
 
           itemValues.push({
             dunningRunId: runRow.id,
             memberId: m.memberId,
             level: input.level,
+            docRef,
             sollIdsJson: JSON.stringify(m.postings.map((p) => p.sollStellungId)),
             itemsJson: JSON.stringify(postings),
             openSum: m.openSum,

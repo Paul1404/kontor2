@@ -1,4 +1,13 @@
-import { index, integer, jsonb, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
 
 /**
@@ -20,6 +29,12 @@ export const kulanzLettersTable = pgTable(
   "kulanz_letters",
   {
     id: text("id").primaryKey(),
+    /**
+     * Human-readable, unique reference for this run, e.g. "KS-2026-0001".
+     * Surfaced in the UI and the download filename so two runs are never
+     * indistinguishable. Nullable for rows created before this was introduced.
+     */
+    docRef: text("doc_ref"),
     /** Letter date (ISO yyyy-mm-dd). */
     runDate: text("run_date").notNull(),
     /** Payment / Kündigungs deadline (ISO yyyy-mm-dd). */
@@ -32,7 +47,10 @@ export const kulanzLettersTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
   },
-  (t) => [index("kulanz_letters_created_idx").on(t.createdAt)],
+  (t) => [
+    index("kulanz_letters_created_idx").on(t.createdAt),
+    uniqueIndex("kulanz_letters_doc_ref_idx").on(t.docRef),
+  ],
 );
 
 export type KulanzLetter = typeof kulanzLettersTable.$inferSelect;

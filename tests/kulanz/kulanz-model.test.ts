@@ -39,6 +39,7 @@ const baseLetter = {
   runDate: "2026-06-04",
   deadlineDate: "2026-06-18",
   vereinsname: "SV Untereuerheim",
+  kontaktEmail: "mitgliedschaft@sv-untereuerheim.de" as string | null,
 };
 
 describe("formatters", () => {
@@ -114,6 +115,18 @@ describe("buildKulanzLetterModel", () => {
     expect(m.kulanz).toContain("Sonderkündigung");
     expect(m.kulanz).toContain("18.06.2026");
     expect(m.kulanz).toContain("verzichten wir auf die offene Forderung");
+  });
+
+  it("offers a formless cancellation by email when a contact mailbox is configured", () => {
+    const m = buildKulanzLetterModel(baseLetter);
+    expect(m.kulanzEmail).toContain("mitgliedschaft@sv-untereuerheim.de");
+    expect(m.kulanzEmail).toContain("formlos");
+    expect(m.kulanzEmail).toContain("18.06.2026");
+  });
+
+  it("omits the email option when no contact mailbox is configured", () => {
+    const m = buildKulanzLetterModel({ ...baseLetter, kontaktEmail: null });
+    expect(m.kulanzEmail).toBeNull();
   });
 
   it("renders postings rows and the total with a Euro sign", () => {

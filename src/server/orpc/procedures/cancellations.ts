@@ -3,6 +3,7 @@ import { ORPCError } from "@orpc/server";
 import { desc, eq } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import { allocateDocRef } from "~/server/db/doc-ref";
 import { cancellationLettersTable } from "~/server/db/schema/cancellations";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
@@ -99,12 +100,13 @@ export const cancellationsRouter = {
       },
     });
 
-    const { base64 } = await renderPdfBase64(AustrittsbestaetigungDocument({ model }));
+    const docRef = await allocateDocRef(context.db, "AU", new Date().getUTCFullYear());
+    const { base64 } = await renderPdfBase64(AustrittsbestaetigungDocument({ model, docRef }));
     const pdf = Buffer.from(base64, "base64");
 
     const id = randomUUID();
     const idRef = member.mitglnr ?? String(member.adrNr);
-    const filename = `Austrittsbestaetigung-${safeFilenamePart(idRef)}-${safeFilenamePart(input.austrittDatum)}.pdf`;
+    const filename = `Austrittsbestaetigung-${docRef}-${safeFilenamePart(idRef)}.pdf`;
     const s3Key = `members/${member.id}/cancellations/${id}/${filename}`;
 
     await putObject({ key: s3Key, body: pdf, contentType: "application/pdf" });
@@ -113,6 +115,7 @@ export const cancellationsRouter = {
       await context.db.transaction(async (tx) => {
         await tx.insert(cancellationLettersTable).values({
           id,
+          docRef,
           memberId: member.id,
           displayName: model.displayName,
           austrittDatum: model.austrittDatum,
@@ -133,6 +136,7 @@ export const cancellationsRouter = {
           actorId: context.session!.user.id,
           actorEmail: context.session!.user.email,
           changes: {
+            docRef: { before: null, after: docRef },
             member: { before: null, after: model.displayName },
             austrittDatum: { before: null, after: model.austrittDatum },
             filename: { before: null, after: filename },
@@ -146,7 +150,7 @@ export const cancellationsRouter = {
       throw err;
     }
 
-    return { id, filename, base64 };
+    return { id, docRef, filename, base64 };
   }),
 
   /** List past Austrittsbestätigungen for a member, newest first. */
@@ -156,6 +160,7 @@ export const cancellationsRouter = {
       const rows = await context.db
         .select({
           id: cancellationLettersTable.id,
+          docRef: cancellationLettersTable.docRef,
           displayName: cancellationLettersTable.displayName,
           austrittDatum: cancellationLettersTable.austrittDatum,
           mitgliedsnummer: cancellationLettersTable.mitgliedsnummer,

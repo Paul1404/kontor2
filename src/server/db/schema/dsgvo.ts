@@ -6,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
@@ -51,6 +52,8 @@ export const dsgvoRequestsTable = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true }),
     completedBy: text("completed_by").references(() => users.id, { onDelete: "set null" }),
     notes: text("notes"),
+    /** Unique, printed reference for the Auskunft document, e.g. "DS-2026-0042". */
+    docRef: text("doc_ref"),
     deliverableSha256: text("deliverable_sha256"),
     deliverableSizeBytes: bigint("deliverable_size_bytes", { mode: "number" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -59,6 +62,7 @@ export const dsgvoRequestsTable = pgTable(
     index("dsgvo_requests_member_idx").on(t.memberId),
     index("dsgvo_requests_status_idx").on(t.status, t.requestedAt),
     index("dsgvo_requests_requested_idx").on(t.requestedAt),
+    uniqueIndex("dsgvo_requests_doc_ref_idx").on(t.docRef),
   ],
 );
 

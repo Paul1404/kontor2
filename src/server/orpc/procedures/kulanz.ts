@@ -3,6 +3,7 @@ import { ORPCError } from "@orpc/server";
 import { desc, eq, inArray } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import { allocateDocRef } from "~/server/db/doc-ref";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { type KulanzRecipientSnapshot, kulanzLettersTable } from "~/server/db/schema/kulanz";
@@ -206,6 +207,7 @@ export const kulanzRouter = {
             runDate: runDateStr,
             deadlineDate: deadlineStr,
             vereinsname: org.vereinsname,
+            kontaktEmail: org.kontaktEmail,
           }),
         );
         snapshot.push({
@@ -216,11 +218,17 @@ export const kulanzRouter = {
         });
       }
 
-      const { base64 } = await renderPdfBase64(KulanzSonderkuendigungDocument({ club, letters }));
+      // Allocate a unique, human-readable reference (KS-2026-0001) so every run
+      // is distinguishable from another with the same date and recipient count.
+      const docRef = await allocateDocRef(context.db, "KS", Number(runDateStr.slice(0, 4)));
+
+      const { base64 } = await renderPdfBase64(
+        KulanzSonderkuendigungDocument({ club, letters, docRef }),
+      );
       const pdf = Buffer.from(base64, "base64");
 
       const id = randomUUID();
-      const filename = `Zahlungserinnerung-Kulanz-${safeFilenamePart(runDateStr)}-${eligible.length}.pdf`;
+      const filename = `Kulanz-${safeFilenamePart(docRef)}-${eligible.length}-Schreiben.pdf`;
       const s3Key = `kulanz/${id}/${filename}`;
       const totalOpen = sumDecimal(eligible.map((m) => m.openSum));
 
@@ -230,6 +238,7 @@ export const kulanzRouter = {
         await context.db.transaction(async (tx) => {
           await tx.insert(kulanzLettersTable).values({
             id,
+            docRef,
             runDate: runDateStr,
             deadlineDate: deadlineStr,
             recipientCount: eligible.length,
@@ -247,6 +256,7 @@ export const kulanzRouter = {
             actorId: context.session!.user.id,
             actorEmail: context.session!.user.email,
             changes: {
+              docRef: { before: null, after: docRef },
               recipientCount: { before: null, after: eligible.length },
               totalOpen: { before: null, after: totalOpen },
               deadlineDate: { before: null, after: deadlineStr },
@@ -260,7 +270,7 @@ export const kulanzRouter = {
         throw err;
       }
 
-      return { id, filename, base64, recipientCount: eligible.length };
+      return { id, docRef, filename, base64, recipientCount: eligible.length };
     }),
 
   /** List past Kulanz letter runs, newest first. */
@@ -268,6 +278,7 @@ export const kulanzRouter = {
     const rows = await context.db
       .select({
         id: kulanzLettersTable.id,
+        docRef: kulanzLettersTable.docRef,
         runDate: kulanzLettersTable.runDate,
         deadlineDate: kulanzLettersTable.deadlineDate,
         recipientCount: kulanzLettersTable.recipientCount,
