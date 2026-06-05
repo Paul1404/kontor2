@@ -9,7 +9,6 @@
  * computed here so it's searchable / displayable without decryption.
  */
 
-import { lastFour } from "~/server/crypto/encrypt";
 import type { Cell } from "~/server/importer/sql-tokenizer";
 import {
   coerceBool,
@@ -22,57 +21,9 @@ import { paysByDirectDebit } from "~/server/sepa/direct-debit";
 
 export type LinearRow = Record<string, Cell>;
 
-/**
- * Linear `adresse` row → `members` insert payload. We carry every column
- * across so the database is a lossless mirror; the `iban1Last4` mirror is
- * computed here for searchability.
- */
-export function mapMemberRow(d: LinearRow): Record<string, unknown> | null {
-  const adrNr = coerceInt(d.AdrNr ?? null);
-  if (adrNr === null) return null;
-
-  const m: Record<string, unknown> = {
-    adrNr,
-    firma1: coerceStr(d.Firma1 ?? null, 40),
-    kurzname: coerceStr(d.Kurzname ?? null, 40),
-    anrede: coerceStr(d.Anrede ?? null, 20),
-    vorname: coerceStr(d.Vorname ?? null, 30),
-    nachname: coerceStr(d.Nachname ?? null, 40),
-    strasse: coerceStr(d.Strasse ?? null, 50),
-    plz: coerceStr(d.PLZ ?? null, 15),
-    ort: coerceStr(d.Ort ?? null, 40),
-    telefon1: coerceStr(d.Telefon1 ?? null, 40),
-    telefon2: coerceStr(d.Telefon2 ?? null, 40),
-    funktion: coerceStr(d.Funktion ?? null, 80),
-    geburtsdatum: coerceDate(d.Geburtsdatum ?? null),
-    eintritt: coerceDate(d.Eintritt ?? null),
-    austritt: coerceDate(d.Austritt ?? null),
-    abwKontoInh: coerceStr(d.AbwKontoInh ?? null, 50),
-    abteilung: coerceStr(d.Abteilung ?? null, 80),
-    verstorbenAm: coerceDate(d.VerstorbenAm ?? null),
-    titel1: coerceStr(d.Titel1 ?? null, 60),
-    geburtsort: coerceStr(d.Geburtsort ?? null, 60),
-    land: coerceStr(d.Land ?? null, 100),
-    spender: coerceStr(d.Spender ?? null, 1),
-    iban1: coerceStr(d.IBAN1 ?? null, 40),
-    iban1Last4: lastFour(coerceStr(d.IBAN1 ?? null, 40)),
-    bic1: coerceStr(d.BIC1 ?? null, 40),
-    hausnummer: coerceStr(d.Hausnummer ?? null, 10),
-    adresszusatz: coerceStr(d.Adresszusatz ?? null, 50),
-    www: coerceStr(d.www ?? null, 256),
-    lastImportedAt: new Date(),
-  };
-  return m;
-}
-
-function _yn(value: Cell): boolean | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "boolean") return value;
-  const s = String(value).trim().toUpperCase();
-  if (s === "Y" || s === "J" || s === "1") return true;
-  if (s === "N" || s === "0" || s === "") return false;
-  return null;
-}
+// Member rows are translated to the clean schema by `translateLinearMember`
+// (`~/server/importer/translate-member`), not mapped here. The functions below
+// map the remaining Linear tables (fee types, contracts, SEPA, etc.).
 
 export function mapFeeTypeRow(d: LinearRow): Record<string, unknown> | null {
   const art = coerceInt(d.Art ?? null);

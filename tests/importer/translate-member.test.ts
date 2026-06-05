@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanMemberColumns, translateLinearMember } from "~/server/importer/translate-member";
+import { translateLinearMember } from "~/server/importer/translate-member";
 
 describe("translateLinearMember", () => {
   it("returns null when AdrNr is missing", () => {
@@ -25,7 +25,6 @@ describe("translateLinearMember", () => {
       Abteilung: "Fußball, Tennis",
       IBAN1: "DE89370400440532013000",
       BIC1: "COBADEFFXXX",
-      mandatsrefenz: "MAN-001",
     });
     expect(m).not.toBeNull();
     if (!m) return;
@@ -38,7 +37,6 @@ describe("translateLinearMember", () => {
     expect(m.dunningBlocked).toBe(false);
     expect(m.iban1).toBe("DE89370400440532013000");
     expect(m.iban1Last4).toBe("3000");
-    expect(m.mandatsreferenz).toBe("MAN-001");
   });
 
   it("normalizes legacy flags: geloscht, mahnSperre, status", () => {
@@ -73,41 +71,5 @@ describe("translateLinearMember", () => {
     expect(
       translateLinearMember({ AdrNr: 1, Eintritt: "0000-00-00 00:00:00" })?.eintritt,
     ).toBeNull();
-  });
-});
-
-describe("cleanMemberColumns", () => {
-  it("projects exactly the four clean columns the importer dual-writes", () => {
-    const clean = translateLinearMember({
-      AdrNr: 7,
-      MITGLNR: "M-0007",
-      EMailName: "x@y.de",
-      AktivPasiv: "P",
-      MahnSperre: "gesperrt",
-    });
-    expect(clean).not.toBeNull();
-    if (!clean) return;
-    expect(cleanMemberColumns(clean)).toEqual({
-      mitgliedsnummer: "M-0007",
-      email: "x@y.de",
-      status: "passiv",
-      dunningBlocked: true,
-    });
-  });
-
-  it("carries the normalized status and the email fallback through", () => {
-    const clean = translateLinearMember({
-      AdrNr: 8,
-      Telefon3: "old@example.com",
-      Austritt: "2024-01-01 00:00:00",
-    });
-    expect(clean).not.toBeNull();
-    if (!clean) return;
-    expect(cleanMemberColumns(clean)).toEqual({
-      mitgliedsnummer: null,
-      email: "old@example.com",
-      status: "ausgetreten",
-      dunningBlocked: false,
-    });
   });
 });
