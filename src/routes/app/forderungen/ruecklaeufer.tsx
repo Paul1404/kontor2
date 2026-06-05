@@ -96,13 +96,13 @@ function RuecklaeuferPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         to="/app/mitglieder/$mitgliedsnummer"
-                        params={{ mitgliedsnummer: r.mitglnr ?? String(r.adrNr) }}
+                        params={{ mitgliedsnummer: r.mitgliedsnummer ?? String(r.adrNr) }}
                         className="font-medium hover:underline"
                       >
                         {r.memberName}
                       </Link>
                       <span className="text-xs text-muted-foreground tabular-nums">
-                        #{r.mitglnr ?? r.adrNr}
+                        #{r.mitgliedsnummer ?? r.adrNr}
                       </span>
                       {r.reasonCode ? <Badge variant="warning">{r.reasonCode}</Badge> : null}
                     </div>
@@ -240,7 +240,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
                           <div className="flex items-center justify-between">
                             <span className="font-medium">{c.memberName}</span>
                             <span className="text-xs text-muted-foreground tabular-nums">
-                              #{c.mitglnr ?? c.adrNr}
+                              #{c.mitgliedsnummer ?? c.adrNr}
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground">

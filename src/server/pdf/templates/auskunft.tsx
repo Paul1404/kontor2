@@ -52,7 +52,7 @@ function fmt(value: unknown): string {
 }
 
 const MEMBER_FIELD_LABELS: Array<[string, string]> = [
-  ["mitglnr", "Mitgliedsnummer"],
+  ["mitgliedsnummer", "Mitgliedsnummer"],
   ["adrNr", "Adressnummer (Legacy)"],
   ["anrede", "Anrede"],
   ["titel1", "Titel"],
@@ -68,7 +68,7 @@ const MEMBER_FIELD_LABELS: Array<[string, string]> = [
   ["land", "Land"],
   ["telefon1", "Telefon"],
   ["telefon2", "Telefon 2"],
-  ["eMailName", "E-Mail"],
+  ["email", "E-Mail"],
   ["www", "Webseite"],
   ["eintritt", "Vereinseintritt"],
   ["austritt", "Vereinsaustritt"],
@@ -85,7 +85,7 @@ export function AuskunftDocument({ pkg, docRef }: { pkg: AuskunftsPackage; docRe
         <Text style={styles.h1}>Auskunft nach Art. 15 DSGVO</Text>
         <Text style={styles.meta}>
           Dokument {docRef} · Erstellt am {new Date(pkg.generatedAt).toLocaleString("de-DE")} ·
-          Mitglied {pkg.generatedFor.mitglnr ?? "—"} · Datei-Hash siehe Begleitschreiben
+          Mitglied {pkg.generatedFor.mitgliedsnummer ?? "—"} · Datei-Hash siehe Begleitschreiben
         </Text>
 
         <View style={styles.notice}>

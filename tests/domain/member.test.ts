@@ -54,7 +54,7 @@ describe("ageAt / isMinorAt", () => {
 describe("memberRef", () => {
   it("prefers the Mitgliedsnummer, falls back to A+adrNr", () => {
     expect(memberRef({ mitgliedsnummer: "M-7", adrNr: 42 })).toBe("M-7");
-    expect(memberRef({ mitglnr: "M-7", adrNr: 42 })).toBe("M-7");
+    expect(memberRef({ mitgliedsnummer: "M-7", adrNr: 42 })).toBe("M-7");
     expect(memberRef({ mitgliedsnummer: "  ", adrNr: 42 })).toBe("A42");
     expect(memberRef({ mitgliedsnummer: null, adrNr: 42 })).toBe("A42");
   });

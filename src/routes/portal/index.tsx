@@ -42,7 +42,7 @@ function PortalHome() {
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-            <Detail label="Mitgliedsnummer" value={m.mitglnr ?? `Adr. ${m.adrNr}`} />
+            <Detail label="Mitgliedsnummer" value={m.mitgliedsnummer ?? `Adr. ${m.adrNr}`} />
             <Detail label="Eintritt" value={m.eintritt ? formatDate(m.eintritt) : "—"} />
             <Detail
               label="Geburtsdatum"

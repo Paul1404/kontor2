@@ -160,7 +160,9 @@ function NewDunningRunPage() {
                 <li key={b.memberId} className="flex items-center justify-between py-2">
                   <span>
                     {b.name}{" "}
-                    <span className="text-xs text-muted-foreground">#{b.mitglnr ?? b.adrNr}</span>
+                    <span className="text-xs text-muted-foreground">
+                      #{b.mitgliedsnummer ?? b.adrNr}
+                    </span>
                   </span>
                   <span className="text-sm tabular-nums">{formatCurrency(b.openSum)}</span>
                 </li>
@@ -219,13 +221,13 @@ function NewDunningRunPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         to="/app/mitglieder/$mitgliedsnummer"
-                        params={{ mitgliedsnummer: i.mitglnr ?? String(i.adrNr) }}
+                        params={{ mitgliedsnummer: i.mitgliedsnummer ?? String(i.adrNr) }}
                         className="font-medium hover:underline"
                       >
                         {i.name}
                       </Link>
                       <span className="text-xs text-muted-foreground tabular-nums">
-                        #{i.mitglnr ?? i.adrNr}
+                        #{i.mitgliedsnummer ?? i.adrNr}
                       </span>
                       {!i.hasAddress ? <Badge variant="warning">Anschrift fehlt</Badge> : null}
                       {i.minorWithoutGuardian ? (

@@ -35,7 +35,7 @@ import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 const StatusSchema = v.picklist(["aktiv", "passiv", "ausgetreten", "verstorben", "alle"]);
 
-const SortBySchema = v.picklist(["nachname", "mitglnr", "ort", "email", "eintritt"]);
+const SortBySchema = v.picklist(["nachname", "mitgliedsnummer", "ort", "email", "eintritt"]);
 const SortDirSchema = v.picklist(["asc", "desc"]);
 
 const DateStringInput = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
@@ -286,7 +286,7 @@ export const membersRouter = {
     // `geloscht` flag is folded into the app's single `deletedAt`.
     conditions.push(memberNotDeleted() as never);
 
-    // "Verwaiste Kontakte" filter: Kontakt (no mitglnr) AND no relationship
+    // "Verwaiste Kontakte" filter: Kontakt (no mitgliedsnummer) AND no relationship
     // pointing to or from this row. Used by admins to find Linear-import
     // leftovers.
     if (input.orphanOnly) {
@@ -334,7 +334,7 @@ export const membersRouter = {
     // logical names without exposing column identifiers in the API.
     const sortColumn = {
       nachname: membersTable.nachname,
-      mitglnr: membersTable.mitgliedsnummer,
+      mitgliedsnummer: membersTable.mitgliedsnummer,
       ort: membersTable.ort,
       email: membersTable.email,
       eintritt: membersTable.eintritt,
@@ -350,7 +350,7 @@ export const membersRouter = {
         .select({
           id: membersTable.id,
           adrNr: membersTable.adrNr,
-          mitglnr: membersTable.mitgliedsnummer,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
           anrede: membersTable.anrede,
           titel: membersTable.titel1,
           vorname: membersTable.vorname,
@@ -381,11 +381,11 @@ export const membersRouter = {
   get: authedProc
     .input(v.object({ mitgliedsnummer: v.string() }))
     .handler(async ({ context, input }) => {
-      // Look up by mitglnr first (the normal member case). Legacy Linear
+      // Look up by mitgliedsnummer first (the normal member case). Legacy Linear
       // "Zahler-only" entries — people who pay for someone else's contract
-      // but aren't members themselves — have no mitglnr; the list links
+      // but aren't members themselves — have no mitgliedsnummer; the list links
       // them by numeric adrNr instead. Fall back to that when the input
-      // parses as an integer and no mitglnr match exists, so those rows
+      // parses as an integer and no mitgliedsnummer match exists, so those rows
       // are still openable from the list and bookmarkable.
       const rows = await context.db
         .select()
@@ -561,7 +561,7 @@ export const membersRouter = {
         // Keep the legacy output keys (sourced from the clean columns) so the
         // detail UI need not change here; the cosmetic API rename is a separate
         // pass.
-        member: { ...stamm, mitglnr: stamm.mitgliedsnummer, eMailName: stamm.email },
+        member: { ...stamm, mitgliedsnummer: stamm.mitgliedsnummer, email: stamm.email },
         abteilungen,
         vertraege,
         sepa,
@@ -655,7 +655,7 @@ export const membersRouter = {
 
         const patch = buildMemberPatch(input.patch);
         if (Object.keys(patch).length === 0) {
-          return { mitglnr: existing.mitgliedsnummer };
+          return { mitgliedsnummer: existing.mitgliedsnummer };
         }
 
         // Enforce the configurable Kündigungsfrist only when the Austritt is
@@ -714,17 +714,17 @@ export const membersRouter = {
           });
         }
 
-        return { mitglnr: existing.mitgliedsnummer };
+        return { mitgliedsnummer: existing.mitgliedsnummer };
       });
 
       await invalidateMemberCaches();
-      return { ok: true, mitglnr: result.mitglnr };
+      return { ok: true, mitgliedsnummer: result.mitgliedsnummer };
     }),
 
   create: vorstandProc
     .input(
       v.object({
-        mitglnr: v.optional(v.nullable(v.string())),
+        mitgliedsnummer: v.optional(v.nullable(v.string())),
         patch: StammdatenInput,
       }),
     )
@@ -752,8 +752,8 @@ export const membersRouter = {
               .from(membersTable);
             const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
             const nextMitglnr =
-              input.mitglnr && input.mitglnr.trim().length > 0
-                ? input.mitglnr.trim()
+              input.mitgliedsnummer && input.mitgliedsnummer.trim().length > 0
+                ? input.mitgliedsnummer.trim()
                 : String((maxRow?.maxMitglnrInt ?? 0) + 1);
 
             if (nextMitglnr) {
@@ -791,7 +791,7 @@ export const membersRouter = {
                 createdAt: now,
                 updatedAt: now,
               } as never)
-              .returning({ id: membersTable.id, mitglnr: membersTable.mitgliedsnummer });
+              .returning({ id: membersTable.id, mitgliedsnummer: membersTable.mitgliedsnummer });
             if (!inserted) {
               throw new ORPCError("INTERNAL_SERVER_ERROR", {
                 message: "Anlage fehlgeschlagen.",
@@ -821,7 +821,7 @@ export const membersRouter = {
 
             return {
               id: inserted.id,
-              mitglnr: inserted.mitglnr ?? nextMitglnr,
+              mitgliedsnummer: inserted.mitgliedsnummer ?? nextMitglnr,
               adrNr: nextAdrNr,
             };
           });
@@ -1144,7 +1144,7 @@ export const membersRouter = {
       const rows = await context.db
         .select({
           id: membersTable.id,
-          mitglnr: membersTable.mitgliedsnummer,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
           adrNr: membersTable.adrNr,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,
@@ -1311,7 +1311,7 @@ export const membersRouter = {
       });
 
       return {
-        mitglnr: member.mitgliedsnummer,
+        mitgliedsnummer: member.mitgliedsnummer,
         abteilungen: plan.abteilungClose.length,
         vertraege: plan.contractClose.length,
         sepaMandate: plan.sepaRevoke.length,
@@ -1456,7 +1456,7 @@ export const membersRouter = {
           auditId,
         });
 
-        return { mitglnr: member.mitgliedsnummer };
+        return { mitgliedsnummer: member.mitgliedsnummer };
       });
 
       await invalidateMemberCaches();
@@ -1471,7 +1471,7 @@ export const membersRouter = {
   onboard: vorstandProc
     .input(
       v.object({
-        mitglnr: v.optional(v.nullable(v.string())),
+        mitgliedsnummer: v.optional(v.nullable(v.string())),
         patch: StammdatenInput,
         abteilungen: v.optional(v.array(OnboardAbteilung), []),
         contract: v.optional(v.nullable(OnboardContract), null),
@@ -1501,8 +1501,8 @@ export const membersRouter = {
             .from(membersTable);
           const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
           const nextMitglnr =
-            input.mitglnr && input.mitglnr.trim().length > 0
-              ? input.mitglnr.trim()
+            input.mitgliedsnummer && input.mitgliedsnummer.trim().length > 0
+              ? input.mitgliedsnummer.trim()
               : String((maxRow?.maxMitglnrInt ?? 0) + 1);
 
           const [dupe] = await tx
@@ -1535,7 +1535,7 @@ export const membersRouter = {
               createdAt: now,
               updatedAt: now,
             } as never)
-            .returning({ id: membersTable.id, mitglnr: membersTable.mitgliedsnummer });
+            .returning({ id: membersTable.id, mitgliedsnummer: membersTable.mitgliedsnummer });
           if (!inserted) {
             throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
           }
@@ -1568,7 +1568,7 @@ export const membersRouter = {
             await tx.insert(contractsTable).values({
               memberId: inserted.id,
               adrNr: nextAdrNr,
-              mitglNr: inserted.mitglnr ?? nextMitglnr,
+              mitglNr: inserted.mitgliedsnummer ?? nextMitglnr,
               vertragNr:
                 input.contract.vertragNr && input.contract.vertragNr.trim().length > 0
                   ? input.contract.vertragNr.trim()
@@ -1609,7 +1609,6 @@ export const membersRouter = {
             changes: diff(null, {
               ...patch,
               adrNr: nextAdrNr,
-              mitglnr: nextMitglnr,
               ...cleanCols,
               abteilungen: input.abteilungen.length,
               vertrag: input.contract ? 1 : 0,
@@ -1626,7 +1625,7 @@ export const membersRouter = {
 
           return {
             id: inserted.id,
-            mitglnr: inserted.mitglnr ?? nextMitglnr,
+            mitgliedsnummer: inserted.mitgliedsnummer ?? nextMitglnr,
             adrNr: nextAdrNr,
           };
         }),

@@ -28,7 +28,7 @@ type Beziehung = {
 
 type TargetSearchHit = {
   id: string;
-  mitglnr: string | null;
+  mitgliedsnummer: string | null;
   vorname: string | null;
   nachname: string | null;
   plz: string | null;
@@ -312,7 +312,7 @@ function AddRelationshipForm({
                     {[h.nachname, h.vorname].filter(Boolean).join(", ")}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {h.mitglnr ?? ""} {h.plz ?? ""} {h.ort ?? ""}
+                    {h.mitgliedsnummer ?? ""} {h.plz ?? ""} {h.ort ?? ""}
                   </span>
                 </button>
               </li>
@@ -325,7 +325,7 @@ function AddRelationshipForm({
               <span className="font-medium">
                 {[selected.nachname, selected.vorname].filter(Boolean).join(", ")}
               </span>{" "}
-              <span className="text-muted-foreground">{selected.mitglnr}</span>
+              <span className="text-muted-foreground">{selected.mitgliedsnummer}</span>
             </span>
             <Button type="button" size="sm" variant="ghost" onClick={() => setSelected(null)}>
               <X className="size-3.5" />

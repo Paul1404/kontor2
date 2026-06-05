@@ -69,7 +69,7 @@ export const kulanzRouter = {
         const resolved = recipients.get(m.memberId);
         return {
           memberId: m.memberId,
-          mitglnr: m.mitglnr,
+          mitgliedsnummer: m.mitgliedsnummer,
           adrNr: m.adrNr,
           name: memberDisplayName(m),
           openSum: m.openSum,
@@ -179,7 +179,7 @@ export const kulanzRouter = {
       for (const m of eligible) {
         const resolved = recipients.get(m.memberId);
         const memberName = memberDisplayName(m);
-        const mitgliedsnummer = m.mitglnr ?? `AdrNr ${m.adrNr}`;
+        const mitgliedsnummer = m.mitgliedsnummer ?? `AdrNr ${m.adrNr}`;
         const recipient = resolved?.recipient ?? {
           anrede: m.anrede,
           name: memberName,

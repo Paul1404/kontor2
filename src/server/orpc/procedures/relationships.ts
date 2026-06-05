@@ -237,7 +237,7 @@ export const relationshipsRouter = {
     }),
 
   /**
-   * Search for a member to link to. Returns id, mitglnr, name; used by the
+   * Search for a member to link to. Returns id, mitgliedsnummer, name; used by the
    * "Beziehung hinzufügen" combobox so vorstand users can find the target
    * without leaving the member detail page.
    */
@@ -250,7 +250,7 @@ export const relationshipsRouter = {
       const rows = await context.db
         .select({
           id: membersTable.id,
-          mitglnr: membersTable.mitgliedsnummer,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,
           plz: membersTable.plz,

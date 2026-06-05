@@ -43,13 +43,13 @@ import { moveCursor } from "~/lib/table-nav";
 import { isTypingTarget, usePageShortcut } from "~/lib/use-global-shortcuts";
 
 type Status = "aktiv" | "passiv" | "ausgetreten" | "verstorben" | "alle";
-type SortBy = "nachname" | "mitglnr" | "ort" | "email" | "eintritt";
+type SortBy = "nachname" | "mitgliedsnummer" | "ort" | "email" | "eintritt";
 type SortDir = "asc" | "desc";
 
 type MemberRow = {
   id: string;
   adrNr: number;
-  mitglnr: string | null;
+  mitgliedsnummer: string | null;
   vorname: string | null;
   nachname: string | null;
   plz: string | null;
@@ -73,7 +73,7 @@ type MembersSearch = {
 };
 
 const STATUS_VALUES: Status[] = ["aktiv", "passiv", "ausgetreten", "verstorben", "alle"];
-const SORT_VALUES: SortBy[] = ["nachname", "mitglnr", "ort", "email", "eintritt"];
+const SORT_VALUES: SortBy[] = ["nachname", "mitgliedsnummer", "ort", "email", "eintritt"];
 
 const EMPTY_SEARCH: MembersSearch = {
   q: "",
@@ -289,7 +289,7 @@ function MembersListPage() {
         e.preventDefault();
         navigate({
           to: "/app/mitglieder/$mitgliedsnummer",
-          params: { mitgliedsnummer: row.mitglnr ?? String(row.adrNr) },
+          params: { mitgliedsnummer: row.mitgliedsnummer ?? String(row.adrNr) },
         });
         return;
       }
@@ -790,7 +790,7 @@ function MembersListPage() {
                 ) : null}
                 <SortHeader
                   label="Mitgl.-Nr."
-                  col="mitglnr"
+                  col="mitgliedsnummer"
                   active={search.sortBy}
                   dir={search.sortDir}
                   onToggle={toggleSort}
@@ -857,7 +857,7 @@ function MembersListPage() {
                 </tr>
               ) : (
                 rows.map((m, index) => {
-                  const isKontakt = !m.mitglnr;
+                  const isKontakt = !m.mitgliedsnummer;
                   const isSelected = selected.has(m.id);
                   const isCursor = index === cursor;
                   return (
@@ -885,7 +885,7 @@ function MembersListPage() {
                         </td>
                       ) : null}
                       <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                        {m.mitglnr ?? (
+                        {m.mitgliedsnummer ?? (
                           <span
                             className="text-muted-foreground/60"
                             title="Kein Mitglied, nur Zahler/Kontakt"
@@ -898,7 +898,7 @@ function MembersListPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <Link
                             to="/app/mitglieder/$mitgliedsnummer"
-                            params={{ mitgliedsnummer: m.mitglnr ?? String(m.adrNr) }}
+                            params={{ mitgliedsnummer: m.mitgliedsnummer ?? String(m.adrNr) }}
                             className="font-medium text-primary hover:underline"
                           >
                             {[m.nachname, m.vorname].filter(Boolean).join(", ")}

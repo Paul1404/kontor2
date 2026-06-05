@@ -71,7 +71,7 @@ export const contractsRouter = {
           .select({
             id: membersTable.id,
             adrNr: membersTable.adrNr,
-            mitglnr: membersTable.mitgliedsnummer,
+            mitgliedsnummer: membersTable.mitgliedsnummer,
           })
           .from(membersTable)
           .where(eq(membersTable.id, input.memberId))
@@ -90,7 +90,7 @@ export const contractsRouter = {
             ...(patch as Record<string, unknown>),
             memberId: member.id,
             adrNr: member.adrNr,
-            mitglNr: member.mitglnr ?? null,
+            mitglNr: member.mitgliedsnummer ?? null,
           } as never)
           .returning({ id: contractsTable.id });
         if (!row) {

@@ -96,7 +96,7 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
 
 type BirthdayRow = {
   id: string;
-  mitglnr: string | null;
+  mitgliedsnummer: string | null;
   vorname: string | null;
   nachname: string | null;
   geburtsdatum: Date | null;
@@ -141,7 +141,7 @@ async function loadGeburtstage(
   const rows = await db
     .select({
       id: membersTable.id,
-      mitglnr: membersTable.mitgliedsnummer,
+      mitgliedsnummer: membersTable.mitgliedsnummer,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
       geburtsdatum: membersTable.geburtsdatum,
@@ -162,7 +162,7 @@ async function loadGeburtstage(
 
 type JubileeMemberRow = {
   id: string;
-  mitglnr: string | null;
+  mitgliedsnummer: string | null;
   vorname: string | null;
   nachname: string | null;
   ort: string | null;
@@ -190,7 +190,7 @@ async function loadEhrungen(
   const rows = await db
     .select({
       id: membersTable.id,
-      mitglnr: membersTable.mitgliedsnummer,
+      mitgliedsnummer: membersTable.mitgliedsnummer,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
       eintritt: membersTable.eintritt,
@@ -214,7 +214,7 @@ async function loadEhrungen(
       )
       .map((r) => ({
         id: r.id,
-        mitglnr: r.mitglnr,
+        mitgliedsnummer: r.mitgliedsnummer,
         vorname: r.vorname,
         nachname: r.nachname,
         ort: r.ort,
@@ -336,7 +336,7 @@ async function loadFinanzbericht(
 }
 
 type MemberExportRow = {
-  mitglnr: string | null;
+  mitgliedsnummer: string | null;
   anrede: string | null;
   titel: string | null;
   vorname: string | null;
@@ -355,7 +355,7 @@ type MemberExportRow = {
 };
 
 const MEMBER_EXPORT_COLUMNS: readonly CsvColumn<MemberExportRow>[] = [
-  { key: "mitglnr", label: "Mitgl.-Nr." },
+  { key: "mitgliedsnummer", label: "Mitgl.-Nr." },
   { key: "anrede", label: "Anrede" },
   { key: "titel", label: "Titel" },
   { key: "vorname", label: "Vorname" },
@@ -399,7 +399,7 @@ export const reportsRouter = {
       const ids = [...new Set(input.ids)];
       const selected: MemberExportRow[] = await context.db
         .select({
-          mitglnr: membersTable.mitgliedsnummer,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
           anrede: membersTable.anrede,
           titel: membersTable.titel1,
           vorname: membersTable.vorname,
@@ -443,7 +443,7 @@ export const reportsRouter = {
     const where = conditions.length > 0 ? and(...conditions) : undefined;
     const rows: MemberExportRow[] = await context.db
       .select({
-        mitglnr: membersTable.mitgliedsnummer,
+        mitgliedsnummer: membersTable.mitgliedsnummer,
         anrede: membersTable.anrede,
         titel: membersTable.titel1,
         vorname: membersTable.vorname,
@@ -478,7 +478,7 @@ export const reportsRouter = {
   geburtstageExport: authedProc.input(GeburtstageInput).handler(async ({ context, input }) => {
     const data = await loadGeburtstage(context.db, input);
     const content = toCsv(data.rows, [
-      { key: "mitglnr", label: "Mitgl.-Nr." },
+      { key: "mitgliedsnummer", label: "Mitgl.-Nr." },
       { key: "nachname", label: "Nachname" },
       { key: "vorname", label: "Vorname" },
       {
@@ -504,7 +504,7 @@ export const reportsRouter = {
     const data = await loadEhrungen(context.db, input);
     type FlatRow = {
       jubilaeum: number;
-      mitglnr: string | null;
+      mitgliedsnummer: string | null;
       nachname: string | null;
       vorname: string | null;
       ort: string | null;
@@ -514,7 +514,7 @@ export const reportsRouter = {
     const flat: FlatRow[] = data.groups.flatMap((g) =>
       g.members.map((m) => ({
         jubilaeum: g.jubilee,
-        mitglnr: m.mitglnr,
+        mitgliedsnummer: m.mitgliedsnummer,
         nachname: m.nachname,
         vorname: m.vorname,
         ort: m.ort,
@@ -524,7 +524,7 @@ export const reportsRouter = {
     );
     const content = toCsv(flat, [
       { key: "jubilaeum", label: "Jubiläum (Jahre)" },
-      { key: "mitglnr", label: "Mitgl.-Nr." },
+      { key: "mitgliedsnummer", label: "Mitgl.-Nr." },
       { key: "nachname", label: "Nachname" },
       { key: "vorname", label: "Vorname" },
       { key: "ort", label: "Ort" },

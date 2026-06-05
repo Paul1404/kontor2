@@ -27,7 +27,7 @@ const PHRASES = {
 } as const;
 
 /**
- * Orphan = Kontakt-row (no mitglnr) with zero relationships pointing
+ * Orphan = Kontakt-row (no mitgliedsnummer) with zero relationships pointing
  * to or from it. Per the data model rule: every Kontakt entry should
  * exist solely to be referenced by a Beziehung; without one it's dead
  * weight that the importer left behind.
@@ -131,7 +131,7 @@ export const dangerZoneRouter = {
         .select({
           id: membersTable.id,
           adrNr: membersTable.adrNr,
-          mitglnr: membersTable.mitgliedsnummer,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,
           deletedAt: membersTable.deletedAt,

@@ -54,6 +54,6 @@ describe("buildVCard", () => {
     // OSes and download tooling that misbehave on UTF-8 filenames.
     expect(vcardFilename({ vorname: "Anna", nachname: "Müller" })).toBe("Anna-M_ller.vcf");
     expect(vcardFilename({ vorname: "A/B", nachname: "C D" })).toBe("A_B-C_D.vcf");
-    expect(vcardFilename({ mitglnr: "42" })).toBe("mitglied-42.vcf");
+    expect(vcardFilename({ mitgliedsnummer: "42" })).toBe("mitglied-42.vcf");
   });
 });

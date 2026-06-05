@@ -22,7 +22,7 @@ export type MemberNameParts = {
   kurzname: string | null;
   firma1: string | null;
   /** Legacy human-readable Mitgliedsnummer (Linear `MITGLNR`). */
-  mitglnr?: string | null;
+  mitgliedsnummer?: string | null;
   /** Legacy address number (Linear `AdrNr`); the real unique key. */
   adrNr?: number;
 };
@@ -84,13 +84,8 @@ export function isMinorAt(birth: Date | string | null | undefined, asOf: Date): 
  * Canonical, human-facing reference for a member. Prefer the Mitgliedsnummer;
  * legacy payer/contact rows without one fall back to "A" + the address number.
  */
-export function memberRef(parts: {
-  mitglnr?: string | null;
-  mitgliedsnummer?: string | null;
-  adrNr: number;
-}): string {
-  const nr = parts.mitgliedsnummer ?? parts.mitglnr;
-  const trimmed = nr?.trim();
+export function memberRef(parts: { mitgliedsnummer?: string | null; adrNr: number }): string {
+  const trimmed = parts.mitgliedsnummer?.trim();
   if (trimmed) return trimmed;
   return `A${parts.adrNr}`;
 }
@@ -102,7 +97,7 @@ export function memberRef(parts: {
 export function memberDisplayName(m: MemberNameParts): string {
   const full = [m.vorname, m.nachname].filter(Boolean).join(" ").trim();
   if (full) return full;
-  return m.kurzname ?? m.firma1 ?? `Mitglied ${m.mitglnr ?? m.adrNr ?? ""}`.trim();
+  return m.kurzname ?? m.firma1 ?? `Mitglied ${m.mitgliedsnummer ?? m.adrNr ?? ""}`.trim();
 }
 
 /**

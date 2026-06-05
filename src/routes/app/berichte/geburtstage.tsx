@@ -147,7 +147,7 @@ function GeburtstagePage() {
                   <tr key={r.id} className="transition-colors hover:bg-muted/30">
                     <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.tag}.</td>
                     <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                      {r.mitglnr ?? "-"}
+                      {r.mitgliedsnummer ?? "-"}
                     </td>
                     <td className="px-4 py-3 font-medium">
                       {[r.nachname, r.vorname].filter(Boolean).join(", ")}

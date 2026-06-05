@@ -62,7 +62,7 @@ export const dsgvoRouter = {
             memberVorname: membersTable.vorname,
             memberNachname: membersTable.nachname,
             memberMitglnr: membersTable.mitgliedsnummer,
-            // Legacy Kontakte have no mitglnr; the member link falls back to
+            // Legacy Kontakte have no mitgliedsnummer; the member link falls back to
             // the numeric adrNr, which the detail route resolves.
             memberAdrNr: membersTable.adrNr,
           })
@@ -123,7 +123,7 @@ export const dsgvoRouter = {
       const [member] = await context.db
         .select({
           id: membersTable.id,
-          mitglnr: membersTable.mitgliedsnummer,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
           nachname: membersTable.nachname,
         })
         .from(membersTable)
@@ -175,7 +175,7 @@ export const dsgvoRouter = {
         return row;
       });
 
-      const slug = (member.mitglnr ?? member.id.slice(0, 8)).replace(/[^a-z0-9]/gi, "");
+      const slug = (member.mitgliedsnummer ?? member.id.slice(0, 8)).replace(/[^a-z0-9]/gi, "");
       return {
         requestId: created?.id,
         docRef,

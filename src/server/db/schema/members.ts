@@ -40,7 +40,7 @@ export const memberStatusEnum = pgEnum("member_status", [
  *
  * Internal `id` is a generated UUID; the Linear `AdrNr` is preserved as a
  * non-null unique integer. IBAN columns are AES-256-GCM encrypted at rest via
- * the `encryptedText` type. The remaining legacy text columns (e.g. `mitglnr`,
+ * the `encryptedText` type. The remaining legacy text columns (e.g. `mitgliedsnummer`,
  * `e_mail_name`, `aktiv_pasiv`, `mahn_sperre`) are being read off in favour of
  * the clean columns and will be dropped once the edit form and importer no
  * longer reference them.
@@ -98,7 +98,7 @@ export const membersTable = pgTable(
     // They are backfilled from the legacy columns above and coexist with them
     // until consumers are cut over; nothing reads them yet. See
     // `~/server/domain/member` for the canonical derivations.
-    /** Clean name for the legacy `mitglnr`. The human-readable member number. */
+    /** Clean name for the legacy `mitgliedsnummer`. The human-readable member number. */
     mitgliedsnummer: text("mitgliedsnummer"),
     /** Clean name for `e_mail_name`, with the legacy `telefon3` fallback. */
     email: text("email"),

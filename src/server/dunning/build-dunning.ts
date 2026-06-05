@@ -26,7 +26,7 @@ export type OpenPosting = {
 
 export type MemberWithDebt = {
   memberId: string;
-  mitglnr: string | null;
+  mitgliedsnummer: string | null;
   adrNr: number;
   vorname: string | null;
   nachname: string | null;
@@ -37,7 +37,7 @@ export type MemberWithDebt = {
   hausnummer: string | null;
   plz: string | null;
   ort: string | null;
-  eMailName: string | null;
+  email: string | null;
   dunningBlocked: boolean;
   geburtsdatum: Date | string | null;
   vertreterAnrede: string | null;
@@ -172,7 +172,7 @@ export async function loadOpenPostings(
       openAmount: sollStellungenTable.openAmount,
       status: sollStellungenTable.status,
       mahnstufe: sollStellungenTable.mahnstufe,
-      mitglnr: membersTable.mitgliedsnummer,
+      mitgliedsnummer: membersTable.mitgliedsnummer,
       adrNr: membersTable.adrNr,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
@@ -183,7 +183,7 @@ export async function loadOpenPostings(
       hausnummer: membersTable.hausnummer,
       plz: membersTable.plz,
       ort: membersTable.ort,
-      eMailName: membersTable.email,
+      email: membersTable.email,
       dunningBlocked: membersTable.dunningBlocked,
       geburtsdatum: membersTable.geburtsdatum,
       vertreterAnrede: membersTable.vertreterAnrede,
@@ -246,7 +246,7 @@ export async function loadOpenPostings(
     if (!entry) {
       entry = {
         memberId: row.memberId,
-        mitglnr: row.mitglnr,
+        mitgliedsnummer: row.mitgliedsnummer,
         adrNr: row.adrNr,
         vorname: row.vorname,
         nachname: row.nachname,
@@ -257,7 +257,7 @@ export async function loadOpenPostings(
         hausnummer: row.hausnummer,
         plz: row.plz,
         ort: row.ort,
-        eMailName: row.eMailName,
+        email: row.email,
         dunningBlocked: row.dunningBlocked,
         geburtsdatum: row.geburtsdatum,
         vertreterAnrede: row.vertreterAnrede,
@@ -325,7 +325,7 @@ export function resolveRecipient(
   asOf: Date,
 ): ResolvedRecipient {
   const memberName = memberDisplayName(member);
-  const memberEmail = cleanEmail(member.eMailName);
+  const memberEmail = cleanEmail(member.email);
   const memberAddress: AddressBlock = {
     anrede: member.anrede,
     name: memberName,

@@ -50,7 +50,7 @@ describe("DIN 5008 letter templates", () => {
           dueDate: "2026-06-18",
           organization: org,
           member: {
-            mitglnr: "1234",
+            mitgliedsnummer: "1234",
             adrNr: 1234,
             vorname: "Erika",
             nachname: "Mustermann",

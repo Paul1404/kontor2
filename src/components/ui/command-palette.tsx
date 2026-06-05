@@ -140,7 +140,7 @@ const NAV_COMMANDS: NavCommand[] = [
 
 type MemberHit = {
   id: string;
-  mitglnr: string | null;
+  mitgliedsnummer: string | null;
   adrNr: number;
   vorname: string | null;
   nachname: string | null;
@@ -222,7 +222,7 @@ export function CommandPalette({ role }: { role: Role }) {
         setOpen(false);
         navigate({
           to: "/app/mitglieder/$mitgliedsnummer",
-          params: { mitgliedsnummer: hit.mitglnr ?? String(hit.adrNr) },
+          params: { mitgliedsnummer: hit.mitgliedsnummer ?? String(hit.adrNr) },
         });
       }
       return;
@@ -234,7 +234,7 @@ export function CommandPalette({ role }: { role: Role }) {
         setOpen(false);
         navigate({
           to: "/app/mitglieder/$mitgliedsnummer",
-          params: { mitgliedsnummer: recentItem.mitglnr },
+          params: { mitgliedsnummer: recentItem.mitgliedsnummer },
         });
       }
     }
@@ -317,7 +317,7 @@ export function CommandPalette({ role }: { role: Role }) {
                         key={hit.id}
                         icon={<Users className="size-4" />}
                         label={name}
-                        sublabel={`${hit.mitglnr ? `#${hit.mitglnr}` : "Kontakt"}${hit.ort ? ` · ${hit.ort}` : ""}`}
+                        sublabel={`${hit.mitgliedsnummer ? `#${hit.mitgliedsnummer}` : "Kontakt"}${hit.ort ? ` · ${hit.ort}` : ""}`}
                         active={i === highlight}
                         onMouseEnter={() => setHighlight(i)}
                         onClick={() => executeAt(i)}
@@ -332,10 +332,10 @@ export function CommandPalette({ role }: { role: Role }) {
                     const i = runningIndex++;
                     return (
                       <CommandItem
-                        key={r.mitglnr}
+                        key={r.mitgliedsnummer}
                         icon={<Users className="size-4" />}
-                        label={r.name || `#${r.mitglnr}`}
-                        sublabel={`#${r.mitglnr}`}
+                        label={r.name || `#${r.mitgliedsnummer}`}
+                        sublabel={`#${r.mitgliedsnummer}`}
                         active={i === highlight}
                         onMouseEnter={() => setHighlight(i)}
                         onClick={() => executeAt(i)}

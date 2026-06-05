@@ -68,7 +68,7 @@ async function loadDunningEmailContext(db: DB, itemId: string) {
       pdfFilename: dunningItemsTable.pdfFilename,
       runDate: dunningRunsTable.runDate,
       memberId: membersTable.id,
-      mitglnr: membersTable.mitgliedsnummer,
+      mitgliedsnummer: membersTable.mitgliedsnummer,
       adrNr: membersTable.adrNr,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
@@ -79,7 +79,7 @@ async function loadDunningEmailContext(db: DB, itemId: string) {
       hausnummer: membersTable.hausnummer,
       plz: membersTable.plz,
       ort: membersTable.ort,
-      eMailName: membersTable.email,
+      email: membersTable.email,
       dunningBlocked: membersTable.dunningBlocked,
       geburtsdatum: membersTable.geburtsdatum,
       vertreterAnrede: membersTable.vertreterAnrede,
@@ -106,7 +106,7 @@ async function loadDunningEmailContext(db: DB, itemId: string) {
   // date, so a minor's mail goes to the guardian's address, mirroring the PDF.
   const member: MemberWithDebt = {
     memberId: row.memberId,
-    mitglnr: row.mitglnr,
+    mitgliedsnummer: row.mitgliedsnummer,
     adrNr: row.adrNr,
     vorname: row.vorname,
     nachname: row.nachname,
@@ -117,7 +117,7 @@ async function loadDunningEmailContext(db: DB, itemId: string) {
     hausnummer: row.hausnummer,
     plz: row.plz,
     ort: row.ort,
-    eMailName: row.eMailName,
+    email: row.email,
     dunningBlocked: row.dunningBlocked,
     geburtsdatum: row.geburtsdatum,
     vertreterAnrede: row.vertreterAnrede,
@@ -135,7 +135,7 @@ async function loadDunningEmailContext(db: DB, itemId: string) {
   const guardians = await loadGuardianConnections(db, [row.memberId]);
   const resolved = resolveRecipient(member, guardians.get(row.memberId) ?? null, asOf);
 
-  const mitgliedsnummer = row.mitglnr ?? `AdrNr ${row.adrNr}`;
+  const mitgliedsnummer = row.mitgliedsnummer ?? `AdrNr ${row.adrNr}`;
   const to = resolved.recipientEmail ?? "";
 
   const content: DunningEmailContent | null = to
@@ -238,14 +238,14 @@ export const dunningRouter = {
         const resolved = recipients.get(m.memberId);
         return {
           memberId: m.memberId,
-          mitglnr: m.mitglnr,
+          mitgliedsnummer: m.mitgliedsnummer,
           adrNr: m.adrNr,
           name:
             [m.vorname, m.nachname].filter(Boolean).join(" ") ||
             m.kurzname ||
             m.firma1 ||
             `AdrNr ${m.adrNr}`,
-          eMail: m.eMailName,
+          eMail: m.email,
           postings: m.postings,
           openSum: m.openSum,
           mahngebuhr: gebuhr,
@@ -267,7 +267,7 @@ export const dunningRouter = {
         items,
         blocked: blocked.map((m) => ({
           memberId: m.memberId,
-          mitglnr: m.mitglnr,
+          mitgliedsnummer: m.mitgliedsnummer,
           adrNr: m.adrNr,
           name:
             [m.vorname, m.nachname].filter(Boolean).join(" ") ||
@@ -412,7 +412,7 @@ export const dunningRouter = {
               logoDataUri,
             },
             member: {
-              mitglnr: m.mitglnr,
+              mitgliedsnummer: m.mitgliedsnummer,
               adrNr: m.adrNr,
               vorname: m.vorname,
               nachname: m.nachname,
@@ -436,7 +436,7 @@ export const dunningRouter = {
 
           const docRef = await allocateDocRef(tx, "MA", refYear);
           const { base64 } = await renderPdfBase64(MahnungDocument({ pkg: pdfInput, docRef }));
-          const filename = `Mahnung-${docRef}-${m.mitglnr ?? m.adrNr}.pdf`;
+          const filename = `Mahnung-${docRef}-${m.mitgliedsnummer ?? m.adrNr}.pdf`;
 
           itemValues.push({
             dunningRunId: runRow.id,
@@ -551,7 +551,7 @@ export const dunningRouter = {
         sentAt: dunningItemsTable.sentAt,
         pdfFilename: dunningItemsTable.pdfFilename,
         memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
-        mitglnr: membersTable.mitgliedsnummer,
+        mitgliedsnummer: membersTable.mitgliedsnummer,
         adrNr: membersTable.adrNr,
         eMail: membersTable.email,
         // Extra columns so we can resolve who the Mahnung is addressed to and
@@ -586,7 +586,7 @@ export const dunningRouter = {
     const items = rows.map((r) => {
       const member: MemberWithDebt = {
         memberId: r.memberId,
-        mitglnr: r.mitglnr,
+        mitgliedsnummer: r.mitgliedsnummer,
         adrNr: r.adrNr,
         vorname: r.vorname,
         nachname: r.nachname,
@@ -597,7 +597,7 @@ export const dunningRouter = {
         hausnummer: r.hausnummer,
         plz: r.plz,
         ort: r.ort,
-        eMailName: r.eMail,
+        email: r.eMail,
         dunningBlocked: false,
         geburtsdatum: r.geburtsdatum,
         vertreterAnrede: r.vertreterAnrede,
@@ -625,7 +625,7 @@ export const dunningRouter = {
         sentAt: r.sentAt,
         pdfFilename: r.pdfFilename,
         memberName: r.memberName,
-        mitglnr: r.mitglnr,
+        mitgliedsnummer: r.mitgliedsnummer,
         adrNr: r.adrNr,
         eMail: r.eMail,
         recipientEmail: resolved.recipientEmail,

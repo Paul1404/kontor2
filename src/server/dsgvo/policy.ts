@@ -65,8 +65,7 @@ export function buildScrubRules(memberId: string): Record<string, ErasureScrubRu
     plzKih: { kind: "null" },
     ortKih: { kind: "null" },
     // Contact
-    eMailName: { kind: "null" },
-    email: { kind: "null" }, // clean column, mirrors eMailName
+    email: { kind: "null" },
     emailKih: { kind: "null" },
     telefon1: { kind: "null" },
     telefon2: { kind: "null" },
@@ -100,8 +99,8 @@ export function buildScrubRules(memberId: string): Record<string, ErasureScrubRu
 export const RETAINED_COLUMNS = [
   "id",
   "adrNr", // legacy linkage to Linear / SVUMS
-  "mitglnr", // human-readable membership number — needed for fee history reconciliation
-  "mitgliedsnummer", // clean column, mirrors mitglnr
+  "mitgliedsnummer", // human-readable membership number — needed for fee history reconciliation
+  "mitgliedsnummer", // clean column, mirrors mitgliedsnummer
   "status", // clean lifecycle status — not identifying
   "dunningBlocked", // clean dunning flag — not identifying
   "createdAt",

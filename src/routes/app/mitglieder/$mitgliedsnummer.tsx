@@ -114,9 +114,9 @@ function MemberDetailPage() {
   }, [detail.data?.member]);
 
   useEffect(() => {
-    if (!detail.data?.member?.mitglnr) return;
-    pushRecent({ mitglnr: detail.data.member.mitglnr, name: memberDisplayName });
-  }, [detail.data?.member?.mitglnr, memberDisplayName, pushRecent]);
+    if (!detail.data?.member?.mitgliedsnummer) return;
+    pushRecent({ mitgliedsnummer: detail.data.member.mitgliedsnummer, name: memberDisplayName });
+  }, [detail.data?.member?.mitgliedsnummer, memberDisplayName, pushRecent]);
 
   if (detail.isLoading) return <MemberDetailSkeleton />;
   if (detail.isError || !detail.data) {
@@ -157,7 +157,7 @@ function MemberDetailPage() {
   // relationships in either direction means this row is leftover from
   // the Linear import and should either get linked up or deleted.
   const isOrphanKontakt =
-    !member.mitglnr && beziehungen.length === 0 && incomingBeziehungenCount === 0;
+    !member.mitgliedsnummer && beziehungen.length === 0 && incomingBeziehungenCount === 0;
 
   // Bank name is derived from the IBAN; the legacy free-text bank field was
   // dropped. BIC prefers the IBAN-derived value over the stored one.
@@ -178,17 +178,17 @@ function MemberDetailPage() {
           <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
             {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")}
             <MemberStatusBadge member={member} />
-            {!member.mitglnr ? (
+            {!member.mitgliedsnummer ? (
               <Badge variant="outline" title="Zahlt für ein Mitglied, ist aber selbst keines">
                 Kontakt
               </Badge>
             ) : null}
           </h1>
           <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-            {member.mitglnr ? (
+            {member.mitgliedsnummer ? (
               <>
-                Mitgliedsnummer: <span className="tabular-nums">{member.mitglnr}</span>
-                <CopyButton value={member.mitglnr} label="Mitgliedsnummer" />
+                Mitgliedsnummer: <span className="tabular-nums">{member.mitgliedsnummer}</span>
+                <CopyButton value={member.mitgliedsnummer} label="Mitgliedsnummer" />
                 <span className="text-muted-foreground/50">·</span>
               </>
             ) : (
@@ -212,7 +212,7 @@ function MemberDetailPage() {
                 titel: member.titel1,
                 firma: member.firma1,
                 funktion: member.funktion,
-                email: member.eMailName,
+                email: member.email,
                 telefon: member.telefon1,
                 mobil: member.telefon2,
                 strasse: member.strasse,
@@ -222,13 +222,13 @@ function MemberDetailPage() {
                 land: member.land,
                 geburtsdatum: member.geburtsdatum,
                 website: member.www,
-                mitglnr: member.mitglnr,
+                mitgliedsnummer: member.mitgliedsnummer,
               });
               triggerDownload(
                 vcardFilename({
                   vorname: member.vorname,
                   nachname: member.nachname,
-                  mitglnr: member.mitglnr,
+                  mitgliedsnummer: member.mitgliedsnummer,
                 }),
                 vcf,
                 "text/vcard;charset=utf-8",
@@ -246,9 +246,9 @@ function MemberDetailPage() {
             </Link>
           ) : null}
           {canEdit ? (
-            <PortalAccessButton memberId={detail.data!.member.id} email={member.eMailName} />
+            <PortalAccessButton memberId={detail.data!.member.id} email={member.email} />
           ) : null}
-          {canEdit && member.mitglnr && !member.verstorbenAm ? (
+          {canEdit && member.mitgliedsnummer && !member.verstorbenAm ? (
             member.austritt ? (
               <Button
                 variant="outline"
@@ -380,9 +380,9 @@ function MemberDetailPage() {
                 />
                 <Field
                   label="E-Mail"
-                  value={member.eMailName}
-                  copyValue={member.eMailName}
-                  href={buildMailtoHref(member.eMailName)}
+                  value={member.email}
+                  copyValue={member.email}
+                  href={buildMailtoHref(member.email)}
                 />
                 <Field label="Website" value={member.www} href={buildWebsiteHref(member.www)} />
                 <Field label="Eintritt" value={formatDate(member.eintritt)} />
@@ -666,12 +666,12 @@ function MemberStatusBadge({
     austritt?: string | Date | null;
     verstorbenAm?: string | Date | null;
     aktivPasiv?: string | null;
-    mitglnr?: string | null;
+    mitgliedsnummer?: string | null;
   };
 }) {
   // Kontakte (no Mitgliedsnummer) carry their own badge in the header; a
   // membership status would be misleading for them.
-  if (!member.mitglnr) return null;
+  if (!member.mitgliedsnummer) return null;
   if (member.verstorbenAm) return <Badge variant="secondary">Verstorben</Badge>;
   if (member.austritt) return <Badge variant="warning">Ausgetreten</Badge>;
   if (member.aktivPasiv === "P") return <Badge variant="secondary">Passiv</Badge>;

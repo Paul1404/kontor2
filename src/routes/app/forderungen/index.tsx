@@ -226,7 +226,7 @@ function ForderungenPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <Link
                             to="/app/mitglieder/$mitgliedsnummer"
-                            params={{ mitgliedsnummer: m.mitglnr ?? String(m.adrNr) }}
+                            params={{ mitgliedsnummer: m.mitgliedsnummer ?? String(m.adrNr) }}
                             className="font-medium hover:underline"
                           >
                             {[m.vorname, m.nachname].filter(Boolean).join(" ") ||
@@ -235,7 +235,7 @@ function ForderungenPage() {
                               `AdrNr ${m.adrNr}`}
                           </Link>
                           <span className="text-xs text-muted-foreground tabular-nums">
-                            #{m.mitglnr ?? m.adrNr}
+                            #{m.mitgliedsnummer ?? m.adrNr}
                           </span>
                           <MahnstufeBadge stufe={m.currentMahnstufe} />
                           {m.dunningBlocked ? (
@@ -281,7 +281,7 @@ function ForderungenPage() {
                         </span>
                         <Link
                           to="/app/mitglieder/$mitgliedsnummer"
-                          params={{ mitgliedsnummer: m.mitglnr ?? String(m.adrNr) }}
+                          params={{ mitgliedsnummer: m.mitgliedsnummer ?? String(m.adrNr) }}
                           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
                         >
                           Mitglied <ExternalLink className="size-3" />

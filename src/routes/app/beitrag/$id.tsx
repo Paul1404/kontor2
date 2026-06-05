@@ -179,13 +179,13 @@ function FeeRunDetailPage() {
                     <td className="px-4 py-2">
                       <Link
                         to="/app/mitglieder/$mitgliedsnummer"
-                        params={{ mitgliedsnummer: it.mitglnr ?? String(it.adrNr) }}
+                        params={{ mitgliedsnummer: it.mitgliedsnummer ?? String(it.adrNr) }}
                         className="font-medium hover:underline"
                       >
                         {it.memberName}
                       </Link>
                       <div className="text-xs text-muted-foreground">
-                        {it.mitglnr ? `#${it.mitglnr}` : `AdrNr ${it.adrNr}`}
+                        {it.mitgliedsnummer ? `#${it.mitgliedsnummer}` : `AdrNr ${it.adrNr}`}
                       </div>
                     </td>
                     <td className="px-4 py-2 text-muted-foreground">{it.artName ?? "-"}</td>
