@@ -57,7 +57,7 @@ export const RELEASES: Release[] = [
       {
         category: "internal",
         description:
-          "Datenmodell deutlich entschlackt: Linear-Altspalten aus der Mitgliedertabelle entfernt (von 265 auf 61). Bearbeitungsmaske, Portal und Anzeige nutzen jetzt durchgehend die aufgeräumten Felder (Mitgliedsnummer, E-Mail, Status, Land). Keine sichtbare Änderung.",
+          "Datenmodell vollständig aufgeräumt: alle ungenutzten Linear-Altspalten aus der Mitgliedertabelle entfernt (von 265 auf 46 klar benannte Felder). Bearbeitungsmaske, Portal und Anzeige nutzen durchgehend die aufgeräumten Felder. Keine sichtbare Änderung.",
       },
     ],
   },

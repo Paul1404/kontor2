@@ -211,6 +211,13 @@
       "when": 1780641291382,
       "tag": "0029_drop_more_legacy_member_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1780641917867,
+      "tag": "0030_drop_unused_name_and_kih_columns",
+      "breakpoints": true
     }
   ]
 }

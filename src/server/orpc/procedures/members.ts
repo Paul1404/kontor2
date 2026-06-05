@@ -60,11 +60,8 @@ const ListInput = v.object({
 const StammdatenInput = v.object({
   anrede: v.optional(v.nullable(v.string())),
   titel1: v.optional(v.nullable(v.string())),
-  titel2: v.optional(v.nullable(v.string())),
   vorname: v.optional(v.nullable(v.string())),
   nachname: v.optional(v.nullable(v.string())),
-  geborene: v.optional(v.nullable(v.string())),
-  geburtsname: v.optional(v.nullable(v.string())),
   geburtsdatum: v.optional(v.nullable(v.string())),
   geburtsort: v.optional(v.nullable(v.string())),
   geschlecht: v.optional(v.nullable(v.picklist(["m", "w", "d", "unbekannt"]))),
@@ -167,11 +164,8 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   };
   setIfPresent("anrede");
   setIfPresent("titel1");
-  setIfPresent("titel2");
   setIfPresent("vorname");
   setIfPresent("nachname");
-  setIfPresent("geborene");
-  setIfPresent("geburtsname");
   setIfPresent("geburtsort");
   setIfPresent("geschlecht");
   setIfPresent("strasse");
