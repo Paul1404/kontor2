@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.16.4",
+    date: "2026-06-05",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Mitglieder, die in der Altsoftware gelöscht waren, werden jetzt überall einheitlich wie im Programm gelöschte Mitglieder behandelt und damit konsistent ausgeblendet (Listen, Berichte, Mahnwesen, Lastschrift, Snapshots).",
+      },
+    ],
+  },
+  {
     version: "0.16.3",
     date: "2026-06-05",
     changes: [

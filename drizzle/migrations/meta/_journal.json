@@ -176,6 +176,13 @@
       "when": 1780634624288,
       "tag": "0024_fixed_lenny_balinger",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1780635595791,
+      "tag": "0025_fold_geloscht_into_deleted_at",
+      "breakpoints": true
     }
   ]
 }

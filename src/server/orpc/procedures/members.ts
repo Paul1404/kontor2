@@ -13,6 +13,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { deriveCleanColumns, type MemberLegacyFields } from "~/server/domain/member";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
 import {
   planAustrittCascade,
@@ -673,6 +674,13 @@ export const membersRouter = {
           ...patch,
         };
 
+        // Keep the clean columns in sync with the legacy fields the form can
+        // change (email, status from aktiv_pasiv + exit/death dates). Derived
+        // from the projected state so partial edits compute the right value.
+        const cleanCols = deriveCleanColumns(projected as MemberLegacyFields);
+        Object.assign(patch, cleanCols);
+        Object.assign(projected, cleanCols);
+
         await tx
           .update(membersTable)
           .set({ ...patch, updatedAt: new Date() } as never)
@@ -755,12 +763,24 @@ export const membersRouter = {
             }
 
             const now = new Date();
+            // Derive the clean columns from the values being inserted so a
+            // newly created member is consistent without waiting for an import.
+            const cleanCols = deriveCleanColumns({
+              mitglnr: nextMitglnr,
+              eMailName: (patch.eMailName as string | null) ?? null,
+              telefon3: null,
+              aktivPasiv: (patch.aktivPasiv as string | null) ?? null,
+              austritt: (patch.austritt as Date | null) ?? null,
+              verstorbenAm: (patch.verstorbenAm as Date | null) ?? null,
+              mahnSperre: null,
+            });
             const [inserted] = await tx
               .insert(membersTable)
               .values({
                 ...(patch as Record<string, unknown>),
                 adrNr: nextAdrNr,
                 mitglnr: nextMitglnr,
+                ...cleanCols,
                 createdAt: now,
                 updatedAt: now,
               } as never)
@@ -778,7 +798,12 @@ export const membersRouter = {
               source: "ui",
               actorId: context.session!.user.id,
               actorEmail: context.session!.user.email,
-              changes: diff(null, { ...patch, adrNr: nextAdrNr, mitglnr: nextMitglnr }),
+              changes: diff(null, {
+                ...patch,
+                adrNr: nextAdrNr,
+                mitglnr: nextMitglnr,
+                ...cleanCols,
+              }),
               requestId: context.requestId ?? null,
             });
             await takeMemberSnapshot(tx, inserted.id, {
@@ -965,9 +990,17 @@ export const membersRouter = {
               skipped += 1;
               continue;
             }
+            const bulkStatus = deriveCleanColumns({
+              ...(existing as unknown as MemberLegacyFields),
+              aktivPasiv: input.action.value,
+            }).status;
             await tx
               .update(membersTable)
-              .set({ aktivPasiv: input.action.value, updatedAt: new Date() } as never)
+              .set({
+                aktivPasiv: input.action.value,
+                status: bulkStatus,
+                updatedAt: new Date(),
+              } as never)
               .where(eq(membersTable.id, memberId));
             const auditId = await appendAudit(tx, {
               entityType: "member",
@@ -978,6 +1011,7 @@ export const membersRouter = {
               actorEmail,
               changes: {
                 aktivPasiv: { before: existing.aktivPasiv, after: input.action.value },
+                status: { before: existing.status, after: bulkStatus },
               },
               requestId,
             });
@@ -1192,6 +1226,11 @@ export const membersRouter = {
         memberSet.austritt = austrittTs;
       }
       if (input.setPassiv) memberSet.aktivPasiv = "P";
+      // Keep the normalized status in sync with the leave date / death / flag.
+      memberSet.status = deriveCleanColumns({
+        ...(member as unknown as MemberLegacyFields),
+        ...(memberSet as Partial<MemberLegacyFields>),
+      }).status;
       await tx
         .update(membersTable)
         .set(memberSet as never)
@@ -1332,9 +1371,19 @@ export const membersRouter = {
         });
 
         const now = new Date();
+        const reactivatedStatus = deriveCleanColumns({
+          ...(member as unknown as MemberLegacyFields),
+          austritt: null,
+          aktivPasiv: "A",
+        }).status;
         await tx
           .update(membersTable)
-          .set({ austritt: null, aktivPasiv: "A", updatedAt: now } as never)
+          .set({
+            austritt: null,
+            aktivPasiv: "A",
+            status: reactivatedStatus,
+            updatedAt: now,
+          } as never)
           .where(eq(membersTable.id, input.memberId));
 
         for (const a of plan.abteilungReopen) {
@@ -1459,12 +1508,22 @@ export const membersRouter = {
           }
 
           const now = new Date();
+          const cleanCols = deriveCleanColumns({
+            mitglnr: nextMitglnr,
+            eMailName: (patch.eMailName as string | null) ?? null,
+            telefon3: null,
+            aktivPasiv: (patch.aktivPasiv as string | null) ?? null,
+            austritt: (patch.austritt as Date | null) ?? null,
+            verstorbenAm: (patch.verstorbenAm as Date | null) ?? null,
+            mahnSperre: null,
+          });
           const [inserted] = await tx
             .insert(membersTable)
             .values({
               ...(patch as Record<string, unknown>),
               adrNr: nextAdrNr,
               mitglnr: nextMitglnr,
+              ...cleanCols,
               createdAt: now,
               updatedAt: now,
             } as never)
@@ -1543,6 +1602,7 @@ export const membersRouter = {
               ...patch,
               adrNr: nextAdrNr,
               mitglnr: nextMitglnr,
+              ...cleanCols,
               abteilungen: input.abteilungen.length,
               vertrag: input.contract ? 1 : 0,
               sepaMandat: input.sepa ? 1 : 0,

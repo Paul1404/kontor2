@@ -124,6 +124,52 @@ export function isActiveStatus(status: MemberStatus): boolean {
   return status === "aktiv" || status === "passiv";
 }
 
+/** Trim a legacy text value to a non-empty string, or null. */
+function cleanText(value: string | null | undefined): string | null {
+  const t = value?.trim();
+  return t && t.length > 0 ? t : null;
+}
+
+/** The four normalized columns derived from legacy member fields. */
+export type DerivedCleanColumns = {
+  mitgliedsnummer: string | null;
+  email: string | null;
+  status: MemberStatus;
+  dunningBlocked: boolean;
+};
+
+/** The legacy member fields the clean columns are derived from. */
+export type MemberLegacyFields = {
+  mitglnr: string | null;
+  eMailName: string | null;
+  telefon3?: string | null;
+  aktivPasiv: string | null;
+  austritt: Date | string | null;
+  verstorbenAm: Date | string | null;
+  mahnSperre: string | null;
+};
+
+/**
+ * Compute the clean, normalized member columns from the legacy fields. This is
+ * the single rule the app-side write paths (member create/update) use to keep
+ * the clean columns in sync whenever a legacy source field changes, mirroring
+ * the importer translator and the one-time SQL backfill. Email keeps Linear's
+ * `telefon3` fallback; status and the dunning block reuse the canonical
+ * `deriveStatus` / `isDunningBlocked` helpers so all three paths agree.
+ */
+export function deriveCleanColumns(m: MemberLegacyFields): DerivedCleanColumns {
+  return {
+    mitgliedsnummer: cleanText(m.mitglnr),
+    email: cleanText(m.eMailName) ?? cleanText(m.telefon3),
+    status: deriveStatus({
+      austritt: m.austritt,
+      verstorbenAm: m.verstorbenAm,
+      aktivPasiv: m.aktivPasiv,
+    }),
+    dunningBlocked: isDunningBlocked(m.mahnSperre),
+  };
+}
+
 /**
  * Clean member shape produced by translating a Linear `adresse` row. These are
  * the app-owned domain fields; the verbatim Linear row is preserved separately

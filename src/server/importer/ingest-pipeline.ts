@@ -258,6 +258,14 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
 
       const existing = existingByAdrNr.get(adrNr);
 
+      // Soft-delete unification: fold the legacy `geloscht` flag into the app's
+      // single `deletedAt`. One-directional and idempotent -- set it once for a
+      // legacy-deleted member, never clobber an existing delete (legacy or app),
+      // and never auto-restore. Consumers read `deletedAt` alone.
+      if (clean?.isDeleted && !existing?.deletedAt) {
+        (row as Record<string, unknown>).deletedAt = new Date();
+      }
+
       let memberId: string;
       if (existing) {
         const changes = diff(existing as unknown as Record<string, unknown>, row);

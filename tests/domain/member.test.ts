@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ageAt,
   type CleanMemberInput,
+  deriveCleanColumns,
   deriveStatus,
   isActiveStatus,
   isDunningBlocked,
@@ -96,6 +97,51 @@ describe("deriveStatus", () => {
     expect(isActiveStatus("passiv")).toBe(true);
     expect(isActiveStatus("ausgetreten")).toBe(false);
     expect(isActiveStatus("verstorben")).toBe(false);
+  });
+});
+
+describe("deriveCleanColumns", () => {
+  const base = {
+    mitglnr: null,
+    eMailName: null,
+    telefon3: null,
+    aktivPasiv: null,
+    austritt: null,
+    verstorbenAm: null,
+    mahnSperre: null,
+  };
+
+  it("derives all four clean columns from legacy fields", () => {
+    expect(
+      deriveCleanColumns({
+        ...base,
+        mitglnr: " M-9 ",
+        eMailName: "a@b.de",
+        aktivPasiv: "P",
+        mahnSperre: "gesperrt",
+      }),
+    ).toEqual({
+      mitgliedsnummer: "M-9",
+      email: "a@b.de",
+      status: "passiv",
+      dunningBlocked: true,
+    });
+  });
+
+  it("keeps the telefon3 email fallback and trims empties to null", () => {
+    expect(deriveCleanColumns({ ...base, eMailName: "  ", telefon3: "old@example.com" })).toEqual({
+      mitgliedsnummer: null,
+      email: "old@example.com",
+      status: "aktiv",
+      dunningBlocked: false,
+    });
+  });
+
+  it("ranks death over exit for the derived status", () => {
+    expect(
+      deriveCleanColumns({ ...base, austritt: new Date(), verstorbenAm: new Date() }).status,
+    ).toBe("verstorben");
+    expect(deriveCleanColumns({ ...base, austritt: new Date() }).status).toBe("ausgetreten");
   });
 });
 
