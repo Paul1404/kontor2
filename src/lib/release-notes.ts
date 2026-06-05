@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.16.2",
+    date: "2026-06-05",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Aufgeräumte Mitgliederfelder vorbereitet: Mitgliedsnummer, E-Mail, Status (aktiv, passiv, ausgetreten, verstorben) und Mahnsperre stehen jetzt zusätzlich in klar benannten Feldern, automatisch aus den Altdaten befüllt. Noch keine sichtbare Änderung, die alten Felder bleiben unverändert erhalten.",
+      },
+    ],
+  },
+  {
     version: "0.16.1",
     date: "2026-06-05",
     changes: [

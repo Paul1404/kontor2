@@ -20,6 +20,20 @@ import { encryptedText } from "~/server/db/types";
 export const geschlechtEnum = pgEnum("geschlecht", ["m", "w", "d", "unbekannt"]);
 
 /**
+ * Normalized member lifecycle status. Replaces the legacy signals (`aktiv_pasiv`
+ * text flag plus the `austritt` / `verstorben_am` dates) with one value derived
+ * by `deriveStatus`. Stored, not generated: the importer sets it at the
+ * translation boundary and the app keeps it in sync, so it survives the
+ * eventual removal of the legacy source columns.
+ */
+export const memberStatusEnum = pgEnum("member_status", [
+  "aktiv",
+  "passiv",
+  "ausgetreten",
+  "verstorben",
+]);
+
+/**
  * Lossless mirror of the Linear Webverein `adresse` table (247 columns).
  * Internal `id` is a generated UUID; the Linear `AdrNr` is preserved as a
  * non-null unique integer and `MITGLNR` as the human-readable Mitgliedsnummer.
@@ -295,6 +309,19 @@ export const membersTable = pgTable(
     freeText2: text("free_text2"),
     freeText3: text("free_text3"),
     freeText4: text("free_text4"),
+    // --- Clean, app-owned columns (Phase 1) ---------------------------------
+    // These hold the normalized shape produced by `translateLinearMember`.
+    // They are backfilled from the legacy columns above and coexist with them
+    // until consumers are cut over; nothing reads them yet. See
+    // `~/server/domain/member` for the canonical derivations.
+    /** Clean name for the legacy `mitglnr`. The human-readable member number. */
+    mitgliedsnummer: text("mitgliedsnummer"),
+    /** Clean name for `e_mail_name`, with the legacy `telefon3` fallback. */
+    email: text("email"),
+    /** Normalized lifecycle status (was `aktiv_pasiv` + the exit/death dates). */
+    status: memberStatusEnum("status"),
+    /** Normalized dunning block (was the free-form `mahn_sperre` text flag). */
+    dunningBlocked: boolean("dunning_blocked").notNull().default(false),
   },
   (t) => [
     uniqueIndex("members_adr_nr_uk").on(t.adrNr),
@@ -305,6 +332,8 @@ export const membersTable = pgTable(
     index("members_austritt_idx").on(t.austritt),
     index("members_eintritt_idx").on(t.eintritt),
     index("members_geloscht_idx").on(t.geloscht),
+    index("members_mitgliedsnummer_idx").on(t.mitgliedsnummer),
+    index("members_status_idx").on(t.status),
   ],
 );
 

@@ -155,6 +155,20 @@
       "when": 1780629611809,
       "tag": "0021_ordinary_leopardon",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1780633185897,
+      "tag": "0022_abnormal_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1780633196015,
+      "tag": "0023_backfill_member_clean_columns",
+      "breakpoints": true
     }
   ]
 }
