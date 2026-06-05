@@ -25,10 +25,10 @@ const EDITABLE_FIELDS = [
   "hausnummer",
   "plz",
   "ort",
-  "landname",
+  "land",
   "telefon1",
   "telefon2",
-  "eMailName",
+  "email",
 ] as const;
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
@@ -57,10 +57,10 @@ const ChangeRequestSchema = v.object({
   hausnummer: v.optional(v.nullable(v.string())),
   plz: v.optional(v.nullable(v.string())),
   ort: v.optional(v.nullable(v.string())),
-  landname: v.optional(v.nullable(v.string())),
+  land: v.optional(v.nullable(v.string())),
   telefon1: v.optional(v.nullable(v.string())),
   telefon2: v.optional(v.nullable(v.string())),
-  eMailName: v.optional(v.nullable(v.string())),
+  email: v.optional(v.nullable(v.string())),
 });
 
 function normalize(value: unknown): string | null {

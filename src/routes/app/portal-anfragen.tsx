@@ -27,10 +27,10 @@ const FIELD_LABELS: Record<string, string> = {
   hausnummer: "Hausnummer",
   plz: "PLZ",
   ort: "Ort",
-  landname: "Land",
+  land: "Land",
   telefon1: "Telefon",
   telefon2: "Mobil",
-  eMailName: "E-Mail",
+  email: "E-Mail",
 };
 
 function PortalRequestsPage() {

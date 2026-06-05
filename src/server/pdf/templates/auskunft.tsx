@@ -65,7 +65,7 @@ const MEMBER_FIELD_LABELS: Array<[string, string]> = [
   ["hausnummer", "Hausnummer"],
   ["plz", "PLZ"],
   ["ort", "Ort"],
-  ["landname", "Land"],
+  ["land", "Land"],
   ["telefon1", "Telefon"],
   ["telefon2", "Telefon 2"],
   ["eMailName", "E-Mail"],
@@ -75,7 +75,6 @@ const MEMBER_FIELD_LABELS: Array<[string, string]> = [
   ["aktivPasiv", "Aktiv/Passiv"],
   ["iban1", "IBAN (maskiert)"],
   ["bic1", "BIC"],
-  ["bank1", "Bank"],
 ];
 
 export function AuskunftDocument({ pkg, docRef }: { pkg: AuskunftsPackage; docRef: string }) {

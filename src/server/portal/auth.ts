@@ -180,10 +180,10 @@ export async function loadPortalMember(db: DB, memberId: string) {
       hausnummer: membersTable.hausnummer,
       plz: membersTable.plz,
       ort: membersTable.ort,
-      landname: membersTable.landname,
+      land: membersTable.land,
       telefon1: membersTable.telefon1,
       telefon2: membersTable.telefon2,
-      eMailName: membersTable.email,
+      email: membersTable.email,
       eintritt: membersTable.eintritt,
       austritt: membersTable.austritt,
     })

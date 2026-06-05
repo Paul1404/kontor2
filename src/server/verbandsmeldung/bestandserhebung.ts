@@ -103,16 +103,10 @@ export async function computeBestandserhebung(
           isNull(membersTable.verstorbenAm),
           sql`${membersTable.verstorbenAm} > ${stichtag}::date`,
         ),
+        // Soft-delete is date-aware: a member deleted after the Stichtag still
+        // counted on it. Linear-deleted members carry the epoch sentinel as
+        // `deletedAt`, so they are excluded for every Stichtag.
         or(isNull(membersTable.deletedAt), sql`${membersTable.deletedAt} > ${stichtag}::date`),
-        // Keep the legacy `geloscht` exclusion here even though it is folded
-        // into `deletedAt` elsewhere. This check is date-aware (a member
-        // deleted after the Stichtag still counted on it), but the fold stamps
-        // legacy-deleted members with `deletedAt = now()`, which is after a past
-        // Stichtag and would wrongly count them as present. `geloscht` has no
-        // date, so it correctly excludes them regardless. This is the one site
-        // that must outlive the fold; do not drop it without a real deletion
-        // date for legacy-deleted members.
-        sql`coalesce(${membersTable.geloscht}, false) = false`,
         whereAbtFilter,
       ),
     );

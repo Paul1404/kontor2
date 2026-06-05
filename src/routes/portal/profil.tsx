@@ -20,10 +20,10 @@ const FIELDS = [
   { key: "hausnummer", label: "Hausnr." },
   { key: "plz", label: "PLZ" },
   { key: "ort", label: "Ort" },
-  { key: "landname", label: "Land" },
+  { key: "land", label: "Land" },
   { key: "telefon1", label: "Telefon" },
   { key: "telefon2", label: "Mobil" },
-  { key: "eMailName", label: "E-Mail" },
+  { key: "email", label: "E-Mail" },
 ] as const;
 
 type FieldKey = (typeof FIELDS)[number]["key"];
@@ -44,10 +44,10 @@ function PortalProfilePage() {
     hausnummer: "",
     plz: "",
     ort: "",
-    landname: "",
+    land: "",
     telefon1: "",
     telefon2: "",
-    eMailName: "",
+    email: "",
   });
 
   useEffect(() => {
@@ -61,10 +61,10 @@ function PortalProfilePage() {
       hausnummer: m.hausnummer ?? "",
       plz: m.plz ?? "",
       ort: m.ort ?? "",
-      landname: m.landname ?? "",
+      land: m.land ?? "",
       telefon1: m.telefon1 ?? "",
       telefon2: m.telefon2 ?? "",
-      eMailName: m.eMailName ?? "",
+      email: m.email ?? "",
     });
   }, [me.data]);
 

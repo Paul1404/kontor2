@@ -159,9 +159,9 @@ function MemberDetailPage() {
   const isOrphanKontakt =
     !member.mitglnr && beziehungen.length === 0 && incomingBeziehungenCount === 0;
 
-  // Prefer the IBAN-derived bank name/BIC over the stored values — those
-  // were free-text in Linear and don't always match the actual BLZ.
-  const bankDisplay = ibanInfo?.name ?? member.bank1;
+  // Bank name is derived from the IBAN; the legacy free-text bank field was
+  // dropped. BIC prefers the IBAN-derived value over the stored one.
+  const bankDisplay = ibanInfo?.name ?? null;
   const bicDisplay = ibanInfo?.bic ?? member.bic1;
 
   return (

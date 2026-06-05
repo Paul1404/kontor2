@@ -62,7 +62,7 @@ function PortalHome() {
             <Detail label="Anrede" value={m.anrede} />
             <Detail label="Vorname" value={m.vorname} />
             <Detail label="Nachname" value={m.nachname} />
-            <Detail label="E-Mail" value={m.eMailName} />
+            <Detail label="E-Mail" value={m.email} />
             <Detail
               label="Anschrift"
               value={
@@ -74,7 +74,7 @@ function PortalHome() {
                   .join(", ") || "—"
               }
             />
-            <Detail label="Land" value={m.landname ?? "Deutschland"} />
+            <Detail label="Land" value={m.land ?? "Deutschland"} />
             <Detail label="Telefon" value={m.telefon1} />
             <Detail label="Telefon mobil" value={m.telefon2} />
           </dl>

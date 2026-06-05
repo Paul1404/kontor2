@@ -87,7 +87,6 @@ const StammdatenInput = v.object({
   // UI membership type. Mapped to the normalized `status` on the server; not a
   // stored column of its own.
   aktivPasiv: v.optional(v.nullable(v.picklist(["A", "P"]))),
-  bank1: v.optional(v.nullable(v.string())),
   bic1: v.optional(v.nullable(v.string())),
   iban1: v.optional(v.nullable(v.string())),
   abwKontoInh: v.optional(v.nullable(v.string())),
@@ -190,7 +189,6 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   setIfPresent("spender");
   // `aktivPasiv` is intentionally not written as a column -- the handler folds
   // it into the normalized `status`.
-  setIfPresent("bank1");
   setIfPresent("bic1");
   setIfPresent("abwKontoInh");
   setIfPresent("vertreterAnrede");
@@ -545,12 +543,9 @@ export const membersRouter = {
             .orderBy(desc(sollStellungenTable.billingYear), asc(contractsTable.vertragNr)),
         ]);
 
-      // The IBAN columns are AES-256-GCM ciphertext at rest but our custom
-      // drizzle type decrypts on read. iban2/iban3 are unused in the UI today,
-      // so drop their plaintext outright.
-      const { iban2, iban3, ...stamm } = m;
-      void iban2;
-      void iban3;
+      // `iban1` is AES-256-GCM ciphertext at rest but our custom drizzle type
+      // decrypts on read. Shallow-copy so we can null it for readonly viewers.
+      const stamm = { ...m };
 
       // Readonly viewers get neither the cleartext IBAN nor the audit trail:
       // the full account number is financial PII the vorstand owns, and the

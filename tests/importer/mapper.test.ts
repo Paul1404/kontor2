@@ -41,12 +41,12 @@ describe("mapMemberRow", () => {
     if (!row) return;
     expect(row.adrNr).toBe(42);
     expect(row.eintritt).toBeInstanceOf(Date);
-    expect(row.geloscht).toBe(false);
     expect(row.abteilung).toBe("Fußball, Tennis");
     expect(row.iban1).toBe("DE89370400440532013000");
     expect(row.iban1Last4).toBe("3000");
     // Renamed/normalized fields (mitgliedsnummer, email, status, dunning block,
-    // mandate ref) now come from translateLinearMember, not the legacy mapper.
+    // mandate ref, soft-delete) now come from translateLinearMember, not the
+    // legacy mapper.
   });
 
   it("zero-dates become null", () => {

@@ -258,12 +258,14 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
 
       const existing = existingByAdrNr.get(adrNr);
 
-      // Soft-delete unification: fold the legacy `geloscht` flag into the app's
-      // single `deletedAt`. One-directional and idempotent -- set it once for a
-      // legacy-deleted member, never clobber an existing delete (legacy or app),
-      // and never auto-restore. Consumers read `deletedAt` alone.
+      // Soft-delete unification: a member deleted in Linear (`geloscht`) maps to
+      // the app's single `deletedAt`. Linear never recorded the deletion date,
+      // so we stamp the epoch sentinel: it marks the member deleted for every
+      // current view AND keeps the date-aware Bestandserhebung correct (a member
+      // "deleted at 1970" is excluded from every Stichtag). One-directional and
+      // idempotent: never clobber an existing delete, never auto-restore.
       if (clean?.isDeleted && !existing?.deletedAt) {
-        (row as Record<string, unknown>).deletedAt = new Date();
+        (row as Record<string, unknown>).deletedAt = new Date(0);
       }
 
       let memberId: string;

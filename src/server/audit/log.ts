@@ -6,7 +6,7 @@ import { type AuditAction, type AuditSource, auditLogTable } from "~/server/db/s
  * Columns whose plaintext values should NEVER appear in the audit log.
  * We diff their `lastFour()` projection instead.
  */
-const SECRET_COLUMNS = new Set(["iban1", "iban2", "iban3", "passwordEncrypted", "vereinsIban"]);
+const SECRET_COLUMNS = new Set(["iban1", "passwordEncrypted", "vereinsIban"]);
 
 export type Changes = Record<string, { before: unknown; after: unknown }>;
 

@@ -59,9 +59,7 @@ export function buildScrubRules(memberId: string): Record<string, ErasureScrubRu
     hausnummer: { kind: "null" },
     plz: { kind: "null" },
     ort: { kind: "null" },
-    landname: { kind: "null" },
     adresszusatz: { kind: "null" },
-    haus: { kind: "null" },
     // Alternative postal addresses
     strasseKih: { kind: "null" },
     plzKih: { kind: "null" },
@@ -84,7 +82,6 @@ export function buildScrubRules(memberId: string): Record<string, ErasureScrubRu
     iban2: { kind: "null" },
     iban3: { kind: "null" },
     bic1: { kind: "null" },
-    bank1: { kind: "null" },
     bank: { kind: "null" },
     blz: { kind: "null" },
     // Cards

@@ -52,7 +52,7 @@ export type AuskunftsPackage = {
   };
 };
 
-const ENCRYPTED_COLUMNS = ["iban1", "iban2", "iban3"] as const;
+const ENCRYPTED_COLUMNS = ["iban1"] as const;
 
 function maskMember(raw: Record<string, unknown>): Record<string, unknown> {
   const copy: Record<string, unknown> = { ...raw };
