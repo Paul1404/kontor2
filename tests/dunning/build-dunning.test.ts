@@ -24,7 +24,7 @@ function makeMember(overrides: Partial<MemberWithDebt> = {}): MemberWithDebt {
     plz: "97447",
     ort: "Untereuerheim",
     eMailName: null,
-    mahnSperre: null,
+    dunningBlocked: false,
     geburtsdatum: null,
     vertreterAnrede: null,
     vertreterName: null,

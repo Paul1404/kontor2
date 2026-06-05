@@ -238,7 +238,7 @@ function ForderungenPage() {
                             #{m.mitglnr ?? m.adrNr}
                           </span>
                           <MahnstufeBadge stufe={m.currentMahnstufe} />
-                          {m.mahnSperre && m.mahnSperre !== "" && m.mahnSperre !== "0" ? (
+                          {m.dunningBlocked ? (
                             <Badge variant="destructive">
                               <ShieldAlert className="size-3" /> Mahnsperre
                             </Badge>

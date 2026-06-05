@@ -71,7 +71,7 @@ export const contractsRouter = {
           .select({
             id: membersTable.id,
             adrNr: membersTable.adrNr,
-            mitglnr: membersTable.mitglnr,
+            mitglnr: membersTable.mitgliedsnummer,
           })
           .from(membersTable)
           .where(eq(membersTable.id, input.memberId))

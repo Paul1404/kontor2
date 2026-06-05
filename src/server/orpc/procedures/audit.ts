@@ -111,7 +111,7 @@ export const auditRouter = {
       const rows2 = await context.db
         .select({
           id: membersTable.id,
-          mitglnr: membersTable.mitglnr,
+          mitglnr: membersTable.mitgliedsnummer,
           adrNr: membersTable.adrNr,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,

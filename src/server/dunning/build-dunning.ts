@@ -38,7 +38,7 @@ export type MemberWithDebt = {
   plz: string | null;
   ort: string | null;
   eMailName: string | null;
-  mahnSperre: string | null;
+  dunningBlocked: boolean;
   geburtsdatum: Date | string | null;
   vertreterAnrede: string | null;
   vertreterName: string | null;
@@ -139,7 +139,7 @@ export type LoadOpenParams = {
 
 /**
  * Load all open Sollstellungen older than the cutoff, grouped per member.
- * `mahnSperre` members are returned too so the UI can flag them; commit
+ * Dunning-blocked members are returned too so the UI can flag them; commit
  * skips them.
  */
 export async function loadOpenPostings(
@@ -172,7 +172,7 @@ export async function loadOpenPostings(
       openAmount: sollStellungenTable.openAmount,
       status: sollStellungenTable.status,
       mahnstufe: sollStellungenTable.mahnstufe,
-      mitglnr: membersTable.mitglnr,
+      mitglnr: membersTable.mitgliedsnummer,
       adrNr: membersTable.adrNr,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
@@ -183,8 +183,8 @@ export async function loadOpenPostings(
       hausnummer: membersTable.hausnummer,
       plz: membersTable.plz,
       ort: membersTable.ort,
-      eMailName: membersTable.eMailName,
-      mahnSperre: membersTable.mahnSperre,
+      eMailName: membersTable.email,
+      dunningBlocked: membersTable.dunningBlocked,
       geburtsdatum: membersTable.geburtsdatum,
       vertreterAnrede: membersTable.vertreterAnrede,
       vertreterName: membersTable.vertreterName,
@@ -258,7 +258,7 @@ export async function loadOpenPostings(
         plz: row.plz,
         ort: row.ort,
         eMailName: row.eMailName,
-        mahnSperre: row.mahnSperre,
+        dunningBlocked: row.dunningBlocked,
         geburtsdatum: row.geburtsdatum,
         vertreterAnrede: row.vertreterAnrede,
         vertreterName: row.vertreterName,
@@ -421,7 +421,7 @@ export async function loadGuardianConnections(
       tHausnummer: membersTable.hausnummer,
       tPlz: membersTable.plz,
       tOrt: membersTable.ort,
-      tEmail: membersTable.eMailName,
+      tEmail: membersTable.email,
     })
     .from(relationshipsTable)
     .leftJoin(membersTable, eq(membersTable.id, relationshipsTable.toMemberId))

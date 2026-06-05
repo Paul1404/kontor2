@@ -75,11 +75,8 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
     conditions.push(isNull(membersTable.verstorbenAm) as never);
   }
   if (input.status === "passiv") {
-    conditions.push(
-      eq(membersTable.aktivPasiv, "P") as never,
-      isNull(membersTable.austritt) as never,
-      isNull(membersTable.verstorbenAm) as never,
-    );
+    // The normalized status already implies neither exited nor deceased.
+    conditions.push(eq(membersTable.status, "passiv") as never);
   }
   conditions.push(memberNotDeleted() as never);
   if (input.q.trim()) {
@@ -88,8 +85,8 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
       or(
         ilike(membersTable.nachname, like),
         ilike(membersTable.vorname, like),
-        ilike(membersTable.mitglnr, like),
-        ilike(membersTable.eMailName, like),
+        ilike(membersTable.mitgliedsnummer, like),
+        ilike(membersTable.email, like),
         ilike(membersTable.ort, like),
       ) as never,
     );
@@ -144,7 +141,7 @@ async function loadGeburtstage(
   const rows = await db
     .select({
       id: membersTable.id,
-      mitglnr: membersTable.mitglnr,
+      mitglnr: membersTable.mitgliedsnummer,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
       geburtsdatum: membersTable.geburtsdatum,
@@ -193,7 +190,7 @@ async function loadEhrungen(
   const rows = await db
     .select({
       id: membersTable.id,
-      mitglnr: membersTable.mitglnr,
+      mitglnr: membersTable.mitgliedsnummer,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
       eintritt: membersTable.eintritt,
@@ -402,7 +399,7 @@ export const reportsRouter = {
       const ids = [...new Set(input.ids)];
       const selected: MemberExportRow[] = await context.db
         .select({
-          mitglnr: membersTable.mitglnr,
+          mitglnr: membersTable.mitgliedsnummer,
           anrede: membersTable.anrede,
           titel: membersTable.titel1,
           vorname: membersTable.vorname,
@@ -413,7 +410,7 @@ export const reportsRouter = {
           plz: membersTable.plz,
           ort: membersTable.ort,
           telefon: membersTable.telefon1,
-          email: membersTable.eMailName,
+          email: membersTable.email,
           eintritt: membersTable.eintritt,
           austritt: membersTable.austritt,
           verstorbenAm: membersTable.verstorbenAm,
@@ -446,7 +443,7 @@ export const reportsRouter = {
     const where = conditions.length > 0 ? and(...conditions) : undefined;
     const rows: MemberExportRow[] = await context.db
       .select({
-        mitglnr: membersTable.mitglnr,
+        mitglnr: membersTable.mitgliedsnummer,
         anrede: membersTable.anrede,
         titel: membersTable.titel1,
         vorname: membersTable.vorname,
@@ -457,7 +454,7 @@ export const reportsRouter = {
         plz: membersTable.plz,
         ort: membersTable.ort,
         telefon: membersTable.telefon1,
-        email: membersTable.eMailName,
+        email: membersTable.email,
         eintritt: membersTable.eintritt,
         austritt: membersTable.austritt,
         verstorbenAm: membersTable.verstorbenAm,

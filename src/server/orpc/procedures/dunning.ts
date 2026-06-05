@@ -15,7 +15,6 @@ import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import {
-  isDunningBlocked,
   loadGuardianConnections,
   loadOpenPostings,
   type MemberWithDebt,
@@ -69,7 +68,7 @@ async function loadDunningEmailContext(db: DB, itemId: string) {
       pdfFilename: dunningItemsTable.pdfFilename,
       runDate: dunningRunsTable.runDate,
       memberId: membersTable.id,
-      mitglnr: membersTable.mitglnr,
+      mitglnr: membersTable.mitgliedsnummer,
       adrNr: membersTable.adrNr,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
@@ -80,8 +79,8 @@ async function loadDunningEmailContext(db: DB, itemId: string) {
       hausnummer: membersTable.hausnummer,
       plz: membersTable.plz,
       ort: membersTable.ort,
-      eMailName: membersTable.eMailName,
-      mahnSperre: membersTable.mahnSperre,
+      eMailName: membersTable.email,
+      dunningBlocked: membersTable.dunningBlocked,
       geburtsdatum: membersTable.geburtsdatum,
       vertreterAnrede: membersTable.vertreterAnrede,
       vertreterName: membersTable.vertreterName,
@@ -119,7 +118,7 @@ async function loadDunningEmailContext(db: DB, itemId: string) {
     plz: row.plz,
     ort: row.ort,
     eMailName: row.eMailName,
-    mahnSperre: row.mahnSperre,
+    dunningBlocked: row.dunningBlocked,
     geburtsdatum: row.geburtsdatum,
     vertreterAnrede: row.vertreterAnrede,
     vertreterName: row.vertreterName,
@@ -227,9 +226,9 @@ export const dunningRouter = {
         input.memberIds && input.memberIds.length > 0
           ? all.filter((m) => input.memberIds!.includes(m.memberId))
           : all
-      ).filter((m) => !isDunningBlocked(m.mahnSperre));
+      ).filter((m) => !m.dunningBlocked);
 
-      const blocked = all.filter((m) => isDunningBlocked(m.mahnSperre));
+      const blocked = all.filter((m) => m.dunningBlocked);
 
       const gebuhr = mahngebuhrFor(input.level, org);
       const recipients = await resolveRecipients(context.db, eligible, runDate);
@@ -319,7 +318,7 @@ export const dunningRouter = {
         mahnstufe: input.level - 1,
         memberIds: input.memberIds,
       });
-      const eligible = allEligible.filter((m) => !isDunningBlocked(m.mahnSperre));
+      const eligible = allEligible.filter((m) => !m.dunningBlocked);
       if (eligible.length === 0) {
         throw new ORPCError("PRECONDITION_FAILED", {
           message:
@@ -552,9 +551,9 @@ export const dunningRouter = {
         sentAt: dunningItemsTable.sentAt,
         pdfFilename: dunningItemsTable.pdfFilename,
         memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
-        mitglnr: membersTable.mitglnr,
+        mitglnr: membersTable.mitgliedsnummer,
         adrNr: membersTable.adrNr,
-        eMail: membersTable.eMailName,
+        eMail: membersTable.email,
         // Extra columns so we can resolve who the Mahnung is addressed to and
         // surface the effective email (guardian's, for minors) to the UI.
         vorname: membersTable.vorname,
@@ -599,7 +598,7 @@ export const dunningRouter = {
         plz: r.plz,
         ort: r.ort,
         eMailName: r.eMail,
-        mahnSperre: null,
+        dunningBlocked: false,
         geburtsdatum: r.geburtsdatum,
         vertreterAnrede: r.vertreterAnrede,
         vertreterName: r.vertreterName,

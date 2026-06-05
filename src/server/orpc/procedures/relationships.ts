@@ -250,7 +250,7 @@ export const relationshipsRouter = {
       const rows = await context.db
         .select({
           id: membersTable.id,
-          mitglnr: membersTable.mitglnr,
+          mitglnr: membersTable.mitgliedsnummer,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,
           plz: membersTable.plz,
@@ -258,7 +258,7 @@ export const relationshipsRouter = {
         })
         .from(membersTable)
         .where(
-          sql`(${membersTable.nachname} ilike ${like} or ${membersTable.vorname} ilike ${like} or ${membersTable.mitglnr} ilike ${like}) and ${membersTable.deletedAt} is null`,
+          sql`(${membersTable.nachname} ilike ${like} or ${membersTable.vorname} ilike ${like} or ${membersTable.mitgliedsnummer} ilike ${like}) and ${membersTable.deletedAt} is null`,
         )
         .limit(20);
       return input.excludeMemberId ? rows.filter((r) => r.id !== input.excludeMemberId) : rows;

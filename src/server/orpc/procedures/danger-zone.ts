@@ -33,7 +33,7 @@ const PHRASES = {
  * weight that the importer left behind.
  */
 const orphanKontaktCondition = and(
-  isNull(membersTable.mitglnr),
+  isNull(membersTable.mitgliedsnummer),
   isNull(membersTable.deletedAt),
   sql`not exists (
     select 1 from ${relationshipsTable}
@@ -131,7 +131,7 @@ export const dangerZoneRouter = {
         .select({
           id: membersTable.id,
           adrNr: membersTable.adrNr,
-          mitglnr: membersTable.mitglnr,
+          mitglnr: membersTable.mitgliedsnummer,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,
           deletedAt: membersTable.deletedAt,

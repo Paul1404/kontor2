@@ -419,7 +419,7 @@ export const feeRunsRouter = {
         returnedAt: feeRunItemsTable.returnedAt,
         returnReasonCode: feeRunItemsTable.returnReasonCode,
         memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
-        mitglnr: membersTable.mitglnr,
+        mitglnr: membersTable.mitgliedsnummer,
         adrNr: membersTable.adrNr,
         artName: contractsTable.artName,
       })

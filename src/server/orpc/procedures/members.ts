@@ -268,13 +268,9 @@ export const membersRouter = {
       conditions.push(isNull(membersTable.verstorbenAm) as never);
     }
     if (input.status === "passiv") {
-      // A passive member who has left is no longer passive — exclude exited
-      // and deceased regardless of `includeAusgetretene`.
-      conditions.push(
-        eq(membersTable.aktivPasiv, "P") as never,
-        isNull(membersTable.austritt) as never,
-        isNull(membersTable.verstorbenAm) as never,
-      );
+      // The normalized status already means "passive and neither exited nor
+      // deceased" (deriveStatus precedence), so one check is enough.
+      conditions.push(eq(membersTable.status, "passiv") as never);
     }
 
     // Hide soft-deleted members from the normal list view. The legacy Linear
@@ -285,7 +281,7 @@ export const membersRouter = {
     // pointing to or from this row. Used by admins to find Linear-import
     // leftovers.
     if (input.orphanOnly) {
-      conditions.push(isNull(membersTable.mitglnr) as never);
+      conditions.push(isNull(membersTable.mitgliedsnummer) as never);
       conditions.push(
         sql`not exists (
           select 1 from ${relationshipsTable}
@@ -301,8 +297,8 @@ export const membersRouter = {
         or(
           ilike(membersTable.nachname, like),
           ilike(membersTable.vorname, like),
-          ilike(membersTable.mitglnr, like),
-          ilike(membersTable.eMailName, like),
+          ilike(membersTable.mitgliedsnummer, like),
+          ilike(membersTable.email, like),
           ilike(membersTable.ort, like),
         ) as never,
       );
@@ -329,9 +325,9 @@ export const membersRouter = {
     // logical names without exposing column identifiers in the API.
     const sortColumn = {
       nachname: membersTable.nachname,
-      mitglnr: membersTable.mitglnr,
+      mitglnr: membersTable.mitgliedsnummer,
       ort: membersTable.ort,
-      email: membersTable.eMailName,
+      email: membersTable.email,
       eintritt: membersTable.eintritt,
     }[input.sortBy];
     const direction = input.sortDir === "desc" ? desc : asc;
@@ -345,14 +341,14 @@ export const membersRouter = {
         .select({
           id: membersTable.id,
           adrNr: membersTable.adrNr,
-          mitglnr: membersTable.mitglnr,
+          mitglnr: membersTable.mitgliedsnummer,
           anrede: membersTable.anrede,
           titel: membersTable.titel1,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,
           plz: membersTable.plz,
           ort: membersTable.ort,
-          email: membersTable.eMailName,
+          email: membersTable.email,
           telefon: membersTable.telefon1,
           eintritt: membersTable.eintritt,
           austritt: membersTable.austritt,
@@ -386,7 +382,7 @@ export const membersRouter = {
       const rows = await context.db
         .select()
         .from(membersTable)
-        .where(eq(membersTable.mitglnr, input.mitgliedsnummer))
+        .where(eq(membersTable.mitgliedsnummer, input.mitgliedsnummer))
         .limit(1);
       let m = rows[0];
       if (!m) {
@@ -494,7 +490,7 @@ export const membersRouter = {
               toMemberId: relationshipsTable.toMemberId,
               toAdrNr: relationshipsTable.toAdrNr,
               fallbackName: relationshipsTable.name,
-              toMitglnr: membersTable.mitglnr,
+              toMitglnr: membersTable.mitgliedsnummer,
               toVorname: membersTable.vorname,
               toNachname: membersTable.nachname,
               // Target address + birthday so the Austrittsbestätigung can
@@ -611,7 +607,7 @@ export const membersRouter = {
           context.db
             .select({ c: count() })
             .from(membersTable)
-            .where(and(lebt, eq(membersTable.aktivPasiv, "P"))),
+            .where(and(lebt, eq(membersTable.status, "passiv"))),
           context.db
             .select({ c: count() })
             .from(membersTable)
@@ -623,7 +619,7 @@ export const membersRouter = {
           context.db
             .select({ c: count() })
             .from(membersTable)
-            .where(and(notDeleted, isNull(membersTable.mitglnr))),
+            .where(and(notDeleted, isNull(membersTable.mitgliedsnummer))),
         ]);
       return {
         total: total?.c ?? 0,
@@ -737,7 +733,7 @@ export const membersRouter = {
             const [maxRow] = await tx
               .select({
                 maxAdrNr: sql<number>`coalesce(max(${membersTable.adrNr}), 0)::int`,
-                maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitglnr}, '\\D', '', 'g'), '')::int), 0)::int`,
+                maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitgliedsnummer}, '\\D', '', 'g'), '')::int), 0)::int`,
               })
               .from(membersTable);
             const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
@@ -750,7 +746,7 @@ export const membersRouter = {
               const [dupe] = await tx
                 .select({ id: membersTable.id })
                 .from(membersTable)
-                .where(eq(membersTable.mitglnr, nextMitglnr))
+                .where(eq(membersTable.mitgliedsnummer, nextMitglnr))
                 .limit(1);
               if (dupe) {
                 throw new ORPCError("CONFLICT", {
@@ -781,7 +777,7 @@ export const membersRouter = {
                 createdAt: now,
                 updatedAt: now,
               } as never)
-              .returning({ id: membersTable.id, mitglnr: membersTable.mitglnr });
+              .returning({ id: membersTable.id, mitglnr: membersTable.mitgliedsnummer });
             if (!inserted) {
               throw new ORPCError("INTERNAL_SERVER_ERROR", {
                 message: "Anlage fehlgeschlagen.",
@@ -1134,7 +1130,7 @@ export const membersRouter = {
       const rows = await context.db
         .select({
           id: membersTable.id,
-          mitglnr: membersTable.mitglnr,
+          mitglnr: membersTable.mitgliedsnummer,
           adrNr: membersTable.adrNr,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,
@@ -1147,8 +1143,8 @@ export const membersRouter = {
             or(
               ilike(membersTable.nachname, like),
               ilike(membersTable.vorname, like),
-              ilike(membersTable.mitglnr, like),
-              ilike(membersTable.eMailName, like),
+              ilike(membersTable.mitgliedsnummer, like),
+              ilike(membersTable.email, like),
             ),
           ),
         )
@@ -1484,7 +1480,7 @@ export const membersRouter = {
           const [maxRow] = await tx
             .select({
               maxAdrNr: sql<number>`coalesce(max(${membersTable.adrNr}), 0)::int`,
-              maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitglnr}, '\\D', '', 'g'), '')::int), 0)::int`,
+              maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitgliedsnummer}, '\\D', '', 'g'), '')::int), 0)::int`,
             })
             .from(membersTable);
           const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
@@ -1496,7 +1492,7 @@ export const membersRouter = {
           const [dupe] = await tx
             .select({ id: membersTable.id })
             .from(membersTable)
-            .where(eq(membersTable.mitglnr, nextMitglnr))
+            .where(eq(membersTable.mitgliedsnummer, nextMitglnr))
             .limit(1);
           if (dupe) {
             throw new ORPCError("CONFLICT", {
@@ -1524,7 +1520,7 @@ export const membersRouter = {
               createdAt: now,
               updatedAt: now,
             } as never)
-            .returning({ id: membersTable.id, mitglnr: membersTable.mitglnr });
+            .returning({ id: membersTable.id, mitglnr: membersTable.mitgliedsnummer });
           if (!inserted) {
             throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
           }

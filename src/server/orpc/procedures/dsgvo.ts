@@ -61,7 +61,7 @@ export const dsgvoRouter = {
             deliverableSha256: dsgvoRequestsTable.deliverableSha256,
             memberVorname: membersTable.vorname,
             memberNachname: membersTable.nachname,
-            memberMitglnr: membersTable.mitglnr,
+            memberMitglnr: membersTable.mitgliedsnummer,
             // Legacy Kontakte have no mitglnr; the member link falls back to
             // the numeric adrNr, which the detail route resolves.
             memberAdrNr: membersTable.adrNr,
@@ -97,7 +97,7 @@ export const dsgvoRouter = {
           deliverableSizeBytes: dsgvoRequestsTable.deliverableSizeBytes,
           memberVorname: membersTable.vorname,
           memberNachname: membersTable.nachname,
-          memberMitglnr: membersTable.mitglnr,
+          memberMitglnr: membersTable.mitgliedsnummer,
           memberAdrNr: membersTable.adrNr,
         })
         .from(dsgvoRequestsTable)
@@ -123,7 +123,7 @@ export const dsgvoRouter = {
       const [member] = await context.db
         .select({
           id: membersTable.id,
-          mitglnr: membersTable.mitglnr,
+          mitglnr: membersTable.mitgliedsnummer,
           nachname: membersTable.nachname,
         })
         .from(membersTable)

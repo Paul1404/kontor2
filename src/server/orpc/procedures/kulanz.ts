@@ -9,7 +9,6 @@ import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { type KulanzRecipientSnapshot, kulanzLettersTable } from "~/server/db/schema/kulanz";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import {
-  isDunningBlocked,
   loadOpenPostings,
   memberDisplayName,
   resolveRecipients,
@@ -63,7 +62,7 @@ export const kulanzRouter = {
     .handler(async ({ context, input }) => {
       const runDate = todayUtc();
       const all = await loadOpenPostings(context.db, { cutoffDate: runDate });
-      const eligible = all.filter((m) => !isDunningBlocked(m.mahnSperre));
+      const eligible = all.filter((m) => !m.dunningBlocked);
       const recipients = await resolveRecipients(context.db, eligible, runDate);
 
       let items = eligible.map((m) => {
@@ -129,7 +128,7 @@ export const kulanzRouter = {
         cutoffDate: runDate,
         memberIds: input.memberIds,
       });
-      const eligible = all.filter((m) => !isDunningBlocked(m.mahnSperre));
+      const eligible = all.filter((m) => !m.dunningBlocked);
       if (eligible.length === 0) {
         throw new ORPCError("PRECONDITION_FAILED", {
           message: "Keine versendbaren Schreiben (Empfänger gesperrt oder ohne offene Beträge).",

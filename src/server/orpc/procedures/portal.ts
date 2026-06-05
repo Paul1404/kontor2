@@ -177,7 +177,7 @@ export const portalRouter = {
           nachname: membersTable.nachname,
           kurzname: membersTable.kurzname,
           firma1: membersTable.firma1,
-          eMailName: membersTable.eMailName,
+          eMailName: membersTable.email,
         })
         .from(membersTable)
         .where(eq(membersTable.id, input.memberId))
@@ -311,7 +311,7 @@ export const portalRouter = {
             reviewedAt: portalChangeRequestsTable.reviewedAt,
             reviewedBy: portalChangeRequestsTable.reviewedBy,
             reviewerNotes: portalChangeRequestsTable.reviewerNotes,
-            mitglnr: membersTable.mitglnr,
+            mitglnr: membersTable.mitgliedsnummer,
             adrNr: membersTable.adrNr,
             vorname: membersTable.vorname,
             nachname: membersTable.nachname,
