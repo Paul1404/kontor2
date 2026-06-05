@@ -1,4 +1,13 @@
-import { index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { importBatchesTable } from "~/server/db/schema/import-batches";
 import { membersTable } from "~/server/db/schema/members";
 
@@ -30,7 +39,11 @@ export const memberSourceRecordsTable = pgTable(
     importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    index("member_source_records_member_idx").on(t.memberId),
+    // One current verbatim record per member and source table. The importer
+    // upserts on this key on every run, so re-imports refresh the row in place
+    // instead of accumulating a copy each time. Change history lives in the
+    // audit log, not here.
+    uniqueIndex("member_source_records_member_source_uk").on(t.memberId, t.sourceTable),
     index("member_source_records_adr_nr_idx").on(t.adrNr),
   ],
 );

@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.16.3",
+    date: "2026-06-05",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Der Import befüllt die aufgeräumten Mitgliederfelder jetzt automatisch mit und legt zu jedem Mitglied die unveränderten Originaldaten aus der Altsoftware als Beleg ab. Die bisherigen Felder bleiben unverändert, es ändert sich nichts an der Anzeige.",
+      },
+    ],
+  },
+  {
     version: "0.16.2",
     date: "2026-06-05",
     changes: [

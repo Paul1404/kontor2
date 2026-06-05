@@ -9,6 +9,7 @@ import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { importBatchesTable } from "~/server/db/schema/import-batches";
 import { legacySepaRunItemsTable, legacySepaRunsTable } from "~/server/db/schema/legacy-sepa";
 import { linearFederationsTable, linearSportTypesTable } from "~/server/db/schema/linear-lookups";
+import { memberSourceRecordsTable } from "~/server/db/schema/member-source-records";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
@@ -31,6 +32,7 @@ import {
   mapSportartRow,
   mapVerknRow,
 } from "~/server/importer/linear-mapper";
+import { cleanMemberColumns, translateLinearMember } from "~/server/importer/translate-member";
 import { invalidateMemberCaches } from "~/server/search/cache";
 
 export type IngestInput = {
@@ -242,8 +244,16 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
   let memberRowIndex = 0;
   for (const raw of input.members ?? []) {
     try {
-      const row = mapMemberRow(raw);
-      if (!row) continue;
+      const mapped = mapMemberRow(raw);
+      if (!mapped) continue;
+      // Dual-write: keep every legacy column exactly as before and add the
+      // clean, normalized columns from the same source row. The translator is
+      // the single anti-corruption boundary (also used by the one-time
+      // backfill), so the live import and the backfill cannot diverge. Nothing
+      // reads the clean columns yet; legacy columns stay authoritative until
+      // consumers are cut over.
+      const clean = translateLinearMember(raw);
+      const row = clean ? { ...mapped, ...cleanMemberColumns(clean) } : mapped;
       const adrNr = row.adrNr as number;
 
       const existing = existingByAdrNr.get(adrNr);
@@ -289,6 +299,29 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
         membersCreated += 1;
       }
       adrNrToMemberId.set(adrNr, memberId);
+
+      // Provenance: store the verbatim Linear row as jsonb so the working
+      // schema can later drop legacy columns without losing data (audit, DSGVO
+      // Auskunft, re-derivation). One current record per member, refreshed in
+      // place on every import; change history lives in the audit log.
+      await db
+        .insert(memberSourceRecordsTable)
+        .values({
+          memberId,
+          adrNr,
+          importBatchId: batch.id,
+          sourceTable: "adresse",
+          raw: raw as Record<string, unknown>,
+        })
+        .onConflictDoUpdate({
+          target: [memberSourceRecordsTable.memberId, memberSourceRecordsTable.sourceTable],
+          set: {
+            adrNr,
+            importBatchId: batch.id,
+            raw: raw as Record<string, unknown>,
+            importedAt: new Date(),
+          },
+        });
 
       // 2b. Abteilungen many-to-many derivation from the Linear string.
       const names = splitAbteilung((row as Record<string, unknown>).abteilung as string | null);

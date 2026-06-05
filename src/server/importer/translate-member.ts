@@ -94,3 +94,29 @@ export function translateLinearMember(d: LinearRow): CleanMemberInput | null {
     adrNrKih: coerceInt(d.AdrNrKIH ?? null),
   };
 }
+
+/**
+ * The clean, normalized member columns the importer writes to `members`
+ * (Drizzle column names). These are the four fields that have no clean home in
+ * the legacy mirror: a normalized status enum, a boolean dunning block, and the
+ * renamed Mitgliedsnummer / E-Mail. The legacy source columns are still written
+ * alongside these until consumers are cut over, so this is purely additive.
+ *
+ * Kept as a small projection of `CleanMemberInput` so the importer wiring stays
+ * in lockstep with the translator and can be unit-tested without a database.
+ */
+export type CleanMemberColumns = {
+  mitgliedsnummer: string | null;
+  email: string | null;
+  status: CleanMemberInput["status"];
+  dunningBlocked: boolean;
+};
+
+export function cleanMemberColumns(clean: CleanMemberInput): CleanMemberColumns {
+  return {
+    mitgliedsnummer: clean.mitgliedsnummer,
+    email: clean.email,
+    status: clean.status,
+    dunningBlocked: clean.dunningBlocked,
+  };
+}

@@ -169,6 +169,13 @@
       "when": 1780633196015,
       "tag": "0023_backfill_member_clean_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1780634624288,
+      "tag": "0024_fixed_lenny_balinger",
+      "breakpoints": true
     }
   ]
 }
