@@ -104,8 +104,14 @@ export async function computeBestandserhebung(
           sql`${membersTable.verstorbenAm} > ${stichtag}::date`,
         ),
         or(isNull(membersTable.deletedAt), sql`${membersTable.deletedAt} > ${stichtag}::date`),
-        // Exclude the legacy Linear soft-delete too; otherwise geloscht
-        // members inflate the official verband report.
+        // Keep the legacy `geloscht` exclusion here even though it is folded
+        // into `deletedAt` elsewhere. This check is date-aware (a member
+        // deleted after the Stichtag still counted on it), but the fold stamps
+        // legacy-deleted members with `deletedAt = now()`, which is after a past
+        // Stichtag and would wrongly count them as present. `geloscht` has no
+        // date, so it correctly excludes them regardless. This is the one site
+        // that must outlive the fold; do not drop it without a real deletion
+        // date for legacy-deleted members.
         sql`coalesce(${membersTable.geloscht}, false) = false`,
         whereAbtFilter,
       ),

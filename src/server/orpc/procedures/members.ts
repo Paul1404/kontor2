@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql }
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { withUniqueRetry } from "~/server/db/retry";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { attachmentsTable } from "~/server/db/schema/attachments";
@@ -276,10 +277,9 @@ export const membersRouter = {
       );
     }
 
-    // Hide soft-deleted members from the normal list view. Both flags: the
-    // app's `deletedAt` and the legacy Linear `geloscht` set on imported rows.
-    conditions.push(isNull(membersTable.deletedAt) as never);
-    conditions.push(sql`coalesce(${membersTable.geloscht}, false) = false` as never);
+    // Hide soft-deleted members from the normal list view. The legacy Linear
+    // `geloscht` flag is folded into the app's single `deletedAt`.
+    conditions.push(memberNotDeleted() as never);
 
     // "Verwaiste Kontakte" filter: Kontakt (no mitglnr) AND no relationship
     // pointing to or from this row. Used by admins to find Linear-import
@@ -598,10 +598,7 @@ export const membersRouter = {
    */
   stats: authedProc.input(v.void()).handler(async ({ context }) =>
     cached(CACHE_NS.dashboard, "members-stats", 120, async () => {
-      const notDeleted = and(
-        isNull(membersTable.deletedAt),
-        sql`coalesce(${membersTable.geloscht}, false) = false`,
-      );
+      const notDeleted = memberNotDeleted();
       const lebt = and(
         notDeleted,
         isNull(membersTable.austritt),

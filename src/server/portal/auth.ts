@@ -186,7 +186,6 @@ export async function loadPortalMember(db: DB, memberId: string) {
       eMailName: membersTable.eMailName,
       eintritt: membersTable.eintritt,
       austritt: membersTable.austritt,
-      geloscht: membersTable.geloscht,
     })
     .from(membersTable)
     .where(eq(membersTable.id, memberId))

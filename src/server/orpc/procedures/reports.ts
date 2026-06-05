@@ -1,5 +1,6 @@
 import { and, asc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
@@ -80,8 +81,7 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
       isNull(membersTable.verstorbenAm) as never,
     );
   }
-  conditions.push(isNull(membersTable.deletedAt) as never);
-  conditions.push(sql`coalesce(${membersTable.geloscht}, false) = false` as never);
+  conditions.push(memberNotDeleted() as never);
   if (input.q.trim()) {
     const like = `%${input.q.trim()}%`;
     conditions.push(
@@ -122,8 +122,7 @@ async function loadGeburtstage(
     isNotNull(membersTable.geburtsdatum) as never,
     isNull(membersTable.austritt) as never,
     isNull(membersTable.verstorbenAm) as never,
-    isNull(membersTable.deletedAt) as never,
-    sql`coalesce(${membersTable.geloscht}, false) = false` as never,
+    memberNotDeleted() as never,
     sql`${monthExpr} = ${input.month}` as never,
   ];
 
@@ -184,8 +183,7 @@ async function loadEhrungen(
 
   const conditions = [
     isNotNull(membersTable.eintritt) as never,
-    isNull(membersTable.deletedAt) as never,
-    sql`coalesce(${membersTable.geloscht}, false) = false` as never,
+    memberNotDeleted() as never,
     inArray(
       sql<number>`extract(year from ${membersTable.eintritt})::int`,
       jubilaeen.map((j) => input.year - j),
@@ -286,12 +284,9 @@ async function loadFinanzbericht(
   db: AppContext["db"],
   input: v.InferOutput<typeof YearInput>,
 ): Promise<FinanzberichtData> {
-  // Exclude postings of soft-deleted members (both the app `deletedAt` and the
-  // legacy Linear `geloscht`), so the Finanzbericht matches every other report.
-  const notDeleted = and(
-    isNull(membersTable.deletedAt),
-    sql`coalesce(${membersTable.geloscht}, false) = false`,
-  );
+  // Exclude postings of soft-deleted members so the Finanzbericht matches every
+  // other report. The legacy `geloscht` flag is folded into `deletedAt`.
+  const notDeleted = memberNotDeleted();
 
   const totalsRows = await db
     .select({
@@ -425,13 +420,7 @@ export const reportsRouter = {
           aktivPasiv: membersTable.aktivPasiv,
         })
         .from(membersTable)
-        .where(
-          and(
-            inArray(membersTable.id, ids),
-            isNull(membersTable.deletedAt),
-            sql`coalesce(${membersTable.geloscht}, false) = false`,
-          ),
-        )
+        .where(and(inArray(membersTable.id, ids), memberNotDeleted()))
         .orderBy(asc(membersTable.nachname), asc(membersTable.vorname));
       const stamp = new Date().toISOString().slice(0, 10);
       return {

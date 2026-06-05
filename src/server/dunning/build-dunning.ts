@@ -1,5 +1,6 @@
-import { and, eq, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, lte, ne, or, sql } from "drizzle-orm";
 import type { DB } from "~/server/db/client";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { sepaReturnsTable } from "~/server/db/schema/dunning";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
@@ -197,11 +198,9 @@ export async function loadOpenPostings(
     .where(
       and(
         ...conditions,
-        // Skip both soft-delete flags: legacy `geloscht` and the app's
-        // `deletedAt` (set by members.softDelete). A UI-deleted member must
-        // never receive a Mahnung.
-        sql`coalesce(${membersTable.geloscht}, false) = false`,
-        isNull(membersTable.deletedAt),
+        // Skip soft-deleted members; a deleted member must never receive a
+        // Mahnung. The legacy `geloscht` flag is folded into `deletedAt`.
+        memberNotDeleted(),
       ),
     )
     .orderBy(membersTable.nachname, membersTable.vorname, sollStellungenTable.billingYear);

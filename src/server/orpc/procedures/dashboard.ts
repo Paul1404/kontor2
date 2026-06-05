@@ -1,5 +1,6 @@
 import { and, count, eq, gte, isNotNull, isNull, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
 import { authedProc } from "~/server/orpc/base";
@@ -20,14 +21,9 @@ export const dashboardRouter = {
     cached(CACHE_NS.dashboard, "stats", 120, async () => {
       const since = startOfMonth();
       // All counts must exclude soft-deleted members or the dashboard drifts
-      // from the member list / fee runs. Members carry TWO delete flags: the
-      // app's `deletedAt` and the legacy Linear `geloscht` (set on imported
-      // rows). The canonical "live member" definition (build-fee-run,
-      // build-dunning) excludes both.
-      const notDeleted = and(
-        isNull(membersTable.deletedAt),
-        sql`coalesce(${membersTable.geloscht}, false) = false`,
-      );
+      // from the member list / fee runs. The legacy Linear `geloscht` flag is
+      // folded into the app's single `deletedAt`, so one check is authoritative.
+      const notDeleted = memberNotDeleted();
       const [
         [total],
         [aktiv],
@@ -70,8 +66,7 @@ export const dashboardRouter = {
             else '75+'
           end as bucket
           from ${membersTable}
-          where ${membersTable.deletedAt} is null
-            and coalesce(${membersTable.geloscht}, false) = false
+          where ${memberNotDeleted()}
             and ${membersTable.austritt} is null
             and ${membersTable.verstorbenAm} is null
         ) t
@@ -90,8 +85,7 @@ export const dashboardRouter = {
             else 'unbekannt'
           end as gender
           from ${membersTable}
-          where ${membersTable.deletedAt} is null
-            and coalesce(${membersTable.geloscht}, false) = false
+          where ${memberNotDeleted()}
             and ${membersTable.austritt} is null
             and ${membersTable.verstorbenAm} is null
         ) t
@@ -133,8 +127,7 @@ export const dashboardRouter = {
                              extract(day from ${membersTable.geburtsdatum})::int)
             end as next_birthday
           from ${membersTable}
-          where ${membersTable.deletedAt} is null
-            and coalesce(${membersTable.geloscht}, false) = false
+          where ${memberNotDeleted()}
             and ${membersTable.austritt} is null
             and ${membersTable.verstorbenAm} is null
             and ${membersTable.geburtsdatum} is not null
@@ -156,8 +149,7 @@ export const dashboardRouter = {
             else '25+ Jahre'
           end as bucket
           from ${membersTable}
-          where ${membersTable.deletedAt} is null
-            and coalesce(${membersTable.geloscht}, false) = false
+          where ${memberNotDeleted()}
             and ${membersTable.austritt} is null
             and ${membersTable.verstorbenAm} is null
         ) t
@@ -174,13 +166,7 @@ export const dashboardRouter = {
         .from(memberAbteilungenTable)
         .innerJoin(abteilungenTable, eq(memberAbteilungenTable.abteilungId, abteilungenTable.id))
         .innerJoin(membersTable, eq(membersTable.id, memberAbteilungenTable.memberId))
-        .where(
-          and(
-            isNull(memberAbteilungenTable.austrittsdatum),
-            isNull(membersTable.deletedAt),
-            sql`coalesce(${membersTable.geloscht}, false) = false`,
-          ),
-        )
+        .where(and(isNull(memberAbteilungenTable.austrittsdatum), memberNotDeleted()))
         .groupBy(abteilungenTable.name)
         .orderBy(sql`count(*) desc`);
 
