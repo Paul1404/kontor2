@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.16.1",
+    date: "2026-06-05",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Grundlage für eine aufgeräumte Mitglieder-Datenbasis: Der Import behält ab sofort die Original-Daten aus der Altsoftware unverändert als Beleg, damit künftig nur noch die tatsächlich genutzten Felder im Hauptdatensatz stehen. Keine sichtbare Änderung, die Daten bleiben vollständig erhalten.",
+      },
+    ],
+  },
+  {
     version: "0.16.0",
     date: "2026-06-04",
     title: "Mitglied austreten und Eintritt mit Assistent",

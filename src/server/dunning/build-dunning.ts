@@ -4,6 +4,11 @@ import { sepaReturnsTable } from "~/server/db/schema/dunning";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
+import { ageAt, isDunningBlocked, isMinorAt, memberDisplayName } from "~/server/domain/member";
+
+// Canonical homes are now in `~/server/domain/member`. Re-exported here so the
+// existing dunning/kulanz/procedure imports and tests keep working unchanged.
+export { ageAt, isDunningBlocked, isMinorAt, memberDisplayName };
 
 export type OpenPosting = {
   sollStellungId: string;
@@ -104,18 +109,6 @@ export function mahngebuhrFor(
   if (level <= 1) return org.mahngebuhr1;
   if (level === 2) return org.mahngebuhr2;
   return org.mahngebuhr3;
-}
-
-/**
- * Whether a member's `mahnSperre` (dunning block) flag suppresses dunning.
- * The legacy Linear column is free-form; we treat an empty/whitespace-only
- * value and the sentinel "0" as "not blocked" and anything else as blocked.
- * Trimming matters: a stray space must not silently block all dunning.
- */
-export function isDunningBlocked(mahnSperre: string | null | undefined): boolean {
-  if (!mahnSperre) return false;
-  const v = mahnSperre.trim();
-  return v !== "" && v !== "0";
 }
 
 /**
@@ -298,40 +291,6 @@ export async function loadOpenPostings(
     if (ln !== 0) return ln;
     return (a.vorname ?? "").localeCompare(b.vorname ?? "", "de");
   });
-}
-
-/** Age in whole years at `asOf`, or null when the birthdate is missing/invalid. */
-export function ageAt(birth: Date | string | null | undefined, asOf: Date): number | null {
-  if (!birth) return null;
-  const b = birth instanceof Date ? birth : new Date(birth);
-  if (!Number.isFinite(b.getTime())) return null;
-  let age = asOf.getUTCFullYear() - b.getUTCFullYear();
-  const monthDelta = asOf.getUTCMonth() - b.getUTCMonth();
-  if (monthDelta < 0 || (monthDelta === 0 && asOf.getUTCDate() < b.getUTCDate())) {
-    age -= 1;
-  }
-  return age;
-}
-
-/** True when the member is under 18 at `asOf` (false if birthdate unknown). */
-export function isMinorAt(birth: Date | string | null | undefined, asOf: Date): boolean {
-  const age = ageAt(birth, asOf);
-  return age !== null && age < 18;
-}
-
-type MemberLike = {
-  vorname: string | null;
-  nachname: string | null;
-  kurzname: string | null;
-  firma1: string | null;
-  mitglnr?: string | null;
-  adrNr?: number;
-};
-
-export function memberDisplayName(m: MemberLike): string {
-  const full = [m.vorname, m.nachname].filter(Boolean).join(" ").trim();
-  if (full) return full;
-  return m.kurzname ?? m.firma1 ?? `Mitglied ${m.mitglnr ?? m.adrNr ?? ""}`.trim();
 }
 
 /**
