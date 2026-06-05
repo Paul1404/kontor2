@@ -49,6 +49,11 @@ export const RELEASES: Release[] = [
         description:
           "Mitglieder, die in der Altsoftware gelöscht waren, werden jetzt überall einheitlich wie im Programm gelöschte Mitglieder behandelt und damit konsistent ausgeblendet (Listen, Berichte, Mahnwesen, Lastschrift, Snapshots).",
       },
+      {
+        category: "internal",
+        description:
+          "DSGVO-Löschung entfernt jetzt auch die unveränderten Originaldaten aus dem Import-Beleg, damit bei einer Anonymisierung keine Kopie der personenbezogenen Daten zurückbleibt.",
+      },
     ],
   },
   {

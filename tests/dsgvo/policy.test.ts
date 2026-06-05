@@ -18,6 +18,7 @@ describe("buildScrubRules", () => {
     const rules = buildScrubRules("ffffffff-0000-0000-0000-000000000000");
     // sample of the categories
     expect(rules.eMailName).toEqual({ kind: "null" });
+    expect(rules.email).toEqual({ kind: "null" }); // clean column must be scrubbed too
     expect(rules.telefon1).toEqual({ kind: "null" });
     expect(rules.iban1).toEqual({ kind: "null" });
     expect(rules.bic1).toEqual({ kind: "null" });
