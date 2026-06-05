@@ -23,7 +23,7 @@ describe("buildScrubRules", () => {
     expect(rules.iban1).toEqual({ kind: "null" });
     expect(rules.bic1).toEqual({ kind: "null" });
     expect(rules.geburtsdatum).toEqual({ kind: "null" });
-    expect(rules.ausweisnummer).toEqual({ kind: "null" });
+    expect(rules.strasse).toEqual({ kind: "null" });
   });
 
   it("does not touch retained columns", () => {

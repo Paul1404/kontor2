@@ -57,7 +57,7 @@ export const RELEASES: Release[] = [
       {
         category: "internal",
         description:
-          "Datenmodell entschlackt: 106 ungenutzte Altspalten aus der Mitgliedertabelle entfernt. Keine Auswirkung auf die Anzeige.",
+          "Datenmodell deutlich entschlackt: über 180 ungenutzte Altspalten aus der Mitgliedertabelle entfernt (von 265 auf 84). Keine Auswirkung auf die Anzeige.",
       },
     ],
   },
