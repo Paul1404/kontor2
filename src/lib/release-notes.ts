@@ -54,6 +54,11 @@ export const RELEASES: Release[] = [
         description:
           "DSGVO-Löschung entfernt jetzt auch die unveränderten Originaldaten aus dem Import-Beleg, damit bei einer Anonymisierung keine Kopie der personenbezogenen Daten zurückbleibt.",
       },
+      {
+        category: "internal",
+        description:
+          "Datenmodell entschlackt: 106 ungenutzte Altspalten aus der Mitgliedertabelle entfernt. Keine Auswirkung auf die Anzeige.",
+      },
     ],
   },
   {
