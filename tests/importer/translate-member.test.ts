@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { deriveCleanColumns, type MemberLegacyFields } from "~/server/domain/member";
-import { type LinearRow, mapMemberRow } from "~/server/importer/linear-mapper";
 import { cleanMemberColumns, translateLinearMember } from "~/server/importer/translate-member";
 
 describe("translateLinearMember", () => {
@@ -112,34 +110,4 @@ describe("cleanMemberColumns", () => {
       dunningBlocked: false,
     });
   });
-});
-
-describe("clean-column equivalence: importer path vs app-write path", () => {
-  // The importer derives clean columns from a raw Linear row via the
-  // translator; the app write paths derive them from the mapped (DB-shaped)
-  // row via deriveCleanColumns. They must agree, or a re-import and an in-app
-  // edit would diverge. This is the equivalence guard from the migration plan.
-  const rows: LinearRow[] = [
-    { AdrNr: 1, MITGLNR: "M-1", EMailName: "a@b.de", AktivPasiv: "A", MahnSperre: null },
-    { AdrNr: 2, MITGLNR: " M-2 ", Telefon3: "fallback@x.de", AktivPasiv: "P", MahnSperre: "1" },
-    { AdrNr: 3, Austritt: "2024-01-01 00:00:00", AktivPasiv: "A", MahnSperre: "0" },
-    {
-      AdrNr: 4,
-      VerstorbenAm: "2024-02-01 00:00:00",
-      Austritt: "2024-01-01 00:00:00",
-      MahnSperre: "gesperrt",
-    },
-    { AdrNr: 5, MITGLNR: "", EMailName: "  ", AktivPasiv: null },
-  ];
-
-  for (const raw of rows) {
-    it(`agrees for AdrNr ${raw.AdrNr}`, () => {
-      const clean = translateLinearMember(raw);
-      const mapped = mapMemberRow(raw);
-      expect(clean).not.toBeNull();
-      expect(mapped).not.toBeNull();
-      if (!clean || !mapped) return;
-      expect(deriveCleanColumns(mapped as MemberLegacyFields)).toEqual(cleanMemberColumns(clean));
-    });
-  }
 });

@@ -24,7 +24,7 @@ export type StammdatenValues = {
   firma1: string;
   telefon1: string;
   telefon2: string;
-  eMailName: string;
+  email: string;
   www: string;
   funktion: string;
   spender: string;
@@ -58,7 +58,7 @@ export const EMPTY_STAMM: StammdatenValues = {
   firma1: "",
   telefon1: "",
   telefon2: "",
-  eMailName: "",
+  email: "",
   www: "",
   funktion: "",
   spender: "",
@@ -141,13 +141,13 @@ export function buildInitialValues(
     firma1: (member.firma1 as string) ?? "",
     telefon1: (member.telefon1 as string) ?? "",
     telefon2: (member.telefon2 as string) ?? "",
-    eMailName: ((member as Record<string, unknown>).eMailName as string) ?? "",
+    email: (member.email as string) ?? "",
     www: (member.www as string) ?? "",
     funktion: (member.funktion as string) ?? "",
     spender: (member.spender as string) ?? "",
     eintritt: toDateInput(member.eintritt as string | Date | null),
     austritt: toDateInput(member.austritt as string | Date | null),
-    aktivPasiv: (member.aktivPasiv === "A" ? "A" : member.aktivPasiv === "P" ? "P" : "") as
+    aktivPasiv: ((member as Record<string, unknown>).status === "passiv" ? "P" : "A") as
       | "A"
       | "P"
       | "",
@@ -188,7 +188,7 @@ export function buildPatch(
   out.firma1 = nullable(values.firma1);
   out.telefon1 = nullable(values.telefon1);
   out.telefon2 = nullable(values.telefon2);
-  out.eMailName = nullable(values.eMailName);
+  out.email = nullable(values.email);
   out.www = nullable(values.www);
   out.funktion = nullable(values.funktion);
   out.spender = nullable(values.spender);
@@ -378,8 +378,8 @@ export function MemberStammdatenForm({
             <FormField label="E-Mail">
               <Input
                 type="email"
-                value={values.eMailName}
-                onChange={(e) => update("eMailName", e.target.value)}
+                value={values.email}
+                onChange={(e) => update("email", e.target.value)}
               />
             </FormField>
             <FormField label="Website">

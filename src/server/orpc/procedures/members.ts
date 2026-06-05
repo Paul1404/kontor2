@@ -14,7 +14,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
-import { deriveCleanColumns, type MemberLegacyFields } from "~/server/domain/member";
+import { deriveStatus, type MemberStatus } from "~/server/domain/member";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
 import {
   planAustrittCascade,
@@ -76,7 +76,7 @@ const StammdatenInput = v.object({
   land: v.optional(v.nullable(v.string())),
   telefon1: v.optional(v.nullable(v.string())),
   telefon2: v.optional(v.nullable(v.string())),
-  eMailName: v.optional(v.nullable(v.pipe(v.string(), v.email()))),
+  email: v.optional(v.nullable(v.pipe(v.string(), v.email()))),
   www: v.optional(v.nullable(v.string())),
   firma1: v.optional(v.nullable(v.string())),
   funktion: v.optional(v.nullable(v.string())),
@@ -84,12 +84,13 @@ const StammdatenInput = v.object({
   eintritt: v.optional(v.nullable(v.string())),
   austritt: v.optional(v.nullable(v.string())),
   verstorbenAm: v.optional(v.nullable(v.string())),
+  // UI membership type. Mapped to the normalized `status` on the server; not a
+  // stored column of its own.
   aktivPasiv: v.optional(v.nullable(v.picklist(["A", "P"]))),
   bank1: v.optional(v.nullable(v.string())),
   bic1: v.optional(v.nullable(v.string())),
   iban1: v.optional(v.nullable(v.string())),
   abwKontoInh: v.optional(v.nullable(v.string())),
-  mandatsrefenz: v.optional(v.nullable(v.string())),
   // Custom legal representative (gesetzliche Vertretung) for minors.
   vertreterAnrede: v.optional(v.nullable(v.string())),
   vertreterName: v.optional(v.nullable(v.string())),
@@ -142,6 +143,22 @@ function validateBetragString(value: string | null | undefined, field: string): 
  * coercing date strings to `Date` and computing `iban1Last4` when the IBAN
  * changes.
  */
+/**
+ * Fold the form's A/P membership type plus the exit/death dates into the
+ * normalized `status`. When the form does not send an A/P (left "Unbekannt"),
+ * fall back to the member's current status so an edit does not silently flip an
+ * active member to passive or vice versa.
+ */
+function memberStatusFromForm(
+  ap: "A" | "P" | null | undefined,
+  austritt: Date | null,
+  verstorbenAm: Date | null,
+  existingStatus?: MemberStatus | null,
+): MemberStatus {
+  const effective = ap ?? (existingStatus === "passiv" ? "P" : "A");
+  return deriveStatus({ austritt, verstorbenAm, aktivPasiv: effective });
+}
+
 function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
   const setIfPresent = <K extends keyof typeof input>(key: K, mapped?: string) => {
@@ -166,16 +183,16 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   setIfPresent("land");
   setIfPresent("telefon1");
   setIfPresent("telefon2");
-  setIfPresent("eMailName");
+  setIfPresent("email");
   setIfPresent("www");
   setIfPresent("firma1");
   setIfPresent("funktion");
   setIfPresent("spender");
-  setIfPresent("aktivPasiv");
+  // `aktivPasiv` is intentionally not written as a column -- the handler folds
+  // it into the normalized `status`.
   setIfPresent("bank1");
   setIfPresent("bic1");
   setIfPresent("abwKontoInh");
-  setIfPresent("mandatsrefenz");
   setIfPresent("vertreterAnrede");
   setIfPresent("vertreterName");
   setIfPresent("vertreterStrasse");
@@ -353,8 +370,7 @@ export const membersRouter = {
           eintritt: membersTable.eintritt,
           austritt: membersTable.austritt,
           verstorbenAm: membersTable.verstorbenAm,
-          aktiv: membersTable.aktiv,
-          aktivPasiv: membersTable.aktivPasiv,
+          status: membersTable.status,
           abteilung: membersTable.abteilung,
         })
         .from(membersTable)
@@ -553,7 +569,10 @@ export const membersRouter = {
         .where(eq(relationshipsTable.toMemberId, m.id));
 
       return {
-        member: stamm,
+        // Keep the legacy output keys (sourced from the clean columns) so the
+        // detail UI need not change here; the cosmetic API rename is a separate
+        // pass.
+        member: { ...stamm, mitglnr: stamm.mitgliedsnummer, eMailName: stamm.email },
         abteilungen,
         vertraege,
         sepa,
@@ -647,7 +666,7 @@ export const membersRouter = {
 
         const patch = buildMemberPatch(input.patch);
         if (Object.keys(patch).length === 0) {
-          return { mitglnr: existing.mitglnr };
+          return { mitglnr: existing.mitgliedsnummer };
         }
 
         // Enforce the configurable Kündigungsfrist only when the Austritt is
@@ -667,12 +686,18 @@ export const membersRouter = {
           ...patch,
         };
 
-        // Keep the clean columns in sync with the legacy fields the form can
-        // change (email, status from aktiv_pasiv + exit/death dates). Derived
-        // from the projected state so partial edits compute the right value.
-        const cleanCols = deriveCleanColumns(projected as MemberLegacyFields);
-        Object.assign(patch, cleanCols);
-        Object.assign(projected, cleanCols);
+        // Keep the normalized `status` in sync with the A/P toggle and the
+        // exit/death dates. `email` is written straight from the patch; the
+        // other clean columns (mitgliedsnummer, dunning_blocked) are not edited
+        // here, so they are left untouched.
+        const nextStatus = memberStatusFromForm(
+          input.patch.aktivPasiv,
+          (projected.austritt as Date | null) ?? null,
+          (projected.verstorbenAm as Date | null) ?? null,
+          existing.status,
+        );
+        patch.status = nextStatus;
+        projected.status = nextStatus;
 
         await tx
           .update(membersTable)
@@ -700,7 +725,7 @@ export const membersRouter = {
           });
         }
 
-        return { mitglnr: existing.mitglnr };
+        return { mitglnr: existing.mitgliedsnummer };
       });
 
       await invalidateMemberCaches();
@@ -756,23 +781,23 @@ export const membersRouter = {
             }
 
             const now = new Date();
-            // Derive the clean columns from the values being inserted so a
-            // newly created member is consistent without waiting for an import.
-            const cleanCols = deriveCleanColumns({
-              mitglnr: nextMitglnr,
-              eMailName: (patch.eMailName as string | null) ?? null,
-              telefon3: null,
-              aktivPasiv: (patch.aktivPasiv as string | null) ?? null,
-              austritt: (patch.austritt as Date | null) ?? null,
-              verstorbenAm: (patch.verstorbenAm as Date | null) ?? null,
-              mahnSperre: null,
-            });
+            // Write the clean columns directly so a newly created member is
+            // consistent without waiting for an import. `email` is already in
+            // the patch.
+            const cleanCols = {
+              mitgliedsnummer: nextMitglnr,
+              status: memberStatusFromForm(
+                input.patch.aktivPasiv,
+                (patch.austritt as Date | null) ?? null,
+                (patch.verstorbenAm as Date | null) ?? null,
+              ),
+              dunningBlocked: false,
+            };
             const [inserted] = await tx
               .insert(membersTable)
               .values({
                 ...(patch as Record<string, unknown>),
                 adrNr: nextAdrNr,
-                mitglnr: nextMitglnr,
                 ...cleanCols,
                 createdAt: now,
                 updatedAt: now,
@@ -794,7 +819,6 @@ export const membersRouter = {
               changes: diff(null, {
                 ...patch,
                 adrNr: nextAdrNr,
-                mitglnr: nextMitglnr,
                 ...cleanCols,
               }),
               requestId: context.requestId ?? null,
@@ -979,18 +1003,20 @@ export const membersRouter = {
           }
 
           if (input.action.type === "setAktivPasiv") {
-            if (existing.aktivPasiv === input.action.value) {
+            // Fold the A/P choice into the normalized status; exited/deceased
+            // members keep their status (dates win in deriveStatus).
+            const bulkStatus = deriveStatus({
+              austritt: existing.austritt,
+              verstorbenAm: existing.verstorbenAm,
+              aktivPasiv: input.action.value,
+            });
+            if (existing.status === bulkStatus) {
               skipped += 1;
               continue;
             }
-            const bulkStatus = deriveCleanColumns({
-              ...(existing as unknown as MemberLegacyFields),
-              aktivPasiv: input.action.value,
-            }).status;
             await tx
               .update(membersTable)
               .set({
-                aktivPasiv: input.action.value,
                 status: bulkStatus,
                 updatedAt: new Date(),
               } as never)
@@ -1003,7 +1029,6 @@ export const membersRouter = {
               actorId,
               actorEmail,
               changes: {
-                aktivPasiv: { before: existing.aktivPasiv, after: input.action.value },
                 status: { before: existing.status, after: bulkStatus },
               },
               requestId,
@@ -1218,12 +1243,13 @@ export const membersRouter = {
       } else {
         memberSet.austritt = austrittTs;
       }
-      if (input.setPassiv) memberSet.aktivPasiv = "P";
-      // Keep the normalized status in sync with the leave date / death / flag.
-      memberSet.status = deriveCleanColumns({
-        ...(member as unknown as MemberLegacyFields),
-        ...(memberSet as Partial<MemberLegacyFields>),
-      }).status;
+      // Normalized status: the exit/death dates win in deriveStatus, so a
+      // leaving member becomes ausgetreten/verstorben regardless of the A/P flag.
+      memberSet.status = deriveStatus({
+        austritt: (memberSet.austritt as Date | null) ?? member.austritt,
+        verstorbenAm: (memberSet.verstorbenAm as Date | null) ?? member.verstorbenAm,
+        aktivPasiv: input.setPassiv ? "P" : member.status === "passiv" ? "P" : "A",
+      });
       await tx
         .update(membersTable)
         .set(memberSet as never)
@@ -1296,7 +1322,7 @@ export const membersRouter = {
       });
 
       return {
-        mitglnr: member.mitglnr,
+        mitglnr: member.mitgliedsnummer,
         abteilungen: plan.abteilungClose.length,
         vertraege: plan.contractClose.length,
         sepaMandate: plan.sepaRevoke.length,
@@ -1364,16 +1390,17 @@ export const membersRouter = {
         });
 
         const now = new Date();
-        const reactivatedStatus = deriveCleanColumns({
-          ...(member as unknown as MemberLegacyFields),
+        // Clearing the Austritt brings the member back to aktiv (or verstorben
+        // if a death date is recorded).
+        const reactivatedStatus = deriveStatus({
           austritt: null,
+          verstorbenAm: member.verstorbenAm,
           aktivPasiv: "A",
-        }).status;
+        });
         await tx
           .update(membersTable)
           .set({
             austritt: null,
-            aktivPasiv: "A",
             status: reactivatedStatus,
             updatedAt: now,
           } as never)
@@ -1440,7 +1467,7 @@ export const membersRouter = {
           auditId,
         });
 
-        return { mitglnr: member.mitglnr };
+        return { mitglnr: member.mitgliedsnummer };
       });
 
       await invalidateMemberCaches();
@@ -1501,21 +1528,20 @@ export const membersRouter = {
           }
 
           const now = new Date();
-          const cleanCols = deriveCleanColumns({
-            mitglnr: nextMitglnr,
-            eMailName: (patch.eMailName as string | null) ?? null,
-            telefon3: null,
-            aktivPasiv: (patch.aktivPasiv as string | null) ?? null,
-            austritt: (patch.austritt as Date | null) ?? null,
-            verstorbenAm: (patch.verstorbenAm as Date | null) ?? null,
-            mahnSperre: null,
-          });
+          const cleanCols = {
+            mitgliedsnummer: nextMitglnr,
+            status: memberStatusFromForm(
+              input.patch.aktivPasiv,
+              (patch.austritt as Date | null) ?? null,
+              (patch.verstorbenAm as Date | null) ?? null,
+            ),
+            dunningBlocked: false,
+          };
           const [inserted] = await tx
             .insert(membersTable)
             .values({
               ...(patch as Record<string, unknown>),
               adrNr: nextAdrNr,
-              mitglnr: nextMitglnr,
               ...cleanCols,
               createdAt: now,
               updatedAt: now,

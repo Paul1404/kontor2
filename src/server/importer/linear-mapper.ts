@@ -59,14 +59,9 @@ export function mapMemberRow(d: LinearRow): Record<string, unknown> | null {
     bank: coerceStr(d.Bank ?? null, 40),
     blz: coerceStr(d.BLZ ?? null, 15),
     landname: coerceStr(d.Landname ?? null, 30),
-    mahnSperre: coerceStr(d.MahnSperre ?? null, 4),
     lastschrift: coerceStr(d.Lastschrift ?? null, 4),
-    mitglnr: coerceStr(d.MITGLNR ?? null, 15),
     jahr: coerceInt(d.Jahr ?? null),
-    aktiv: coerceStr(d.Aktiv ?? null, 1),
     abwKontoInh: coerceStr(d.AbwKontoInh ?? null, 50),
-    aktivPasiv: coerceStr(d.AktivPasiv ?? null, 1),
-    telefon3: coerceStr(d.Telefon3 ?? null, 240),
     abteilung: coerceStr(d.Abteilung ?? null, 80),
     mitglied: coerceStr(d.Mitglied ?? null, 60),
     geborene: coerceStr(d.Geborene ?? null, 50),
@@ -77,7 +72,6 @@ export function mapMemberRow(d: LinearRow): Record<string, unknown> | null {
     titel1: coerceStr(d.Titel1 ?? null, 60),
     titel2: coerceStr(d.Titel2 ?? null, 60),
     geburtsort: coerceStr(d.Geburtsort ?? null, 60),
-    eMailName: coerceStr(d.EMailName ?? null, 250) ?? coerceStr(d.Telefon3 ?? null, 250),
     haus: coerceStr(d.Haus ?? null, 1),
     land: coerceStr(d.Land ?? null, 100),
     gesperrt: coerceStr(d.gesperrt ?? null, 1),
@@ -88,10 +82,6 @@ export function mapMemberRow(d: LinearRow): Record<string, unknown> | null {
     iban3: coerceStr(d.IBAN3 ?? null, 40),
     bic1: coerceStr(d.BIC1 ?? null, 40),
     adrNrKih: coerceInt(d.AdrNrKIH ?? null),
-    // Linear has a typo: column is `mandatsrefenz` (single 'r'); some exports
-    // also include the corrected spelling. Prefer the typo'd column.
-    mandatsrefenz:
-      coerceStr(d.mandatsrefenz ?? null, 35) ?? coerceStr(d.Mandatsreferenz ?? null, 35),
     hausnummer: coerceStr(d.Hausnummer ?? null, 10),
     strasseKih: coerceStr(d.StrasseKIH ?? null, 40),
     plzKih: coerceStr(d.PlzKIH ?? null, 15),

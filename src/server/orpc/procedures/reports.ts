@@ -414,7 +414,7 @@ export const reportsRouter = {
           eintritt: membersTable.eintritt,
           austritt: membersTable.austritt,
           verstorbenAm: membersTable.verstorbenAm,
-          aktivPasiv: membersTable.aktivPasiv,
+          aktivPasiv: membersTable.status,
         })
         .from(membersTable)
         .where(and(inArray(membersTable.id, ids), memberNotDeleted()))
@@ -458,7 +458,7 @@ export const reportsRouter = {
         eintritt: membersTable.eintritt,
         austritt: membersTable.austritt,
         verstorbenAm: membersTable.verstorbenAm,
-        aktivPasiv: membersTable.aktivPasiv,
+        aktivPasiv: membersTable.status,
       })
       .from(membersTable)
       .where(where)

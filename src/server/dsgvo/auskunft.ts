@@ -174,7 +174,7 @@ export async function buildAuskunftsPackage(
 
   const pkg: AuskunftsPackage = {
     generatedAt: new Date().toISOString(),
-    generatedFor: { memberId: memberRow.id, mitglnr: memberRow.mitglnr },
+    generatedFor: { memberId: memberRow.id, mitglnr: memberRow.mitgliedsnummer },
     notice:
       "Diese Datei enthält alle zu Ihrer Person gespeicherten Daten gemäß " +
       "Art. 15 DSGVO. IBAN-Felder wurden auf die letzten vier Ziffern maskiert, " +

@@ -40,23 +40,13 @@ describe("mapMemberRow", () => {
     expect(row).toBeTruthy();
     if (!row) return;
     expect(row.adrNr).toBe(42);
-    expect(row.mitglnr).toBe("M-0042");
-    expect(row.eMailName).toBe("anna@example.com");
     expect(row.eintritt).toBeInstanceOf(Date);
     expect(row.geloscht).toBe(false);
-    expect(row.aktivPasiv).toBe("A");
     expect(row.abteilung).toBe("Fußball, Tennis");
     expect(row.iban1).toBe("DE89370400440532013000");
     expect(row.iban1Last4).toBe("3000");
-    expect(row.mandatsrefenz).toBe("MAN-001");
-  });
-
-  it("falls back to Telefon3 for email when EMailName missing", () => {
-    const row = mapMemberRow({
-      AdrNr: 1,
-      Telefon3: "old@example.com",
-    });
-    expect(row?.eMailName).toBe("old@example.com");
+    // Renamed/normalized fields (mitgliedsnummer, email, status, dunning block,
+    // mandate ref) now come from translateLinearMember, not the legacy mapper.
   });
 
   it("zero-dates become null", () => {

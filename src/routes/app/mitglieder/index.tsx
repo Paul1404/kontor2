@@ -58,7 +58,7 @@ type MemberRow = {
   eintritt: string | Date | null;
   austritt: string | Date | null;
   verstorbenAm: string | Date | null;
-  aktivPasiv: string | null;
+  status: string | null;
 };
 
 type MembersSearch = {
@@ -1095,8 +1095,8 @@ function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }
 }
 
 function StatusBadge({ member }: { member: MemberRow }) {
-  if (member.verstorbenAm) return <Badge variant="secondary">Verstorben</Badge>;
-  if (member.austritt) return <Badge variant="warning">Ausgetreten</Badge>;
-  if (member.aktivPasiv === "P") return <Badge variant="secondary">Passiv</Badge>;
+  if (member.status === "verstorben") return <Badge variant="secondary">Verstorben</Badge>;
+  if (member.status === "ausgetreten") return <Badge variant="warning">Ausgetreten</Badge>;
+  if (member.status === "passiv") return <Badge variant="secondary">Passiv</Badge>;
   return <Badge variant="success">Aktiv</Badge>;
 }

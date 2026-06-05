@@ -149,7 +149,7 @@ export const portalRouter = {
         action: "create",
         source: "system",
         actorId: null,
-        actorEmail: member.eMailName ?? null,
+        actorEmail: member.email ?? null,
         changes: payload,
         requestId: context.requestId ?? null,
       });
@@ -177,14 +177,14 @@ export const portalRouter = {
           nachname: membersTable.nachname,
           kurzname: membersTable.kurzname,
           firma1: membersTable.firma1,
-          eMailName: membersTable.email,
+          email: membersTable.email,
         })
         .from(membersTable)
         .where(eq(membersTable.id, input.memberId))
         .limit(1);
       if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
 
-      const targetEmail = input.overrideEmail?.trim() || member.eMailName?.trim() || null;
+      const targetEmail = input.overrideEmail?.trim() || member.email?.trim() || null;
       if (input.sendEmail && !targetEmail) {
         throw new ORPCError("BAD_REQUEST", {
           message:
