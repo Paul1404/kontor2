@@ -27,10 +27,10 @@ const FIELD_LABELS: Record<string, string> = {
   hausnummer: "Hausnummer",
   plz: "PLZ",
   ort: "Ort",
-  landname: "Land",
+  land: "Land",
   telefon1: "Telefon",
   telefon2: "Mobil",
-  eMailName: "E-Mail",
+  email: "E-Mail",
 };
 
 function PortalRequestsPage() {
@@ -192,13 +192,13 @@ function RequestRow({ row, onAction }: { row: Row; onAction: () => void }) {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               to="/app/mitglieder/$mitgliedsnummer"
-              params={{ mitgliedsnummer: row.mitglnr ?? String(row.adrNr) }}
+              params={{ mitgliedsnummer: row.mitgliedsnummer ?? String(row.adrNr) }}
               className="font-medium hover:underline"
             >
               {memberName}
             </Link>
             <span className="text-xs text-muted-foreground tabular-nums">
-              #{row.mitglnr ?? row.adrNr}
+              #{row.mitgliedsnummer ?? row.adrNr}
             </span>
             <StatusBadge status={row.status} />
           </div>

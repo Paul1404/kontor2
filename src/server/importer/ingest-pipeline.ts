@@ -9,6 +9,7 @@ import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { importBatchesTable } from "~/server/db/schema/import-batches";
 import { legacySepaRunItemsTable, legacySepaRunsTable } from "~/server/db/schema/legacy-sepa";
 import { linearFederationsTable, linearSportTypesTable } from "~/server/db/schema/linear-lookups";
+import { memberSourceRecordsTable } from "~/server/db/schema/member-source-records";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
@@ -24,13 +25,13 @@ import {
   mapInterRow,
   mapLastProtRow,
   mapLastProtSRow,
-  mapMemberRow,
   mapMgartDatRow,
   mapSepaRow,
   mapSollStellungRow,
   mapSportartRow,
   mapVerknRow,
 } from "~/server/importer/linear-mapper";
+import { translateLinearMember } from "~/server/importer/translate-member";
 import { invalidateMemberCaches } from "~/server/search/cache";
 
 export type IngestInput = {
@@ -242,11 +243,25 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
   let memberRowIndex = 0;
   for (const raw of input.members ?? []) {
     try {
-      const row = mapMemberRow(raw);
-      if (!row) continue;
-      const adrNr = row.adrNr as number;
+      // Translate Linear -> clean at the boundary. The importer writes only the
+      // clean schema columns; the verbatim row is kept as provenance below.
+      const clean = translateLinearMember(raw);
+      if (!clean) continue;
+      const adrNr = clean.adrNr;
+      const { isDeleted, ...cleanCols } = clean;
+      const row: Record<string, unknown> = { ...cleanCols, lastImportedAt: new Date() };
 
       const existing = existingByAdrNr.get(adrNr);
+
+      // Soft-delete: a member deleted in Linear (`geloscht`) maps to the app's
+      // single `deletedAt`. Linear never recorded the deletion date, so we stamp
+      // the epoch sentinel -- it marks the member deleted for every current view
+      // AND keeps the date-aware Bestandserhebung correct (a member "deleted at
+      // 1970" is excluded from every Stichtag). One-directional and idempotent:
+      // never clobber an existing delete, never auto-restore.
+      if (isDeleted && !existing?.deletedAt) {
+        row.deletedAt = new Date(0);
+      }
 
       let memberId: string;
       if (existing) {
@@ -289,6 +304,29 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
         membersCreated += 1;
       }
       adrNrToMemberId.set(adrNr, memberId);
+
+      // Provenance: store the verbatim Linear row as jsonb so the working
+      // schema can later drop legacy columns without losing data (audit, DSGVO
+      // Auskunft, re-derivation). One current record per member, refreshed in
+      // place on every import; change history lives in the audit log.
+      await db
+        .insert(memberSourceRecordsTable)
+        .values({
+          memberId,
+          adrNr,
+          importBatchId: batch.id,
+          sourceTable: "adresse",
+          raw: raw as Record<string, unknown>,
+        })
+        .onConflictDoUpdate({
+          target: [memberSourceRecordsTable.memberId, memberSourceRecordsTable.sourceTable],
+          set: {
+            adrNr,
+            importBatchId: batch.id,
+            raw: raw as Record<string, unknown>,
+            importedAt: new Date(),
+          },
+        });
 
       // 2b. Abteilungen many-to-many derivation from the Linear string.
       const names = splitAbteilung((row as Record<string, unknown>).abteilung as string | null);

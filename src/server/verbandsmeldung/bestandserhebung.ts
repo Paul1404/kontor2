@@ -103,10 +103,10 @@ export async function computeBestandserhebung(
           isNull(membersTable.verstorbenAm),
           sql`${membersTable.verstorbenAm} > ${stichtag}::date`,
         ),
+        // Soft-delete is date-aware: a member deleted after the Stichtag still
+        // counted on it. Linear-deleted members carry the epoch sentinel as
+        // `deletedAt`, so they are excluded for every Stichtag.
         or(isNull(membersTable.deletedAt), sql`${membersTable.deletedAt} > ${stichtag}::date`),
-        // Exclude the legacy Linear soft-delete too; otherwise geloscht
-        // members inflate the official verband report.
-        sql`coalesce(${membersTable.geloscht}, false) = false`,
         whereAbtFilter,
       ),
     );

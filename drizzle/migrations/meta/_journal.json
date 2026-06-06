@@ -148,6 +148,76 @@
       "when": 1780602800205,
       "tag": "0020_lying_sally_floyd",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1780629611809,
+      "tag": "0021_ordinary_leopardon",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1780633185897,
+      "tag": "0022_abnormal_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1780633196015,
+      "tag": "0023_backfill_member_clean_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1780634624288,
+      "tag": "0024_fixed_lenny_balinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1780635595791,
+      "tag": "0025_fold_geloscht_into_deleted_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1780638664432,
+      "tag": "0026_drop_dead_legacy_member_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1780638957264,
+      "tag": "0027_drop_policy_only_legacy_member_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1780640361938,
+      "tag": "0028_drop_renamed_legacy_member_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1780641291382,
+      "tag": "0029_drop_more_legacy_member_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1780641917867,
+      "tag": "0030_drop_unused_name_and_kih_columns",
+      "breakpoints": true
     }
   ]
 }

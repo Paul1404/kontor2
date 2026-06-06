@@ -15,6 +15,7 @@ export * from "./import-batches";
 export * from "./kulanz";
 export * from "./legacy-sepa";
 export * from "./linear-lookups";
+export * from "./member-source-records";
 export * from "./members";
 export * from "./organization-settings";
 export * from "./portal";

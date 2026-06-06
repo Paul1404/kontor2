@@ -12,7 +12,7 @@ import {
 function makeMember(overrides: Partial<MemberWithDebt> = {}): MemberWithDebt {
   return {
     memberId: "m1",
-    mitglnr: "100",
+    mitgliedsnummer: "100",
     adrNr: 1,
     vorname: "Max",
     nachname: "Muster",
@@ -23,8 +23,8 @@ function makeMember(overrides: Partial<MemberWithDebt> = {}): MemberWithDebt {
     hausnummer: "1",
     plz: "97447",
     ort: "Untereuerheim",
-    eMailName: null,
-    mahnSperre: null,
+    email: null,
+    dunningBlocked: false,
     geburtsdatum: null,
     vertreterAnrede: null,
     vertreterName: null,
@@ -174,7 +174,7 @@ describe("resolveRecipient", () => {
   describe("recipientEmail", () => {
     it("uses the member's own email for adults", () => {
       const r = resolveRecipient(
-        makeMember({ geburtsdatum: "1990-01-01", eMailName: "max@example.org" }),
+        makeMember({ geburtsdatum: "1990-01-01", email: "max@example.org" }),
         null,
         asOf,
       );
@@ -183,7 +183,7 @@ describe("resolveRecipient", () => {
 
     it("prefers the guardian connection's email for minors", () => {
       const r = resolveRecipient(
-        makeMember({ geburtsdatum: minorBirth, eMailName: "kid@example.org" }),
+        makeMember({ geburtsdatum: minorBirth, email: "kid@example.org" }),
         {
           anrede: "Frau",
           name: "Erika Muster",
@@ -200,7 +200,7 @@ describe("resolveRecipient", () => {
 
     it("falls back to the member's email when the guardian has none", () => {
       const r = resolveRecipient(
-        makeMember({ geburtsdatum: minorBirth, eMailName: "kid@example.org" }),
+        makeMember({ geburtsdatum: minorBirth, email: "kid@example.org" }),
         {
           anrede: "Frau",
           name: "Erika Muster",

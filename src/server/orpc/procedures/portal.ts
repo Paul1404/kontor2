@@ -25,10 +25,10 @@ const EDITABLE_FIELDS = [
   "hausnummer",
   "plz",
   "ort",
-  "landname",
+  "land",
   "telefon1",
   "telefon2",
-  "eMailName",
+  "email",
 ] as const;
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
@@ -57,10 +57,10 @@ const ChangeRequestSchema = v.object({
   hausnummer: v.optional(v.nullable(v.string())),
   plz: v.optional(v.nullable(v.string())),
   ort: v.optional(v.nullable(v.string())),
-  landname: v.optional(v.nullable(v.string())),
+  land: v.optional(v.nullable(v.string())),
   telefon1: v.optional(v.nullable(v.string())),
   telefon2: v.optional(v.nullable(v.string())),
-  eMailName: v.optional(v.nullable(v.string())),
+  email: v.optional(v.nullable(v.string())),
 });
 
 function normalize(value: unknown): string | null {
@@ -149,7 +149,7 @@ export const portalRouter = {
         action: "create",
         source: "system",
         actorId: null,
-        actorEmail: member.eMailName ?? null,
+        actorEmail: member.email ?? null,
         changes: payload,
         requestId: context.requestId ?? null,
       });
@@ -177,14 +177,14 @@ export const portalRouter = {
           nachname: membersTable.nachname,
           kurzname: membersTable.kurzname,
           firma1: membersTable.firma1,
-          eMailName: membersTable.eMailName,
+          email: membersTable.email,
         })
         .from(membersTable)
         .where(eq(membersTable.id, input.memberId))
         .limit(1);
       if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
 
-      const targetEmail = input.overrideEmail?.trim() || member.eMailName?.trim() || null;
+      const targetEmail = input.overrideEmail?.trim() || member.email?.trim() || null;
       if (input.sendEmail && !targetEmail) {
         throw new ORPCError("BAD_REQUEST", {
           message:
@@ -311,7 +311,7 @@ export const portalRouter = {
             reviewedAt: portalChangeRequestsTable.reviewedAt,
             reviewedBy: portalChangeRequestsTable.reviewedBy,
             reviewerNotes: portalChangeRequestsTable.reviewerNotes,
-            mitglnr: membersTable.mitglnr,
+            mitgliedsnummer: membersTable.mitgliedsnummer,
             adrNr: membersTable.adrNr,
             vorname: membersTable.vorname,
             nachname: membersTable.nachname,

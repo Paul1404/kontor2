@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql }
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { withUniqueRetry } from "~/server/db/retry";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { attachmentsTable } from "~/server/db/schema/attachments";
@@ -13,6 +14,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { deriveStatus, type MemberStatus } from "~/server/domain/member";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
 import {
   planAustrittCascade,
@@ -33,7 +35,7 @@ import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 const StatusSchema = v.picklist(["aktiv", "passiv", "ausgetreten", "verstorben", "alle"]);
 
-const SortBySchema = v.picklist(["nachname", "mitglnr", "ort", "email", "eintritt"]);
+const SortBySchema = v.picklist(["nachname", "mitgliedsnummer", "ort", "email", "eintritt"]);
 const SortDirSchema = v.picklist(["asc", "desc"]);
 
 const DateStringInput = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
@@ -58,11 +60,8 @@ const ListInput = v.object({
 const StammdatenInput = v.object({
   anrede: v.optional(v.nullable(v.string())),
   titel1: v.optional(v.nullable(v.string())),
-  titel2: v.optional(v.nullable(v.string())),
   vorname: v.optional(v.nullable(v.string())),
   nachname: v.optional(v.nullable(v.string())),
-  geborene: v.optional(v.nullable(v.string())),
-  geburtsname: v.optional(v.nullable(v.string())),
   geburtsdatum: v.optional(v.nullable(v.string())),
   geburtsort: v.optional(v.nullable(v.string())),
   geschlecht: v.optional(v.nullable(v.picklist(["m", "w", "d", "unbekannt"]))),
@@ -74,7 +73,7 @@ const StammdatenInput = v.object({
   land: v.optional(v.nullable(v.string())),
   telefon1: v.optional(v.nullable(v.string())),
   telefon2: v.optional(v.nullable(v.string())),
-  eMailName: v.optional(v.nullable(v.pipe(v.string(), v.email()))),
+  email: v.optional(v.nullable(v.pipe(v.string(), v.email()))),
   www: v.optional(v.nullable(v.string())),
   firma1: v.optional(v.nullable(v.string())),
   funktion: v.optional(v.nullable(v.string())),
@@ -82,12 +81,12 @@ const StammdatenInput = v.object({
   eintritt: v.optional(v.nullable(v.string())),
   austritt: v.optional(v.nullable(v.string())),
   verstorbenAm: v.optional(v.nullable(v.string())),
+  // UI membership type. Mapped to the normalized `status` on the server; not a
+  // stored column of its own.
   aktivPasiv: v.optional(v.nullable(v.picklist(["A", "P"]))),
-  bank1: v.optional(v.nullable(v.string())),
   bic1: v.optional(v.nullable(v.string())),
   iban1: v.optional(v.nullable(v.string())),
   abwKontoInh: v.optional(v.nullable(v.string())),
-  mandatsrefenz: v.optional(v.nullable(v.string())),
   // Custom legal representative (gesetzliche Vertretung) for minors.
   vertreterAnrede: v.optional(v.nullable(v.string())),
   vertreterName: v.optional(v.nullable(v.string())),
@@ -140,6 +139,22 @@ function validateBetragString(value: string | null | undefined, field: string): 
  * coercing date strings to `Date` and computing `iban1Last4` when the IBAN
  * changes.
  */
+/**
+ * Fold the form's A/P membership type plus the exit/death dates into the
+ * normalized `status`. When the form does not send an A/P (left "Unbekannt"),
+ * fall back to the member's current status so an edit does not silently flip an
+ * active member to passive or vice versa.
+ */
+function memberStatusFromForm(
+  ap: "A" | "P" | null | undefined,
+  austritt: Date | null,
+  verstorbenAm: Date | null,
+  existingStatus?: MemberStatus | null,
+): MemberStatus {
+  const effective = ap ?? (existingStatus === "passiv" ? "P" : "A");
+  return deriveStatus({ austritt, verstorbenAm, aktivPasiv: effective });
+}
+
 function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
   const setIfPresent = <K extends keyof typeof input>(key: K, mapped?: string) => {
@@ -149,11 +164,8 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   };
   setIfPresent("anrede");
   setIfPresent("titel1");
-  setIfPresent("titel2");
   setIfPresent("vorname");
   setIfPresent("nachname");
-  setIfPresent("geborene");
-  setIfPresent("geburtsname");
   setIfPresent("geburtsort");
   setIfPresent("geschlecht");
   setIfPresent("strasse");
@@ -164,16 +176,15 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   setIfPresent("land");
   setIfPresent("telefon1");
   setIfPresent("telefon2");
-  setIfPresent("eMailName");
+  setIfPresent("email");
   setIfPresent("www");
   setIfPresent("firma1");
   setIfPresent("funktion");
   setIfPresent("spender");
-  setIfPresent("aktivPasiv");
-  setIfPresent("bank1");
+  // `aktivPasiv` is intentionally not written as a column -- the handler folds
+  // it into the normalized `status`.
   setIfPresent("bic1");
   setIfPresent("abwKontoInh");
-  setIfPresent("mandatsrefenz");
   setIfPresent("vertreterAnrede");
   setIfPresent("vertreterName");
   setIfPresent("vertreterStrasse");
@@ -266,25 +277,20 @@ export const membersRouter = {
       conditions.push(isNull(membersTable.verstorbenAm) as never);
     }
     if (input.status === "passiv") {
-      // A passive member who has left is no longer passive — exclude exited
-      // and deceased regardless of `includeAusgetretene`.
-      conditions.push(
-        eq(membersTable.aktivPasiv, "P") as never,
-        isNull(membersTable.austritt) as never,
-        isNull(membersTable.verstorbenAm) as never,
-      );
+      // The normalized status already means "passive and neither exited nor
+      // deceased" (deriveStatus precedence), so one check is enough.
+      conditions.push(eq(membersTable.status, "passiv") as never);
     }
 
-    // Hide soft-deleted members from the normal list view. Both flags: the
-    // app's `deletedAt` and the legacy Linear `geloscht` set on imported rows.
-    conditions.push(isNull(membersTable.deletedAt) as never);
-    conditions.push(sql`coalesce(${membersTable.geloscht}, false) = false` as never);
+    // Hide soft-deleted members from the normal list view. The legacy Linear
+    // `geloscht` flag is folded into the app's single `deletedAt`.
+    conditions.push(memberNotDeleted() as never);
 
-    // "Verwaiste Kontakte" filter: Kontakt (no mitglnr) AND no relationship
+    // "Verwaiste Kontakte" filter: Kontakt (no mitgliedsnummer) AND no relationship
     // pointing to or from this row. Used by admins to find Linear-import
     // leftovers.
     if (input.orphanOnly) {
-      conditions.push(isNull(membersTable.mitglnr) as never);
+      conditions.push(isNull(membersTable.mitgliedsnummer) as never);
       conditions.push(
         sql`not exists (
           select 1 from ${relationshipsTable}
@@ -300,8 +306,8 @@ export const membersRouter = {
         or(
           ilike(membersTable.nachname, like),
           ilike(membersTable.vorname, like),
-          ilike(membersTable.mitglnr, like),
-          ilike(membersTable.eMailName, like),
+          ilike(membersTable.mitgliedsnummer, like),
+          ilike(membersTable.email, like),
           ilike(membersTable.ort, like),
         ) as never,
       );
@@ -328,9 +334,9 @@ export const membersRouter = {
     // logical names without exposing column identifiers in the API.
     const sortColumn = {
       nachname: membersTable.nachname,
-      mitglnr: membersTable.mitglnr,
+      mitgliedsnummer: membersTable.mitgliedsnummer,
       ort: membersTable.ort,
-      email: membersTable.eMailName,
+      email: membersTable.email,
       eintritt: membersTable.eintritt,
     }[input.sortBy];
     const direction = input.sortDir === "desc" ? desc : asc;
@@ -344,20 +350,19 @@ export const membersRouter = {
         .select({
           id: membersTable.id,
           adrNr: membersTable.adrNr,
-          mitglnr: membersTable.mitglnr,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
           anrede: membersTable.anrede,
           titel: membersTable.titel1,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,
           plz: membersTable.plz,
           ort: membersTable.ort,
-          email: membersTable.eMailName,
+          email: membersTable.email,
           telefon: membersTable.telefon1,
           eintritt: membersTable.eintritt,
           austritt: membersTable.austritt,
           verstorbenAm: membersTable.verstorbenAm,
-          aktiv: membersTable.aktiv,
-          aktivPasiv: membersTable.aktivPasiv,
+          status: membersTable.status,
           abteilung: membersTable.abteilung,
         })
         .from(membersTable)
@@ -376,16 +381,16 @@ export const membersRouter = {
   get: authedProc
     .input(v.object({ mitgliedsnummer: v.string() }))
     .handler(async ({ context, input }) => {
-      // Look up by mitglnr first (the normal member case). Legacy Linear
+      // Look up by mitgliedsnummer first (the normal member case). Legacy Linear
       // "Zahler-only" entries — people who pay for someone else's contract
-      // but aren't members themselves — have no mitglnr; the list links
+      // but aren't members themselves — have no mitgliedsnummer; the list links
       // them by numeric adrNr instead. Fall back to that when the input
-      // parses as an integer and no mitglnr match exists, so those rows
+      // parses as an integer and no mitgliedsnummer match exists, so those rows
       // are still openable from the list and bookmarkable.
       const rows = await context.db
         .select()
         .from(membersTable)
-        .where(eq(membersTable.mitglnr, input.mitgliedsnummer))
+        .where(eq(membersTable.mitgliedsnummer, input.mitgliedsnummer))
         .limit(1);
       let m = rows[0];
       if (!m) {
@@ -493,7 +498,7 @@ export const membersRouter = {
               toMemberId: relationshipsTable.toMemberId,
               toAdrNr: relationshipsTable.toAdrNr,
               fallbackName: relationshipsTable.name,
-              toMitglnr: membersTable.mitglnr,
+              toMitglnr: membersTable.mitgliedsnummer,
               toVorname: membersTable.vorname,
               toNachname: membersTable.nachname,
               // Target address + birthday so the Austrittsbestätigung can
@@ -532,12 +537,9 @@ export const membersRouter = {
             .orderBy(desc(sollStellungenTable.billingYear), asc(contractsTable.vertragNr)),
         ]);
 
-      // The IBAN columns are AES-256-GCM ciphertext at rest but our custom
-      // drizzle type decrypts on read. iban2/iban3 are unused in the UI today,
-      // so drop their plaintext outright.
-      const { iban2, iban3, ...stamm } = m;
-      void iban2;
-      void iban3;
+      // `iban1` is AES-256-GCM ciphertext at rest but our custom drizzle type
+      // decrypts on read. Shallow-copy so we can null it for readonly viewers.
+      const stamm = { ...m };
 
       // Readonly viewers get neither the cleartext IBAN nor the audit trail:
       // the full account number is financial PII the vorstand owns, and the
@@ -556,7 +558,10 @@ export const membersRouter = {
         .where(eq(relationshipsTable.toMemberId, m.id));
 
       return {
-        member: stamm,
+        // Keep the legacy output keys (sourced from the clean columns) so the
+        // detail UI need not change here; the cosmetic API rename is a separate
+        // pass.
+        member: { ...stamm, mitgliedsnummer: stamm.mitgliedsnummer, email: stamm.email },
         abteilungen,
         vertraege,
         sepa,
@@ -597,10 +602,7 @@ export const membersRouter = {
    */
   stats: authedProc.input(v.void()).handler(async ({ context }) =>
     cached(CACHE_NS.dashboard, "members-stats", 120, async () => {
-      const notDeleted = and(
-        isNull(membersTable.deletedAt),
-        sql`coalesce(${membersTable.geloscht}, false) = false`,
-      );
+      const notDeleted = memberNotDeleted();
       const lebt = and(
         notDeleted,
         isNull(membersTable.austritt),
@@ -613,7 +615,7 @@ export const membersRouter = {
           context.db
             .select({ c: count() })
             .from(membersTable)
-            .where(and(lebt, eq(membersTable.aktivPasiv, "P"))),
+            .where(and(lebt, eq(membersTable.status, "passiv"))),
           context.db
             .select({ c: count() })
             .from(membersTable)
@@ -625,7 +627,7 @@ export const membersRouter = {
           context.db
             .select({ c: count() })
             .from(membersTable)
-            .where(and(notDeleted, isNull(membersTable.mitglnr))),
+            .where(and(notDeleted, isNull(membersTable.mitgliedsnummer))),
         ]);
       return {
         total: total?.c ?? 0,
@@ -653,7 +655,7 @@ export const membersRouter = {
 
         const patch = buildMemberPatch(input.patch);
         if (Object.keys(patch).length === 0) {
-          return { mitglnr: existing.mitglnr };
+          return { mitgliedsnummer: existing.mitgliedsnummer };
         }
 
         // Enforce the configurable Kündigungsfrist only when the Austritt is
@@ -672,6 +674,19 @@ export const membersRouter = {
           ...(existing as Record<string, unknown>),
           ...patch,
         };
+
+        // Keep the normalized `status` in sync with the A/P toggle and the
+        // exit/death dates. `email` is written straight from the patch; the
+        // other clean columns (mitgliedsnummer, dunning_blocked) are not edited
+        // here, so they are left untouched.
+        const nextStatus = memberStatusFromForm(
+          input.patch.aktivPasiv,
+          (projected.austritt as Date | null) ?? null,
+          (projected.verstorbenAm as Date | null) ?? null,
+          existing.status,
+        );
+        patch.status = nextStatus;
+        projected.status = nextStatus;
 
         await tx
           .update(membersTable)
@@ -699,17 +714,17 @@ export const membersRouter = {
           });
         }
 
-        return { mitglnr: existing.mitglnr };
+        return { mitgliedsnummer: existing.mitgliedsnummer };
       });
 
       await invalidateMemberCaches();
-      return { ok: true, mitglnr: result.mitglnr };
+      return { ok: true, mitgliedsnummer: result.mitgliedsnummer };
     }),
 
   create: vorstandProc
     .input(
       v.object({
-        mitglnr: v.optional(v.nullable(v.string())),
+        mitgliedsnummer: v.optional(v.nullable(v.string())),
         patch: StammdatenInput,
       }),
     )
@@ -732,20 +747,20 @@ export const membersRouter = {
             const [maxRow] = await tx
               .select({
                 maxAdrNr: sql<number>`coalesce(max(${membersTable.adrNr}), 0)::int`,
-                maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitglnr}, '\\D', '', 'g'), '')::int), 0)::int`,
+                maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitgliedsnummer}, '\\D', '', 'g'), '')::int), 0)::int`,
               })
               .from(membersTable);
             const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
             const nextMitglnr =
-              input.mitglnr && input.mitglnr.trim().length > 0
-                ? input.mitglnr.trim()
+              input.mitgliedsnummer && input.mitgliedsnummer.trim().length > 0
+                ? input.mitgliedsnummer.trim()
                 : String((maxRow?.maxMitglnrInt ?? 0) + 1);
 
             if (nextMitglnr) {
               const [dupe] = await tx
                 .select({ id: membersTable.id })
                 .from(membersTable)
-                .where(eq(membersTable.mitglnr, nextMitglnr))
+                .where(eq(membersTable.mitgliedsnummer, nextMitglnr))
                 .limit(1);
               if (dupe) {
                 throw new ORPCError("CONFLICT", {
@@ -755,16 +770,28 @@ export const membersRouter = {
             }
 
             const now = new Date();
+            // Write the clean columns directly so a newly created member is
+            // consistent without waiting for an import. `email` is already in
+            // the patch.
+            const cleanCols = {
+              mitgliedsnummer: nextMitglnr,
+              status: memberStatusFromForm(
+                input.patch.aktivPasiv,
+                (patch.austritt as Date | null) ?? null,
+                (patch.verstorbenAm as Date | null) ?? null,
+              ),
+              dunningBlocked: false,
+            };
             const [inserted] = await tx
               .insert(membersTable)
               .values({
                 ...(patch as Record<string, unknown>),
                 adrNr: nextAdrNr,
-                mitglnr: nextMitglnr,
+                ...cleanCols,
                 createdAt: now,
                 updatedAt: now,
               } as never)
-              .returning({ id: membersTable.id, mitglnr: membersTable.mitglnr });
+              .returning({ id: membersTable.id, mitgliedsnummer: membersTable.mitgliedsnummer });
             if (!inserted) {
               throw new ORPCError("INTERNAL_SERVER_ERROR", {
                 message: "Anlage fehlgeschlagen.",
@@ -778,7 +805,11 @@ export const membersRouter = {
               source: "ui",
               actorId: context.session!.user.id,
               actorEmail: context.session!.user.email,
-              changes: diff(null, { ...patch, adrNr: nextAdrNr, mitglnr: nextMitglnr }),
+              changes: diff(null, {
+                ...patch,
+                adrNr: nextAdrNr,
+                ...cleanCols,
+              }),
               requestId: context.requestId ?? null,
             });
             await takeMemberSnapshot(tx, inserted.id, {
@@ -790,7 +821,7 @@ export const membersRouter = {
 
             return {
               id: inserted.id,
-              mitglnr: inserted.mitglnr ?? nextMitglnr,
+              mitgliedsnummer: inserted.mitgliedsnummer ?? nextMitglnr,
               adrNr: nextAdrNr,
             };
           });
@@ -961,13 +992,23 @@ export const membersRouter = {
           }
 
           if (input.action.type === "setAktivPasiv") {
-            if (existing.aktivPasiv === input.action.value) {
+            // Fold the A/P choice into the normalized status; exited/deceased
+            // members keep their status (dates win in deriveStatus).
+            const bulkStatus = deriveStatus({
+              austritt: existing.austritt,
+              verstorbenAm: existing.verstorbenAm,
+              aktivPasiv: input.action.value,
+            });
+            if (existing.status === bulkStatus) {
               skipped += 1;
               continue;
             }
             await tx
               .update(membersTable)
-              .set({ aktivPasiv: input.action.value, updatedAt: new Date() } as never)
+              .set({
+                status: bulkStatus,
+                updatedAt: new Date(),
+              } as never)
               .where(eq(membersTable.id, memberId));
             const auditId = await appendAudit(tx, {
               entityType: "member",
@@ -977,7 +1018,7 @@ export const membersRouter = {
               actorId,
               actorEmail,
               changes: {
-                aktivPasiv: { before: existing.aktivPasiv, after: input.action.value },
+                status: { before: existing.status, after: bulkStatus },
               },
               requestId,
             });
@@ -1103,7 +1144,7 @@ export const membersRouter = {
       const rows = await context.db
         .select({
           id: membersTable.id,
-          mitglnr: membersTable.mitglnr,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
           adrNr: membersTable.adrNr,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,
@@ -1116,8 +1157,8 @@ export const membersRouter = {
             or(
               ilike(membersTable.nachname, like),
               ilike(membersTable.vorname, like),
-              ilike(membersTable.mitglnr, like),
-              ilike(membersTable.eMailName, like),
+              ilike(membersTable.mitgliedsnummer, like),
+              ilike(membersTable.email, like),
             ),
           ),
         )
@@ -1191,7 +1232,13 @@ export const membersRouter = {
       } else {
         memberSet.austritt = austrittTs;
       }
-      if (input.setPassiv) memberSet.aktivPasiv = "P";
+      // Normalized status: the exit/death dates win in deriveStatus, so a
+      // leaving member becomes ausgetreten/verstorben regardless of the A/P flag.
+      memberSet.status = deriveStatus({
+        austritt: (memberSet.austritt as Date | null) ?? member.austritt,
+        verstorbenAm: (memberSet.verstorbenAm as Date | null) ?? member.verstorbenAm,
+        aktivPasiv: input.setPassiv ? "P" : member.status === "passiv" ? "P" : "A",
+      });
       await tx
         .update(membersTable)
         .set(memberSet as never)
@@ -1264,7 +1311,7 @@ export const membersRouter = {
       });
 
       return {
-        mitglnr: member.mitglnr,
+        mitgliedsnummer: member.mitgliedsnummer,
         abteilungen: plan.abteilungClose.length,
         vertraege: plan.contractClose.length,
         sepaMandate: plan.sepaRevoke.length,
@@ -1332,9 +1379,20 @@ export const membersRouter = {
         });
 
         const now = new Date();
+        // Clearing the Austritt brings the member back to aktiv (or verstorben
+        // if a death date is recorded).
+        const reactivatedStatus = deriveStatus({
+          austritt: null,
+          verstorbenAm: member.verstorbenAm,
+          aktivPasiv: "A",
+        });
         await tx
           .update(membersTable)
-          .set({ austritt: null, aktivPasiv: "A", updatedAt: now } as never)
+          .set({
+            austritt: null,
+            status: reactivatedStatus,
+            updatedAt: now,
+          } as never)
           .where(eq(membersTable.id, input.memberId));
 
         for (const a of plan.abteilungReopen) {
@@ -1398,7 +1456,7 @@ export const membersRouter = {
           auditId,
         });
 
-        return { mitglnr: member.mitglnr };
+        return { mitgliedsnummer: member.mitgliedsnummer };
       });
 
       await invalidateMemberCaches();
@@ -1413,7 +1471,7 @@ export const membersRouter = {
   onboard: vorstandProc
     .input(
       v.object({
-        mitglnr: v.optional(v.nullable(v.string())),
+        mitgliedsnummer: v.optional(v.nullable(v.string())),
         patch: StammdatenInput,
         abteilungen: v.optional(v.array(OnboardAbteilung), []),
         contract: v.optional(v.nullable(OnboardContract), null),
@@ -1438,19 +1496,19 @@ export const membersRouter = {
           const [maxRow] = await tx
             .select({
               maxAdrNr: sql<number>`coalesce(max(${membersTable.adrNr}), 0)::int`,
-              maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitglnr}, '\\D', '', 'g'), '')::int), 0)::int`,
+              maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitgliedsnummer}, '\\D', '', 'g'), '')::int), 0)::int`,
             })
             .from(membersTable);
           const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
           const nextMitglnr =
-            input.mitglnr && input.mitglnr.trim().length > 0
-              ? input.mitglnr.trim()
+            input.mitgliedsnummer && input.mitgliedsnummer.trim().length > 0
+              ? input.mitgliedsnummer.trim()
               : String((maxRow?.maxMitglnrInt ?? 0) + 1);
 
           const [dupe] = await tx
             .select({ id: membersTable.id })
             .from(membersTable)
-            .where(eq(membersTable.mitglnr, nextMitglnr))
+            .where(eq(membersTable.mitgliedsnummer, nextMitglnr))
             .limit(1);
           if (dupe) {
             throw new ORPCError("CONFLICT", {
@@ -1459,16 +1517,25 @@ export const membersRouter = {
           }
 
           const now = new Date();
+          const cleanCols = {
+            mitgliedsnummer: nextMitglnr,
+            status: memberStatusFromForm(
+              input.patch.aktivPasiv,
+              (patch.austritt as Date | null) ?? null,
+              (patch.verstorbenAm as Date | null) ?? null,
+            ),
+            dunningBlocked: false,
+          };
           const [inserted] = await tx
             .insert(membersTable)
             .values({
               ...(patch as Record<string, unknown>),
               adrNr: nextAdrNr,
-              mitglnr: nextMitglnr,
+              ...cleanCols,
               createdAt: now,
               updatedAt: now,
             } as never)
-            .returning({ id: membersTable.id, mitglnr: membersTable.mitglnr });
+            .returning({ id: membersTable.id, mitgliedsnummer: membersTable.mitgliedsnummer });
           if (!inserted) {
             throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
           }
@@ -1501,7 +1568,7 @@ export const membersRouter = {
             await tx.insert(contractsTable).values({
               memberId: inserted.id,
               adrNr: nextAdrNr,
-              mitglNr: inserted.mitglnr ?? nextMitglnr,
+              mitglNr: inserted.mitgliedsnummer ?? nextMitglnr,
               vertragNr:
                 input.contract.vertragNr && input.contract.vertragNr.trim().length > 0
                   ? input.contract.vertragNr.trim()
@@ -1542,7 +1609,7 @@ export const membersRouter = {
             changes: diff(null, {
               ...patch,
               adrNr: nextAdrNr,
-              mitglnr: nextMitglnr,
+              ...cleanCols,
               abteilungen: input.abteilungen.length,
               vertrag: input.contract ? 1 : 0,
               sepaMandat: input.sepa ? 1 : 0,
@@ -1558,7 +1625,7 @@ export const membersRouter = {
 
           return {
             id: inserted.id,
-            mitglnr: inserted.mitglnr ?? nextMitglnr,
+            mitgliedsnummer: inserted.mitgliedsnummer ?? nextMitglnr,
             adrNr: nextAdrNr,
           };
         }),

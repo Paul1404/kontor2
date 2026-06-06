@@ -1,5 +1,6 @@
 import { and, asc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
@@ -74,22 +75,18 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
     conditions.push(isNull(membersTable.verstorbenAm) as never);
   }
   if (input.status === "passiv") {
-    conditions.push(
-      eq(membersTable.aktivPasiv, "P") as never,
-      isNull(membersTable.austritt) as never,
-      isNull(membersTable.verstorbenAm) as never,
-    );
+    // The normalized status already implies neither exited nor deceased.
+    conditions.push(eq(membersTable.status, "passiv") as never);
   }
-  conditions.push(isNull(membersTable.deletedAt) as never);
-  conditions.push(sql`coalesce(${membersTable.geloscht}, false) = false` as never);
+  conditions.push(memberNotDeleted() as never);
   if (input.q.trim()) {
     const like = `%${input.q.trim()}%`;
     conditions.push(
       or(
         ilike(membersTable.nachname, like),
         ilike(membersTable.vorname, like),
-        ilike(membersTable.mitglnr, like),
-        ilike(membersTable.eMailName, like),
+        ilike(membersTable.mitgliedsnummer, like),
+        ilike(membersTable.email, like),
         ilike(membersTable.ort, like),
       ) as never,
     );
@@ -99,7 +96,7 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
 
 type BirthdayRow = {
   id: string;
-  mitglnr: string | null;
+  mitgliedsnummer: string | null;
   vorname: string | null;
   nachname: string | null;
   geburtsdatum: Date | null;
@@ -122,8 +119,7 @@ async function loadGeburtstage(
     isNotNull(membersTable.geburtsdatum) as never,
     isNull(membersTable.austritt) as never,
     isNull(membersTable.verstorbenAm) as never,
-    isNull(membersTable.deletedAt) as never,
-    sql`coalesce(${membersTable.geloscht}, false) = false` as never,
+    memberNotDeleted() as never,
     sql`${monthExpr} = ${input.month}` as never,
   ];
 
@@ -145,7 +141,7 @@ async function loadGeburtstage(
   const rows = await db
     .select({
       id: membersTable.id,
-      mitglnr: membersTable.mitglnr,
+      mitgliedsnummer: membersTable.mitgliedsnummer,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
       geburtsdatum: membersTable.geburtsdatum,
@@ -166,7 +162,7 @@ async function loadGeburtstage(
 
 type JubileeMemberRow = {
   id: string;
-  mitglnr: string | null;
+  mitgliedsnummer: string | null;
   vorname: string | null;
   nachname: string | null;
   ort: string | null;
@@ -184,8 +180,7 @@ async function loadEhrungen(
 
   const conditions = [
     isNotNull(membersTable.eintritt) as never,
-    isNull(membersTable.deletedAt) as never,
-    sql`coalesce(${membersTable.geloscht}, false) = false` as never,
+    memberNotDeleted() as never,
     inArray(
       sql<number>`extract(year from ${membersTable.eintritt})::int`,
       jubilaeen.map((j) => input.year - j),
@@ -195,7 +190,7 @@ async function loadEhrungen(
   const rows = await db
     .select({
       id: membersTable.id,
-      mitglnr: membersTable.mitglnr,
+      mitgliedsnummer: membersTable.mitgliedsnummer,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
       eintritt: membersTable.eintritt,
@@ -219,7 +214,7 @@ async function loadEhrungen(
       )
       .map((r) => ({
         id: r.id,
-        mitglnr: r.mitglnr,
+        mitgliedsnummer: r.mitgliedsnummer,
         vorname: r.vorname,
         nachname: r.nachname,
         ort: r.ort,
@@ -286,12 +281,9 @@ async function loadFinanzbericht(
   db: AppContext["db"],
   input: v.InferOutput<typeof YearInput>,
 ): Promise<FinanzberichtData> {
-  // Exclude postings of soft-deleted members (both the app `deletedAt` and the
-  // legacy Linear `geloscht`), so the Finanzbericht matches every other report.
-  const notDeleted = and(
-    isNull(membersTable.deletedAt),
-    sql`coalesce(${membersTable.geloscht}, false) = false`,
-  );
+  // Exclude postings of soft-deleted members so the Finanzbericht matches every
+  // other report. The legacy `geloscht` flag is folded into `deletedAt`.
+  const notDeleted = memberNotDeleted();
 
   const totalsRows = await db
     .select({
@@ -344,7 +336,7 @@ async function loadFinanzbericht(
 }
 
 type MemberExportRow = {
-  mitglnr: string | null;
+  mitgliedsnummer: string | null;
   anrede: string | null;
   titel: string | null;
   vorname: string | null;
@@ -363,7 +355,7 @@ type MemberExportRow = {
 };
 
 const MEMBER_EXPORT_COLUMNS: readonly CsvColumn<MemberExportRow>[] = [
-  { key: "mitglnr", label: "Mitgl.-Nr." },
+  { key: "mitgliedsnummer", label: "Mitgl.-Nr." },
   { key: "anrede", label: "Anrede" },
   { key: "titel", label: "Titel" },
   { key: "vorname", label: "Vorname" },
@@ -407,7 +399,7 @@ export const reportsRouter = {
       const ids = [...new Set(input.ids)];
       const selected: MemberExportRow[] = await context.db
         .select({
-          mitglnr: membersTable.mitglnr,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
           anrede: membersTable.anrede,
           titel: membersTable.titel1,
           vorname: membersTable.vorname,
@@ -418,20 +410,14 @@ export const reportsRouter = {
           plz: membersTable.plz,
           ort: membersTable.ort,
           telefon: membersTable.telefon1,
-          email: membersTable.eMailName,
+          email: membersTable.email,
           eintritt: membersTable.eintritt,
           austritt: membersTable.austritt,
           verstorbenAm: membersTable.verstorbenAm,
-          aktivPasiv: membersTable.aktivPasiv,
+          aktivPasiv: membersTable.status,
         })
         .from(membersTable)
-        .where(
-          and(
-            inArray(membersTable.id, ids),
-            isNull(membersTable.deletedAt),
-            sql`coalesce(${membersTable.geloscht}, false) = false`,
-          ),
-        )
+        .where(and(inArray(membersTable.id, ids), memberNotDeleted()))
         .orderBy(asc(membersTable.nachname), asc(membersTable.vorname));
       const stamp = new Date().toISOString().slice(0, 10);
       return {
@@ -457,7 +443,7 @@ export const reportsRouter = {
     const where = conditions.length > 0 ? and(...conditions) : undefined;
     const rows: MemberExportRow[] = await context.db
       .select({
-        mitglnr: membersTable.mitglnr,
+        mitgliedsnummer: membersTable.mitgliedsnummer,
         anrede: membersTable.anrede,
         titel: membersTable.titel1,
         vorname: membersTable.vorname,
@@ -468,11 +454,11 @@ export const reportsRouter = {
         plz: membersTable.plz,
         ort: membersTable.ort,
         telefon: membersTable.telefon1,
-        email: membersTable.eMailName,
+        email: membersTable.email,
         eintritt: membersTable.eintritt,
         austritt: membersTable.austritt,
         verstorbenAm: membersTable.verstorbenAm,
-        aktivPasiv: membersTable.aktivPasiv,
+        aktivPasiv: membersTable.status,
       })
       .from(membersTable)
       .where(where)
@@ -492,7 +478,7 @@ export const reportsRouter = {
   geburtstageExport: authedProc.input(GeburtstageInput).handler(async ({ context, input }) => {
     const data = await loadGeburtstage(context.db, input);
     const content = toCsv(data.rows, [
-      { key: "mitglnr", label: "Mitgl.-Nr." },
+      { key: "mitgliedsnummer", label: "Mitgl.-Nr." },
       { key: "nachname", label: "Nachname" },
       { key: "vorname", label: "Vorname" },
       {
@@ -518,7 +504,7 @@ export const reportsRouter = {
     const data = await loadEhrungen(context.db, input);
     type FlatRow = {
       jubilaeum: number;
-      mitglnr: string | null;
+      mitgliedsnummer: string | null;
       nachname: string | null;
       vorname: string | null;
       ort: string | null;
@@ -528,7 +514,7 @@ export const reportsRouter = {
     const flat: FlatRow[] = data.groups.flatMap((g) =>
       g.members.map((m) => ({
         jubilaeum: g.jubilee,
-        mitglnr: m.mitglnr,
+        mitgliedsnummer: m.mitgliedsnummer,
         nachname: m.nachname,
         vorname: m.vorname,
         ort: m.ort,
@@ -538,7 +524,7 @@ export const reportsRouter = {
     );
     const content = toCsv(flat, [
       { key: "jubilaeum", label: "Jubiläum (Jahre)" },
-      { key: "mitglnr", label: "Mitgl.-Nr." },
+      { key: "mitgliedsnummer", label: "Mitgl.-Nr." },
       { key: "nachname", label: "Nachname" },
       { key: "vorname", label: "Vorname" },
       { key: "ort", label: "Ort" },

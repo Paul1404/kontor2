@@ -10,7 +10,7 @@
  */
 
 export type ViewStatus = "aktiv" | "passiv" | "ausgetreten" | "verstorben" | "alle";
-export type ViewSortBy = "nachname" | "mitglnr" | "ort" | "email" | "eintritt";
+export type ViewSortBy = "nachname" | "mitgliedsnummer" | "ort" | "email" | "eintritt";
 export type ViewSortDir = "asc" | "desc";
 
 /** The bookmarkable filter/sort state of the members list, minus the page. */
@@ -31,7 +31,7 @@ export type SavedView = {
 };
 
 const STATUS_VALUES: ViewStatus[] = ["aktiv", "passiv", "ausgetreten", "verstorben", "alle"];
-const SORT_VALUES: ViewSortBy[] = ["nachname", "mitglnr", "ort", "email", "eintritt"];
+const SORT_VALUES: ViewSortBy[] = ["nachname", "mitgliedsnummer", "ort", "email", "eintritt"];
 
 export const SAVED_VIEWS_KEY = "members.savedViews.v1";
 

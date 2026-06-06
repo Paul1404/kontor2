@@ -1,8 +1,9 @@
 import { ORPCError } from "@orpc/server";
-import { and, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import { db } from "~/server/db/client";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
 import { membersTable } from "~/server/db/schema/members";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
@@ -22,13 +23,7 @@ export async function loadDownloadableAttachment(
     .select({ s3Key: attachmentsTable.s3Key, filename: attachmentsTable.filename })
     .from(attachmentsTable)
     .innerJoin(membersTable, eq(membersTable.id, attachmentsTable.memberId))
-    .where(
-      and(
-        eq(attachmentsTable.id, id),
-        isNull(membersTable.deletedAt),
-        sql`coalesce(${membersTable.geloscht}, false) = false`,
-      ),
-    )
+    .where(and(eq(attachmentsTable.id, id), memberNotDeleted()))
     .limit(1);
   return row ?? null;
 }

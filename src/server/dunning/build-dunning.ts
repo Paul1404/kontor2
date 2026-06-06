@@ -1,9 +1,15 @@
-import { and, eq, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, lte, ne, or, sql } from "drizzle-orm";
 import type { DB } from "~/server/db/client";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { sepaReturnsTable } from "~/server/db/schema/dunning";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
+import { ageAt, isDunningBlocked, isMinorAt, memberDisplayName } from "~/server/domain/member";
+
+// Canonical homes are now in `~/server/domain/member`. Re-exported here so the
+// existing dunning/kulanz/procedure imports and tests keep working unchanged.
+export { ageAt, isDunningBlocked, isMinorAt, memberDisplayName };
 
 export type OpenPosting = {
   sollStellungId: string;
@@ -20,7 +26,7 @@ export type OpenPosting = {
 
 export type MemberWithDebt = {
   memberId: string;
-  mitglnr: string | null;
+  mitgliedsnummer: string | null;
   adrNr: number;
   vorname: string | null;
   nachname: string | null;
@@ -31,8 +37,8 @@ export type MemberWithDebt = {
   hausnummer: string | null;
   plz: string | null;
   ort: string | null;
-  eMailName: string | null;
-  mahnSperre: string | null;
+  email: string | null;
+  dunningBlocked: boolean;
   geburtsdatum: Date | string | null;
   vertreterAnrede: string | null;
   vertreterName: string | null;
@@ -107,18 +113,6 @@ export function mahngebuhrFor(
 }
 
 /**
- * Whether a member's `mahnSperre` (dunning block) flag suppresses dunning.
- * The legacy Linear column is free-form; we treat an empty/whitespace-only
- * value and the sentinel "0" as "not blocked" and anything else as blocked.
- * Trimming matters: a stray space must not silently block all dunning.
- */
-export function isDunningBlocked(mahnSperre: string | null | undefined): boolean {
-  if (!mahnSperre) return false;
-  const v = mahnSperre.trim();
-  return v !== "" && v !== "0";
-}
-
-/**
  * Decide how to reopen a Sollstellung that was booked as `eingezogen`
  * (SEPA presumed collected) but is being manually flagged as *not*
  * collected. Returns the update to apply, or `null` if the row is not
@@ -145,7 +139,7 @@ export type LoadOpenParams = {
 
 /**
  * Load all open Sollstellungen older than the cutoff, grouped per member.
- * `mahnSperre` members are returned too so the UI can flag them; commit
+ * Dunning-blocked members are returned too so the UI can flag them; commit
  * skips them.
  */
 export async function loadOpenPostings(
@@ -178,7 +172,7 @@ export async function loadOpenPostings(
       openAmount: sollStellungenTable.openAmount,
       status: sollStellungenTable.status,
       mahnstufe: sollStellungenTable.mahnstufe,
-      mitglnr: membersTable.mitglnr,
+      mitgliedsnummer: membersTable.mitgliedsnummer,
       adrNr: membersTable.adrNr,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
@@ -189,8 +183,8 @@ export async function loadOpenPostings(
       hausnummer: membersTable.hausnummer,
       plz: membersTable.plz,
       ort: membersTable.ort,
-      eMailName: membersTable.eMailName,
-      mahnSperre: membersTable.mahnSperre,
+      email: membersTable.email,
+      dunningBlocked: membersTable.dunningBlocked,
       geburtsdatum: membersTable.geburtsdatum,
       vertreterAnrede: membersTable.vertreterAnrede,
       vertreterName: membersTable.vertreterName,
@@ -204,11 +198,9 @@ export async function loadOpenPostings(
     .where(
       and(
         ...conditions,
-        // Skip both soft-delete flags: legacy `geloscht` and the app's
-        // `deletedAt` (set by members.softDelete). A UI-deleted member must
-        // never receive a Mahnung.
-        sql`coalesce(${membersTable.geloscht}, false) = false`,
-        isNull(membersTable.deletedAt),
+        // Skip soft-deleted members; a deleted member must never receive a
+        // Mahnung. The legacy `geloscht` flag is folded into `deletedAt`.
+        memberNotDeleted(),
       ),
     )
     .orderBy(membersTable.nachname, membersTable.vorname, sollStellungenTable.billingYear);
@@ -254,7 +246,7 @@ export async function loadOpenPostings(
     if (!entry) {
       entry = {
         memberId: row.memberId,
-        mitglnr: row.mitglnr,
+        mitgliedsnummer: row.mitgliedsnummer,
         adrNr: row.adrNr,
         vorname: row.vorname,
         nachname: row.nachname,
@@ -265,8 +257,8 @@ export async function loadOpenPostings(
         hausnummer: row.hausnummer,
         plz: row.plz,
         ort: row.ort,
-        eMailName: row.eMailName,
-        mahnSperre: row.mahnSperre,
+        email: row.email,
+        dunningBlocked: row.dunningBlocked,
         geburtsdatum: row.geburtsdatum,
         vertreterAnrede: row.vertreterAnrede,
         vertreterName: row.vertreterName,
@@ -298,40 +290,6 @@ export async function loadOpenPostings(
     if (ln !== 0) return ln;
     return (a.vorname ?? "").localeCompare(b.vorname ?? "", "de");
   });
-}
-
-/** Age in whole years at `asOf`, or null when the birthdate is missing/invalid. */
-export function ageAt(birth: Date | string | null | undefined, asOf: Date): number | null {
-  if (!birth) return null;
-  const b = birth instanceof Date ? birth : new Date(birth);
-  if (!Number.isFinite(b.getTime())) return null;
-  let age = asOf.getUTCFullYear() - b.getUTCFullYear();
-  const monthDelta = asOf.getUTCMonth() - b.getUTCMonth();
-  if (monthDelta < 0 || (monthDelta === 0 && asOf.getUTCDate() < b.getUTCDate())) {
-    age -= 1;
-  }
-  return age;
-}
-
-/** True when the member is under 18 at `asOf` (false if birthdate unknown). */
-export function isMinorAt(birth: Date | string | null | undefined, asOf: Date): boolean {
-  const age = ageAt(birth, asOf);
-  return age !== null && age < 18;
-}
-
-type MemberLike = {
-  vorname: string | null;
-  nachname: string | null;
-  kurzname: string | null;
-  firma1: string | null;
-  mitglnr?: string | null;
-  adrNr?: number;
-};
-
-export function memberDisplayName(m: MemberLike): string {
-  const full = [m.vorname, m.nachname].filter(Boolean).join(" ").trim();
-  if (full) return full;
-  return m.kurzname ?? m.firma1 ?? `Mitglied ${m.mitglnr ?? m.adrNr ?? ""}`.trim();
 }
 
 /**
@@ -367,7 +325,7 @@ export function resolveRecipient(
   asOf: Date,
 ): ResolvedRecipient {
   const memberName = memberDisplayName(member);
-  const memberEmail = cleanEmail(member.eMailName);
+  const memberEmail = cleanEmail(member.email);
   const memberAddress: AddressBlock = {
     anrede: member.anrede,
     name: memberName,
@@ -463,7 +421,7 @@ export async function loadGuardianConnections(
       tHausnummer: membersTable.hausnummer,
       tPlz: membersTable.plz,
       tOrt: membersTable.ort,
-      tEmail: membersTable.eMailName,
+      tEmail: membersTable.email,
     })
     .from(relationshipsTable)
     .leftJoin(membersTable, eq(membersTable.id, relationshipsTable.toMemberId))

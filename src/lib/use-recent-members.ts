@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 export type RecentMember = {
-  mitglnr: string;
+  mitgliedsnummer: string;
   name: string;
   visitedAt: number;
 };
@@ -18,7 +18,7 @@ function readFromStorage(): RecentMember[] {
     const parsed = JSON.parse(raw) as RecentMember[];
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .filter((r) => r && typeof r.mitglnr === "string" && typeof r.name === "string")
+      .filter((r) => r && typeof r.mitgliedsnummer === "string" && typeof r.name === "string")
       .slice(0, MAX_RECENT);
   } catch {
     return [];
@@ -43,7 +43,7 @@ function writeToStorage(items: RecentMember[]) {
  */
 export function useRecentMembers(): {
   recent: RecentMember[];
-  push: (item: { mitglnr: string; name: string }) => void;
+  push: (item: { mitgliedsnummer: string; name: string }) => void;
   clear: () => void;
 } {
   const [recent, setRecent] = useState<RecentMember[]>([]);
@@ -61,12 +61,12 @@ export function useRecentMembers(): {
     };
   }, []);
 
-  const push = useCallback((item: { mitglnr: string; name: string }) => {
-    if (!item.mitglnr) return;
+  const push = useCallback((item: { mitgliedsnummer: string; name: string }) => {
+    if (!item.mitgliedsnummer) return;
     const current = readFromStorage();
-    const filtered = current.filter((r) => r.mitglnr !== item.mitglnr);
+    const filtered = current.filter((r) => r.mitgliedsnummer !== item.mitgliedsnummer);
     const next: RecentMember[] = [
-      { mitglnr: item.mitglnr, name: item.name, visitedAt: Date.now() },
+      { mitgliedsnummer: item.mitgliedsnummer, name: item.name, visitedAt: Date.now() },
       ...filtered,
     ].slice(0, MAX_RECENT);
     writeToStorage(next);

@@ -70,7 +70,7 @@ export const sepaReturnsRouter = {
             sequenceType: feeRunItemsTable.sequenceType,
             billingYear: feeRunsTable.billingYear,
             memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
-            mitglnr: membersTable.mitglnr,
+            mitgliedsnummer: membersTable.mitgliedsnummer,
             adrNr: membersTable.adrNr,
           })
           .from(sepaReturnsTable)
@@ -107,7 +107,7 @@ export const sepaReturnsRouter = {
         sql`${feeRunItemsTable.returnedAt} is null`,
         q
           ? sql`(
-              ${membersTable.mitglnr} ilike ${`%${q}%`} or
+              ${membersTable.mitgliedsnummer} ilike ${`%${q}%`} or
               ${membersTable.nachname} ilike ${`%${q}%`} or
               ${membersTable.vorname} ilike ${`%${q}%`} or
               ${membersTable.firma1} ilike ${`%${q}%`} or
@@ -127,7 +127,7 @@ export const sepaReturnsRouter = {
           debtorIbanLast4: feeRunItemsTable.debtorIbanLast4,
           memberId: feeRunItemsTable.memberId,
           memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
-          mitglnr: membersTable.mitglnr,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
           adrNr: membersTable.adrNr,
         })
         .from(feeRunItemsTable)

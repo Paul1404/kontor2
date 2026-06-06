@@ -152,13 +152,13 @@ function MahnungDetailPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         to="/app/mitglieder/$mitgliedsnummer"
-                        params={{ mitgliedsnummer: i.mitglnr ?? String(i.adrNr) }}
+                        params={{ mitgliedsnummer: i.mitgliedsnummer ?? String(i.adrNr) }}
                         className="font-medium hover:underline"
                       >
                         {i.memberName}
                       </Link>
                       <span className="text-xs text-muted-foreground tabular-nums">
-                        #{i.mitglnr ?? i.adrNr}
+                        #{i.mitgliedsnummer ?? i.adrNr}
                       </span>
                       <SentBadge channel={i.sentChannel} sentAt={i.sentAt} />
                     </div>

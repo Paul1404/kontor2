@@ -81,7 +81,7 @@ export const cancellationsRouter = {
         plz: member.plz,
         ort: member.ort,
         geburtsdatum: member.geburtsdatum,
-        mitgliedsnummer: member.mitglnr,
+        mitgliedsnummer: member.mitgliedsnummer,
       },
       austrittDatum: input.austrittDatum,
       abteilung: input.abteilung,
@@ -110,7 +110,7 @@ export const cancellationsRouter = {
     const pdf = Buffer.from(base64, "base64");
 
     const id = randomUUID();
-    const idRef = member.mitglnr ?? String(member.adrNr);
+    const idRef = member.mitgliedsnummer ?? String(member.adrNr);
     const filename = `Austrittsbestaetigung-${docRef}-${safeFilenamePart(idRef)}.pdf`;
     const s3Key = `members/${member.id}/cancellations/${id}/${filename}`;
 

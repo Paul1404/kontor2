@@ -41,6 +41,60 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.16.4",
+    date: "2026-06-05",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Mitglieder, die in der Altsoftware gelöscht waren, werden jetzt überall einheitlich wie im Programm gelöschte Mitglieder behandelt und damit konsistent ausgeblendet (Listen, Berichte, Mahnwesen, Lastschrift, Snapshots).",
+      },
+      {
+        category: "internal",
+        description:
+          "DSGVO-Löschung entfernt jetzt auch die unveränderten Originaldaten aus dem Import-Beleg, damit bei einer Anonymisierung keine Kopie der personenbezogenen Daten zurückbleibt.",
+      },
+      {
+        category: "internal",
+        description:
+          "Datenmodell vollständig aufgeräumt: alle ungenutzten Linear-Altspalten aus der Mitgliedertabelle entfernt (von 265 auf 46 klar benannte Felder). Bearbeitungsmaske, Portal und Anzeige nutzen durchgehend die aufgeräumten Felder. Keine sichtbare Änderung.",
+      },
+    ],
+  },
+  {
+    version: "0.16.3",
+    date: "2026-06-05",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Der Import befüllt die aufgeräumten Mitgliederfelder jetzt automatisch mit und legt zu jedem Mitglied die unveränderten Originaldaten aus der Altsoftware als Beleg ab. Die bisherigen Felder bleiben unverändert, es ändert sich nichts an der Anzeige.",
+      },
+    ],
+  },
+  {
+    version: "0.16.2",
+    date: "2026-06-05",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Aufgeräumte Mitgliederfelder vorbereitet: Mitgliedsnummer, E-Mail, Status (aktiv, passiv, ausgetreten, verstorben) und Mahnsperre stehen jetzt zusätzlich in klar benannten Feldern, automatisch aus den Altdaten befüllt. Noch keine sichtbare Änderung, die alten Felder bleiben unverändert erhalten.",
+      },
+    ],
+  },
+  {
+    version: "0.16.1",
+    date: "2026-06-05",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Grundlage für eine aufgeräumte Mitglieder-Datenbasis: Der Import behält ab sofort die Original-Daten aus der Altsoftware unverändert als Beleg, damit künftig nur noch die tatsächlich genutzten Felder im Hauptdatensatz stehen. Keine sichtbare Änderung, die Daten bleiben vollständig erhalten.",
+      },
+    ],
+  },
+  {
     version: "0.16.0",
     date: "2026-06-04",
     title: "Mitglied austreten und Eintritt mit Assistent",

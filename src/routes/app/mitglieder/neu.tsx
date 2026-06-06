@@ -26,7 +26,7 @@ function NewMemberPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [step, setStep] = useState<Step>("stamm");
-  const [mitglnr, setMitglnr] = useState("");
+  const [mitgliedsnummer, setMitglnr] = useState("");
   const [stamm, setStamm] = useState<StammdatenValues>(EMPTY_STAMM);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -55,7 +55,7 @@ function NewMemberPage() {
           ? (feeTypes.data?.find((f) => f.art === beitragArt)?.bezeichnung ?? null)
           : null;
       return orpc.members.onboard({
-        mitglnr: mitglnr.trim().length > 0 ? mitglnr.trim() : null,
+        mitgliedsnummer: mitgliedsnummer.trim().length > 0 ? mitgliedsnummer.trim() : null,
         patch: buildPatch(stamm, "") as never,
         abteilungen: selectedAbt.map((id) => ({ abteilungId: id, eintrittsdatum: eintritt })),
         contract:
@@ -74,7 +74,7 @@ function NewMemberPage() {
       await qc.invalidateQueries({ queryKey: ["members.list"] });
       navigate({
         to: "/app/mitglieder/$mitgliedsnummer",
-        params: { mitgliedsnummer: result.mitglnr ?? String(result.adrNr) },
+        params: { mitgliedsnummer: result.mitgliedsnummer ?? String(result.adrNr) },
       });
     },
     onError: (e: unknown) => {
@@ -109,7 +109,7 @@ function NewMemberPage() {
           initial={stamm}
           submitting={false}
           submitLabel="Weiter"
-          mitglnrInput={{ value: mitglnr, onChange: setMitglnr }}
+          mitglnrInput={{ value: mitgliedsnummer, onChange: setMitglnr }}
           onCancel={() => navigate({ to: "/app/mitglieder", search: () => ({}) as never })}
           onSubmit={(values) => {
             setStamm(values);

@@ -170,7 +170,7 @@ export async function loadPortalMember(db: DB, memberId: string) {
   const [m] = await db
     .select({
       id: membersTable.id,
-      mitglnr: membersTable.mitglnr,
+      mitgliedsnummer: membersTable.mitgliedsnummer,
       adrNr: membersTable.adrNr,
       anrede: membersTable.anrede,
       vorname: membersTable.vorname,
@@ -180,13 +180,12 @@ export async function loadPortalMember(db: DB, memberId: string) {
       hausnummer: membersTable.hausnummer,
       plz: membersTable.plz,
       ort: membersTable.ort,
-      landname: membersTable.landname,
+      land: membersTable.land,
       telefon1: membersTable.telefon1,
       telefon2: membersTable.telefon2,
-      eMailName: membersTable.eMailName,
+      email: membersTable.email,
       eintritt: membersTable.eintritt,
       austritt: membersTable.austritt,
-      geloscht: membersTable.geloscht,
     })
     .from(membersTable)
     .where(eq(membersTable.id, memberId))

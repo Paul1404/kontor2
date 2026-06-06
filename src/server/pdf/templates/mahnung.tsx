@@ -79,7 +79,7 @@ export type MahnungInput = {
   };
   /** The member the dues belong to (drives Mitgliedsnummer + Verwendungszweck). */
   member: {
-    mitglnr: string | null;
+    mitgliedsnummer: string | null;
     adrNr: number;
     vorname: string | null;
     nachname: string | null;
@@ -141,7 +141,7 @@ function fmtIban(s: string): string {
 
 function subjectName(m: MahnungInput["member"]): string {
   const full = [m.vorname, m.nachname].filter(Boolean).join(" ").trim();
-  return full || m.kurzname || m.firma1 || `Mitglied ${m.mitglnr ?? m.adrNr}`;
+  return full || m.kurzname || m.firma1 || `Mitglied ${m.mitgliedsnummer ?? m.adrNr}`;
 }
 
 function salutation(r: MahnungInput["recipient"]): string {
@@ -183,7 +183,10 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
         recipientLines={recipientLines}
         recipientNote={r.vertretungFor ? `gesetzliche Vertretung von ${r.vertretungFor}` : null}
         infoRows={[
-          { label: "Mitgliedsnummer", value: pkg.member.mitglnr ?? `AdrNr ${pkg.member.adrNr}` },
+          {
+            label: "Mitgliedsnummer",
+            value: pkg.member.mitgliedsnummer ?? `AdrNr ${pkg.member.adrNr}`,
+          },
           { label: "Dokument", value: docRef },
           { label: "Datum", value: fmtDate(pkg.runDate) },
         ]}
@@ -262,7 +265,7 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
           <View style={styles.paymentRow}>
             <Text style={styles.paymentKey}>Verwendung</Text>
             <Text style={styles.paymentValue}>
-              {title} · {subject} · Mitgliedsnr {pkg.member.mitglnr ?? pkg.member.adrNr}
+              {title} · {subject} · Mitgliedsnr {pkg.member.mitgliedsnummer ?? pkg.member.adrNr}
             </Text>
           </View>
         </View>

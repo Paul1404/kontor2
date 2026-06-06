@@ -3,67 +3,12 @@ import {
   mapContractRow,
   mapInteresRow,
   mapInterRow,
-  mapMemberRow,
   mapSepaRow,
   mapVerknRow,
 } from "~/server/importer/linear-mapper";
 
-describe("mapMemberRow", () => {
-  it("returns null when AdrNr is missing", () => {
-    expect(mapMemberRow({})).toBeNull();
-  });
-
-  it("maps the SVUMS subset correctly", () => {
-    const row = mapMemberRow({
-      AdrNr: 42,
-      MITGLNR: "M-0042",
-      Vorname: "Anna",
-      Nachname: "Beispiel",
-      Strasse: "Hauptstr.",
-      Hausnummer: "12a",
-      PLZ: "97520",
-      Ort: "Untereuerheim",
-      Land: "DE",
-      EMailName: "anna@example.com",
-      Telefon1: "09382-12345",
-      Telefon2: "+49 170 0000000",
-      Geburtsdatum: "1990-05-12 00:00:00.000000",
-      Eintritt: "2010-01-01 00:00:00",
-      Geloscht: false,
-      Aktiv: "Y",
-      AktivPasiv: "A",
-      Abteilung: "Fußball, Tennis",
-      IBAN1: "DE89370400440532013000",
-      BIC1: "COBADEFFXXX",
-      mandatsrefenz: "MAN-001",
-    });
-    expect(row).toBeTruthy();
-    if (!row) return;
-    expect(row.adrNr).toBe(42);
-    expect(row.mitglnr).toBe("M-0042");
-    expect(row.eMailName).toBe("anna@example.com");
-    expect(row.eintritt).toBeInstanceOf(Date);
-    expect(row.geloscht).toBe(false);
-    expect(row.aktivPasiv).toBe("A");
-    expect(row.abteilung).toBe("Fußball, Tennis");
-    expect(row.iban1).toBe("DE89370400440532013000");
-    expect(row.iban1Last4).toBe("3000");
-    expect(row.mandatsrefenz).toBe("MAN-001");
-  });
-
-  it("falls back to Telefon3 for email when EMailName missing", () => {
-    const row = mapMemberRow({
-      AdrNr: 1,
-      Telefon3: "old@example.com",
-    });
-    expect(row?.eMailName).toBe("old@example.com");
-  });
-
-  it("zero-dates become null", () => {
-    const row = mapMemberRow({ AdrNr: 1, Eintritt: "0000-00-00 00:00:00" });
-    expect(row?.eintritt).toBeNull();
-  });
-});
+// Member rows are translated by translateLinearMember -- see
+// tests/importer/translate-member.test.ts.
 
 describe("mapContractRow / mapSepaRow", () => {
   it("contracts require AdrNr, VertragNr, Art", () => {

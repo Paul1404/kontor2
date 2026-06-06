@@ -237,7 +237,7 @@ export const relationshipsRouter = {
     }),
 
   /**
-   * Search for a member to link to. Returns id, mitglnr, name; used by the
+   * Search for a member to link to. Returns id, mitgliedsnummer, name; used by the
    * "Beziehung hinzufügen" combobox so vorstand users can find the target
    * without leaving the member detail page.
    */
@@ -250,7 +250,7 @@ export const relationshipsRouter = {
       const rows = await context.db
         .select({
           id: membersTable.id,
-          mitglnr: membersTable.mitglnr,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,
           plz: membersTable.plz,
@@ -258,7 +258,7 @@ export const relationshipsRouter = {
         })
         .from(membersTable)
         .where(
-          sql`(${membersTable.nachname} ilike ${like} or ${membersTable.vorname} ilike ${like} or ${membersTable.mitglnr} ilike ${like}) and ${membersTable.deletedAt} is null`,
+          sql`(${membersTable.nachname} ilike ${like} or ${membersTable.vorname} ilike ${like} or ${membersTable.mitgliedsnummer} ilike ${like}) and ${membersTable.deletedAt} is null`,
         )
         .limit(20);
       return input.excludeMemberId ? rows.filter((r) => r.id !== input.excludeMemberId) : rows;

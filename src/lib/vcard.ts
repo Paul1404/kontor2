@@ -24,7 +24,7 @@ export type VCardInput = {
   land?: string | null;
   geburtsdatum?: string | Date | null;
   website?: string | null;
-  mitglnr?: string | null;
+  mitgliedsnummer?: string | null;
 };
 
 function escapeVcard(value: string): string {
@@ -69,7 +69,7 @@ export function buildVCard(m: VCardInput): string {
     : null;
 
   const bday = isoDateOnly(m.geburtsdatum ?? null);
-  const note = m.mitglnr ? `Mitgliedsnummer: ${m.mitglnr}` : null;
+  const note = m.mitgliedsnummer ? `Mitgliedsnummer: ${m.mitgliedsnummer}` : null;
 
   const lines = [
     "BEGIN:VCARD",
@@ -97,6 +97,6 @@ export function vcardFilename(m: VCardInput): string {
     [m.vorname, m.nachname]
       .filter(Boolean)
       .join("-")
-      .replace(/[^a-zA-Z0-9_-]+/g, "_") || `mitglied-${m.mitglnr ?? "unbekannt"}`;
+      .replace(/[^a-zA-Z0-9_-]+/g, "_") || `mitglied-${m.mitgliedsnummer ?? "unbekannt"}`;
   return `${safe}.vcf`;
 }

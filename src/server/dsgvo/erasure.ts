@@ -5,6 +5,7 @@ import type { DBOrTx } from "~/server/db/client";
 import { auditLogTable } from "~/server/db/schema/audit";
 import { dsgvoRequestsTable } from "~/server/db/schema/dsgvo";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
+import { memberSourceRecordsTable } from "~/server/db/schema/member-source-records";
 import { membersTable } from "~/server/db/schema/members";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { buildScrubRules, earliestErasureDate } from "~/server/dsgvo/policy";
@@ -132,12 +133,27 @@ export async function executeErasure(
 
   await db.update(membersTable).set(updates).where(eq(membersTable.id, memberId));
 
+  // Erase the verbatim Linear provenance too. `member_source_records.raw` holds
+  // the original dump row in plaintext (names, address, possibly IBAN), so it
+  // must be cleared on erasure -- pseudonymizing the members row alone would
+  // leave a full copy of the personal data behind.
+  const deletedSource = await db
+    .delete(memberSourceRecordsTable)
+    .where(eq(memberSourceRecordsTable.memberId, memberId))
+    .returning({ id: memberSourceRecordsTable.id });
+
   const changes = Object.fromEntries(
     Object.keys({ ...before, ...after }).map((k) => [
       k,
       { before: before[k] ?? null, after: after[k] ?? null },
     ]),
   );
+  if (deletedSource.length > 0) {
+    changes.__sourceRecords = {
+      before: `${deletedSource.length} Datensatz/Datensätze`,
+      after: null,
+    };
+  }
   if (opts.forceOverride && opts.overrideReason) {
     changes.__override = { before: null, after: opts.overrideReason };
   }

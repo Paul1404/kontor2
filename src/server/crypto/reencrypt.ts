@@ -22,8 +22,6 @@ export type EncryptedTarget = {
 /** Every column persisted via the `encryptedText` Drizzle custom type. */
 export const ENCRYPTED_TARGETS: EncryptedTarget[] = [
   { table: "members", column: "iban1", idColumn: "id" },
-  { table: "members", column: "iban2", idColumn: "id" },
-  { table: "members", column: "iban3", idColumn: "id" },
   { table: "organization_settings", column: "vereins_iban", idColumn: "id" },
   { table: "smtp_config", column: "password_encrypted", idColumn: "id" },
 ];

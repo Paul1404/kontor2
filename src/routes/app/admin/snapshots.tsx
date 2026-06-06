@@ -157,7 +157,7 @@ type RunSnapshot = {
   createdAt: string | Date;
   byteSize: number;
   contentHash: string;
-  mitglnr: string | null;
+  mitgliedsnummer: string | null;
   adrNr: number;
   vorname: string | null;
   nachname: string | null;
@@ -319,7 +319,7 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
                       />
                     </td>
                     <td className="px-4 py-2 tabular-nums text-muted-foreground">
-                      {s.mitglnr ?? <span className="text-muted-foreground/60">—</span>}
+                      {s.mitgliedsnummer ?? <span className="text-muted-foreground/60">—</span>}
                     </td>
                     <td className="px-4 py-2">
                       {[s.vorname, s.nachname].filter(Boolean).join(" ") || "—"}
@@ -333,7 +333,7 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
                     <td className="px-4 py-2 text-right">
                       <Link
                         to="/app/mitglieder/$mitgliedsnummer"
-                        params={{ mitgliedsnummer: s.mitglnr ?? String(s.adrNr) }}
+                        params={{ mitgliedsnummer: s.mitgliedsnummer ?? String(s.adrNr) }}
                         className="text-xs text-primary hover:underline"
                       >
                         Mitglied →
