@@ -41,6 +41,22 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.17.0",
+    date: "2026-06-07",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Kulanzbrief: Die SEPA-Rücklastgebühr kann pro Lauf aus Kulanz erlassen werden. Dann fordert das Schreiben nur den offenen Beitrag und weist die erlassene Gebühr aus.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Kulanzbrief: Kontakte ohne Mitgliedsnummer bekommen statt einer erfundenen Nummer eine klare Referenz (z. B. A123), die im Schreiben, im Verwendungszweck und auf der Kündigungsbestätigung als Referenz statt als Mitgliedsnummer steht.",
+      },
+    ],
+  },
+  {
     version: "0.16.4",
     date: "2026-06-05",
     changes: [
