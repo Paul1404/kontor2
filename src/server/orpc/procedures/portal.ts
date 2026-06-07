@@ -49,18 +49,21 @@ const portalProc = base.use(observability).use(
   }),
 );
 
+// Cap each field so a member can't submit a megabyte of text for the Vorstand
+// to review (and store). 200 chars is well above any real name/address line.
+const shortText = v.optional(v.nullable(v.pipe(v.string(), v.maxLength(200))));
 const ChangeRequestSchema = v.object({
-  anrede: v.optional(v.nullable(v.string())),
-  vorname: v.optional(v.nullable(v.string())),
-  nachname: v.optional(v.nullable(v.string())),
-  strasse: v.optional(v.nullable(v.string())),
-  hausnummer: v.optional(v.nullable(v.string())),
-  plz: v.optional(v.nullable(v.string())),
-  ort: v.optional(v.nullable(v.string())),
-  land: v.optional(v.nullable(v.string())),
-  telefon1: v.optional(v.nullable(v.string())),
-  telefon2: v.optional(v.nullable(v.string())),
-  email: v.optional(v.nullable(v.string())),
+  anrede: shortText,
+  vorname: shortText,
+  nachname: shortText,
+  strasse: shortText,
+  hausnummer: shortText,
+  plz: shortText,
+  ort: shortText,
+  land: shortText,
+  telefon1: shortText,
+  telefon2: shortText,
+  email: shortText,
 });
 
 function normalize(value: unknown): string | null {

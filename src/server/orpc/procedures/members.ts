@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql }
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
+import { escapeLike } from "~/server/db/like";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { withUniqueRetry } from "~/server/db/retry";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
@@ -46,6 +47,7 @@ const ListInput = v.object({
   abteilungId: v.optional(v.nullable(v.string()), null),
   includeAusgetretene: v.optional(v.boolean(), false),
   orphanOnly: v.optional(v.boolean(), false),
+  deletedOnly: v.optional(v.boolean(), false),
   page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
   pageSize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
   sortBy: v.optional(SortBySchema, "nachname"),
@@ -73,7 +75,7 @@ const StammdatenInput = v.object({
   land: v.optional(v.nullable(v.string())),
   telefon1: v.optional(v.nullable(v.string())),
   telefon2: v.optional(v.nullable(v.string())),
-  email: v.optional(v.nullable(v.pipe(v.string(), v.email()))),
+  email: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.email()))),
   www: v.optional(v.nullable(v.string())),
   firma1: v.optional(v.nullable(v.string())),
   funktion: v.optional(v.nullable(v.string())),
@@ -107,6 +109,21 @@ function toDateOrNull(value: string | null | undefined, field: string): Date | n
   if (!value) return null;
   const d = new Date(value);
   if (!Number.isFinite(d.getTime())) {
+    throw new ORPCError("VALIDATION_FAILED", {
+      message: `Ungültiges Datum im Feld "${field}": ${value}`,
+    });
+  }
+  // `new Date` silently rolls day-overflow dates forward: "2025-02-30" becomes
+  // March 2, "2025-02-29" (non-leap) becomes March 1. That passes the finite
+  // check above but stores a different day than the user typed. For plain
+  // YYYY-MM-DD input, require the parsed UTC date to match the components.
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (
+    m &&
+    (d.getUTCFullYear() !== Number(m[1]) ||
+      d.getUTCMonth() + 1 !== Number(m[2]) ||
+      d.getUTCDate() !== Number(m[3]))
+  ) {
     throw new ORPCError("VALIDATION_FAILED", {
       message: `Ungültiges Datum im Feld "${field}": ${value}`,
     });
@@ -159,7 +176,13 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   const patch: Record<string, unknown> = {};
   const setIfPresent = <K extends keyof typeof input>(key: K, mapped?: string) => {
     if (key in input) {
-      patch[mapped ?? (key as string)] = input[key] ?? null;
+      const raw = input[key];
+      // Trim text input and fold blank/whitespace-only values to null. Without
+      // this a name of "   " passes the "Vor- oder Nachname erforderlich" check
+      // (it is truthy) and an untrimmed "  Müller " never matches the ilike
+      // search or duplicate detection.
+      const value = typeof raw === "string" ? raw.trim() || null : (raw ?? null);
+      patch[mapped ?? (key as string)] = value;
     }
   };
   setIfPresent("anrede");
@@ -257,16 +280,27 @@ export const membersRouter = {
 
     const conditions = [] as ReturnType<typeof eq>[];
 
-    if (!input.includeAusgetretene && input.status !== "ausgetreten") {
+    // The "Papierkorb" view shows only soft-deleted rows and ignores the
+    // lifecycle status filters (a deleted member can be of any status). It is
+    // the in-app entry point for restoring an accidental deletion.
+    if (input.deletedOnly) {
+      conditions.push(isNotNull(membersTable.deletedAt) as never);
+    } else {
+      // Hide soft-deleted members from every normal view. The legacy Linear
+      // `geloscht` flag is folded into the app's single `deletedAt`.
+      conditions.push(memberNotDeleted() as never);
+    }
+
+    if (!input.deletedOnly && !input.includeAusgetretene && input.status !== "ausgetreten") {
       conditions.push(isNull(membersTable.austritt) as never);
     }
-    if (input.status === "ausgetreten") {
+    if (!input.deletedOnly && input.status === "ausgetreten") {
       conditions.push(isNotNull(membersTable.austritt) as never);
     }
-    if (input.status === "verstorben") {
+    if (!input.deletedOnly && input.status === "verstorben") {
       conditions.push(isNotNull(membersTable.verstorbenAm) as never);
     }
-    if (input.status === "aktiv") {
+    if (!input.deletedOnly && input.status === "aktiv") {
       // Match the dashboard's "Aktive Mitglieder" definition: not exited
       // and not deceased. Enforce `isNull(austritt)` here directly so the
       // result is correct even when `includeAusgetretene` is set (the
@@ -276,15 +310,11 @@ export const membersRouter = {
       conditions.push(isNull(membersTable.austritt) as never);
       conditions.push(isNull(membersTable.verstorbenAm) as never);
     }
-    if (input.status === "passiv") {
+    if (!input.deletedOnly && input.status === "passiv") {
       // The normalized status already means "passive and neither exited nor
       // deceased" (deriveStatus precedence), so one check is enough.
       conditions.push(eq(membersTable.status, "passiv") as never);
     }
-
-    // Hide soft-deleted members from the normal list view. The legacy Linear
-    // `geloscht` flag is folded into the app's single `deletedAt`.
-    conditions.push(memberNotDeleted() as never);
 
     // "Verwaiste Kontakte" filter: Kontakt (no mitgliedsnummer) AND no relationship
     // pointing to or from this row. Used by admins to find Linear-import
@@ -301,7 +331,7 @@ export const membersRouter = {
     }
 
     if (input.q.trim()) {
-      const like = `%${input.q.trim()}%`;
+      const like = `%${escapeLike(input.q.trim())}%`;
       conditions.push(
         or(
           ilike(membersTable.nachname, like),
@@ -364,6 +394,7 @@ export const membersRouter = {
           verstorbenAm: membersTable.verstorbenAm,
           status: membersTable.status,
           abteilung: membersTable.abteilung,
+          deletedAt: membersTable.deletedAt,
         })
         .from(membersTable)
         .where(where)
@@ -641,7 +672,16 @@ export const membersRouter = {
   ),
 
   update: vorstandProc
-    .input(v.object({ memberId: v.string(), patch: StammdatenInput }))
+    .input(
+      v.object({
+        memberId: v.string(),
+        patch: StammdatenInput,
+        // Optimistic-lock token: the `updatedAt` the editor loaded. When two
+        // people edit the same member, the second save is rejected instead of
+        // silently clobbering the first. Optional so other callers stay valid.
+        expectedUpdatedAt: v.optional(v.nullable(v.string()), null),
+      }),
+    )
     .handler(async ({ context, input }) => {
       const result = await context.db.transaction(async (tx) => {
         const [existing] = await tx
@@ -651,6 +691,20 @@ export const membersRouter = {
           .limit(1);
         if (!existing) {
           throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        }
+
+        // Conflict detection. Both the editor's token and `existing.updatedAt`
+        // come back through the same Drizzle timestamptz->Date read, so an
+        // unchanged row compares equal to the millisecond.
+        if (input.expectedUpdatedAt) {
+          const expectedMs = new Date(input.expectedUpdatedAt).getTime();
+          const currentMs = existing.updatedAt?.getTime() ?? null;
+          if (Number.isFinite(expectedMs) && currentMs !== null && currentMs !== expectedMs) {
+            throw new ORPCError("CONFLICT", {
+              message:
+                "Die Daten wurden zwischenzeitlich von jemand anderem geändert. Bitte Seite neu laden und erneut speichern.",
+            });
+          }
         }
 
         const patch = buildMemberPatch(input.patch);
@@ -757,10 +811,13 @@ export const membersRouter = {
                 : String((maxRow?.maxMitglnrInt ?? 0) + 1);
 
             if (nextMitglnr) {
+              // Only live members own a number. A soft-deleted row must not
+              // keep a Mitgliedsnummer reserved forever, otherwise the number
+              // is unusable until someone purges the (invisible) old row.
               const [dupe] = await tx
                 .select({ id: membersTable.id })
                 .from(membersTable)
-                .where(eq(membersTable.mitgliedsnummer, nextMitglnr))
+                .where(and(eq(membersTable.mitgliedsnummer, nextMitglnr), memberNotDeleted()))
                 .limit(1);
               if (dupe) {
                 throw new ORPCError("CONFLICT", {
@@ -1140,7 +1197,7 @@ export const membersRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      const like = `%${input.q.trim()}%`;
+      const like = `%${escapeLike(input.q.trim())}%`;
       const rows = await context.db
         .select({
           id: membersTable.id,
@@ -1505,10 +1562,11 @@ export const membersRouter = {
               ? input.mitgliedsnummer.trim()
               : String((maxRow?.maxMitglnrInt ?? 0) + 1);
 
+          // Soft-deleted rows don't reserve their number (see create above).
           const [dupe] = await tx
             .select({ id: membersTable.id })
             .from(membersTable)
-            .where(eq(membersTable.mitgliedsnummer, nextMitglnr))
+            .where(and(eq(membersTable.mitgliedsnummer, nextMitglnr), memberNotDeleted()))
             .limit(1);
           if (dupe) {
             throw new ORPCError("CONFLICT", {

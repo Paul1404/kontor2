@@ -14,6 +14,7 @@ import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { memberSnapshotsTable, snapshotRunsTable } from "~/server/db/schema/snapshots";
 import { adminProc } from "~/server/orpc/base";
+import { invalidateMemberCaches } from "~/server/search/cache";
 
 // Confirmation phrases are deliberately not localized: typing a fixed
 // German all-caps string forces the user to read the dialog rather than
@@ -117,6 +118,7 @@ export const dangerZoneRouter = {
         });
         return { deleted: targets.length };
       });
+      if (result.deleted > 0) await invalidateMemberCaches();
       return result;
     }),
 
@@ -183,6 +185,7 @@ export const dangerZoneRouter = {
         });
         return { purged: targets.length };
       });
+      if (result.purged > 0) await invalidateMemberCaches();
       return result;
     }),
 
@@ -313,6 +316,7 @@ export const dangerZoneRouter = {
           },
         });
       });
+      await invalidateMemberCaches();
       return { wiped: true, totalsBefore };
     }),
 };

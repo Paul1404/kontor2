@@ -40,7 +40,7 @@ describe("portal cookie helpers", () => {
   it("always sets HttpOnly and SameSite", () => {
     const c = buildPortalCookie("v", 60, true);
     expect(c).toContain("HttpOnly");
-    expect(c).toContain("SameSite=Lax");
+    expect(c).toContain("SameSite=Strict");
     expect(c).toContain("Max-Age=60");
     expect(c).toContain(`${portalCookieName()}=v`);
   });

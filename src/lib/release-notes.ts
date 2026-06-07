@@ -41,6 +41,121 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.18.4",
+    date: "2026-06-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "DSGVO-Löschung reicht jetzt vollständig durch: Neben dem Mitglied werden auch Snapshots, Mahnungen samt PDF und die personenbezogenen Felder in Beziehungen gelöscht bzw. bereinigt. Alte Personenwerte im Änderungsprotokoll werden entfernt, der Löschvorgang selbst bleibt nachvollziehbar protokolliert.",
+      },
+      {
+        category: "fix",
+        description:
+          "Beitragslauf überspringt Verträge mit negativem Betrag und weist sie in der Ausschlussliste aus, statt eine ungültige Lastschrift zu erzeugen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Sicherheit: Das Cookie der Mitgliederportal-Sitzung nutzt jetzt SameSite=Strict. Portal-Änderungswünsche sind pro Feld in der Länge begrenzt.",
+      },
+    ],
+  },
+  {
+    version: "0.18.3",
+    date: "2026-06-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "SEPA-Lastschriftdatei: Namen und Verwendungszwecke mit Umlauten oder ß (z. B. „Schäfer“, „München“, „Straße“) werden jetzt in den von Banken zugelassenen Zeichensatz umgesetzt (ae, oe, ue, ss). Vorher konnte ein einziger Umlaut dazu führen, dass die Bank die komplette Datei ablehnt.",
+      },
+      {
+        category: "fix",
+        description:
+          "Suche: Eingaben mit % oder _ werden jetzt wörtlich gesucht statt als Platzhalter. Eine Suche nach „50%“ liefert keine unerwarteten Treffer mehr.",
+      },
+      {
+        category: "fix",
+        description:
+          "DSGVO-Löschung entfernt jetzt auch die hinterlegte gesetzliche Vertretung (Name und Anschrift), den abweichenden Kontoinhaber sowie Firma und Funktion. Veraltete Regeln für längst entfernte Felder wurden bereinigt.",
+      },
+    ],
+  },
+  {
+    version: "0.18.2",
+    date: "2026-06-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Mahnlauf: Klicken zwei Personen gleichzeitig auf „Mahnlauf erstellen“, entstehen keine doppelten Mahnungen und keine doppelte Mahngebühr mehr. Der zweite Lauf erkennt die bereits gemahnten Posten und überspringt sie.",
+      },
+      {
+        category: "fix",
+        description:
+          "Bearbeiten zwei Personen dasselbe Mitglied gleichzeitig, wird die zweite Speicherung mit einem Hinweis abgelehnt, statt die erste Änderung unbemerkt zu überschreiben. Vor dem erneuten Speichern die Seite neu laden.",
+      },
+    ],
+  },
+  {
+    version: "0.18.1",
+    date: "2026-06-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Blättern in langen Listen: Die Schaltfläche „Weiter“ ist jetzt auf der letzten Seite korrekt deaktiviert. Vorher konnte man auf eine leere Seite klicken, wenn die Anzahl genau aufging.",
+      },
+      {
+        category: "fix",
+        description:
+          "Unmögliche Datumsangaben wie der 30.02. werden beim Speichern abgewiesen, statt still auf den 02.03. zu rutschen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Namen und andere Textfelder werden beim Speichern von führenden und folgenden Leerzeichen befreit. Ein Name aus reinen Leerzeichen wird nicht mehr akzeptiert, und die Suche findet betroffene Einträge wieder.",
+      },
+      {
+        category: "fix",
+        description:
+          "CSV-Export: Felder, die mit = + - oder @ beginnen, werden so geschrieben, dass Excel oder LibreOffice sie nicht als Formel ausführen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Nach dem endgültigen Löschen oder Aufräumen im Adminbereich werden Listen, Dashboard und Abteilungszahlen sofort aktualisiert, statt bis zu fünf Minuten veraltet zu bleiben.",
+      },
+    ],
+  },
+  {
+    version: "0.18.0",
+    date: "2026-06-07",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Papierkorb in der Mitgliederliste. Über den Filter „Papierkorb“ lassen sich gelöschte Mitglieder finden und mit „Wiederherstellen“ zurückholen. Auch auf der Profilseite eines gelöschten Mitglieds gibt es jetzt einen Hinweis und einen Wiederherstellen-Knopf. Bisher ließ sich eine versehentliche Löschung im Programm nicht rückgängig machen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Die Mitgliedsnummer eines gelöschten Mitglieds ist wieder frei und kann erneut vergeben werden. Vorher blieb sie dauerhaft belegt.",
+      },
+      {
+        category: "fix",
+        description:
+          "Ein gelöschtes Mitglied verliert sofort den Zugang zum Mitgliederportal, auch wenn die Anmeldung im Browser noch gespeichert war.",
+      },
+      {
+        category: "fix",
+        description:
+          "Lässt sich ein verschlüsseltes Feld (z. B. eine IBAN) nicht entschlüsseln, bleibt nur dieses Feld leer. Listen, Einstellungen und Berichte funktionieren weiter, statt komplett zu blockieren.",
+      },
+    ],
+  },
+  {
     version: "0.17.1",
     date: "2026-06-07",
     changes: [

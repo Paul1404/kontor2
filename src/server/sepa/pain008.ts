@@ -66,7 +66,7 @@ export function buildPain008(input: Pain008Input): string {
       <NbOfTxs>${totals.count}</NbOfTxs>
       <CtrlSum>${formatAmount(totals.sum)}</CtrlSum>
       <InitgPty>
-        <Nm>${esc(input.creditor.name)}</Nm>
+        <Nm>${esc(sepaText(input.creditor.name))}</Nm>
         <Id>
           <OrgId>
             <Othr>
@@ -103,7 +103,7 @@ function paymentInfoBlock(opts: {
         <SeqTp>${opts.sequenceType}</SeqTp>
       </PmtTpInf>
       <ReqdColltnDt>${esc(opts.falligkeitsdatum)}</ReqdColltnDt>
-      <Cdtr><Nm>${esc(opts.creditor.name)}</Nm></Cdtr>
+      <Cdtr><Nm>${esc(sepaText(opts.creditor.name))}</Nm></Cdtr>
       <CdtrAcct><Id><IBAN>${esc(normalizeIban(opts.creditor.iban))}</IBAN></Id></CdtrAcct>
       <CdtrAgt><FinInstnId><BIC>${esc(opts.creditor.bic)}</BIC></FinInstnId></CdtrAgt>
       <ChrgBr>SLEV</ChrgBr>
@@ -135,9 +135,9 @@ function txInfo(it: Pain008Item): string {
           </MndtRltdInf>
         </DrctDbtTx>
         ${dbtrAgt}
-        <Dbtr><Nm>${esc(truncate(it.debtorName, 70))}</Nm></Dbtr>
+        <Dbtr><Nm>${esc(truncate(sepaText(it.debtorName), 70))}</Nm></Dbtr>
         <DbtrAcct><Id><IBAN>${esc(normalizeIban(it.debtorIban))}</IBAN></Id></DbtrAcct>
-        <RmtInf><Ustrd>${esc(truncate(it.purpose, 140))}</Ustrd></RmtInf>
+        <RmtInf><Ustrd>${esc(truncate(sepaText(it.purpose), 140))}</Ustrd></RmtInf>
       </DrctDbtTxInf>`;
 }
 
@@ -198,4 +198,34 @@ function esc(s: string): string {
     .replace(/'/g, "&apos;");
 }
 
-export const __test = { amountToCents, centsToAmount, esc, truncate };
+const SEPA_UMLAUTS: Record<string, string> = {
+  ä: "ae",
+  ö: "oe",
+  ü: "ue",
+  Ä: "Ae",
+  Ö: "Oe",
+  Ü: "Ue",
+  ß: "ss",
+};
+
+/**
+ * Restrict free text to the SEPA (EPC) Latin character set
+ * `a-z A-Z 0-9 / - ? : ( ) . , ' + space`. Banks reject a pain.008 whose
+ * names or remittance info contain anything else, and for a German club that
+ * is virtually every batch ("Schäfer", "München", "Straße"). German umlauts
+ * and ß get the conventional transliteration (ä->ae, ß->ss); other accents are
+ * stripped to their base letter (é->e); anything still out of range becomes a
+ * space. Apply to debtor/creditor names and remittance info only -- not to the
+ * mandate reference or EndToEndId, which must match what the bank registered.
+ */
+export function sepaText(s: string): string {
+  return s
+    .replace(/[äöüÄÖÜß]/g, (c) => SEPA_UMLAUTS[c] ?? c)
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^A-Za-z0-9/\-?:().,'+ ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export const __test = { amountToCents, centsToAmount, esc, truncate, sepaText };

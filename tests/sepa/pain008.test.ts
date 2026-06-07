@@ -122,7 +122,7 @@ describe("buildPain008", () => {
     expect(xml).toContain("<MsgId>SV-2026-TESTMSG</MsgId>");
   });
 
-  it("escapes umlauts in debtor name unchanged but XML-escapes ampersands", () => {
+  it("transliterates umlauts in debtor name to the SEPA charset", () => {
     const xml = buildPain008({
       ...baseInput,
       items: [
@@ -132,6 +132,26 @@ describe("buildPain008", () => {
         },
       ],
     });
-    expect(xml).toContain("Müller &amp; Söhne");
+    // SEPA rejects umlauts and "&": ä/ö/ü -> ae/oe/ue, & dropped.
+    expect(xml).toContain("<Nm>Mueller Soehne</Nm>");
+    expect(xml).not.toContain("Müller");
+    expect(xml).not.toContain("&amp;");
+  });
+});
+
+describe("sepaText", () => {
+  const { sepaText } = __test;
+  it("transliterates German umlauts and ß", () => {
+    expect(sepaText("Schäfer Straße Öhringen Über")).toBe("Schaefer Strasse Oehringen Ueber");
+    expect(sepaText("Weißbier")).toBe("Weissbier");
+  });
+  it("strips other diacritics to the base letter", () => {
+    expect(sepaText("José Citroën")).toBe("Jose Citroen");
+  });
+  it("replaces disallowed characters with a single space", () => {
+    expect(sepaText("A&B  #C")).toBe("A B C");
+  });
+  it("keeps the allowed SEPA punctuation", () => {
+    expect(sepaText("Beitrag 2026 (Erw.) -/+ Ref:1,00'")).toBe("Beitrag 2026 (Erw.) -/+ Ref:1,00'");
   });
 });
