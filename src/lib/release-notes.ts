@@ -41,6 +41,22 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.18.2",
+    date: "2026-06-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Mahnlauf: Klicken zwei Personen gleichzeitig auf „Mahnlauf erstellen“, entstehen keine doppelten Mahnungen und keine doppelte Mahngebühr mehr. Der zweite Lauf erkennt die bereits gemahnten Posten und überspringt sie.",
+      },
+      {
+        category: "fix",
+        description:
+          "Bearbeiten zwei Personen dasselbe Mitglied gleichzeitig, wird die zweite Speicherung mit einem Hinweis abgelehnt, statt die erste Änderung unbemerkt zu überschreiben. Vor dem erneuten Speichern die Seite neu laden.",
+      },
+    ],
+  },
+  {
     version: "0.18.1",
     date: "2026-06-07",
     changes: [

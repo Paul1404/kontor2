@@ -22,6 +22,7 @@ import {
   planNichtEingezogen,
   resolveRecipient,
   resolveRecipients,
+  restrictToDunnable,
   sumDecimal,
 } from "~/server/dunning/build-dunning";
 import {
@@ -351,6 +352,39 @@ export const dunningRouter = {
       const logoDataUri = clubLogoDataUri();
 
       const result = await context.db.transaction(async (tx) => {
+        // Serialize commits at the same level. Eligibility (and the PDFs
+        // below) were computed before this transaction; without the lock two
+        // operators committing the same level at once would both render and
+        // bump the same postings, producing duplicate Mahnungen and double
+        // Mahngebühr. The advisory xact lock blocks the second commit until the
+        // first finishes and releases at COMMIT/ROLLBACK.
+        await tx.execute(sql`select pg_advisory_xact_lock(4712, ${input.level})`);
+
+        // Re-verify inside the lock: keep only postings still at level-1. A run
+        // that committed first has already bumped its postings, so they drop
+        // out here and are not dunned a second time.
+        const candidateSollIds = eligible.flatMap((m) => m.postings.map((p) => p.sollStellungId));
+        const stillRows =
+          candidateSollIds.length > 0
+            ? await tx
+                .select({ id: sollStellungenTable.id })
+                .from(sollStellungenTable)
+                .where(
+                  and(
+                    inArray(sollStellungenTable.id, candidateSollIds),
+                    eq(sollStellungenTable.mahnstufe, input.level - 1),
+                  ),
+                )
+            : [];
+        const stillEligible = new Set(stillRows.map((r) => r.id));
+        const verified = restrictToDunnable(eligible, stillEligible);
+        if (verified.length === 0) {
+          throw new ORPCError("CONFLICT", {
+            message:
+              "Diese Mahnungen wurden zwischenzeitlich bereits in einem anderen Lauf erzeugt. Bitte Liste neu laden.",
+          });
+        }
+
         // Header
         const [runRow] = await tx
           .insert(dunningRunsTable)
@@ -359,9 +393,9 @@ export const dunningRouter = {
             status: "committed",
             runDate: toDateString(runDate),
             dueDate: toDateString(dueDate),
-            itemCount: eligible.length,
-            totalOpen: sumDecimal(eligible.map((m) => m.openSum)),
-            totalFees: sumDecimal(eligible.map(() => gebuhr)),
+            itemCount: verified.length,
+            totalOpen: sumDecimal(verified.map((m) => m.openSum)),
+            totalFees: sumDecimal(verified.map(() => gebuhr)),
             notes: input.notes,
             createdBy: context.session!.user.id,
           } satisfies NewDunningRun as never)
@@ -373,7 +407,7 @@ export const dunningRouter = {
         const touchedSollIds: string[] = [];
         const refYear = Number(toDateString(runDate).slice(0, 4));
 
-        for (const m of eligible) {
+        for (const m of verified) {
           const postings = m.postings.map((p) => ({
             billingYear: p.billingYear,
             falligkeitsdatum: p.falligkeitsdatum,
@@ -479,7 +513,7 @@ export const dunningRouter = {
           actorEmail: context.session!.user.email,
           changes: {
             level: { before: null, after: input.level },
-            itemCount: { before: null, after: eligible.length },
+            itemCount: { before: null, after: verified.length },
             totalDue: {
               before: null,
               after: sumDecimal(itemValues.map((i) => i.totalDue as string)),
@@ -488,7 +522,7 @@ export const dunningRouter = {
           requestId: context.requestId ?? null,
         });
 
-        return { runId: runRow.id, itemCount: eligible.length };
+        return { runId: runRow.id, itemCount: verified.length };
       });
 
       return result;

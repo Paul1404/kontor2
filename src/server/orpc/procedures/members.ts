@@ -671,7 +671,16 @@ export const membersRouter = {
   ),
 
   update: vorstandProc
-    .input(v.object({ memberId: v.string(), patch: StammdatenInput }))
+    .input(
+      v.object({
+        memberId: v.string(),
+        patch: StammdatenInput,
+        // Optimistic-lock token: the `updatedAt` the editor loaded. When two
+        // people edit the same member, the second save is rejected instead of
+        // silently clobbering the first. Optional so other callers stay valid.
+        expectedUpdatedAt: v.optional(v.nullable(v.string()), null),
+      }),
+    )
     .handler(async ({ context, input }) => {
       const result = await context.db.transaction(async (tx) => {
         const [existing] = await tx
@@ -681,6 +690,20 @@ export const membersRouter = {
           .limit(1);
         if (!existing) {
           throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        }
+
+        // Conflict detection. Both the editor's token and `existing.updatedAt`
+        // come back through the same Drizzle timestamptz->Date read, so an
+        // unchanged row compares equal to the millisecond.
+        if (input.expectedUpdatedAt) {
+          const expectedMs = new Date(input.expectedUpdatedAt).getTime();
+          const currentMs = existing.updatedAt?.getTime() ?? null;
+          if (Number.isFinite(expectedMs) && currentMs !== null && currentMs !== expectedMs) {
+            throw new ORPCError("CONFLICT", {
+              message:
+                "Die Daten wurden zwischenzeitlich von jemand anderem geändert. Bitte Seite neu laden und erneut speichern.",
+            });
+          }
         }
 
         const patch = buildMemberPatch(input.patch);

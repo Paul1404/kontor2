@@ -100,6 +100,37 @@ export function sumDecimal(values: string[]): string {
 }
 
 /**
+ * Re-verify a previously loaded eligible set against the Sollstellungen that
+ * are still dunnable (`allowed`), dropping postings and members that are no
+ * longer in scope and recomputing `openSum` exactly as `loadOpenPostings`
+ * does (open amounts + Rücklastgebühren).
+ *
+ * `dunning.commit` loads eligibility and renders PDFs before opening its
+ * transaction. Under the per-level advisory lock it calls this with the set of
+ * postings still at level-1, so a run that committed first is not dunned twice.
+ */
+export function restrictToDunnable<
+  T extends {
+    postings: { sollStellungId: string; openAmount: string; rueckgebuhr: string }[];
+    openSum: string;
+  },
+>(members: readonly T[], allowed: ReadonlySet<string>): T[] {
+  return members
+    .map((m) => {
+      const postings = m.postings.filter((p) => allowed.has(p.sollStellungId));
+      return {
+        ...m,
+        postings,
+        openSum: sumDecimal([
+          ...postings.map((p) => p.openAmount),
+          ...postings.map((p) => p.rueckgebuhr),
+        ]),
+      };
+    })
+    .filter((m) => m.postings.length > 0);
+}
+
+/**
  * Pick the right Mahngebühr for the given level. Levels map: 1 ->
  * mahngebuhr1, 2 -> mahngebuhr2, 3 -> mahngebuhr3.
  */

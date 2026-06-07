@@ -31,9 +31,17 @@ function EditMemberPage() {
     mutationFn: async (values: StammdatenValues) => {
       if (!detail.data) return;
       const initialIban = ((detail.data.member as Record<string, unknown>).iban1 as string) ?? "";
+      // Optimistic-lock token: the updatedAt we loaded. If someone else saved
+      // in the meantime the server rejects this with a CONFLICT.
+      const loadedUpdatedAt = (detail.data.member as Record<string, unknown>).updatedAt;
+      const expectedUpdatedAt =
+        loadedUpdatedAt instanceof Date
+          ? loadedUpdatedAt.toISOString()
+          : ((loadedUpdatedAt as string | null) ?? null);
       return orpc.members.update({
         memberId: detail.data.member.id,
         patch: buildPatch(values, initialIban.replace(/\s+/g, "").toUpperCase()) as never,
+        expectedUpdatedAt,
       });
     },
     onSuccess: async () => {
