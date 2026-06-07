@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.17.1",
+    date: "2026-06-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Kulanzbrief: Die erlassene SEPA-Rücklastgebühr steht jetzt nachvollziehbar in der Betragsübersicht. Sie wird als Position aufgeführt und direkt darunter als Erlass wieder abgezogen, sodass sich der offene Beitrag als Summe ergibt. Hinweis: Eine Gebühr gibt es nur bei einer erfassten Rücklastschrift; ohne eine solche bleibt der Schalter ohne Wirkung.",
+      },
+    ],
+  },
+  {
     version: "0.17.0",
     date: "2026-06-07",
     changes: [

@@ -139,7 +139,7 @@ describe("buildKulanzLetterModel", () => {
     });
     expect(m.openSum).toBe("60,00 €");
     expect(m.rueckgebuhr).toBeNull();
-    expect(m.rueckgebuhrWaived).toBeNull();
+    expect(m.rueckgebuhrErlass).toBeNull();
     expect(m.feeWaiverNote).toBeNull();
   });
 
@@ -157,12 +157,12 @@ describe("buildKulanzLetterModel", () => {
     });
     expect(m.postings.map((p) => p.offen)).toEqual(["30,00 €", "30,00 €"]);
     expect(m.rueckgebuhr).toBe("3,00 €");
-    expect(m.rueckgebuhrWaived).toBeNull();
+    expect(m.rueckgebuhrErlass).toBeNull();
     // 30,00 + 30,00 + 3,00 fee = 63,00 total shown.
     expect(m.openSum).toBe("63,00 €");
   });
 
-  it("waives the SEPA return fee out of goodwill: drops it from the total and states so", () => {
+  it("waives the SEPA return fee out of goodwill: adds it then subtracts it so the total nets to the Beitrag", () => {
     const m = buildKulanzLetterModel({
       ...baseLetter,
       postings: [
@@ -172,18 +172,20 @@ describe("buildKulanzLetterModel", () => {
       openSum: "63.00",
       waiveReturnFee: true,
     });
-    expect(m.rueckgebuhr).toBeNull();
-    expect(m.rueckgebuhrWaived).toBe("3,00 €");
+    // The fee shows as a positive line, then the Erlass subtracts it again, so
+    // the visible rows reconcile to the bare Beitrag.
+    expect(m.rueckgebuhr).toBe("3,00 €");
+    expect(m.rueckgebuhrErlass).toBe("-3,00 €");
     expect(m.feeWaiverNote).toContain("3,00 €");
     expect(m.feeWaiverNote).toContain("erlassen");
-    // Only the Beitrag remains payable: 30,00 + 30,00 = 60,00.
+    // Only the Beitrag remains payable: 30,00 + 30,00 + 3,00 - 3,00 = 60,00.
     expect(m.openSum).toBe("60,00 €");
   });
 
   it("ignores the waive flag when there is no SEPA return fee", () => {
     const m = buildKulanzLetterModel({ ...baseLetter, waiveReturnFee: true });
     expect(m.rueckgebuhr).toBeNull();
-    expect(m.rueckgebuhrWaived).toBeNull();
+    expect(m.rueckgebuhrErlass).toBeNull();
     expect(m.feeWaiverNote).toBeNull();
     expect(m.openSum).toBe("60,00 €");
   });
