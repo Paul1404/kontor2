@@ -41,6 +41,27 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.18.4",
+    date: "2026-06-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "DSGVO-Löschung reicht jetzt vollständig durch: Neben dem Mitglied werden auch Snapshots, Mahnungen samt PDF und die personenbezogenen Felder in Beziehungen gelöscht bzw. bereinigt. Alte Personenwerte im Änderungsprotokoll werden entfernt, der Löschvorgang selbst bleibt nachvollziehbar protokolliert.",
+      },
+      {
+        category: "fix",
+        description:
+          "Beitragslauf überspringt Verträge mit negativem Betrag und weist sie in der Ausschlussliste aus, statt eine ungültige Lastschrift zu erzeugen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Sicherheit: Das Cookie der Mitgliederportal-Sitzung nutzt jetzt SameSite=Strict. Portal-Änderungswünsche sind pro Feld in der Länge begrenzt.",
+      },
+    ],
+  },
+  {
     version: "0.18.3",
     date: "2026-06-07",
     changes: [

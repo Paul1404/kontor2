@@ -219,7 +219,7 @@ export function buildPortalCookie(value: string, maxAgeSeconds: number, isSecure
     `${PORTAL_COOKIE}=${value}`,
     "Path=/",
     "HttpOnly",
-    "SameSite=Lax",
+    "SameSite=Strict",
     `Max-Age=${maxAgeSeconds}`,
   ];
   if (isSecure) parts.push("Secure");

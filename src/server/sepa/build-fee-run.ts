@@ -150,14 +150,19 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
     const memberName = displayName(member);
     const baseAmount = parseAmount(contract.betrag);
 
-    if (baseAmount === 0) {
+    if (baseAmount <= 0) {
       excluded.push({
         memberId: member.id,
         memberName,
         contractId: contract.id,
         vertragNr: contract.vertragNr,
         artName: contract.artName,
-        reason: "Beitragsfrei (Betrag = 0)",
+        // A SEPA direct debit must be a positive amount. A negative Beitrag
+        // would otherwise produce an invalid (or reversing) debit line.
+        reason:
+          baseAmount === 0
+            ? "Beitragsfrei (Betrag = 0)"
+            : "Ungültiger Betrag (negativ), keine Lastschrift erzeugt",
       });
       continue;
     }

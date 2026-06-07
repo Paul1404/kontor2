@@ -1,13 +1,16 @@
 import { ORPCError } from "@orpc/server";
-import { desc, eq, sql } from "drizzle-orm";
-import { appendAudit } from "~/server/audit/log";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
+import { appendAudit, type Changes } from "~/server/audit/log";
 import type { DBOrTx } from "~/server/db/client";
 import { auditLogTable } from "~/server/db/schema/audit";
 import { dsgvoRequestsTable } from "~/server/db/schema/dsgvo";
+import { dunningItemsTable } from "~/server/db/schema/dunning";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { memberSourceRecordsTable } from "~/server/db/schema/member-source-records";
 import { membersTable } from "~/server/db/schema/members";
+import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { memberSnapshotsTable } from "~/server/db/schema/snapshots";
 import { buildScrubRules, earliestErasureDate } from "~/server/dsgvo/policy";
 
 export type ErasureDiffEntry = {
@@ -122,38 +125,63 @@ export async function executeErasure(
   }
   updates.updatedAt = new Date();
 
-  const before = preview.diff.reduce<Record<string, unknown>>((acc, d) => {
-    acc[d.column] = d.before;
-    return acc;
-  }, {});
-  const after = preview.diff.reduce<Record<string, unknown>>((acc, d) => {
-    acc[d.column] = d.after;
-    return acc;
-  }, {});
-
   await db.update(membersTable).set(updates).where(eq(membersTable.id, memberId));
 
-  // Erase the verbatim Linear provenance too. `member_source_records.raw` holds
-  // the original dump row in plaintext (names, address, possibly IBAN), so it
-  // must be cleared on erasure -- pseudonymizing the members row alone would
-  // leave a full copy of the personal data behind.
+  // Pseudonymizing the members row is not enough: the same personal data is
+  // copied into several derived stores. Clear every copy so none survives.
+
+  // 1. Verbatim Linear provenance -- `raw` holds the original dump row in
+  //    plaintext (names, address, possibly IBAN).
   const deletedSource = await db
     .delete(memberSourceRecordsTable)
     .where(eq(memberSourceRecordsTable.memberId, memberId))
     .returning({ id: memberSourceRecordsTable.id });
 
-  const changes = Object.fromEntries(
-    Object.keys({ ...before, ...after }).map((k) => [
-      k,
-      { before: before[k] ?? null, after: after[k] ?? null },
-    ]),
-  );
-  if (deletedSource.length > 0) {
-    changes.__sourceRecords = {
-      before: `${deletedSource.length} Datensatz/Datensätze`,
-      after: null,
-    };
-  }
+  // 2. Member snapshots store a full JSONB copy of the row at every change.
+  const deletedSnapshots = await db
+    .delete(memberSnapshotsTable)
+    .where(eq(memberSnapshotsTable.memberId, memberId))
+    .returning({ id: memberSnapshotsTable.id });
+
+  // 3. Dunning items embed the rendered name/address in JSON plus a Mahnung PDF.
+  const deletedDunning = await db
+    .delete(dunningItemsTable)
+    .where(eq(dunningItemsTable.memberId, memberId))
+    .returning({ id: dunningItemsTable.id });
+
+  // 4. Relationship rows where this member is the linked party carry their
+  //    name/contact/notes in plaintext (the Linear `verkn` payload). Scrub
+  //    those columns; the row stays so the other side keeps its link.
+  const scrubbedRels = await db
+    .update(relationshipsTable)
+    .set({
+      name: null,
+      nachname: null,
+      anrede: null,
+      telefon: null,
+      email: null,
+      fax: null,
+      vEmail: null,
+      funktion: null,
+      notiz: null,
+      matchcode: null,
+    })
+    .where(eq(relationshipsTable.toMemberId, memberId))
+    .returning({ id: relationshipsTable.id });
+
+  // The erasure audit entry records WHAT was cleared, never the cleared values
+  // -- the before-values are exactly the PII we are removing.
+  const changes: Changes = {
+    __scrubbedColumns: { before: null, after: preview.diff.map((d) => d.column).join(", ") },
+  };
+  if (deletedSource.length > 0)
+    changes.__sourceRecords = { before: `${deletedSource.length}`, after: null };
+  if (deletedSnapshots.length > 0)
+    changes.__snapshots = { before: `${deletedSnapshots.length}`, after: null };
+  if (deletedDunning.length > 0)
+    changes.__dunningItems = { before: `${deletedDunning.length}`, after: null };
+  if (scrubbedRels.length > 0)
+    changes.__relationships = { before: `${scrubbedRels.length}`, after: null };
   if (opts.forceOverride && opts.overrideReason) {
     changes.__override = { before: null, after: opts.overrideReason };
   }
@@ -168,6 +196,20 @@ export async function executeErasure(
     changes,
     requestId: opts.requestId ?? null,
   });
+
+  // 5. Redact the personal values still sitting in this member's earlier audit
+  //    entries (before/after of past edits). Keep the rows and the erasure
+  //    event for accountability; drop only the values.
+  await db
+    .update(auditLogTable)
+    .set({ changes: {} })
+    .where(
+      and(
+        eq(auditLogTable.entityType, "member"),
+        eq(auditLogTable.entityId, memberId),
+        auditId ? ne(auditLogTable.id, auditId) : undefined,
+      ),
+    );
 
   if (opts.requestId) {
     await db
