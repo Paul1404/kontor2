@@ -41,6 +41,37 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.18.1",
+    date: "2026-06-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Blättern in langen Listen: Die Schaltfläche „Weiter“ ist jetzt auf der letzten Seite korrekt deaktiviert. Vorher konnte man auf eine leere Seite klicken, wenn die Anzahl genau aufging.",
+      },
+      {
+        category: "fix",
+        description:
+          "Unmögliche Datumsangaben wie der 30.02. werden beim Speichern abgewiesen, statt still auf den 02.03. zu rutschen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Namen und andere Textfelder werden beim Speichern von führenden und folgenden Leerzeichen befreit. Ein Name aus reinen Leerzeichen wird nicht mehr akzeptiert, und die Suche findet betroffene Einträge wieder.",
+      },
+      {
+        category: "fix",
+        description:
+          "CSV-Export: Felder, die mit = + - oder @ beginnen, werden so geschrieben, dass Excel oder LibreOffice sie nicht als Formel ausführen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Nach dem endgültigen Löschen oder Aufräumen im Adminbereich werden Listen, Dashboard und Abteilungszahlen sofort aktualisiert, statt bis zu fünf Minuten veraltet zu bleiben.",
+      },
+    ],
+  },
+  {
     version: "0.18.0",
     date: "2026-06-07",
     changes: [

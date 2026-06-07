@@ -10,7 +10,15 @@ const EOL = "\r\n";
 
 function escapeField(raw: unknown): string {
   if (raw === null || raw === undefined) return "";
-  const s = raw instanceof Date ? raw.toISOString() : String(raw);
+  let s = raw instanceof Date ? raw.toISOString() : String(raw);
+  // Spreadsheet formula-injection guard: Excel/LibreOffice/Sheets evaluate a
+  // cell whose text starts with = + - @ (or a tab/CR). A member name like
+  // "=HYPERLINK(...)" would otherwise run on open. Prefix an apostrophe so the
+  // value stays literal text. Plain numbers (incl. negatives like "-5,00 €")
+  // are left untouched so amount columns still read as numbers.
+  if (/^[=+\-@\t\r]/.test(s) && !/^[+-]?[\d.,\s]*\d[\d.,\s]*(?:\s*€)?$/.test(s)) {
+    s = `'${s}`;
+  }
   if (/[";\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }

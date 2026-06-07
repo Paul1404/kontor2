@@ -74,7 +74,7 @@ const StammdatenInput = v.object({
   land: v.optional(v.nullable(v.string())),
   telefon1: v.optional(v.nullable(v.string())),
   telefon2: v.optional(v.nullable(v.string())),
-  email: v.optional(v.nullable(v.pipe(v.string(), v.email()))),
+  email: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.email()))),
   www: v.optional(v.nullable(v.string())),
   firma1: v.optional(v.nullable(v.string())),
   funktion: v.optional(v.nullable(v.string())),
@@ -108,6 +108,21 @@ function toDateOrNull(value: string | null | undefined, field: string): Date | n
   if (!value) return null;
   const d = new Date(value);
   if (!Number.isFinite(d.getTime())) {
+    throw new ORPCError("VALIDATION_FAILED", {
+      message: `Ungültiges Datum im Feld "${field}": ${value}`,
+    });
+  }
+  // `new Date` silently rolls day-overflow dates forward: "2025-02-30" becomes
+  // March 2, "2025-02-29" (non-leap) becomes March 1. That passes the finite
+  // check above but stores a different day than the user typed. For plain
+  // YYYY-MM-DD input, require the parsed UTC date to match the components.
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (
+    m &&
+    (d.getUTCFullYear() !== Number(m[1]) ||
+      d.getUTCMonth() + 1 !== Number(m[2]) ||
+      d.getUTCDate() !== Number(m[3]))
+  ) {
     throw new ORPCError("VALIDATION_FAILED", {
       message: `Ungültiges Datum im Feld "${field}": ${value}`,
     });
@@ -160,7 +175,13 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   const patch: Record<string, unknown> = {};
   const setIfPresent = <K extends keyof typeof input>(key: K, mapped?: string) => {
     if (key in input) {
-      patch[mapped ?? (key as string)] = input[key] ?? null;
+      const raw = input[key];
+      // Trim text input and fold blank/whitespace-only values to null. Without
+      // this a name of "   " passes the "Vor- oder Nachname erforderlich" check
+      // (it is truthy) and an untrimmed "  Müller " never matches the ilike
+      // search or duplicate detection.
+      const value = typeof raw === "string" ? raw.trim() || null : (raw ?? null);
+      patch[mapped ?? (key as string)] = value;
     }
   };
   setIfPresent("anrede");

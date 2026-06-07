@@ -975,7 +975,7 @@ function MembersListPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={(list.data?.rows.length ?? 0) < pageSize}
+                disabled={search.page * pageSize >= (list.data?.total ?? 0)}
                 onClick={() => updateSearch({ page: search.page + 1 }, false)}
               >
                 Weiter <ChevronRight className="size-3.5" />

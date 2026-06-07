@@ -241,7 +241,7 @@ function AuditPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={(list.data?.rows.length ?? 0) < pageSize}
+                disabled={page * pageSize >= (list.data?.total ?? 0)}
                 onClick={() => setPage((p) => p + 1)}
               >
                 Weiter <ChevronRight className="size-3.5" />
