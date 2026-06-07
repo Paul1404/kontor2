@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
+  ArchiveRestore,
   ArrowLeft,
   ChevronDown,
   Contact,
@@ -70,6 +71,19 @@ function MemberDetailPage() {
     },
     onError: (err) =>
       toast.error("Löschen fehlgeschlagen", {
+        description: err instanceof Error ? err.message : String(err),
+      }),
+  });
+
+  const restore = useMutation({
+    mutationFn: (memberId: string) => orpc.members.restore({ memberId }),
+    onSuccess: async () => {
+      toast.success("Mitglied wiederhergestellt");
+      await qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
+      await qc.invalidateQueries({ queryKey: ["members.list"] });
+    },
+    onError: (err) =>
+      toast.error("Wiederherstellen fehlgeschlagen", {
         description: err instanceof Error ? err.message : String(err),
       }),
   });
@@ -158,6 +172,7 @@ function MemberDetailPage() {
   // the Linear import and should either get linked up or deleted.
   const isOrphanKontakt =
     !member.mitgliedsnummer && beziehungen.length === 0 && incomingBeziehungenCount === 0;
+  const isDeleted = (member as { deletedAt?: string | Date | null }).deletedAt != null;
 
   // Bank name is derived from the IBAN; the legacy free-text bank field was
   // dropped. BIC prefers the IBAN-derived value over the stored one.
@@ -264,7 +279,17 @@ function MemberDetailPage() {
               </Button>
             )
           ) : null}
-          {canEdit ? (
+          {canEdit && isDeleted ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => restore.mutate(member.id)}
+              disabled={restore.isPending}
+            >
+              <ArchiveRestore className="size-4" /> Wiederherstellen
+            </Button>
+          ) : null}
+          {canEdit && !isDeleted ? (
             <Button variant="outline" size="sm" onClick={() => setConfirmDelete(true)}>
               <Trash2 className="size-4 text-destructive" /> Löschen
             </Button>
@@ -304,6 +329,29 @@ function MemberDetailPage() {
           setTab("dokumente");
         }}
       />
+
+      {isDeleted ? (
+        <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <Trash2 className="mt-0.5 size-4 shrink-0 text-destructive" />
+          <div className="flex flex-col gap-1">
+            <p className="font-medium text-foreground">Gelöschtes Mitglied</p>
+            <p className="text-muted-foreground">
+              Dieser Eintrag ist gelöscht und taucht nicht mehr in der Liste, in Mahnläufen oder
+              Berichten auf. Über „Wiederherstellen“ wird er wieder aktiv.
+            </p>
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={() => restore.mutate(member.id)}
+                disabled={restore.isPending}
+                className="self-start text-xs text-destructive underline-offset-2 hover:underline disabled:opacity-60"
+              >
+                Jetzt wiederherstellen
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {isOrphanKontakt ? (
         <div className="flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">

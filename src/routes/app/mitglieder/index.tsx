@@ -59,6 +59,7 @@ type MemberRow = {
   austritt: string | Date | null;
   verstorbenAm: string | Date | null;
   status: string | null;
+  deletedAt: string | Date | null;
 };
 
 type MembersSearch = {
@@ -67,6 +68,7 @@ type MembersSearch = {
   abteilungId: string | null;
   includeAusgetretene: boolean;
   orphanOnly: boolean;
+  deletedOnly: boolean;
   page: number;
   sortBy: SortBy;
   sortDir: SortDir;
@@ -81,6 +83,7 @@ const EMPTY_SEARCH: MembersSearch = {
   abteilungId: null,
   includeAusgetretene: false,
   orphanOnly: false,
+  deletedOnly: false,
   page: 1,
   sortBy: "nachname",
   sortDir: "asc",
@@ -102,6 +105,7 @@ export const Route = createFileRoute("/app/mitglieder/")({
       abteilungId: typeof s.abteilungId === "string" && s.abteilungId ? s.abteilungId : null,
       includeAusgetretene: s.includeAusgetretene === true || s.includeAusgetretene === "true",
       orphanOnly: s.orphanOnly === true || s.orphanOnly === "true",
+      deletedOnly: s.deletedOnly === true || s.deletedOnly === "true",
       page: Number.isFinite(pageNum) && pageNum >= 1 ? Math.floor(pageNum) : 1,
       sortBy,
       sortDir,
@@ -339,7 +343,9 @@ function MembersListPage() {
 
   function applyView(view: SavedView) {
     setQDraft(view.search.q);
-    navigate({ search: () => ({ ...view.search, page: 1 }), replace: true });
+    // Saved views predate the Papierkorb filter; default it off so applying a
+    // view always lands on the live list.
+    navigate({ search: () => ({ ...EMPTY_SEARCH, ...view.search, page: 1 }), replace: true });
   }
 
   function saveCurrentView() {
@@ -405,7 +411,8 @@ function MembersListPage() {
     search.status !== "aktiv" ||
     !!search.abteilungId ||
     search.includeAusgetretene ||
-    search.orphanOnly;
+    search.orphanOnly ||
+    search.deletedOnly;
 
   const abteilungName = search.abteilungId
     ? abteilungen.data?.find((a) => a.id === search.abteilungId)?.name
@@ -599,6 +606,20 @@ function MembersListPage() {
               <span className="text-muted-foreground">Nur verwaiste Kontakte</span>
             </label>
           ) : null}
+          {canEdit ? (
+            <label
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm shadow-soft"
+              title="Gelöschte Mitglieder anzeigen, um sie wiederherzustellen"
+            >
+              <input
+                type="checkbox"
+                checked={search.deletedOnly}
+                onChange={(e) => updateSearch({ deletedOnly: e.target.checked })}
+                className="size-4 accent-primary"
+              />
+              <span className="text-muted-foreground">Papierkorb</span>
+            </label>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -637,6 +658,9 @@ function MembersListPage() {
               label="Verwaiste Kontakte"
               onRemove={() => updateSearch({ orphanOnly: false })}
             />
+          ) : null}
+          {search.deletedOnly ? (
+            <FilterChip label="Papierkorb" onRemove={() => updateSearch({ deletedOnly: false })} />
           ) : null}
           <button
             type="button"
@@ -1095,6 +1119,7 @@ function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }
 }
 
 function StatusBadge({ member }: { member: MemberRow }) {
+  if (member.deletedAt) return <Badge variant="destructive">Gelöscht</Badge>;
   if (member.status === "verstorben") return <Badge variant="secondary">Verstorben</Badge>;
   if (member.status === "ausgetreten") return <Badge variant="warning">Ausgetreten</Badge>;
   if (member.status === "passiv") return <Badge variant="secondary">Passiv</Badge>;

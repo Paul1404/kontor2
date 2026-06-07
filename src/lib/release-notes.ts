@@ -41,6 +41,32 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.18.0",
+    date: "2026-06-07",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Papierkorb in der Mitgliederliste. Über den Filter „Papierkorb“ lassen sich gelöschte Mitglieder finden und mit „Wiederherstellen“ zurückholen. Auch auf der Profilseite eines gelöschten Mitglieds gibt es jetzt einen Hinweis und einen Wiederherstellen-Knopf. Bisher ließ sich eine versehentliche Löschung im Programm nicht rückgängig machen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Die Mitgliedsnummer eines gelöschten Mitglieds ist wieder frei und kann erneut vergeben werden. Vorher blieb sie dauerhaft belegt.",
+      },
+      {
+        category: "fix",
+        description:
+          "Ein gelöschtes Mitglied verliert sofort den Zugang zum Mitgliederportal, auch wenn die Anmeldung im Browser noch gespeichert war.",
+      },
+      {
+        category: "fix",
+        description:
+          "Lässt sich ein verschlüsseltes Feld (z. B. eine IBAN) nicht entschlüsseln, bleibt nur dieses Feld leer. Listen, Einstellungen und Berichte funktionieren weiter, statt komplett zu blockieren.",
+      },
+    ],
+  },
+  {
     version: "0.17.1",
     date: "2026-06-07",
     changes: [

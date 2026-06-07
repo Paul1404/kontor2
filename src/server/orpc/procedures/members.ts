@@ -46,6 +46,7 @@ const ListInput = v.object({
   abteilungId: v.optional(v.nullable(v.string()), null),
   includeAusgetretene: v.optional(v.boolean(), false),
   orphanOnly: v.optional(v.boolean(), false),
+  deletedOnly: v.optional(v.boolean(), false),
   page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
   pageSize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
   sortBy: v.optional(SortBySchema, "nachname"),
@@ -257,16 +258,27 @@ export const membersRouter = {
 
     const conditions = [] as ReturnType<typeof eq>[];
 
-    if (!input.includeAusgetretene && input.status !== "ausgetreten") {
+    // The "Papierkorb" view shows only soft-deleted rows and ignores the
+    // lifecycle status filters (a deleted member can be of any status). It is
+    // the in-app entry point for restoring an accidental deletion.
+    if (input.deletedOnly) {
+      conditions.push(isNotNull(membersTable.deletedAt) as never);
+    } else {
+      // Hide soft-deleted members from every normal view. The legacy Linear
+      // `geloscht` flag is folded into the app's single `deletedAt`.
+      conditions.push(memberNotDeleted() as never);
+    }
+
+    if (!input.deletedOnly && !input.includeAusgetretene && input.status !== "ausgetreten") {
       conditions.push(isNull(membersTable.austritt) as never);
     }
-    if (input.status === "ausgetreten") {
+    if (!input.deletedOnly && input.status === "ausgetreten") {
       conditions.push(isNotNull(membersTable.austritt) as never);
     }
-    if (input.status === "verstorben") {
+    if (!input.deletedOnly && input.status === "verstorben") {
       conditions.push(isNotNull(membersTable.verstorbenAm) as never);
     }
-    if (input.status === "aktiv") {
+    if (!input.deletedOnly && input.status === "aktiv") {
       // Match the dashboard's "Aktive Mitglieder" definition: not exited
       // and not deceased. Enforce `isNull(austritt)` here directly so the
       // result is correct even when `includeAusgetretene` is set (the
@@ -276,15 +288,11 @@ export const membersRouter = {
       conditions.push(isNull(membersTable.austritt) as never);
       conditions.push(isNull(membersTable.verstorbenAm) as never);
     }
-    if (input.status === "passiv") {
+    if (!input.deletedOnly && input.status === "passiv") {
       // The normalized status already means "passive and neither exited nor
       // deceased" (deriveStatus precedence), so one check is enough.
       conditions.push(eq(membersTable.status, "passiv") as never);
     }
-
-    // Hide soft-deleted members from the normal list view. The legacy Linear
-    // `geloscht` flag is folded into the app's single `deletedAt`.
-    conditions.push(memberNotDeleted() as never);
 
     // "Verwaiste Kontakte" filter: Kontakt (no mitgliedsnummer) AND no relationship
     // pointing to or from this row. Used by admins to find Linear-import
@@ -364,6 +372,7 @@ export const membersRouter = {
           verstorbenAm: membersTable.verstorbenAm,
           status: membersTable.status,
           abteilung: membersTable.abteilung,
+          deletedAt: membersTable.deletedAt,
         })
         .from(membersTable)
         .where(where)
@@ -757,10 +766,13 @@ export const membersRouter = {
                 : String((maxRow?.maxMitglnrInt ?? 0) + 1);
 
             if (nextMitglnr) {
+              // Only live members own a number. A soft-deleted row must not
+              // keep a Mitgliedsnummer reserved forever, otherwise the number
+              // is unusable until someone purges the (invisible) old row.
               const [dupe] = await tx
                 .select({ id: membersTable.id })
                 .from(membersTable)
-                .where(eq(membersTable.mitgliedsnummer, nextMitglnr))
+                .where(and(eq(membersTable.mitgliedsnummer, nextMitglnr), memberNotDeleted()))
                 .limit(1);
               if (dupe) {
                 throw new ORPCError("CONFLICT", {
@@ -1505,10 +1517,11 @@ export const membersRouter = {
               ? input.mitgliedsnummer.trim()
               : String((maxRow?.maxMitglnrInt ?? 0) + 1);
 
+          // Soft-deleted rows don't reserve their number (see create above).
           const [dupe] = await tx
             .select({ id: membersTable.id })
             .from(membersTable)
-            .where(eq(membersTable.mitgliedsnummer, nextMitglnr))
+            .where(and(eq(membersTable.mitgliedsnummer, nextMitglnr), memberNotDeleted()))
             .limit(1);
           if (dupe) {
             throw new ORPCError("CONFLICT", {

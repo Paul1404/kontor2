@@ -93,6 +93,15 @@ export async function consumePortalToken(
     if (!token) return null;
     if (!constantEqual(token.tokenHash, hash)) return null;
 
+    // A token for a member who has since been soft-deleted must not mint a
+    // session. Otherwise a deleted member keeps full portal access.
+    const [holder] = await tx
+      .select({ deletedAt: membersTable.deletedAt })
+      .from(membersTable)
+      .where(eq(membersTable.id, token.memberId))
+      .limit(1);
+    if (!holder || holder.deletedAt) return null;
+
     // Claim the token atomically before creating the session. The
     // conditional `consumed_at IS NULL` closes the race where two requests
     // present the same token concurrently — only one claim succeeds.
@@ -143,13 +152,21 @@ export async function resolvePortalSession(
   if (!sessionId || !secret) return null;
 
   const [session] = await db
-    .select()
+    .select({
+      id: portalSessionsTable.id,
+      memberId: portalSessionsTable.memberId,
+      secretHash: portalSessionsTable.secretHash,
+    })
     .from(portalSessionsTable)
+    // Drop the session the moment the member is soft-deleted, even though the
+    // 30-day cookie itself is still valid.
+    .innerJoin(membersTable, eq(membersTable.id, portalSessionsTable.memberId))
     .where(
       and(
         eq(portalSessionsTable.id, sessionId),
         gt(portalSessionsTable.expiresAt, new Date()),
         isNull(portalSessionsTable.revokedAt),
+        isNull(membersTable.deletedAt),
       ),
     )
     .limit(1);
@@ -188,7 +205,7 @@ export async function loadPortalMember(db: DB, memberId: string) {
       austritt: membersTable.austritt,
     })
     .from(membersTable)
-    .where(eq(membersTable.id, memberId))
+    .where(and(eq(membersTable.id, memberId), isNull(membersTable.deletedAt)))
     .limit(1);
   return m ?? null;
 }
