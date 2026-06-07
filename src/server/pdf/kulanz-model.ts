@@ -121,13 +121,18 @@ export type KulanzLetterModel = {
   verwendungszweck: string;
   postings: KulanzPostingRow[];
   /**
-   * Combined SEPA return fees charged as a separate line, or null when there
-   * are none or they were waived (see `rueckgebuhrWaived`).
+   * Combined SEPA return fees as a separate positive line, or null when there
+   * are none. Shown whenever a fee exists; when waived, `rueckgebuhrErlass`
+   * subtracts the same amount again on the following line.
    */
   rueckgebuhr: string | null;
-  /** Combined SEPA return fees waived out of goodwill, or null when none/charged. */
-  rueckgebuhrWaived: string | null;
-  /** Sentence stating the fee was waived, shown when `rueckgebuhrWaived` is set. */
+  /**
+   * Goodwill waiver of the SEPA return fee as a negative line ("-3,00 €"), or
+   * null when nothing is waived. Pairs with `rueckgebuhr` so the rows net out
+   * to the bare Beitrag.
+   */
+  rueckgebuhrErlass: string | null;
+  /** Sentence stating the fee was waived, shown when `rueckgebuhrErlass` is set. */
   feeWaiverNote: string | null;
   openSum: string;
   deadline: string;
@@ -244,21 +249,22 @@ export function buildKulanzLetterModel(input: KulanzLetterInput): KulanzLetterMo
   }));
 
   // SEPA return fees are folded into the member's openSum upstream, but the
-  // posting rows only show the Beitrag. When charged, surface the combined fee
-  // as its own line so the visible rows reconcile with the printed total. When
-  // waived out of goodwill, drop it from the total instead and state so.
+  // posting rows only show the Beitrag. Surface the combined fee as its own
+  // positive line so the visible rows reconcile with the printed total. When
+  // waived out of goodwill, a second line subtracts the same amount again, so
+  // the goodwill is visible in the table and the total drops to the bare Beitrag.
   let feeCents = 0;
   for (const p of input.postings) feeCents += Math.round(Number.parseFloat(p.rueckgebuhr) * 100);
   const waive = !!input.waiveReturnFee && feeCents > 0;
   const feeFmt = feeCents > 0 ? `${fmtKulanzMoney((feeCents / 100).toFixed(2))} €` : null;
-  const rueckgebuhr = waive ? null : feeFmt;
-  const rueckgebuhrWaived = waive ? feeFmt : null;
+  const rueckgebuhr = feeFmt;
+  const rueckgebuhrErlass = waive ? `-${feeFmt}` : null;
 
   const openSumCents = Math.round(Number.parseFloat(input.openSum) * 100);
   const dueCents = waive ? openSumCents - feeCents : openSumCents;
 
   const feeWaiverNote = waive
-    ? `Die angefallene SEPA-Rücklastgebühr in Höhe von ${feeFmt} erlassen wir Ihnen aus Kulanz. ` +
+    ? `Die SEPA-Rücklastgebühr in Höhe von ${feeFmt} erlassen wir Ihnen aus Kulanz. ` +
       `Bitte überweisen Sie nur den offenen Mitgliedsbeitrag.`
     : null;
 
@@ -275,7 +281,7 @@ export function buildKulanzLetterModel(input: KulanzLetterInput): KulanzLetterMo
     verwendungszweck: `Mitgliedsbeitrag · ${input.member.name} · ${refWord} ${input.member.reference}`,
     postings,
     rueckgebuhr,
-    rueckgebuhrWaived,
+    rueckgebuhrErlass,
     feeWaiverNote,
     openSum: `${fmtKulanzMoney((dueCents / 100).toFixed(2))} €`,
     deadline,
