@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql }
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
+import { escapeLike } from "~/server/db/like";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { withUniqueRetry } from "~/server/db/retry";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
@@ -330,7 +331,7 @@ export const membersRouter = {
     }
 
     if (input.q.trim()) {
-      const like = `%${input.q.trim()}%`;
+      const like = `%${escapeLike(input.q.trim())}%`;
       conditions.push(
         or(
           ilike(membersTable.nachname, like),
@@ -1196,7 +1197,7 @@ export const membersRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      const like = `%${input.q.trim()}%`;
+      const like = `%${escapeLike(input.q.trim())}%`;
       const rows = await context.db
         .select({
           id: membersTable.id,

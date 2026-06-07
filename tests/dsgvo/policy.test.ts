@@ -1,4 +1,6 @@
+import { getTableColumns } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
+import { membersTable } from "~/server/db/schema/members";
 import {
   buildScrubRules,
   earliestErasureDate,
@@ -29,6 +31,30 @@ describe("buildScrubRules", () => {
     const rules = buildScrubRules("ffffffff-0000-0000-0000-000000000000");
     for (const c of RETAINED_COLUMNS) {
       expect(rules[c]).toBeUndefined();
+    }
+  });
+
+  it("only references columns that actually exist on the members table", () => {
+    // Guards against rules for columns dropped in the schema trim, which would
+    // silently scrub nothing and let PII survive erasure.
+    const columns = new Set(Object.keys(getTableColumns(membersTable)));
+    for (const key of Object.keys(buildScrubRules("ffffffff-0000-0000-0000-000000000000"))) {
+      expect(columns.has(key), `scrub rule "${key}" is not a members column`).toBe(true);
+    }
+  });
+
+  it("scrubs the legal-representative (guardian) and alt-account-holder PII", () => {
+    const rules = buildScrubRules("ffffffff-0000-0000-0000-000000000000");
+    for (const key of [
+      "vertreterAnrede",
+      "vertreterName",
+      "vertreterStrasse",
+      "vertreterHausnummer",
+      "vertreterPlz",
+      "vertreterOrt",
+      "abwKontoInh",
+    ]) {
+      expect(rules[key]).toEqual({ kind: "null" });
     }
   });
 });

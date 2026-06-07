@@ -1,5 +1,6 @@
 import { and, asc, between, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { escapeLike } from "~/server/db/like";
 import { attachmentsTable } from "~/server/db/schema/attachments";
 import { auditLogTable } from "~/server/db/schema/audit";
 import { contractsTable } from "~/server/db/schema/contracts";
@@ -57,7 +58,7 @@ export const auditRouter = {
     else if (to) conditions.push(lte(auditLogTable.createdAt, to) as never);
 
     if (input.q.trim()) {
-      const like = `%${input.q.trim()}%`;
+      const like = `%${escapeLike(input.q.trim())}%`;
       conditions.push(
         or(
           ilike(auditLogTable.actorEmail, like),

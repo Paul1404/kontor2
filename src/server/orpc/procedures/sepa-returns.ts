@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import { escapeLike } from "~/server/db/like";
 import { sepaReturnsTable } from "~/server/db/schema/dunning";
 import { feeRunItemsTable, feeRunsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
@@ -102,16 +103,17 @@ export const sepaReturnsRouter = {
     )
     .handler(async ({ context, input }) => {
       const q = (input.query ?? "").trim();
+      const like = `%${escapeLike(q)}%`;
       const where = and(
         eq(feeRunsTable.status, "committed"),
         sql`${feeRunItemsTable.returnedAt} is null`,
         q
           ? sql`(
-              ${membersTable.mitgliedsnummer} ilike ${`%${q}%`} or
-              ${membersTable.nachname} ilike ${`%${q}%`} or
-              ${membersTable.vorname} ilike ${`%${q}%`} or
-              ${membersTable.firma1} ilike ${`%${q}%`} or
-              ${feeRunItemsTable.endToEndId} ilike ${`%${q}%`}
+              ${membersTable.mitgliedsnummer} ilike ${like} or
+              ${membersTable.nachname} ilike ${like} or
+              ${membersTable.vorname} ilike ${like} or
+              ${membersTable.firma1} ilike ${like} or
+              ${feeRunItemsTable.endToEndId} ilike ${like}
             )`
           : sql`true`,
       );

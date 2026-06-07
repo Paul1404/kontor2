@@ -1,5 +1,6 @@
 import { and, asc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { escapeLike } from "~/server/db/like";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { contractsTable } from "~/server/db/schema/contracts";
@@ -80,7 +81,7 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
   }
   conditions.push(memberNotDeleted() as never);
   if (input.q.trim()) {
-    const like = `%${input.q.trim()}%`;
+    const like = `%${escapeLike(input.q.trim())}%`;
     conditions.push(
       or(
         ilike(membersTable.nachname, like),

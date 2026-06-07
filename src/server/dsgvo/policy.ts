@@ -41,51 +41,48 @@ export type ErasureScrubRule = { kind: "null" } | { kind: "pseudonym"; value: st
  */
 export function buildScrubRules(memberId: string): Record<string, ErasureScrubRule> {
   const tag = memberId.slice(0, 8);
+  // Every key MUST be a real column of the members table (the schema was
+  // trimmed from 265 to 46 columns; rules for dropped columns would silently
+  // do nothing). The policy test asserts this.
   return {
     // Names
     vorname: { kind: "pseudonym", value: `Anonym-${tag}` },
     nachname: { kind: "pseudonym", value: "(gelöscht)" },
     kurzname: { kind: "null" },
-    geborene: { kind: "null" },
-    geburtsname: { kind: "null" },
-    genannt: { kind: "null" },
-    namensvorsatz: { kind: "null" },
-    namenszusatz: { kind: "null" },
     anrede: { kind: "null" },
     titel1: { kind: "null" },
-    titel2: { kind: "null" },
     // Address
     strasse: { kind: "null" },
     hausnummer: { kind: "null" },
     plz: { kind: "null" },
     ort: { kind: "null" },
     adresszusatz: { kind: "null" },
-    // Alternative postal addresses
-    strasseKih: { kind: "null" },
-    plzKih: { kind: "null" },
-    ortKih: { kind: "null" },
+    land: { kind: "null" },
+    // Legal representative / guardian (free-text PII for minors' Mahnungen).
+    // These are a third party's full name and postal address and must go too.
+    vertreterAnrede: { kind: "null" },
+    vertreterName: { kind: "null" },
+    vertreterStrasse: { kind: "null" },
+    vertreterHausnummer: { kind: "null" },
+    vertreterPlz: { kind: "null" },
+    vertreterOrt: { kind: "null" },
     // Contact
     email: { kind: "null" },
-    emailKih: { kind: "null" },
     telefon1: { kind: "null" },
     telefon2: { kind: "null" },
-    telefon3: { kind: "null" },
-    fax: { kind: "null" },
     www: { kind: "null" },
     // Demographics
     geburtsdatum: { kind: "null" },
     geburtsort: { kind: "null" },
     // Bank details — full plaintext IBAN is scrubbed; `iban1Last4` is kept
     // for SEPA mandate retention / R-transaction reconciliation per Rulebook.
+    // `abwKontoInh` is the alternative account holder's name (PII).
     iban1: { kind: "null" },
-    iban2: { kind: "null" },
-    iban3: { kind: "null" },
     bic1: { kind: "null" },
-    bank: { kind: "null" },
-    blz: { kind: "null" },
-    // Cards
-    // Identity documents
-    // Free text / notes that may contain personal narrative
+    abwKontoInh: { kind: "null" },
+    // Free text that may carry personal data.
+    firma1: { kind: "null" },
+    funktion: { kind: "null" },
     notes: { kind: "null" },
   };
 }

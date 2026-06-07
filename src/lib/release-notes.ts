@@ -41,6 +41,27 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.18.3",
+    date: "2026-06-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "SEPA-Lastschriftdatei: Namen und Verwendungszwecke mit Umlauten oder ß (z. B. „Schäfer“, „München“, „Straße“) werden jetzt in den von Banken zugelassenen Zeichensatz umgesetzt (ae, oe, ue, ss). Vorher konnte ein einziger Umlaut dazu führen, dass die Bank die komplette Datei ablehnt.",
+      },
+      {
+        category: "fix",
+        description:
+          "Suche: Eingaben mit % oder _ werden jetzt wörtlich gesucht statt als Platzhalter. Eine Suche nach „50%“ liefert keine unerwarteten Treffer mehr.",
+      },
+      {
+        category: "fix",
+        description:
+          "DSGVO-Löschung entfernt jetzt auch die hinterlegte gesetzliche Vertretung (Name und Anschrift), den abweichenden Kontoinhaber sowie Firma und Funktion. Veraltete Regeln für längst entfernte Felder wurden bereinigt.",
+      },
+    ],
+  },
+  {
     version: "0.18.2",
     date: "2026-06-07",
     changes: [

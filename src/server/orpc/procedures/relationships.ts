@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, eq, ne, or, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import { escapeLike } from "~/server/db/like";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { vorstandProc } from "~/server/orpc/base";
@@ -246,7 +247,7 @@ export const relationshipsRouter = {
     .handler(async ({ context, input }) => {
       const q = input.q.trim();
       if (q.length < 2) return [];
-      const like = `%${q}%`;
+      const like = `%${escapeLike(q)}%`;
       const rows = await context.db
         .select({
           id: membersTable.id,
