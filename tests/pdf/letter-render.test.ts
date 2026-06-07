@@ -129,7 +129,7 @@ describe("DIN 5008 letter templates", () => {
         ort: "Untereuerheim",
         vertretungFor: null,
       },
-      member: { mitgliedsnummer: "1234", name: "Erika Mustermann" },
+      member: { reference: "1234", isContact: false, name: "Erika Mustermann" },
       postings: [posting],
       openSum: "60.00",
       runDate: "2026-06-04",
@@ -137,8 +137,33 @@ describe("DIN 5008 letter templates", () => {
       vereinsname: org.vereinsname,
       kontaktEmail: "mitgliedschaft@untereuerheim.de",
     });
+    // A second letter exercises the contact-only reference and the waived fee
+    // branches so the template renders both paths.
+    const contactLetter = buildKulanzLetterModel({
+      recipient: {
+        anrede: null,
+        name: "Spedition Mustermann",
+        strasse: "Industriestraße",
+        hausnummer: "5",
+        plz: "97516",
+        ort: "Untereuerheim",
+        vertretungFor: null,
+      },
+      member: { reference: "A4711", isContact: true, name: "Spedition Mustermann" },
+      postings: [{ ...posting, rueckgebuhr: "3.00" }],
+      openSum: "63.00",
+      runDate: "2026-06-04",
+      deadlineDate: "2026-06-18",
+      vereinsname: org.vereinsname,
+      kontaktEmail: "mitgliedschaft@untereuerheim.de",
+      waiveReturnFee: true,
+    });
     await expectValidPdf(
-      KulanzSonderkuendigungDocument({ club, letters: [letter], docRef: "KS-2026-0001" }),
+      KulanzSonderkuendigungDocument({
+        club,
+        letters: [letter, contactLetter],
+        docRef: "KS-2026-0001",
+      }),
     );
   });
 });

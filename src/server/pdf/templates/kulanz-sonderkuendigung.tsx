@@ -93,7 +93,7 @@ function KulanzLetterPage({
         letter.vertretungFor ? `gesetzliche Vertretung von ${letter.vertretungFor}` : null
       }
       infoRows={[
-        { label: "Mitgliedsnummer", value: letter.mitgliedsnummer },
+        { label: letter.referenceLabel, value: letter.reference },
         { label: "Dokument", value: docRef },
         { label: "Datum", value: letter.datum },
       ]}
@@ -128,12 +128,21 @@ function KulanzLetterPage({
             <Text style={styles.c3}>{letter.rueckgebuhr}</Text>
           </View>
         ) : null}
+        {letter.rueckgebuhrWaived ? (
+          <View style={styles.tableRow} wrap={false}>
+            <Text style={styles.c1}> </Text>
+            <Text style={styles.c2}>SEPA-Rücklastgebühr (aus Kulanz erlassen)</Text>
+            <Text style={styles.c3}>0,00 €</Text>
+          </View>
+        ) : null}
         <View style={styles.totalsRow}>
           <Text style={styles.c1}> </Text>
           <Text style={styles.c2}>Offener Gesamtbetrag</Text>
           <Text style={styles.c3}>{letter.openSum}</Text>
         </View>
       </View>
+
+      {letter.feeWaiverNote ? <Text style={styles.para}>{letter.feeWaiverNote}</Text> : null}
 
       <View style={styles.paymentBox}>
         <Text style={{ marginBottom: 4, fontFamily: "Helvetica-Bold" }}>Bankverbindung</Text>
@@ -196,7 +205,7 @@ function KulanzResponsePage({
       returnLine={letter.recipientLines.join(" · ")}
       recipientLines={club.rueckantwort.adresseLines}
       infoRows={[
-        { label: "Mitgliedsnummer", value: letter.mitgliedsnummer },
+        { label: letter.referenceLabel, value: letter.reference },
         { label: "Dokument", value: docRef },
         { label: "Datum", value: letter.datum },
       ]}
@@ -215,9 +224,9 @@ function KulanzResponsePage({
       {club.rueckantwort.email ? (
         <Text style={[styles.para, styles.responseEmail]}>
           Sie müssen dieses Formular nicht zurücksenden. Eine formlose E-Mail an{" "}
-          {club.rueckantwort.email} mit Ihrem Namen und Ihrer Mitgliedsnummer gilt ebenso als
-          Kündigung. Wenn Sie möchten, senden Sie die unterschriebene Kündigungsbestätigung per Post
-          oder eingescannt per E-Mail.
+          {club.rueckantwort.email} mit Ihrem Namen und Ihrer {letter.referenceLabel} gilt ebenso
+          als Kündigung. Wenn Sie möchten, senden Sie die unterschriebene Kündigungsbestätigung per
+          Post oder eingescannt per E-Mail.
         </Text>
       ) : null}
     </LetterPage>

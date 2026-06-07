@@ -28,6 +28,7 @@ function sumDec(values: string[]): string {
 function KulanzPage() {
   const qc = useQueryClient();
   const [onlyWithoutEmail, setOnlyWithoutEmail] = useState(true);
+  const [waiveReturnFee, setWaiveReturnFee] = useState(false);
   const [deadline, setDeadline] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -52,6 +53,7 @@ function KulanzPage() {
       orpc.kulanz.generate({
         memberIds: [...selected],
         deadlineDate: deadline.trim() || null,
+        waiveReturnFee,
       }),
     onSuccess: (r) => {
       triggerDownloadBase64(r.filename, r.base64, "application/pdf");
@@ -74,14 +76,17 @@ function KulanzPage() {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const filteredTotals = useMemo(() => {
-    if (!preview.data) return { count: 0, openSum: "0", noAddress: 0 };
+    if (!preview.data) return { count: 0, openSum: "0", feeSum: "0", noAddress: 0 };
     const picked = preview.data.items.filter((i) => selected.has(i.memberId));
+    const feeSum = sumDec(picked.map((i) => i.feeSum));
+    const gross = sumDec(picked.map((i) => i.openSum));
     return {
       count: picked.length,
-      openSum: sumDec(picked.map((i) => i.openSum)),
+      openSum: waiveReturnFee ? sumDec([gross, `-${feeSum}`]) : gross,
+      feeSum,
       noAddress: picked.filter((i) => !i.hasAddress).length,
     };
-  }, [preview.data, selected]);
+  }, [preview.data, selected, waiveReturnFee]);
 
   function toggleAll() {
     if (!preview.data) return;
@@ -145,6 +150,13 @@ function KulanzPage() {
             description="Diese können wir nur per Post erreichen."
             checked={onlyWithoutEmail}
             onChange={(e) => setOnlyWithoutEmail(e.target.checked)}
+          />
+          <Switch
+            id="waive-return-fee"
+            label="SEPA-Rücklastgebühr erlassen"
+            description="Aus Kulanz nur den offenen Beitrag fordern."
+            checked={waiveReturnFee}
+            onChange={(e) => setWaiveReturnFee(e.target.checked)}
           />
           <Field label="Frist (Zahlung oder Kündigung)">
             <Input
@@ -216,8 +228,9 @@ function KulanzPage() {
                         {i.name}
                       </Link>
                       <span className="text-xs text-muted-foreground tabular-nums">
-                        #{i.mitgliedsnummer ?? i.adrNr}
+                        #{i.reference}
                       </span>
+                      {i.isContact ? <Badge variant="outline">Kontakt</Badge> : null}
                       {!i.hasEmail ? (
                         <Badge variant="secondary" className="gap-1">
                           <MailX className="size-3" /> keine E-Mail
@@ -248,6 +261,12 @@ function KulanzPage() {
               Summe offen:{" "}
               <strong className="tabular-nums">{formatCurrency(filteredTotals.openSum)}</strong>
             </span>
+            {waiveReturnFee && Number.parseFloat(filteredTotals.feeSum) > 0 ? (
+              <span className="text-xs text-muted-foreground">
+                Erlassene SEPA-Rücklastgebühr:{" "}
+                <span className="tabular-nums">{formatCurrency(filteredTotals.feeSum)}</span>
+              </span>
+            ) : null}
           </div>
           <Button
             disabled={filteredTotals.count === 0 || generate.isPending}
@@ -301,7 +320,9 @@ function KulanzPage() {
           if (!o && !generate.isPending) setConfirmOpen(false);
         }}
         title="Sammelbrief erzeugen"
-        description={`${filteredTotals.count} Schreiben mit Kündigungsbestätigung erzeugen? Es werden keine Mahnstufen verändert.`}
+        description={`${filteredTotals.count} Schreiben mit Kündigungsbestätigung erzeugen?${
+          waiveReturnFee ? " Die SEPA-Rücklastgebühr wird aus Kulanz erlassen." : ""
+        } Es werden keine Mahnstufen verändert.`}
         confirmLabel="Erzeugen"
         loading={generate.isPending}
         onConfirm={() => generate.mutate()}

@@ -8,6 +8,7 @@ import { contractsTable } from "~/server/db/schema/contracts";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { type KulanzRecipientSnapshot, kulanzLettersTable } from "~/server/db/schema/kulanz";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
+import { memberRef } from "~/server/domain/member";
 import {
   loadOpenPostings,
   memberDisplayName,
@@ -67,12 +68,18 @@ export const kulanzRouter = {
 
       let items = eligible.map((m) => {
         const resolved = recipients.get(m.memberId);
+        // SEPA return fee portion of the open sum, so the UI can show the net
+        // when the operator chooses to waive it out of goodwill.
+        const feeSum = sumDecimal(m.postings.map((p) => p.rueckgebuhr));
         return {
           memberId: m.memberId,
           mitgliedsnummer: m.mitgliedsnummer,
           adrNr: m.adrNr,
+          reference: memberRef({ mitgliedsnummer: m.mitgliedsnummer, adrNr: m.adrNr }),
+          isContact: !m.mitgliedsnummer?.trim(),
           name: memberDisplayName(m),
           openSum: m.openSum,
+          feeSum,
           postingCount: m.postings.length,
           hasEmail: !!resolved?.recipientEmail,
           hasAddress: !!(resolved?.recipient.strasse && resolved.recipient.plz),
@@ -91,6 +98,7 @@ export const kulanzRouter = {
         totals: {
           itemCount: items.length,
           openSum: sumDecimal(items.map((i) => i.openSum)),
+          feeSum: sumDecimal(items.map((i) => i.feeSum)),
           withoutAddress: items.filter((i) => !i.hasAddress).length,
         },
       };
@@ -109,6 +117,8 @@ export const kulanzRouter = {
         memberIds: v.pipe(v.array(v.string()), v.minLength(1)),
         runDate: v.optional(v.nullable(ISO_DATE), null),
         deadlineDate: v.optional(v.nullable(ISO_DATE), null),
+        /** Waive the SEPA return fee out of goodwill across the whole run. */
+        waiveReturnFee: v.optional(v.boolean(), false),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -179,7 +189,8 @@ export const kulanzRouter = {
       for (const m of eligible) {
         const resolved = recipients.get(m.memberId);
         const memberName = memberDisplayName(m);
-        const mitgliedsnummer = m.mitgliedsnummer ?? `AdrNr ${m.adrNr}`;
+        const reference = memberRef({ mitgliedsnummer: m.mitgliedsnummer, adrNr: m.adrNr });
+        const isContact = !m.mitgliedsnummer?.trim();
         const recipient = resolved?.recipient ?? {
           anrede: m.anrede,
           name: memberName,
@@ -199,7 +210,7 @@ export const kulanzRouter = {
               ort: recipient.ort,
               vertretungFor: resolved?.vertretungFor ?? null,
             },
-            member: { mitgliedsnummer, name: memberName },
+            member: { reference, isContact, name: memberName },
             postings: m.postings.map((p) => ({
               billingYear: p.billingYear,
               falligkeitsdatum: p.falligkeitsdatum,
@@ -212,12 +223,13 @@ export const kulanzRouter = {
             deadlineDate: deadlineStr,
             vereinsname: org.vereinsname,
             kontaktEmail: mitgliedschaftEmail,
+            waiveReturnFee: input.waiveReturnFee,
           }),
         );
         snapshot.push({
           memberId: m.memberId,
           name: memberName,
-          mitgliedsnummer,
+          mitgliedsnummer: reference,
           openSum: m.openSum,
         });
       }
@@ -234,7 +246,11 @@ export const kulanzRouter = {
       const id = randomUUID();
       const filename = `Kulanz-${safeFilenamePart(docRef)}-${eligible.length}-Schreiben.pdf`;
       const s3Key = `kulanz/${id}/${filename}`;
-      const totalOpen = sumDecimal(eligible.map((m) => m.openSum));
+      // Record the amount actually requested: net of the SEPA return fees when
+      // they were waived out of goodwill.
+      const totalOpen = input.waiveReturnFee
+        ? sumDecimal(eligible.flatMap((m) => m.postings.map((p) => p.openAmount)))
+        : sumDecimal(eligible.map((m) => m.openSum));
 
       await putObject({ key: s3Key, body: pdf, contentType: "application/pdf" });
 

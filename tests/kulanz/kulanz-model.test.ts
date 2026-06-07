@@ -18,7 +18,7 @@ const baseLetter = {
     ort: "Untereuerheim",
     vertretungFor: null as string | null,
   },
-  member: { mitgliedsnummer: "123", name: "Max Mustermann" },
+  member: { reference: "123", isContact: false, name: "Max Mustermann" },
   postings: [
     {
       billingYear: 2024,
@@ -139,6 +139,8 @@ describe("buildKulanzLetterModel", () => {
     });
     expect(m.openSum).toBe("60,00 €");
     expect(m.rueckgebuhr).toBeNull();
+    expect(m.rueckgebuhrWaived).toBeNull();
+    expect(m.feeWaiverNote).toBeNull();
   });
 
   it("surfaces SEPA return fees as a separate line so the rows reconcile with the total", () => {
@@ -155,14 +157,55 @@ describe("buildKulanzLetterModel", () => {
     });
     expect(m.postings.map((p) => p.offen)).toEqual(["30,00 €", "30,00 €"]);
     expect(m.rueckgebuhr).toBe("3,00 €");
+    expect(m.rueckgebuhrWaived).toBeNull();
     // 30,00 + 30,00 + 3,00 fee = 63,00 total shown.
     expect(m.openSum).toBe("63,00 €");
+  });
+
+  it("waives the SEPA return fee out of goodwill: drops it from the total and states so", () => {
+    const m = buildKulanzLetterModel({
+      ...baseLetter,
+      postings: [
+        { ...baseLetter.postings[0]!, rueckgebuhr: "3.00" },
+        { ...baseLetter.postings[1]!, rueckgebuhr: "0.00" },
+      ],
+      openSum: "63.00",
+      waiveReturnFee: true,
+    });
+    expect(m.rueckgebuhr).toBeNull();
+    expect(m.rueckgebuhrWaived).toBe("3,00 €");
+    expect(m.feeWaiverNote).toContain("3,00 €");
+    expect(m.feeWaiverNote).toContain("erlassen");
+    // Only the Beitrag remains payable: 30,00 + 30,00 = 60,00.
+    expect(m.openSum).toBe("60,00 €");
+  });
+
+  it("ignores the waive flag when there is no SEPA return fee", () => {
+    const m = buildKulanzLetterModel({ ...baseLetter, waiveReturnFee: true });
+    expect(m.rueckgebuhr).toBeNull();
+    expect(m.rueckgebuhrWaived).toBeNull();
+    expect(m.feeWaiverNote).toBeNull();
+    expect(m.openSum).toBe("60,00 €");
   });
 
   it("builds the tear-off slip with member identity and club name", () => {
     const m = buildKulanzLetterModel(baseLetter);
     expect(m.slip.intro).toBe("Hiermit kündige ich meine Mitgliedschaft beim SV Untereuerheim.");
     expect(m.slip.memberLine).toBe("Max Mustermann · Mitgliedsnummer 123");
+    expect(m.referenceLabel).toBe("Mitgliedsnummer");
+    expect(m.reference).toBe("123");
+  });
+
+  it("uses a neutral reference label for contact-only payers without a Mitgliedsnummer", () => {
+    const m = buildKulanzLetterModel({
+      ...baseLetter,
+      member: { reference: "A4711", isContact: true, name: "Max Mustermann" },
+    });
+    expect(m.referenceLabel).toBe("Referenz");
+    expect(m.reference).toBe("A4711");
+    expect(m.slip.memberLine).toBe("Max Mustermann · Referenz A4711");
+    expect(m.verwendungszweck).toContain("Referenz A4711");
+    expect(m.kulanzEmail).toContain("Ihre Referenz");
   });
 
   it("drops empty address lines and surfaces the guardian note", () => {
