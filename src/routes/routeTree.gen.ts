@@ -53,6 +53,7 @@ import { Route as AppBerichteAbteilungsStatistikRouteImport } from './app/berich
 import { Route as AppBeitragNeuRouteImport } from './app/beitrag/neu'
 import { Route as AppBeitragIdRouteImport } from './app/beitrag/$id'
 import { Route as AppAdminSnapshotsRouteImport } from './app/admin/snapshots'
+import { Route as AppAdminProtokollRouteImport } from './app/admin/protokoll'
 import { Route as AppAdminErweitertRouteImport } from './app/admin/erweitert'
 import { Route as ApiRpcSplatRouteImport } from './api/rpc.$'
 import { Route as ApiPortalLogoutRouteImport } from './api/portal.logout'
@@ -294,6 +295,11 @@ const AppAdminSnapshotsRoute = AppAdminSnapshotsRouteImport.update({
   path: '/admin/snapshots',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppAdminProtokollRoute = AppAdminProtokollRouteImport.update({
+  id: '/admin/protokoll',
+  path: '/admin/protokoll',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppAdminErweitertRoute = AppAdminErweitertRouteImport.update({
   id: '/admin/erweitert',
   path: '/admin/erweitert',
@@ -394,6 +400,7 @@ export interface FileRoutesByFullPath {
   '/api/portal/logout': typeof ApiPortalLogoutRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
+  '/app/admin/protokoll': typeof AppAdminProtokollRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
@@ -451,6 +458,7 @@ export interface FileRoutesByTo {
   '/api/portal/logout': typeof ApiPortalLogoutRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
+  '/app/admin/protokoll': typeof AppAdminProtokollRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
@@ -511,6 +519,7 @@ export interface FileRoutesById {
   '/api/portal/logout': typeof ApiPortalLogoutRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
+  '/app/admin/protokoll': typeof AppAdminProtokollRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
@@ -572,6 +581,7 @@ export interface FileRouteTypes {
     | '/api/portal/logout'
     | '/api/rpc/$'
     | '/app/admin/erweitert'
+    | '/app/admin/protokoll'
     | '/app/admin/snapshots'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
@@ -629,6 +639,7 @@ export interface FileRouteTypes {
     | '/api/portal/logout'
     | '/api/rpc/$'
     | '/app/admin/erweitert'
+    | '/app/admin/protokoll'
     | '/app/admin/snapshots'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
@@ -688,6 +699,7 @@ export interface FileRouteTypes {
     | '/api/portal/logout'
     | '/api/rpc/$'
     | '/app/admin/erweitert'
+    | '/app/admin/protokoll'
     | '/app/admin/snapshots'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
@@ -1046,6 +1058,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminSnapshotsRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/admin/protokoll': {
+      id: '/app/admin/protokoll'
+      path: '/admin/protokoll'
+      fullPath: '/app/admin/protokoll'
+      preLoaderRoute: typeof AppAdminProtokollRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/admin/erweitert': {
       id: '/app/admin/erweitert'
       path: '/admin/erweitert'
@@ -1152,6 +1171,7 @@ interface AppRouteRouteChildren {
   AppZahlungsabgleichRoute: typeof AppZahlungsabgleichRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAdminErweitertRoute: typeof AppAdminErweitertRoute
+  AppAdminProtokollRoute: typeof AppAdminProtokollRoute
   AppAdminSnapshotsRoute: typeof AppAdminSnapshotsRoute
   AppBeitragIdRoute: typeof AppBeitragIdRoute
   AppBeitragNeuRoute: typeof AppBeitragNeuRoute
@@ -1194,6 +1214,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppZahlungsabgleichRoute: AppZahlungsabgleichRoute,
   AppIndexRoute: AppIndexRoute,
   AppAdminErweitertRoute: AppAdminErweitertRoute,
+  AppAdminProtokollRoute: AppAdminProtokollRoute,
   AppAdminSnapshotsRoute: AppAdminSnapshotsRoute,
   AppBeitragIdRoute: AppBeitragIdRoute,
   AppBeitragNeuRoute: AppBeitragNeuRoute,
