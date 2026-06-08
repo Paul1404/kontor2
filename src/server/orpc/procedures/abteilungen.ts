@@ -3,6 +3,7 @@ import { and, asc, count, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
+import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { slugify } from "~/server/importer/abteilung-splitter";
@@ -12,6 +13,7 @@ import {
   CACHE_NS,
   cached,
   invalidateAbteilungCaches,
+  invalidateFeeTypeCaches,
   invalidateMemberCaches,
 } from "~/server/search/cache";
 
@@ -208,6 +210,104 @@ export const abteilungenRouter = {
     await invalidateAbteilungCaches();
     return { ok: true };
   }),
+
+  /**
+   * Merge a duplicate Abteilung into a target one: all memberships move from
+   * the source to the target, fee types relabel to the target name, and the
+   * source Abteilung is deleted. The membership PK is
+   * (member, abteilung, eintrittsdatum), so a member who already sits in the
+   * target for the same Eintrittsdatum keeps the target row; if the source row
+   * was still active, the surviving target row is reactivated.
+   */
+  merge: adminProc
+    .input(v.object({ fromId: v.string(), toId: v.string() }))
+    .handler(async ({ context, input }) => {
+      if (input.fromId === input.toId) {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: "Quelle und Ziel müssen unterschiedlich sein.",
+        });
+      }
+      const result = await context.db.transaction(async (tx) => {
+        const [from] = await tx
+          .select()
+          .from(abteilungenTable)
+          .where(eq(abteilungenTable.id, input.fromId))
+          .limit(1);
+        if (!from) throw new ORPCError("NOT_FOUND", { message: "Quell-Abteilung nicht gefunden." });
+        const [to] = await tx
+          .select()
+          .from(abteilungenTable)
+          .where(eq(abteilungenTable.id, input.toId))
+          .limit(1);
+        if (!to) throw new ORPCError("NOT_FOUND", { message: "Ziel-Abteilung nicht gefunden." });
+
+        const [before] = await tx
+          .select({ c: count() })
+          .from(memberAbteilungenTable)
+          .where(eq(memberAbteilungenTable.abteilungId, input.fromId));
+        const totalLinks = before?.c ?? 0;
+
+        // Move links that don't collide with an existing target membership for
+        // the same Eintrittsdatum.
+        await tx.execute(sql`
+          update member_abteilungen ma set abteilung_id = ${input.toId}
+          where ma.abteilung_id = ${input.fromId}
+            and not exists (
+              select 1 from member_abteilungen x
+              where x.member_id = ma.member_id
+                and x.abteilung_id = ${input.toId}
+                and x.eintrittsdatum = ma.eintrittsdatum
+            )`);
+
+        // For colliding links, prefer an active membership: if the source row
+        // was still active, reactivate the surviving target row.
+        await tx.execute(sql`
+          update member_abteilungen t set austrittsdatum = null
+          where t.abteilung_id = ${input.toId}
+            and t.austrittsdatum is not null
+            and exists (
+              select 1 from member_abteilungen s
+              where s.member_id = t.member_id
+                and s.abteilung_id = ${input.fromId}
+                and s.eintrittsdatum = t.eintrittsdatum
+                and s.austrittsdatum is null
+            )`);
+
+        // Drop the leftover colliding source links, then the Abteilung itself.
+        await tx
+          .delete(memberAbteilungenTable)
+          .where(eq(memberAbteilungenTable.abteilungId, input.fromId));
+
+        // Fee types carry the Abteilung as a text label; keep them consistent.
+        await tx
+          .update(feeTypesTable)
+          .set({ abteilung: to.name, updatedAt: new Date() })
+          .where(eq(feeTypesTable.abteilung, from.name));
+
+        await tx.delete(abteilungenTable).where(eq(abteilungenTable.id, input.fromId));
+
+        await appendAudit(tx, {
+          entityType: "abteilung",
+          entityId: input.fromId,
+          action: "delete",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            ...diff({ name: from.name, slug: from.slug }, {}),
+            __mergedInto: { before: null, after: to.name },
+            __reassignedLinks: { before: null, after: totalLinks },
+          },
+          requestId: context.requestId ?? null,
+        });
+
+        return { reassigned: totalLinks, fromName: from.name, toName: to.name };
+      });
+      await invalidateAbteilungCaches();
+      await invalidateMemberCaches();
+      await invalidateFeeTypeCaches();
+      return result;
+    }),
 
   assignMember: vorstandProc
     .input(

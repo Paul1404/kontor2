@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { ABTEILUNG_NONE_FILTER } from "~/lib/abteilung-filter";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
 import { escapeLike } from "~/server/db/like";
@@ -354,7 +355,17 @@ export const membersRouter = {
     }
 
     let memberIdsByAbt: string[] | null = null;
-    if (input.abteilungId) {
+    if (input.abteilungId === ABTEILUNG_NONE_FILTER) {
+      // "Ohne Abteilung": members with no active department membership. Surfaces
+      // the Linear rows that carried no Abteilung (or only the "Keine-Abteilung"
+      // sentinel) so the office can find and fix them.
+      conditions.push(
+        sql`not exists (
+          select 1 from ${memberAbteilungenTable} ma
+          where ma.member_id = ${membersTable.id} and ma.austrittsdatum is null
+        )` as never,
+      );
+    } else if (input.abteilungId) {
       const rows = await context.db
         .select({ memberId: memberAbteilungenTable.memberId })
         .from(memberAbteilungenTable)

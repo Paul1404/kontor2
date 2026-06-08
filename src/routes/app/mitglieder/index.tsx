@@ -28,6 +28,7 @@ import { Input } from "~/components/ui/input";
 import { PageSizeSelect, usePersistentPageSize } from "~/components/ui/page-size-select";
 import { SkeletonTableRows } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
+import { ABTEILUNG_NONE_FILTER } from "~/lib/abteilung-filter";
 import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
@@ -418,9 +419,12 @@ function MembersListPage() {
     search.orphanOnly ||
     search.deletedOnly;
 
-  const abteilungName = search.abteilungId
-    ? abteilungen.data?.find((a) => a.id === search.abteilungId)?.name
-    : null;
+  const abteilungName =
+    search.abteilungId === ABTEILUNG_NONE_FILTER
+      ? "Ohne Abteilung"
+      : search.abteilungId
+        ? abteilungen.data?.find((a) => a.id === search.abteilungId)?.name
+        : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -580,6 +584,7 @@ function MembersListPage() {
               className="h-10 min-w-0 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
             >
               <option value="">Alle Abteilungen</option>
+              <option value={ABTEILUNG_NONE_FILTER}>Ohne Abteilung</option>
               {abteilungen.data?.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name} ({a.count})

@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.27.0",
+    date: "2026-06-08",
+    title: "Datenpflege und Keine Abteilung",
+    changes: [
+      {
+        category: "feature",
+        description:
+          'Auf der Datenqualität-Seite lassen sich doppelte Beitragsarten und doppelte Abteilungen zusammenführen. Alle Verträge bzw. Mitgliedschaften wandern auf den Zieleintrag, der Quelleintrag wird gelöscht. Damit verschwindet zum Beispiel eine Altlast wie "Erwachsene doppelt".',
+      },
+      {
+        category: "feature",
+        description:
+          'Die Mitgliederliste hat einen Filter "Ohne Abteilung", der alle aktiven Mitglieder ohne Spartenzuordnung zeigt.',
+      },
+      {
+        category: "improvement",
+        description:
+          'Der Import legt für die Linear-Markierung "Keine-Abteilung" jetzt eine echte Abteilung "Keine Abteilung" an, statt sie zu verwerfen. Betroffene Mitglieder bleiben so auffindbar. Wirkt beim nächsten Import.',
+      },
+    ],
+  },
+  {
     version: "0.26.1",
     date: "2026-06-08",
     title: "Korrekturen und Feinschliff",

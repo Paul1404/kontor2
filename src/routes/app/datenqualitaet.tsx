@@ -1,10 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronRight, ListChecks, Loader2, ShieldCheck } from "lucide-react";
+import { ChevronRight, GitMerge, ListChecks, Loader2, ShieldCheck, Wrench } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
-import { Card, CardContent } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { QueryError } from "~/components/ui/query-error";
+import { toast } from "~/components/ui/toaster";
 import { cn } from "~/lib/cn";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -151,7 +154,257 @@ function DatenqualitaetPage() {
           </button>
         </div>
       ) : null}
+
+      <DatenpflegeSection />
     </div>
+  );
+}
+
+/**
+ * Admin-only cleanup tools for legacy reference data: merge a duplicate
+ * Beitragsart or Abteilung into the correct one. Both actions reassign
+ * everything that pointed at the source and then delete it, so they are gated
+ * behind a confirm dialog and the admin role.
+ */
+function DatenpflegeSection() {
+  const me = useQuery({ queryKey: ["me"], queryFn: () => orpc.auth.me(), retry: false });
+  if (me.data?.role !== "admin") return null;
+  return (
+    <div className="mt-2 flex flex-col gap-3 border-t border-border pt-6">
+      <div className="flex flex-col gap-1">
+        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <Wrench className="size-5 text-brand" /> Datenpflege
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Doppelte oder veraltete Stammdaten bereinigen. Die Aktionen sind dauerhaft und werden im
+          Protokoll festgehalten.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <FeeTypeMergeCard />
+        <AbteilungMergeCard />
+      </div>
+    </div>
+  );
+}
+
+const selectClass =
+  "h-10 w-full rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30";
+
+function FeeTypeMergeCard() {
+  const qc = useQueryClient();
+  const list = useQuery({ queryKey: ["feeTypes.list"], queryFn: () => orpc.feeTypes.list() });
+  const [fromArt, setFromArt] = useState("");
+  const [toArt, setToArt] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const merge = useMutation({
+    mutationFn: () => orpc.feeTypes.merge({ fromArt: Number(fromArt), toArt: Number(toArt) }),
+    onSuccess: (r) => {
+      toast.success("Beitragsart zusammengeführt.", {
+        description: `${r.reassigned} Vertrag/Verträge auf Beitragsart ${r.toArt} umgestellt.`,
+      });
+      setConfirmOpen(false);
+      setFromArt("");
+      setToArt("");
+      qc.invalidateQueries({ queryKey: ["feeTypes.list"] });
+      qc.invalidateQueries({ queryKey: ["dataQuality.summary"] });
+    },
+    onError: (e: Error) => toast.error("Zusammenführen fehlgeschlagen", { description: e.message }),
+  });
+
+  const rows = list.data ?? [];
+  const valid = fromArt !== "" && toArt !== "" && fromArt !== toArt;
+  const fromRow = rows.find((r) => String(r.art) === fromArt);
+  const toRow = rows.find((r) => String(r.art) === toArt);
+  const label = (r: (typeof rows)[number]) =>
+    `${r.art} ${r.bezeichnung ?? "ohne Name"} (${r.contractCount} Verträge)`;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <GitMerge className="size-4 text-muted-foreground" /> Beitragsart zusammenführen
+        </CardTitle>
+        <CardDescription>
+          Verschiebt alle Verträge der Quelle auf das Ziel und löscht die Quelle. Für doppelte
+          Altlasten wie "Erwachsene doppelt".
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {list.isError ? (
+          <QueryError onRetry={() => list.refetch()} />
+        ) : (
+          <>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-muted-foreground">Quelle (wird gelöscht)</span>
+              <select
+                className={selectClass}
+                value={fromArt}
+                onChange={(e) => setFromArt(e.target.value)}
+                disabled={list.isLoading}
+              >
+                <option value="">Bitte wählen…</option>
+                {rows.map((r) => (
+                  <option key={r.art} value={r.art}>
+                    {label(r)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-muted-foreground">Ziel (bleibt erhalten)</span>
+              <select
+                className={selectClass}
+                value={toArt}
+                onChange={(e) => setToArt(e.target.value)}
+                disabled={list.isLoading}
+              >
+                <option value="">Bitte wählen…</option>
+                {rows
+                  .filter((r) => String(r.art) !== fromArt)
+                  .map((r) => (
+                    <option key={r.art} value={r.art}>
+                      {label(r)}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!valid}
+              onClick={() => setConfirmOpen(true)}
+              className="self-start"
+            >
+              <GitMerge className="size-4" /> Zusammenführen
+            </Button>
+          </>
+        )}
+      </CardContent>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(o) => !merge.isPending && setConfirmOpen(o)}
+        title="Beitragsart zusammenführen?"
+        description={
+          fromRow && toRow
+            ? `Alle ${fromRow.contractCount} Vertrag/Verträge der Beitragsart ${fromRow.art} (${fromRow.bezeichnung ?? "ohne Name"}) werden auf ${toRow.art} (${toRow.bezeichnung ?? "ohne Name"}) umgestellt. Anschließend wird ${fromRow.art} gelöscht. Das lässt sich nicht rückgängig machen.`
+            : undefined
+        }
+        confirmLabel="Zusammenführen"
+        destructive
+        loading={merge.isPending}
+        onConfirm={() => merge.mutate()}
+      />
+    </Card>
+  );
+}
+
+function AbteilungMergeCard() {
+  const qc = useQueryClient();
+  const list = useQuery({ queryKey: ["abteilungen.list"], queryFn: () => orpc.abteilungen.list() });
+  const [fromId, setFromId] = useState("");
+  const [toId, setToId] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const merge = useMutation({
+    mutationFn: () => orpc.abteilungen.merge({ fromId, toId }),
+    onSuccess: (r) => {
+      toast.success("Abteilung zusammengeführt.", {
+        description: `${r.reassigned} Mitgliedschaft(en) von "${r.fromName}" nach "${r.toName}" verschoben.`,
+      });
+      setConfirmOpen(false);
+      setFromId("");
+      setToId("");
+      qc.invalidateQueries({ queryKey: ["abteilungen.list"] });
+      qc.invalidateQueries({ queryKey: ["dataQuality.summary"] });
+    },
+    onError: (e: Error) => toast.error("Zusammenführen fehlgeschlagen", { description: e.message }),
+  });
+
+  const rows = list.data ?? [];
+  const valid = fromId !== "" && toId !== "" && fromId !== toId;
+  const fromRow = rows.find((r) => r.id === fromId);
+  const toRow = rows.find((r) => r.id === toId);
+  const label = (r: (typeof rows)[number]) => `${r.name} (${r.totalCount} Mitgliedschaften)`;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <GitMerge className="size-4 text-muted-foreground" /> Abteilung zusammenführen
+        </CardTitle>
+        <CardDescription>
+          Verschiebt alle Mitgliedschaften der Quelle auf das Ziel und löscht die Quelle. Für
+          doppelt angelegte Sparten.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {list.isError ? (
+          <QueryError onRetry={() => list.refetch()} />
+        ) : (
+          <>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-muted-foreground">Quelle (wird gelöscht)</span>
+              <select
+                className={selectClass}
+                value={fromId}
+                onChange={(e) => setFromId(e.target.value)}
+                disabled={list.isLoading}
+              >
+                <option value="">Bitte wählen…</option>
+                {rows.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {label(r)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-muted-foreground">Ziel (bleibt erhalten)</span>
+              <select
+                className={selectClass}
+                value={toId}
+                onChange={(e) => setToId(e.target.value)}
+                disabled={list.isLoading}
+              >
+                <option value="">Bitte wählen…</option>
+                {rows
+                  .filter((r) => r.id !== fromId)
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {label(r)}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!valid}
+              onClick={() => setConfirmOpen(true)}
+              className="self-start"
+            >
+              <GitMerge className="size-4" /> Zusammenführen
+            </Button>
+          </>
+        )}
+      </CardContent>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(o) => !merge.isPending && setConfirmOpen(o)}
+        title="Abteilung zusammenführen?"
+        description={
+          fromRow && toRow
+            ? `Alle ${fromRow.totalCount} Mitgliedschaft(en) von "${fromRow.name}" werden nach "${toRow.name}" verschoben. Anschließend wird "${fromRow.name}" gelöscht. Das lässt sich nicht rückgängig machen.`
+            : undefined
+        }
+        confirmLabel="Zusammenführen"
+        destructive
+        loading={merge.isPending}
+        onConfirm={() => merge.mutate()}
+      />
+    </Card>
   );
 }
 
