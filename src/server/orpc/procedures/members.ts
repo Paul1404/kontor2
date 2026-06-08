@@ -98,6 +98,8 @@ const StammdatenInput = v.object({
   vertreterPlz: v.optional(v.nullable(v.string())),
   vertreterOrt: v.optional(v.nullable(v.string())),
   notes: v.optional(v.nullable(v.string())),
+  /** Suspends SEPA direct debit: the Beitragslauf skips this member. */
+  directDebitBlocked: v.optional(v.nullable(v.boolean())),
 });
 
 /**
@@ -216,6 +218,7 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   setIfPresent("vertreterPlz");
   setIfPresent("vertreterOrt");
   setIfPresent("notes");
+  setIfPresent("directDebitBlocked");
 
   if ("geburtsdatum" in input)
     patch.geburtsdatum = toDateOrNull(input.geburtsdatum, "Geburtsdatum");
@@ -849,6 +852,7 @@ export const membersRouter = {
               (patch.verstorbenAm as Date | null) ?? null,
             ),
             dunningBlocked: false,
+            directDebitBlocked: false,
           };
           const [inserted] = await tx
             .insert(membersTable)
@@ -1578,6 +1582,7 @@ export const membersRouter = {
               (patch.verstorbenAm as Date | null) ?? null,
             ),
             dunningBlocked: false,
+            directDebitBlocked: false,
           };
           const [inserted] = await tx
             .insert(membersTable)

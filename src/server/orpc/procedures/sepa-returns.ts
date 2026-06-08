@@ -1,13 +1,96 @@
 import { ORPCError } from "@orpc/server";
-import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import { matchCamtReturns, parseCamt054, type ReturnableItem } from "~/server/bank/camt054";
+import type { DB } from "~/server/db/client";
 import { escapeLike } from "~/server/db/like";
 import { sepaReturnsTable } from "~/server/db/schema/dunning";
 import { feeRunItemsTable, feeRunsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
+import { memberRef } from "~/server/domain/member";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
+
+type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0];
+
+type ReturnItemRef = { id: string; memberId: string; sollStellungId: string | null };
+
+/**
+ * Record one SEPA return inside a transaction: claim the fee_run_item (so a
+ * double-submit cannot reopen the same posting twice), insert the sepa_returns
+ * row, reopen the linked Sollstellung, and write the audit entry. Returns the
+ * new return id, or null when the item had already been returned.
+ *
+ * Reopening resets `mahnstufe` to 0: a freshly failed collection must restart
+ * the Mahnwesen at the Erinnerung, not jump in at whatever level the posting
+ * happened to carry before.
+ */
+async function recordReturn(
+  tx: Tx,
+  actor: { actorId: string; actorEmail: string; requestId: string | null; source: "ui" | "import" },
+  item: ReturnItemRef,
+  data: {
+    returnedOn: string;
+    reasonCode: string | null;
+    reasonText: string | null;
+    rueckgebuhr: string;
+    notes: string | null;
+  },
+): Promise<string | null> {
+  const claimed = await tx
+    .update(feeRunItemsTable)
+    .set({ returnedAt: new Date(), returnReasonCode: data.reasonCode ?? null })
+    .where(and(eq(feeRunItemsTable.id, item.id), isNull(feeRunItemsTable.returnedAt)))
+    .returning({ id: feeRunItemsTable.id });
+  if (claimed.length === 0) return null;
+
+  const [row] = await tx
+    .insert(sepaReturnsTable)
+    .values({
+      feeRunItemId: item.id,
+      sollStellungId: item.sollStellungId,
+      memberId: item.memberId,
+      returnedOn: data.returnedOn,
+      reasonCode: data.reasonCode,
+      reasonText: data.reasonText,
+      rueckgebuhr: data.rueckgebuhr,
+      notes: data.notes,
+      createdBy: actor.actorId,
+    } as never)
+    .returning({ id: sepaReturnsTable.id });
+
+  // Reopen the Sollstellung: paid back to 0, status=returned, openAmount=full,
+  // and the dunning ladder reset to 0.
+  if (item.sollStellungId) {
+    await tx
+      .update(sollStellungenTable)
+      .set({
+        status: "returned",
+        paidAmount: "0",
+        openAmount: sql`${sollStellungenTable.amount}`,
+        mahnstufe: 0,
+        updatedAt: new Date(),
+      })
+      .where(eq(sollStellungenTable.id, item.sollStellungId));
+  }
+
+  await appendAudit(tx, {
+    entityType: "sepa_return",
+    entityId: row!.id,
+    action: "create",
+    source: actor.source,
+    actorId: actor.actorId,
+    actorEmail: actor.actorEmail,
+    changes: {
+      feeRunItemId: { before: null, after: item.id },
+      reasonCode: { before: null, after: data.reasonCode },
+      rueckgebuhr: { before: null, after: data.rueckgebuhr },
+    },
+    requestId: actor.requestId ?? null,
+  });
+  return row!.id;
+}
 
 const KnownReasonCodes = v.picklist([
   "AC04", // closed account
@@ -174,72 +257,185 @@ export const sepaReturnsRouter = {
     }
 
     const result = await context.db.transaction(async (tx) => {
-      // Claim the item atomically: mark it returned only if it isn't
-      // already. This closes the race between the pre-check above and the
-      // insert — a double-submit would otherwise create two returns (double
-      // Rücklastgebühr, Sollstellung reopened twice), since there is no
-      // unique constraint on fee_run_item_id.
-      const claimed = await tx
-        .update(feeRunItemsTable)
-        .set({
-          returnedAt: new Date(),
-          returnReasonCode: input.reasonCode ?? null,
-        })
-        .where(and(eq(feeRunItemsTable.id, item.id), isNull(feeRunItemsTable.returnedAt)))
-        .returning({ id: feeRunItemsTable.id });
-      if (claimed.length === 0) {
-        throw new ORPCError("CONFLICT", {
-          message: "Diese Lastschrift wurde bereits als Rückläufer erfasst.",
-        });
-      }
-
-      const [row] = await tx
-        .insert(sepaReturnsTable)
-        .values({
-          feeRunItemId: item.id,
-          sollStellungId: item.sollStellungId,
-          memberId: item.memberId,
+      const id = await recordReturn(
+        tx,
+        {
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          requestId: context.requestId ?? null,
+          source: "ui",
+        },
+        item,
+        {
           returnedOn: input.returnedOn,
           reasonCode: input.reasonCode,
           reasonText: input.reasonText,
           rueckgebuhr: gebuhr,
           notes: input.notes,
-          createdBy: context.session!.user.id,
-        } as never)
-        .returning({ id: sepaReturnsTable.id });
-
-      // Reopen the Sollstellung: paid back to 0, status=returned, openAmount=full
-      if (item.sollStellungId) {
-        await tx
-          .update(sollStellungenTable)
-          .set({
-            status: "returned",
-            paidAmount: "0",
-            openAmount: sql`${sollStellungenTable.amount}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(sollStellungenTable.id, item.sollStellungId));
-      }
-
-      await appendAudit(tx, {
-        entityType: "sepa_return",
-        entityId: row!.id,
-        action: "create",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: {
-          feeRunItemId: { before: null, after: item.id },
-          reasonCode: { before: null, after: input.reasonCode },
-          rueckgebuhr: { before: null, after: gebuhr },
         },
-        requestId: context.requestId ?? null,
-      });
-      return row!.id;
+      );
+      if (!id) {
+        throw new ORPCError("CONFLICT", {
+          message: "Diese Lastschrift wurde bereits als Rückläufer erfasst.",
+        });
+      }
+      return id;
     });
 
     return { id: result };
   }),
+
+  /**
+   * Parse an uploaded camt.054 (Rücklastschrift) file and match each returned
+   * debit to a committed fee_run_item by EndToEndId. No writes -- the operator
+   * confirms the matched set, then calls `importCamt`.
+   */
+  previewCamt: vorstandProc
+    .input(v.object({ xml: v.pipe(v.string(), v.minLength(1)) }))
+    .handler(async ({ context, input }) => {
+      const parsed = parseCamt054(input.xml);
+
+      const e2eIds = parsed.returns
+        .map((r) => r.endToEndId)
+        .filter((id): id is string => !!id && id.length > 0);
+
+      const items =
+        e2eIds.length === 0
+          ? []
+          : await context.db
+              .select({
+                feeRunItemId: feeRunItemsTable.id,
+                endToEndId: feeRunItemsTable.endToEndId,
+                amount: feeRunItemsTable.amount,
+                returnedAt: feeRunItemsTable.returnedAt,
+                billingYear: feeRunsTable.billingYear,
+                memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
+                memberNo: membersTable.memberNo,
+                kontaktNo: membersTable.kontaktNo,
+                mitgliedsnummer: membersTable.mitgliedsnummer,
+                adrNr: membersTable.adrNr,
+              })
+              .from(feeRunItemsTable)
+              .innerJoin(feeRunsTable, eq(feeRunItemsTable.feeRunId, feeRunsTable.id))
+              .innerJoin(membersTable, eq(feeRunItemsTable.memberId, membersTable.id))
+              .where(inArray(feeRunItemsTable.endToEndId, e2eIds));
+
+      const refByItem = new Map(items.map((i) => [i.feeRunItemId, i]));
+      const returnable: ReturnableItem[] = items.map((i) => ({
+        feeRunItemId: i.feeRunItemId,
+        endToEndId: i.endToEndId,
+        amount: i.amount,
+        alreadyReturned: i.returnedAt != null,
+      }));
+
+      const matches = matchCamtReturns(parsed.returns, returnable);
+      let matched = 0;
+      let alreadyReturned = 0;
+      let unmatched = 0;
+      const rows = matches.map((m, idx) => {
+        if (m.status === "matched") matched += 1;
+        else if (m.status === "already_returned") alreadyReturned += 1;
+        else unmatched += 1;
+        const ref = m.item ? refByItem.get(m.item.feeRunItemId) : null;
+        return {
+          index: idx,
+          status: m.status,
+          endToEndId: m.ret.endToEndId,
+          amount: m.ret.amount,
+          reasonCode: m.ret.reasonCode,
+          reasonText: m.ret.reasonText,
+          returnedOn: m.ret.returnedOn,
+          debtorName: m.ret.debtorName,
+          feeRunItemId: m.item?.feeRunItemId ?? null,
+          member: ref
+            ? {
+                name: ref.memberName,
+                ref: memberRef(ref),
+                billingYear: ref.billingYear,
+                amount: ref.amount,
+              }
+            : null,
+        };
+      });
+
+      return {
+        warnings: parsed.warnings,
+        totals: { total: matches.length, matched, alreadyReturned, unmatched },
+        rows,
+      };
+    }),
+
+  /**
+   * Apply confirmed camt.054 matches: record one return per fee_run_item,
+   * reopening each Sollstellung. Skips any item already returned. The
+   * Rücklastgebühr falls back to the org-wide default unless overridden.
+   */
+  importCamt: vorstandProc
+    .input(
+      v.object({
+        items: v.pipe(
+          v.array(
+            v.object({
+              feeRunItemId: v.string(),
+              returnedOn: v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)),
+              reasonCode: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(35))), null),
+              reasonText: v.optional(v.nullable(v.string()), null),
+              rueckgebuhr: v.optional(v.nullable(MoneyString), null),
+            }),
+          ),
+          v.minLength(1),
+        ),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+      const defaultFee = org?.sepaReturnFee && org.sepaReturnFee !== "0" ? org.sepaReturnFee : "0";
+
+      const ids = input.items.map((i) => i.feeRunItemId);
+      const items = await context.db
+        .select({
+          id: feeRunItemsTable.id,
+          memberId: feeRunItemsTable.memberId,
+          sollStellungId: feeRunItemsTable.sollStellungId,
+        })
+        .from(feeRunItemsTable)
+        .where(inArray(feeRunItemsTable.id, ids));
+      const itemById = new Map(items.map((i) => [i.id, i]));
+
+      const out = await context.db.transaction(async (tx) => {
+        let imported = 0;
+        let skipped = 0;
+        for (const want of input.items) {
+          const item = itemById.get(want.feeRunItemId);
+          if (!item) {
+            skipped += 1;
+            continue;
+          }
+          const id = await recordReturn(
+            tx,
+            {
+              actorId: context.session!.user.id,
+              actorEmail: context.session!.user.email,
+              requestId: context.requestId ?? null,
+              source: "import",
+            },
+            item,
+            {
+              returnedOn: want.returnedOn,
+              reasonCode: want.reasonCode ?? null,
+              reasonText: want.reasonText ?? null,
+              rueckgebuhr: want.rueckgebuhr ?? defaultFee,
+              notes: null,
+            },
+          );
+          if (id) imported += 1;
+          else skipped += 1;
+        }
+        return { imported, skipped };
+      });
+
+      return out;
+    }),
 
   delete: vorstandProc.input(v.object({ id: v.string() })).handler(async ({ context, input }) => {
     const [row] = await context.db

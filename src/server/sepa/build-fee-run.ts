@@ -3,7 +3,7 @@ import type { DB } from "~/server/db/client";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import type { Contract } from "~/server/db/schema/contracts";
 import { contractsTable } from "~/server/db/schema/contracts";
-import { feeRunItemsTable, feeRunsTable } from "~/server/db/schema/fee-runs";
+import { feeRunItemsTable, feeRunsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
 import type { Member } from "~/server/db/schema/members";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
@@ -155,9 +155,53 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
     for (const s of seen) aufnGesehen.add(s.contractId);
   }
 
+  // Contracts that already carry a live (non-cancelled) Sollstellung for this
+  // year. Re-running the Beitragslauf must not collect them again, so they are
+  // excluded here -- a re-run only picks up contracts added or unblocked since
+  // the last run, and is empty once everyone is covered. A cancelled posting
+  // does not count, so re-billing after a Storno still works.
+  const alreadyBilled = new Set<string>();
+  if (contractIds.length > 0) {
+    const billed = await db
+      .select({ contractId: sollStellungenTable.contractId })
+      .from(sollStellungenTable)
+      .where(
+        and(
+          inArray(sollStellungenTable.contractId, contractIds),
+          eq(sollStellungenTable.billingYear, billingYear),
+          ne(sollStellungenTable.status, "cancelled"),
+        ),
+      );
+    for (const b of billed) alreadyBilled.add(b.contractId);
+  }
+
   for (const { contract, member } of rows) {
     const memberName = displayName(member);
     const baseAmount = parseAmount(contract.betrag);
+
+    if (alreadyBilled.has(contract.id)) {
+      excluded.push({
+        memberId: member.id,
+        memberName,
+        contractId: contract.id,
+        vertragNr: contract.vertragNr,
+        artName: contract.artName,
+        reason: "Bereits abgerechnet (Sollstellung vorhanden)",
+      });
+      continue;
+    }
+
+    if (member.directDebitBlocked) {
+      excluded.push({
+        memberId: member.id,
+        memberName,
+        contractId: contract.id,
+        vertragNr: contract.vertragNr,
+        artName: contract.artName,
+        reason: "Einzug ausgesetzt",
+      });
+      continue;
+    }
 
     if (baseAmount <= 0) {
       excluded.push({

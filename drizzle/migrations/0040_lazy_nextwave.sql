@@ -1,0 +1,1 @@
+ALTER TABLE "members" ADD COLUMN "direct_debit_blocked" boolean DEFAULT false NOT NULL;

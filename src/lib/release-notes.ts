@@ -41,6 +41,33 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.26.0",
+    date: "2026-06-08",
+    title: "Beitragslauf und Rücklastschriften",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Der Beitragslauf läuft jetzt inkrementell. Ein erneuter Lauf für dasselbe Jahr zieht nur Mitglieder ein, die seit dem letzten Lauf dazugekommen oder wieder freigegeben wurden. Sind bereits alle abgerechnet, bleibt der Lauf leer. Ein kompletter Storno ist dafür nicht mehr nötig.",
+      },
+      {
+        category: "feature",
+        description:
+          "Rücklastschriften lassen sich als camt.054-Datei der Bank importieren. Die Rückläufer werden über die End-to-End-ID automatisch dem Beitragslauf zugeordnet. Bestätigte Treffer setzen die Sollstellung wieder offen.",
+      },
+      {
+        category: "feature",
+        description:
+          'Neuer Schalter je Mitglied unter Bankverbindung. Mit "Einzug ausgesetzt" überspringt der Beitragslauf das Mitglied, bis der Einzug wieder aktiv geschaltet wird. Das ist getrennt von der Mahnsperre.',
+      },
+      {
+        category: "improvement",
+        description:
+          "Ein erfasster Rückläufer setzt die Mahnstufe der Sollstellung zurück. Die Mahnung beginnt damit wieder bei der Erinnerung statt auf der vorherigen Stufe.",
+      },
+    ],
+  },
+  {
     version: "0.25.2",
     date: "2026-06-08",
     changes: [

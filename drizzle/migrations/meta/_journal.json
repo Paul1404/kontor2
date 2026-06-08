@@ -281,6 +281,13 @@
       "when": 1780922553516,
       "tag": "0039_married_sunfire",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1780933268182,
+      "tag": "0040_lazy_nextwave",
+      "breakpoints": true
     }
   ]
 }

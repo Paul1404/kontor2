@@ -10,7 +10,7 @@ import { organizationSettingsTable } from "~/server/db/schema/organization-setti
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { memberDisplayName } from "~/server/domain/member";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
-import { buildFeeRunPreview } from "~/server/sepa/build-fee-run";
+import { amountStrToCents, buildFeeRunPreview, centsToAmount } from "~/server/sepa/build-fee-run";
 import { buildPain008, type Pain008Item } from "~/server/sepa/pain008";
 import { buildPrenotificationEmail } from "~/server/sepa/prenotification";
 
@@ -135,20 +135,10 @@ export const feeRunsRouter = {
       });
     }
 
-    // Block duplicate committed runs for the same year.
-    const [existing] = await context.db
-      .select({ id: feeRunsTable.id })
-      .from(feeRunsTable)
-      .where(
-        and(eq(feeRunsTable.billingYear, input.billingYear), eq(feeRunsTable.status, "committed")),
-      )
-      .limit(1);
-    if (existing) {
-      throw new ORPCError("CONFLICT", {
-        message: `Für ${input.billingYear} existiert bereits ein abgeschlossener Beitragslauf. Stornieren Sie ihn, um einen neuen zu erzeugen.`,
-      });
-    }
-
+    // Runs are incremental: a contract already carrying a live Sollstellung for
+    // the year is excluded by buildFeeRunPreview, so a second run for the same
+    // year only collects members added or unblocked since the last run. No
+    // hard block on a second committed run -- the catch-up run is the point.
     const falligkeitsdatum = parseFalligkeit(input.falligkeitsdatum);
     const preview = await buildFeeRunPreview(context.db, {
       billingYear: input.billingYear,
@@ -223,21 +213,36 @@ export const feeRunsRouter = {
       // released automatically at COMMIT/ROLLBACK. We then re-check inside
       // the lock so the check-and-insert is atomic.
       await tx.execute(sql`select pg_advisory_xact_lock(4711, ${input.billingYear})`);
-      const [dupe] = await tx
-        .select({ id: feeRunsTable.id })
-        .from(feeRunsTable)
-        .where(
-          and(
-            eq(feeRunsTable.billingYear, input.billingYear),
-            eq(feeRunsTable.status, "committed"),
-          ),
-        )
-        .limit(1);
-      if (dupe) {
+
+      // Re-check inside the lock which candidates already have a live posting
+      // for the year. The preview was built before the lock, so a concurrent
+      // (or just-finished) run for the same year may have billed some of them
+      // since; re-billing would double-collect. Drop those defensively.
+      const previewContractIds = preview.candidates.map((c) => c.contractId);
+      const liveSoll =
+        previewContractIds.length === 0
+          ? []
+          : await tx
+              .select({ contractId: sollStellungenTable.contractId })
+              .from(sollStellungenTable)
+              .where(
+                and(
+                  inArray(sollStellungenTable.contractId, previewContractIds),
+                  eq(sollStellungenTable.billingYear, input.billingYear),
+                  ne(sollStellungenTable.status, "cancelled"),
+                ),
+              );
+      const liveSet = new Set(liveSoll.map((s) => s.contractId));
+      const candidates = preview.candidates.filter((c) => !liveSet.has(c.contractId));
+      if (candidates.length === 0) {
         throw new ORPCError("CONFLICT", {
-          message: `Für ${input.billingYear} existiert bereits ein abgeschlossener Beitragslauf. Stornieren Sie ihn, um einen neuen zu erzeugen.`,
+          message: `Alle Posten für ${input.billingYear} wurden zwischenzeitlich bereits abgerechnet.`,
         });
       }
+      let runCents = 0n;
+      for (const c of candidates) runCents += amountStrToCents(c.amount);
+      const runItemCount = candidates.length;
+      const runTotalAmount = centsToAmount(runCents);
 
       // 1. Insert fee run header.
       const [run] = await tx
@@ -246,8 +251,8 @@ export const feeRunsRouter = {
           billingYear: input.billingYear,
           falligkeitsdatum: input.falligkeitsdatum,
           status: "committed",
-          itemCount: preview.totals.count,
-          totalAmount: preview.totals.grandTotal,
+          itemCount: runItemCount,
+          totalAmount: runTotalAmount,
           notes: input.notes ?? null,
           createdBy: context.session!.user.id,
           committedAt: new Date(),
@@ -267,8 +272,8 @@ export const feeRunsRouter = {
       //    instead of `open`. Recording a Rücklastschrift reopens it. This is
       //    what keeps the Mahnwesen from chasing money that was already pulled.
       const sollByContract = new Map<string, string>();
-      if (preview.candidates.length > 0) {
-        const sollValues = preview.candidates.map((c) => ({
+      if (candidates.length > 0) {
+        const sollValues = candidates.map((c) => ({
           memberId: c.memberId,
           contractId: c.contractId,
           billingYear: input.billingYear,
@@ -306,7 +311,7 @@ export const feeRunsRouter = {
       const pain008Items: Pain008Item[] = [];
       const itemValues: Array<Record<string, unknown>> = [];
       const usedMandateIdSet = new Set<string>();
-      for (const c of preview.candidates) {
+      for (const c of candidates) {
         const iban = ibanByMember.get(c.memberId);
         if (!iban) continue; // Already excluded in preview, defensive.
         const mandate = mandateById.get(c.chosenMandateId);
@@ -407,8 +412,8 @@ export const feeRunsRouter = {
         actorEmail: context.session!.user.email,
         changes: {
           billingYear: { before: null, after: input.billingYear },
-          itemCount: { before: null, after: preview.totals.count },
-          totalAmount: { before: null, after: preview.totals.grandTotal },
+          itemCount: { before: null, after: runItemCount },
+          totalAmount: { before: null, after: runTotalAmount },
           status: { before: null, after: "committed" },
         },
         requestId: context.requestId ?? null,
@@ -416,8 +421,8 @@ export const feeRunsRouter = {
 
       return {
         feeRunId: run.id,
-        itemCount: preview.totals.count,
-        totalAmount: preview.totals.grandTotal,
+        itemCount: runItemCount,
+        totalAmount: runTotalAmount,
         xmlFilename: filename,
       };
     });

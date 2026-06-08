@@ -41,6 +41,7 @@ export type StammdatenValues = {
   vertreterPlz: string;
   vertreterOrt: string;
   notes: string;
+  directDebitBlocked: boolean;
 };
 
 export const EMPTY_STAMM: StammdatenValues = {
@@ -75,6 +76,7 @@ export const EMPTY_STAMM: StammdatenValues = {
   vertreterPlz: "",
   vertreterOrt: "",
   notes: "",
+  directDebitBlocked: false,
 };
 
 function calcAge(yyyymmdd: string): string {
@@ -139,6 +141,7 @@ export function buildInitialValues(
     vertreterPlz: (member.vertreterPlz as string) ?? "",
     vertreterOrt: (member.vertreterOrt as string) ?? "",
     notes: (member.notes as string) ?? "",
+    directDebitBlocked: (member.directDebitBlocked as boolean | null | undefined) ?? false,
   };
 }
 
@@ -150,8 +153,8 @@ export function buildInitialValues(
 export function buildPatch(
   values: StammdatenValues,
   initialIban: string,
-): Record<string, string | null> {
-  const out: Record<string, string | null> = {};
+): Record<string, string | null | boolean> {
+  const out: Record<string, string | null | boolean> = {};
   const nullable = (s: string) => (s.trim().length > 0 ? s.trim() : null);
   out.anrede = nullable(values.anrede);
   out.titel1 = nullable(values.titel1);
@@ -187,6 +190,7 @@ export function buildPatch(
   out.vertreterPlz = nullable(values.vertreterPlz);
   out.vertreterOrt = nullable(values.vertreterOrt);
   out.notes = nullable(values.notes);
+  out.directDebitBlocked = values.directDebitBlocked;
   const normIban = values.iban1.replace(/\s+/g, "").toUpperCase();
   if (normIban !== initialIban) {
     out.iban1 = normIban.length > 0 ? normIban : null;
@@ -451,6 +455,21 @@ export function MemberStammdatenForm({
                 onChange={(e) => update("abwKontoInh", e.target.value)}
               />
             </FormField>
+            <FormField label="SEPA-Lastschrift">
+              <select
+                value={values.directDebitBlocked ? "blocked" : "active"}
+                onChange={(e) => update("directDebitBlocked", e.target.value === "blocked")}
+                className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              >
+                <option value="active">Einzug aktiv</option>
+                <option value="blocked">Einzug ausgesetzt</option>
+              </select>
+            </FormField>
+            {values.directDebitBlocked ? (
+              <p className="text-xs text-muted-foreground">
+                Der Beitragslauf überspringt dieses Mitglied, bis der Einzug wieder aktiv ist.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 

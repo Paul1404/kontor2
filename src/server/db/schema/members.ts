@@ -119,6 +119,13 @@ export const membersTable = pgTable(
     status: memberStatusEnum("status"),
     /** Normalized dunning block (was the free-form `mahn_sperre` text flag). */
     dunningBlocked: boolean("dunning_blocked").notNull().default(false),
+    /**
+     * Suspends SEPA direct debit for this member: the Beitragslauf skips them
+     * (reason "Einzug ausgesetzt") until cleared. Separate from
+     * `dunningBlocked`, which only pauses Mahnungen. Use for disputed amounts,
+     * a member who switched to Überweisung, or a temporary hold.
+     */
+    directDebitBlocked: boolean("direct_debit_blocked").notNull().default(false),
   },
   (t) => [
     uniqueIndex("members_adr_nr_uk").on(t.adrNr),
