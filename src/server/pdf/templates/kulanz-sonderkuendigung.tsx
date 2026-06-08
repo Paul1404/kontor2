@@ -4,13 +4,13 @@ import type { KulanzClubModel, KulanzLetterModel } from "~/server/pdf/kulanz-mod
 import { LetterPage } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
-  para: { marginBottom: 7 },
-  table: { marginVertical: 7, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: "#999" },
+  para: { marginBottom: 5 },
+  table: { marginVertical: 5, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: "#999" },
   tableHeader: {
     flexDirection: "row",
     borderBottomWidth: 0.5,
     borderColor: "#999",
-    paddingVertical: 3,
+    paddingVertical: 2.5,
     fontFamily: "Helvetica-Bold",
     fontSize: 9,
     backgroundColor: "#f4f4f5",
@@ -19,31 +19,31 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     borderBottomWidth: 0.25,
     borderColor: "#ddd",
-    paddingVertical: 2.5,
+    paddingVertical: 2,
     fontSize: 9,
   },
   totalsRow: {
     flexDirection: "row",
-    paddingVertical: 3,
+    paddingVertical: 2.5,
     borderTopWidth: 0.5,
     borderColor: "#444",
-    marginTop: 3,
+    marginTop: 2,
     fontFamily: "Helvetica-Bold",
   },
   c1: { flex: 1.3 },
   c2: { flex: 2.4 },
   c3: { flex: 1, textAlign: "right" },
   kulanzBox: {
-    marginTop: 8,
-    padding: 8,
+    marginTop: 6,
+    padding: 7,
     backgroundColor: "#f0fdf4",
     borderLeftWidth: 2,
     borderColor: "#16a34a",
     fontSize: 9,
   },
   paymentBox: {
-    marginTop: 8,
-    padding: 8,
+    marginTop: 6,
+    padding: 7,
     borderWidth: 0.5,
     borderColor: "#999",
     fontSize: 9,
@@ -99,6 +99,10 @@ function KulanzLetterPage({
       ]}
       subject="Zahlungserinnerung"
       footerText={footerText(club, docRef)}
+      // The cover page carries a posting table plus the payment and Kulanz
+      // boxes, so it starts a touch above the strict DIN reference line to keep
+      // the greeting on this page instead of spilling to an empty one.
+      bodyStartMm={88}
     >
       <Text style={styles.para}>{letter.salutation}</Text>
       {letter.vertretungFor ? (
@@ -176,8 +180,8 @@ function KulanzLetterPage({
       </View>
 
       <View wrap={false}>
-        <Text style={{ marginTop: 10 }}>Mit freundlichen Grüßen</Text>
-        <Text style={{ marginTop: 12 }}>{club.vereinsname}</Text>
+        <Text style={{ marginTop: 8 }}>Mit freundlichen Grüßen</Text>
+        <Text style={{ marginTop: 10 }}>{club.vereinsname}</Text>
       </View>
     </LetterPage>
   );

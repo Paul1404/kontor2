@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.24.1",
+    date: "2026-06-08",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Kulanz-Brief: Die Grußformel landet nicht mehr allein auf einer fast leeren zweiten Seite. Das Anschreiben passt jetzt zuverlässig auf eine Seite, die Kündigungsbestätigung folgt wie gehabt auf der nächsten.",
+      },
+    ],
+  },
+  {
     version: "0.24.0",
     date: "2026-06-08",
     title: "Ehrungsverwaltung, übersichtlicheres Netzwerk und sauberer Kulanz-Brief",
