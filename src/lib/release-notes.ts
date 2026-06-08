@@ -55,6 +55,11 @@ export const RELEASES: Release[] = [
         description:
           "Neuer Aktivitäts-Verlauf am Mitglied im Reiter Verlauf: Änderungen, Mahnungen, Kulanz-Schreiben, Rundschreiben und SEPA-Rückläufer in einer gemeinsamen Zeitleiste, neueste zuerst.",
       },
+      {
+        category: "improvement",
+        description:
+          "Schnellbearbeitung in der Mitgliederliste: Status (aktiv/passiv) direkt am Eintrag umschalten und ein Mitglied per Klick einer Abteilung zuordnen, ohne die Detailseite zu öffnen.",
+      },
     ],
   },
   {

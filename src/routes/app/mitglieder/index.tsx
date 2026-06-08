@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { InlineStatusEdit } from "~/components/forms/InlineStatusEdit";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
@@ -944,7 +945,16 @@ function MembersListPage() {
                       <td className="px-4 py-3 text-muted-foreground">{m.email ?? ""}</td>
                       <td className="px-4 py-3 text-muted-foreground">{formatDate(m.eintritt)}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge member={m} />
+                        <InlineStatusEdit
+                          member={m}
+                          canEdit={canEdit}
+                          abteilungen={abteilungen.data ?? []}
+                          onChanged={() => {
+                            list.refetch();
+                            stats.refetch();
+                            abteilungen.refetch();
+                          }}
+                        />
                       </td>
                     </tr>
                   );
@@ -1119,12 +1129,4 @@ function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }
       </button>
     </span>
   );
-}
-
-function StatusBadge({ member }: { member: MemberRow }) {
-  if (member.deletedAt) return <Badge variant="destructive">Gelöscht</Badge>;
-  if (member.status === "verstorben") return <Badge variant="secondary">Verstorben</Badge>;
-  if (member.status === "ausgetreten") return <Badge variant="warning">Ausgetreten</Badge>;
-  if (member.status === "passiv") return <Badge variant="secondary">Passiv</Badge>;
-  return <Badge variant="success">Aktiv</Badge>;
 }
