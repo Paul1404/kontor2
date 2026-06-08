@@ -6,6 +6,36 @@ import type { AppContext } from "~/server/orpc/context";
 export const base = os.$context<AppContext>();
 
 /**
+ * Pull the loggable shape out of a thrown value. Beyond the top-level message
+ * we walk the `cause` chain, because the messages that actually explain a
+ * failure usually hide one level down: Drizzle wraps the driver error in a
+ * `DrizzleQueryError` whose own message is only "Failed query: select ...",
+ * while the real reason ("column ... does not exist") and the Postgres SQLSTATE
+ * sit on the wrapped pg error in `.cause`. Without unwrapping, `rpc.failed`
+ * logs the SQL but never the reason, which is exactly what made a broken
+ * `feeRuns.preview` undiagnosable from the deploy logs.
+ *
+ * We surface the deepest cause message and any SQLSTATE `code`, but not the pg
+ * `detail`/`hint` fields, which can echo row values.
+ */
+export function errorLogFields(err: unknown): Record<string, unknown> {
+  if (!(err instanceof Error)) return { error: String(err) };
+  const fields: Record<string, unknown> = { error: err.message };
+
+  const topCode = (err as { code?: unknown }).code;
+  if (typeof topCode === "string") fields.pgCode = topCode;
+
+  let cause: unknown = err.cause;
+  for (let depth = 0; cause instanceof Error && depth < 5; depth += 1) {
+    fields.cause = cause.message;
+    const code = (cause as { code?: unknown }).code;
+    if (typeof code === "string") fields.pgCode = code;
+    cause = cause.cause;
+  }
+  return fields;
+}
+
+/**
  * Outermost middleware on every procedure: times the call and logs its
  * outcome once, with the request id. Expected client-facing failures
  * (`ORPCError`, e.g. UNAUTHORIZED / NOT_FOUND) log at warn without a stack;
@@ -26,12 +56,7 @@ export const observability = base.middleware(async ({ context, path, next }) => 
     if (err instanceof ORPCError) {
       logger.warn("rpc.rejected", { proc, requestId, ms, code: err.code });
     } else {
-      logger.error("rpc.failed", {
-        proc,
-        requestId,
-        ms,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      logger.error("rpc.failed", { proc, requestId, ms, ...errorLogFields(err) });
     }
     throw err;
   }
