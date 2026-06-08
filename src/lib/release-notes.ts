@@ -75,6 +75,11 @@ export const RELEASES: Release[] = [
         description:
           "SEPA-Vorabankündigung: Am abgeschlossenen Beitragslauf lässt sich jedem Zahler der bevorstehende Einzug per E-Mail ankündigen (Betrag, Fälligkeit, Mandatsreferenz, Gläubiger-ID). Der Versandzeitpunkt wird am Lauf vermerkt.",
       },
+      {
+        category: "feature",
+        description:
+          "Beitragslauf-Vorschau zeigt auf Wunsch einen Vorjahresvergleich: wer neu dazukommt, wer wegfällt und bei wem sich der Betrag ändert, mit Summen für beide Jahre. So lässt sich ein Lauf vor dem Abschluss prüfen.",
+      },
     ],
   },
   {

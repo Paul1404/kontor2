@@ -225,6 +225,128 @@ function SetupStep(props: {
 
 type PreviewData = Awaited<ReturnType<typeof orpc.feeRuns.preview>>;
 
+function SimulationSection(props: {
+  billingYear: number;
+  falligkeitsdatum: string;
+  mandateOverrides: Record<string, string>;
+}) {
+  const [show, setShow] = useState(false);
+  const sim = useQuery({
+    enabled: show,
+    queryKey: [
+      "feeRuns.simulate",
+      props.billingYear,
+      props.falligkeitsdatum,
+      props.mandateOverrides,
+    ],
+    queryFn: () =>
+      orpc.feeRuns.simulate({
+        billingYear: props.billingYear,
+        falligkeitsdatum: props.falligkeitsdatum,
+        mandateOverrides: props.mandateOverrides,
+      }),
+  });
+
+  if (!show) {
+    return (
+      <Button type="button" variant="outline" onClick={() => setShow(true)}>
+        Vorjahresvergleich anzeigen
+      </Button>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Vorjahresvergleich</CardTitle>
+        <CardDescription>
+          Was dieser Lauf gegenüber dem Vorjahr verändert (je Vertrag).
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {sim.isLoading || !sim.data ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> Berechne Vergleich…
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <SummaryTile
+                label={`${sim.data.lastYear.year}`}
+                value={formatCurrency(sim.data.lastYear.total)}
+              />
+              <SummaryTile
+                label={`${props.billingYear}`}
+                value={formatCurrency(sim.data.thisYear.total)}
+                highlight
+              />
+              <SummaryTile label="Neu" value={`+${sim.data.added.length}`} />
+              <SummaryTile label="Entfallen" value={`-${sim.data.removed.length}`} />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {sim.data.unchangedCount} unverändert · {sim.data.changed.length} mit geändertem
+              Betrag
+            </div>
+            <SimList title="Neu in diesem Lauf" rows={sim.data.added} tone="text-emerald-600" />
+            <SimList
+              title="Entfallen gegenüber Vorjahr"
+              rows={sim.data.removed}
+              tone="text-rose-600"
+            />
+            {sim.data.changed.length > 0 ? (
+              <div className="flex flex-col gap-1">
+                <div className="text-xs font-semibold uppercase tracking-wide text-amber-600">
+                  Betrag geändert ({sim.data.changed.length})
+                </div>
+                <ul className="flex flex-col divide-y divide-border text-sm">
+                  {sim.data.changed.map((c) => (
+                    <li
+                      key={`${c.name}-${c.to}`}
+                      className="flex items-center justify-between py-1.5"
+                    >
+                      <span>{c.name}</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {formatCurrency(c.from)} → {formatCurrency(c.to)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SimList({
+  title,
+  rows,
+  tone,
+}: {
+  title: string;
+  rows: { name: string; amount: string }[];
+  tone: string;
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      <div className={`text-xs font-semibold uppercase tracking-wide ${tone}`}>
+        {title} ({rows.length})
+      </div>
+      <ul className="flex flex-col divide-y divide-border text-sm">
+        {rows.slice(0, 100).map((r) => (
+          <li key={`${r.name}-${r.amount}`} className="flex items-center justify-between py-1.5">
+            <span>{r.name}</span>
+            <span className="tabular-nums text-muted-foreground">{formatCurrency(r.amount)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function PreviewStep(props: {
   preview: PreviewData | undefined;
   isLoading: boolean;
@@ -278,6 +400,12 @@ function PreviewStep(props: {
         <SummaryTile label="Summe" value={formatCurrency(p.totals.grandTotal)} highlight />
         <SummaryTile label="Ausgeschlossen" value={p.excluded.length.toString()} />
       </div>
+
+      <SimulationSection
+        billingYear={props.billingYear}
+        falligkeitsdatum={props.falligkeitsdatum}
+        mandateOverrides={props.mandateOverrides}
+      />
 
       {Object.keys(p.totals.byCategory).length > 0 ? (
         <Card>

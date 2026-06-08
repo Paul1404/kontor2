@@ -62,6 +62,69 @@ export const feeRunsRouter = {
     });
   }),
 
+  /**
+   * Compare what this year's run would produce against last year's postings,
+   * per contract: who is new, who fell away, and whose amount changed. Lets the
+   * Vorstand sanity-check a Beitragslauf before committing.
+   */
+  simulate: vorstandProc.input(PreviewInput).handler(async ({ context, input }) => {
+    const preview = await buildFeeRunPreview(context.db, {
+      billingYear: input.billingYear,
+      falligkeitsdatum: parseFalligkeit(input.falligkeitsdatum),
+      mandateOverrides: input.mandateOverrides,
+    });
+
+    const prevRows = await context.db
+      .select({
+        contractId: sollStellungenTable.contractId,
+        amount: sollStellungenTable.amount,
+        name: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
+      })
+      .from(sollStellungenTable)
+      .innerJoin(membersTable, eq(membersTable.id, sollStellungenTable.memberId))
+      .where(
+        and(
+          eq(sollStellungenTable.billingYear, input.billingYear - 1),
+          ne(sollStellungenTable.status, "cancelled"),
+        ),
+      );
+
+    const cents = (s: string) => Math.round(Number.parseFloat(s) * 100);
+    const prevByContract = new Map(prevRows.map((p) => [p.contractId, p]));
+    const thisByContract = new Map(preview.candidates.map((c) => [c.contractId, c]));
+
+    const added: Array<{ name: string; amount: string }> = [];
+    const changed: Array<{ name: string; from: string; to: string }> = [];
+    let unchangedCount = 0;
+    for (const c of preview.candidates) {
+      const prev = prevByContract.get(c.contractId);
+      if (!prev) {
+        added.push({ name: c.debtorName, amount: c.amount });
+      } else if (cents(prev.amount) !== cents(c.amount)) {
+        changed.push({ name: c.debtorName, from: prev.amount, to: c.amount });
+      } else {
+        unchangedCount += 1;
+      }
+    }
+    const removed = prevRows
+      .filter((p) => !thisByContract.has(p.contractId))
+      .map((p) => ({ name: p.name, amount: p.amount }));
+
+    const prevTotalCents = prevRows.reduce((s, p) => s + cents(p.amount), 0);
+    return {
+      thisYear: { count: preview.totals.count, total: preview.totals.grandTotal },
+      lastYear: {
+        year: input.billingYear - 1,
+        count: prevRows.length,
+        total: (prevTotalCents / 100).toFixed(2),
+      },
+      added: added.sort((a, b) => a.name.localeCompare(b.name)),
+      removed: removed.sort((a, b) => a.name.localeCompare(b.name)),
+      changed: changed.sort((a, b) => a.name.localeCompare(b.name)),
+      unchangedCount,
+    };
+  }),
+
   commit: vorstandProc.input(CommitInput).handler(async ({ context, input }) => {
     // Singleton org settings must exist before generating XML.
     const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
