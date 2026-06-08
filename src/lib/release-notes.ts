@@ -46,6 +46,11 @@ export const RELEASES: Release[] = [
     title: "Wiedervorlagen, Verlauf und Finanz-Werkzeuge",
     changes: [
       {
+        category: "fix",
+        description:
+          "Sicherheit: Einladungs-Links werden jetzt nur noch als Hash gespeichert, nicht mehr im Klartext. Bereits versendete, noch offene Einladungen werden dadurch ungültig und müssen einmalig neu verschickt werden.",
+      },
+      {
         category: "feature",
         description:
           "Wiedervorlagen: Aufgaben mit Fälligkeit pro Mitglied anlegen (etwa IBAN nachfordern), direkt am Mitglied abhaken und in einer gemeinsamen Liste über alle Mitglieder abarbeiten. Überfällige werden in der Seitenleiste rot markiert.",

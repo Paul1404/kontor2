@@ -253,6 +253,13 @@
       "when": 1780912402451,
       "tag": "0035_flowery_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1780917003750,
+      "tag": "0036_steady_network",
+      "breakpoints": true
     }
   ]
 }

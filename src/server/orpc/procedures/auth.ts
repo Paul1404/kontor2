@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { ORPCError } from "@orpc/server";
 import { and, count, eq, ne, sql } from "drizzle-orm";
 import * as v from "valibot";
@@ -9,6 +9,11 @@ import { completeSetup, isInSetupMode } from "~/server/auth/setup";
 import { invitations, roleEnum, users } from "~/server/db/schema/auth";
 import { env } from "~/server/env";
 import { adminProc, authedProc, publicProc } from "~/server/orpc/base";
+
+/** SHA-256 hex of the raw invite token; only the hash is persisted. */
+function sha256(s: string): string {
+  return createHash("sha256").update(s).digest("hex");
+}
 
 const RoleSchema = v.picklist(roleEnum.enumValues);
 
@@ -139,7 +144,8 @@ export const authRouter = {
         .insert(invitations)
         .values({
           id: crypto.randomUUID(),
-          token,
+          // Store only the hash; the raw token lives in the emailed URL alone.
+          tokenHash: sha256(token),
           email: input.email.toLowerCase(),
           role: input.role,
           invitedBy: context.session!.user.id,
@@ -220,7 +226,7 @@ export const authRouter = {
       const rows = await context.db
         .select()
         .from(invitations)
-        .where(eq(invitations.token, input.token))
+        .where(eq(invitations.tokenHash, sha256(input.token)))
         .limit(1);
       const inv = rows[0];
       if (!inv) throw new ORPCError("NOT_FOUND", { message: "Einladung nicht gefunden." });
@@ -250,7 +256,7 @@ export const authRouter = {
         .set({ acceptedAt: new Date() })
         .where(
           and(
-            eq(invitations.token, input.token),
+            eq(invitations.tokenHash, sha256(input.token)),
             sql`accepted_at is null`,
             sql`revoked_at is null`,
             sql`expires_at > now()`,
