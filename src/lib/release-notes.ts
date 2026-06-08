@@ -41,6 +41,40 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.24.0",
+    date: "2026-06-08",
+    title: "Ehrungsverwaltung, übersichtlicheres Netzwerk und sauberer Kulanz-Brief",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neue Ehrungsverwaltung: Anstehende Vereinsjubiläen lassen sich direkt als vergeben vermerken, damit niemand doppelt geehrt wird. Zu jeder Ehrung kann eine Ehrenurkunde als PDF erzeugt und gedruckt werden. Am Mitglied gibt es einen eigenen Bereich Ehrungen für Jubiläen und Sonderehrungen (zum Beispiel Ehrenmitglied oder Goldene Ehrennadel); erfasste Ehrungen erscheinen zusätzlich im Verlauf.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Beziehungsnetzwerk: Ein Klick auf eine Person öffnet jetzt ihre Verbindungen in einer Seitenleiste, statt sofort zur Mitgliedsseite zu springen. Von dort lässt sich zu verbundenen Personen weiterklicken, ein eigener Knopf öffnet das Mitglied. Das funktioniert auch per Fingertipp auf dem Touchscreen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Kulanz-Brief: Das Schreiben bricht nicht mehr ungünstig auf eine zweite Seite um, wenn die SEPA-Gebühr ausgewiesen wird. Außerdem wird das Wort Kulanz im Text nicht mehr mehrfach wiederholt.",
+      },
+    ],
+  },
+  {
+    version: "0.23.0",
+    date: "2026-06-08",
+    title: "SEPA-Gebühr auf dem Kulanz-Brief mit sinnvollem Standard",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Rücklastschriftgebühr unter Vereinsdaten ist jetzt auf 3,00 Euro voreingestellt (übliches Rücklastschriftentgelt der Banken) und wird damit auf jedem Kulanz-Brief als SEPA-Gebühr ausgewiesen und zum offenen Betrag addiert. Stand der Wert bisher auf 0, wird er einmalig auf 3,00 Euro gesetzt. Du kannst ihn jederzeit unter Einstellungen, Vereinsdaten anpassen oder mit 0 wieder abschalten.",
+      },
+    ],
+  },
+  {
     version: "0.22.0",
     date: "2026-06-08",
     title: "Beziehungsnetzwerk und schärfere Datenprüfung",

@@ -260,6 +260,27 @@
       "when": 1780917003750,
       "tag": "0036_steady_network",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1780921621784,
+      "tag": "0037_curved_cassandra_nova",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1780921635572,
+      "tag": "0038_backfill_sepa_return_fee",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1780922553516,
+      "tag": "0039_married_sunfire",
+      "breakpoints": true
     }
   ]
 }

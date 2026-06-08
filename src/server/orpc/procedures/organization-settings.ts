@@ -22,7 +22,7 @@ const UpdateInput = v.object({
   mahngebuhr1: v.optional(MoneyString, "0"),
   mahngebuhr2: v.optional(MoneyString, "5"),
   mahngebuhr3: v.optional(MoneyString, "10"),
-  sepaReturnFee: v.optional(MoneyString, "0"),
+  sepaReturnFee: v.optional(MoneyString, "3.00"),
   mahnFristTage: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(90)), 14),
   beitragModus: v.optional(v.picklist(["voll", "anteilig"]), "voll"),
   anteilEinheit: v.optional(v.picklist(["monat", "tag"]), "monat"),

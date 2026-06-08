@@ -26,6 +26,7 @@ import { AustrittsbestaetigungCard } from "~/components/forms/Austrittsbestaetig
 import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
 import { DsgvoCard } from "~/components/forms/DsgvoCard";
+import { EhrungenCard } from "~/components/forms/EhrungenCard";
 import { SepaCard } from "~/components/forms/SepaCard";
 import { WiedervorlagenCard } from "~/components/forms/WiedervorlagenCard";
 import { SnapshotsTab } from "~/components/snapshots/SnapshotsTab";
@@ -497,6 +498,8 @@ function MemberDetailPage() {
           />
 
           <WiedervorlagenCard memberId={member.id} canEdit={canEdit} />
+
+          <EhrungenCard memberId={member.id} canEdit={canEdit} />
         </div>
       ) : null}
 

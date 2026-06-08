@@ -269,7 +269,7 @@ export function buildKulanzLetterModel(input: KulanzLetterInput): KulanzLetterMo
   const dueCents = waive ? beitragCents : beitragCents + feeCents;
 
   const feeWaiverNote = waive
-    ? `Die SEPA-Gebühr in Höhe von ${feeFmt} erlassen wir Ihnen aus Kulanz. ` +
+    ? `Die SEPA-Gebühr in Höhe von ${feeFmt} erlassen wir Ihnen. ` +
       `Bitte überweisen Sie nur den offenen Mitgliedsbeitrag.`
     : null;
 

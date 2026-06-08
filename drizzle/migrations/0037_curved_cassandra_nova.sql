@@ -1,0 +1,1 @@
+ALTER TABLE "organization_settings" ALTER COLUMN "sepa_return_fee" SET DEFAULT '3.00';

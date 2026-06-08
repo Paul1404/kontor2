@@ -1,7 +1,8 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { auditLogTable } from "~/server/db/schema/audit";
 import { dunningItemsTable, sepaReturnsTable } from "~/server/db/schema/dunning";
+import { ehrungenTable } from "~/server/db/schema/ehrungen";
 import { rundschreibenRecipientsTable, rundschreibenTable } from "~/server/db/schema/rundschreiben";
 import { authedProc } from "~/server/orpc/base";
 
@@ -12,7 +13,13 @@ import { authedProc } from "~/server/orpc/base";
  * history one chronological view on the member page.
  */
 
-export type TimelineKind = "audit" | "dunning" | "kulanz" | "rundschreiben" | "sepa_return";
+export type TimelineKind =
+  | "audit"
+  | "dunning"
+  | "kulanz"
+  | "rundschreiben"
+  | "sepa_return"
+  | "ehrung";
 
 export type TimelineEvent = {
   id: string;
@@ -45,12 +52,19 @@ function fmtMoney(s: string | number | null): string {
   return `${n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 }
 
+/** Format an ISO yyyy-mm-dd date as dd.mm.yyyy; passes other strings through. */
+function fmtDate(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
+
 export const timelineRouter = {
   forMember: authedProc
     .input(v.object({ memberId: v.string() }))
     .handler(async ({ context, input }) => {
       const { memberId } = input;
-      const [audit, dunning, kulanzRows, rundschreiben, returns] = await Promise.all([
+      const [audit, dunning, kulanzRows, rundschreiben, returns, ehrungen] = await Promise.all([
         context.db
           .select({
             id: auditLogTable.id,
@@ -117,6 +131,18 @@ export const timelineRouter = {
           .from(sepaReturnsTable)
           .where(eq(sepaReturnsTable.memberId, memberId))
           .orderBy(desc(sepaReturnsTable.createdAt))
+          .limit(20),
+        context.db
+          .select({
+            id: ehrungenTable.id,
+            createdAt: ehrungenTable.createdAt,
+            titel: ehrungenTable.titel,
+            verliehenAm: ehrungenTable.verliehenAm,
+            createdByEmail: ehrungenTable.createdByEmail,
+          })
+          .from(ehrungenTable)
+          .where(and(eq(ehrungenTable.memberId, memberId), isNull(ehrungenTable.deletedAt)))
+          .orderBy(desc(ehrungenTable.createdAt))
           .limit(20),
       ]);
 
@@ -186,6 +212,18 @@ export const timelineRouter = {
           title: "SEPA-Rückläufer",
           detail: parts.join(" · ") || null,
           actor: null,
+        });
+      }
+
+      for (const e of ehrungen) {
+        const datum = e.verliehenAm ? fmtDate(e.verliehenAm) : null;
+        events.push({
+          id: `ehrung-${e.id}`,
+          kind: "ehrung",
+          at: e.createdAt,
+          title: "Ehrung",
+          detail: [e.titel, datum ? `verliehen am ${datum}` : null].filter(Boolean).join(" · "),
+          actor: e.createdByEmail ?? null,
         });
       }
 

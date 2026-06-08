@@ -4,13 +4,13 @@ import type { KulanzClubModel, KulanzLetterModel } from "~/server/pdf/kulanz-mod
 import { LetterPage } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
-  para: { marginBottom: 10 },
-  table: { marginVertical: 10, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: "#999" },
+  para: { marginBottom: 7 },
+  table: { marginVertical: 7, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: "#999" },
   tableHeader: {
     flexDirection: "row",
     borderBottomWidth: 0.5,
     borderColor: "#999",
-    paddingVertical: 4,
+    paddingVertical: 3,
     fontFamily: "Helvetica-Bold",
     fontSize: 9,
     backgroundColor: "#f4f4f5",
@@ -19,36 +19,36 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     borderBottomWidth: 0.25,
     borderColor: "#ddd",
-    paddingVertical: 3,
+    paddingVertical: 2.5,
     fontSize: 9,
   },
   totalsRow: {
     flexDirection: "row",
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderTopWidth: 0.5,
     borderColor: "#444",
-    marginTop: 4,
+    marginTop: 3,
     fontFamily: "Helvetica-Bold",
   },
   c1: { flex: 1.3 },
   c2: { flex: 2.4 },
   c3: { flex: 1, textAlign: "right" },
   kulanzBox: {
-    marginTop: 10,
-    padding: 9,
+    marginTop: 8,
+    padding: 8,
     backgroundColor: "#f0fdf4",
     borderLeftWidth: 2,
     borderColor: "#16a34a",
-    fontSize: 9.5,
+    fontSize: 9,
   },
   paymentBox: {
-    marginTop: 10,
-    padding: 9,
+    marginTop: 8,
+    padding: 8,
     borderWidth: 0.5,
     borderColor: "#999",
-    fontSize: 9.5,
+    fontSize: 9,
   },
-  paymentRow: { flexDirection: "row", marginBottom: 2 },
+  paymentRow: { flexDirection: "row", marginBottom: 1.5 },
   paymentKey: { width: 110, color: "#555" },
   paymentValue: { flex: 1, fontFamily: "Helvetica-Bold" },
   slipFieldRow: { flexDirection: "row", marginTop: 28, gap: 18 },
@@ -131,7 +131,7 @@ function KulanzLetterPage({
         {letter.rueckgebuhrErlass ? (
           <View style={styles.tableRow} wrap={false}>
             <Text style={styles.c1}> </Text>
-            <Text style={styles.c2}>SEPA-Gebühr (aus Kulanz erlassen)</Text>
+            <Text style={styles.c2}>SEPA-Gebühr (erlassen)</Text>
             <Text style={styles.c3}>{letter.rueckgebuhrErlass}</Text>
           </View>
         ) : null}
@@ -144,7 +144,7 @@ function KulanzLetterPage({
 
       {letter.feeWaiverNote ? <Text style={styles.para}>{letter.feeWaiverNote}</Text> : null}
 
-      <View style={styles.paymentBox}>
+      <View style={styles.paymentBox} wrap={false}>
         <Text style={{ marginBottom: 4, fontFamily: "Helvetica-Bold" }}>Bankverbindung</Text>
         <View style={styles.paymentRow}>
           <Text style={styles.paymentKey}>Empfänger</Text>
@@ -170,13 +170,15 @@ function KulanzLetterPage({
         </View>
       </View>
 
-      <View style={styles.kulanzBox}>
+      <View style={styles.kulanzBox} wrap={false}>
         <Text>{letter.kulanz}</Text>
         {letter.kulanzEmail ? <Text style={{ marginTop: 6 }}>{letter.kulanzEmail}</Text> : null}
       </View>
 
-      <Text style={{ marginTop: 12 }}>Mit freundlichen Grüßen</Text>
-      <Text style={{ marginTop: 16 }}>{club.vereinsname}</Text>
+      <View wrap={false}>
+        <Text style={{ marginTop: 10 }}>Mit freundlichen Grüßen</Text>
+        <Text style={{ marginTop: 12 }}>{club.vereinsname}</Text>
+      </View>
     </LetterPage>
   );
 }

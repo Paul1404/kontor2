@@ -28,8 +28,12 @@ export const organizationSettingsTable = pgTable("organization_settings", {
   mahngebuhr1: numeric("mahngebuhr1", { precision: 19, scale: 2 }).notNull().default("0"),
   mahngebuhr2: numeric("mahngebuhr2", { precision: 19, scale: 2 }).notNull().default("5"),
   mahngebuhr3: numeric("mahngebuhr3", { precision: 19, scale: 2 }).notNull().default("10"),
-  /** Optionale Rücklastschriftgebühr für SEPA-Rückläufer. */
-  sepaReturnFee: numeric("sepa_return_fee", { precision: 19, scale: 2 }).notNull().default("0"),
+  /**
+   * Rücklastschriftgebühr für SEPA-Rückläufer. Dient zugleich als SEPA-Gebühr auf
+   * dem Kulanz-Brief. Default 3,00 € entspricht dem üblichen Rücklastschrift-
+   * entgelt der Banken; 0 schaltet die Gebühr ab.
+   */
+  sepaReturnFee: numeric("sepa_return_fee", { precision: 19, scale: 2 }).notNull().default("3.00"),
   /** Zahlungsfrist in Tagen ab Mahndatum. */
   mahnFristTage: integer("mahn_frist_tage").notNull().default(14),
   /**
