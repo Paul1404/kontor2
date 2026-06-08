@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.20.0",
+    date: "2026-06-08",
+    title: "Verträge und SEPA-Mandate bearbeiten",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Bestehende Verträge lassen sich jetzt direkt bearbeiten: Vertragsnummer, Betrag, Beginn, Ende und Kündigungsdaten ändern, ohne den Vertrag löschen und neu anlegen zu müssen.",
+      },
+      {
+        category: "feature",
+        description:
+          "SEPA-Mandate sind bearbeitbar: Typ, Lastschriftart, Unterschriftsdatum sowie Gültig ab und Gültig bis lassen sich nachträglich anpassen.",
+      },
+    ],
+  },
+  {
     version: "0.19.0",
     date: "2026-06-08",
     title: "Eigene Mitglieds- und Kontaktnummern",
