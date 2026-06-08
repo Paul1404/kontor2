@@ -18,7 +18,7 @@ const baseLetter = {
     ort: "Untereuerheim",
     vertretungFor: null as string | null,
   },
-  member: { reference: "123", isContact: false, name: "Max Mustermann" },
+  member: { reference: "123", isContact: false, name: "Max Mustermann", mitgliedsnummer: "98765" },
   postings: [
     {
       billingYear: 2024,
@@ -187,10 +187,33 @@ describe("buildKulanzLetterModel", () => {
     expect(m.reference).toBe("123");
   });
 
+  it("carries the legacy Mitgliedsnummer as a separate value when it differs from the reference", () => {
+    const m = buildKulanzLetterModel(baseLetter);
+    expect(m.legacyMitgliedsnummer).toBe("98765");
+  });
+
+  it("suppresses the legacy Mitgliedsnummer when it already equals the reference", () => {
+    const m = buildKulanzLetterModel({
+      ...baseLetter,
+      member: {
+        reference: "98765",
+        isContact: false,
+        name: "Max Mustermann",
+        mitgliedsnummer: "98765",
+      },
+    });
+    expect(m.legacyMitgliedsnummer).toBeNull();
+  });
+
   it("uses a neutral reference label for contact-only payers without a Mitgliedsnummer", () => {
     const m = buildKulanzLetterModel({
       ...baseLetter,
-      member: { reference: "A4711", isContact: true, name: "Max Mustermann" },
+      member: {
+        reference: "A4711",
+        isContact: true,
+        name: "Max Mustermann",
+        mitgliedsnummer: null,
+      },
     });
     expect(m.referenceLabel).toBe("Referenz");
     expect(m.reference).toBe("A4711");

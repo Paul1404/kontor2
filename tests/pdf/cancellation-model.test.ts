@@ -28,6 +28,7 @@ function baseInput(overrides: Partial<CancellationInput> = {}): CancellationInpu
       ort: "Untereuerheim",
       geburtsdatum: "1990-05-04",
       mitgliedsnummer: "M-100",
+      legacyMitgliedsnummer: "98765",
     },
     austrittDatum: "2026-12-31",
     club,
@@ -85,6 +86,8 @@ describe("buildCancellationModel", () => {
     expect(m.istEmpfaengerAbweichend).toBe(false);
     expect(m.displayName).toBe("Mustermann, Erika");
     expect(m.combinedMitgliedsnummer).toBe("M-100");
+    // The legacy Linear number rides along as its own value next to the app number.
+    expect(m.legacyMitgliedsnummer).toBe("98765");
     // No em/en dashes anywhere in the rendered copy.
     const copy = [m.subject, m.bodyIntro, m.bodyClause, m.bodyThanks, m.closing].join(" ");
     expect(copy).not.toMatch(/[–—]/);

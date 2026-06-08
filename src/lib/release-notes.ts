@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.25.0",
+    date: "2026-06-08",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Schreiben an Mitglieder zeigen jetzt zusätzlich die alte Mitgliedsnummer aus Linear. Mahnung, Kulanz-Brief, Serienbrief und Austrittsbestätigung führen sie als eigene Zeile, die Ehrenurkunde nennt sie klein in der Fußzeile. So finden sich Mitglieder mit ihrer gewohnten Nummer wieder, während die neue Nummer weiter oben steht.",
+      },
+    ],
+  },
+  {
     version: "0.24.1",
     date: "2026-06-08",
     changes: [

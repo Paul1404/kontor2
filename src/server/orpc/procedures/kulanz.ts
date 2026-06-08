@@ -215,7 +215,7 @@ export const kulanzRouter = {
               ort: recipient.ort,
               vertretungFor: resolved?.vertretungFor ?? null,
             },
-            member: { reference, isContact, name: memberName },
+            member: { reference, isContact, name: memberName, mitgliedsnummer: m.mitgliedsnummer },
             postings: m.postings.map((p) => ({
               billingYear: p.billingYear,
               falligkeitsdatum: p.falligkeitsdatum,

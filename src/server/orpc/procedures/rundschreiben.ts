@@ -9,7 +9,7 @@ import { memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { rundschreibenRecipientsTable, rundschreibenTable } from "~/server/db/schema/rundschreiben";
-import { memberDisplayName, memberRef } from "~/server/domain/member";
+import { altMitgliedsnummer, memberDisplayName, memberRef } from "~/server/domain/member";
 import { vorstandProc } from "~/server/orpc/base";
 import { clubLogoDataUri } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
@@ -169,10 +169,12 @@ export const rundschreibenRouter = {
           [r.strasse, r.hausnummer].filter(Boolean).join(" "),
           [r.plz, r.ort].filter(Boolean).join(" "),
         ].filter((l) => l.trim().length > 0);
+        const reference = memberRef(r);
         return {
           recipientLines,
-          reference: memberRef(r),
+          reference,
           referenceLabel: r.memberNo ? "Mitgliedsnr." : "Kontaktnr.",
+          legacyMitgliedsnummer: altMitgliedsnummer(r.mitgliedsnummer, reference),
           datum,
           subject: renderTemplate(input.subject, vars),
           paragraphs: renderTemplate(input.body, vars)

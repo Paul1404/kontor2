@@ -1,5 +1,5 @@
 import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
-import { memberRef } from "~/server/domain/member";
+import { altMitgliedsnummer, memberRef } from "~/server/domain/member";
 import { LetterPage } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
@@ -170,6 +170,8 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
 
   const title = LEVEL_TITLES[pkg.level];
   const subject = subjectName(pkg.member);
+  const ref = memberRef(pkg.member);
+  const altNr = altMitgliedsnummer(pkg.member.mitgliedsnummer, ref);
   const r = pkg.recipient;
   const recipientLines = [
     r.name,
@@ -188,8 +190,9 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
         infoRows={[
           {
             label: pkg.member.memberNo ? "Mitgliedsnummer" : "Kontaktnummer",
-            value: memberRef(pkg.member),
+            value: ref,
           },
+          ...(altNr ? [{ label: "Mitgliedsnummer (alt)", value: altNr }] : []),
           { label: "Dokument", value: docRef },
           { label: "Datum", value: fmtDate(pkg.runDate) },
         ]}
@@ -268,8 +271,8 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
           <View style={styles.paymentRow}>
             <Text style={styles.paymentKey}>Verwendung</Text>
             <Text style={styles.paymentValue}>
-              {title} · {subject} · Mitgliedsnr {memberRef(pkg.member)}
-              {pkg.member.mitgliedsnummer ? ` (alt ${pkg.member.mitgliedsnummer})` : ""}
+              {title} · {subject} · Mitgliedsnr {ref}
+              {altNr ? ` (alt ${altNr})` : ""}
             </Text>
           </View>
         </View>

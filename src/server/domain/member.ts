@@ -12,9 +12,9 @@
  * import and easy to test.
  */
 
-import { type MemberRefParts, memberRef } from "~/lib/member-ref";
+import { altMitgliedsnummer, type MemberRefParts, memberRef } from "~/lib/member-ref";
 
-export { type MemberRefParts, memberRef };
+export { altMitgliedsnummer, type MemberRefParts, memberRef };
 
 /** A member's lifecycle status, derived from dates + the legacy A/P flag. */
 export type MemberStatus = "aktiv" | "passiv" | "ausgetreten" | "verstorben";
