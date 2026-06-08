@@ -1,12 +1,28 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Cake, UserCheck, UserMinus, UserPlus, Users } from "lucide-react";
+import { BarChart3, Cake, UserCheck, UserMinus, UserPlus, Users } from "lucide-react";
+import {
+  AgePyramid,
+  AreaChart,
+  ChartLegend,
+  DonutChart,
+  GroupedBarChart,
+  HorizontalBars,
+  PALETTE,
+} from "~/components/charts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { QueryError } from "~/components/ui/query-error";
 import { Skeleton } from "~/components/ui/skeleton";
-import { formatDate } from "~/lib/format";
+import { formatCurrency, formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
+
+const GENDER_COLORS: Record<string, string> = {
+  männlich: PALETTE.sky,
+  weiblich: PALETTE.rose,
+  divers: PALETTE.amber,
+  unbekannt: PALETTE.slate,
+};
 
 export const Route = createFileRoute("/app/")({
   component: DashboardPage,
@@ -16,6 +32,10 @@ function DashboardPage() {
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["dashboard.stats"],
     queryFn: () => orpc.dashboard.stats(),
+  });
+  const insights = useQuery({
+    queryKey: ["dashboard.insights"],
+    queryFn: () => orpc.dashboard.insights(),
   });
 
   if (isError) {
@@ -81,22 +101,39 @@ function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Altersstruktur</CardTitle>
-            <CardDescription>Aktive Mitglieder nach Altersgruppe.</CardDescription>
+            <CardDescription>Aktive Mitglieder nach Altersgruppe und Geschlecht.</CardDescription>
           </CardHeader>
           <CardContent>
-            <BarList rows={data.ageBuckets.map((b) => ({ label: b.bucket, value: b.c }))} />
+            {insights.data ? (
+              <AgePyramid
+                rows={insights.data.agePyramid.map((r) => ({
+                  bucket: r.bucket,
+                  left: r.m,
+                  right: r.w,
+                }))}
+                left={{ label: "männlich", color: PALETTE.sky }}
+                right={{ label: "weiblich", color: PALETTE.rose }}
+              />
+            ) : (
+              <BarList rows={data.ageBuckets.map((b) => ({ label: b.bucket, value: b.c }))} />
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Geschlecht</CardTitle>
-            <CardDescription>
-              Anhand der Anrede ermittelt (Herr / Frau / unbekannt).
-            </CardDescription>
+            <CardDescription>Aktive Mitglieder nach hinterlegtem Geschlecht.</CardDescription>
           </CardHeader>
           <CardContent>
-            <BarList rows={data.gender.map((g) => ({ label: g.gender, value: g.c }))} />
+            <DonutChart
+              centerLabel="Mitglieder"
+              segments={data.gender.map((g) => ({
+                label: g.gender,
+                value: g.c,
+                color: GENDER_COLORS[g.gender] ?? PALETTE.slate,
+              }))}
+            />
           </CardContent>
         </Card>
       </div>
@@ -143,6 +180,164 @@ function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <div className="flex flex-col gap-1 pt-2">
+        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <BarChart3 className="size-5 text-brand" /> Auswertungen
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Entwicklung und Finanzen im Zeitverlauf. Werte werden kurz zwischengespeichert.
+        </p>
+      </div>
+
+      {insights.isError ? (
+        <QueryError
+          title="Auswertungen konnten nicht geladen werden"
+          onRetry={() => insights.refetch()}
+        />
+      ) : !insights.data ? (
+        <Card>
+          <CardContent className="p-6">
+            <Skeleton className="h-56 w-full" />
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Mitgliederentwicklung</CardTitle>
+              <CardDescription>Aktive Mitglieder zum Jahresende, letzte 10 Jahre.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AreaChart
+                data={insights.data.membersOverTime.map((r) => ({
+                  label: String(r.year),
+                  value: r.aktiv,
+                }))}
+              />
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Eintritte und Austritte</CardTitle>
+                <CardDescription>Zugänge und Abgänge pro Jahr.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
+                <ChartLegend
+                  items={[
+                    { label: "Eintritte", color: PALETTE.emerald },
+                    { label: "Austritte", color: PALETTE.rose },
+                  ]}
+                />
+                <GroupedBarChart
+                  categories={insights.data.membersOverTime.map((r) => String(r.year))}
+                  series={[
+                    {
+                      name: "Eintritte",
+                      color: PALETTE.emerald,
+                      values: insights.data.membersOverTime.map((r) => r.eintritte),
+                    },
+                    {
+                      name: "Austritte",
+                      color: PALETTE.rose,
+                      values: insights.data.membersOverTime.map((r) => r.austritte),
+                    },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Beitragsvolumen</CardTitle>
+                <CardDescription>Soll und Bezahlt je Beitragsjahr.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
+                {insights.data.revenueByYear.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    Noch keine Beitragsläufe erfasst.
+                  </p>
+                ) : (
+                  <>
+                    <ChartLegend
+                      items={[
+                        { label: "Soll", color: PALETTE.indigo },
+                        { label: "Bezahlt", color: PALETTE.emerald },
+                      ]}
+                    />
+                    <GroupedBarChart
+                      categories={insights.data.revenueByYear.map((r) => String(r.year))}
+                      valueFormat={(n) => formatCurrency(n)}
+                      series={[
+                        {
+                          name: "Soll",
+                          color: PALETTE.indigo,
+                          values: insights.data.revenueByYear.map((r) => r.soll),
+                        },
+                        {
+                          name: "Bezahlt",
+                          color: PALETTE.emerald,
+                          values: insights.data.revenueByYear.map((r) => r.bezahlt),
+                        },
+                      ]}
+                    />
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Zahlart</CardTitle>
+                <CardDescription>Aktive Mitglieder nach Zahlungsweg.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DonutChart
+                  centerLabel="Zahler"
+                  segments={[
+                    {
+                      label: "Lastschrift",
+                      value: insights.data.zahlart.lastschrift,
+                      color: PALETTE.indigo,
+                    },
+                    {
+                      label: "Rechnung",
+                      value: insights.data.zahlart.rechnung,
+                      color: PALETTE.amber,
+                    },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Offene Posten nach Mahnstufe</CardTitle>
+                <CardDescription>
+                  Dunnbare Sollstellungen, gruppiert nach Mahnstufe.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {insights.data.dunningFunnel.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    Keine offenen Posten.
+                  </p>
+                ) : (
+                  <HorizontalBars
+                    rows={insights.data.dunningFunnel.map((f) => ({
+                      label: f.mahnstufe === 0 ? "Noch nicht gemahnt" : `Mahnstufe ${f.mahnstufe}`,
+                      value: f.anzahl,
+                      hint: `${f.anzahl} · ${formatCurrency(f.offen)}`,
+                    }))}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
 
       <Card>
         <CardHeader>

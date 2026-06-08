@@ -15,7 +15,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
-import { deriveStatus, type MemberStatus } from "~/server/domain/member";
+import { deriveGeschlecht, deriveStatus, type MemberStatus } from "~/server/domain/member";
 import { generateMemberNumber } from "~/server/domain/member-number";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
 import {
@@ -801,6 +801,11 @@ export const membersRouter = {
           message: "Vor- oder Nachname ist erforderlich.",
         });
       }
+      // Seed the explicit gender from the Anrede when the form left it open, so
+      // a new member is not silently "unbekannt" on the dashboard.
+      if (patch.geschlecht == null) {
+        patch.geschlecht = deriveGeschlecht(input.patch.anrede);
+      }
 
       // Single transaction: allocate the internal AdrNr (still a sequential
       // join key) and mint an opaque app-owned member number, then insert.
@@ -1523,6 +1528,9 @@ export const membersRouter = {
         throw new ORPCError("VALIDATION_FAILED", {
           message: "Vor- oder Nachname ist erforderlich.",
         });
+      }
+      if (patch.geschlecht == null) {
+        patch.geschlecht = deriveGeschlecht(input.patch.anrede);
       }
 
       const actorId = context.session!.user.id;

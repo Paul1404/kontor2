@@ -65,6 +65,16 @@ export const RELEASES: Release[] = [
         description:
           "Neue Seite Datenqualität prüft den Bestand auf typische Lücken: Lastschrift ohne SEPA-Mandat oder IBAN, fehlende E-Mail oder Anschrift, Minderjährige ohne gesetzliche Vertretung, Verträge ohne Beitragsart, Austritte mit offenem Vertrag und mögliche Dubletten. Jeder Treffer verlinkt direkt zum Mitglied, die Anzahl offener Hinweise steht als Zähler in der Seitenleiste.",
       },
+      {
+        category: "feature",
+        description:
+          "Das Dashboard hat einen neuen Bereich Auswertungen: Mitgliederentwicklung über zehn Jahre, Ein- und Austritte pro Jahr, Beitragsvolumen mit Soll und Bezahlt, Zahlart-Verteilung und offene Posten nach Mahnstufe. Die Altersstruktur zeigt jetzt eine Pyramide nach Geschlecht.",
+      },
+      {
+        category: "fix",
+        description:
+          "Das Geschlecht wird jetzt korrekt als eigenes Merkmal geführt und nicht mehr mit der Anrede verwechselt. Bei Import und Neuanlage wird es aus der Anrede abgeleitet (Herr, Frau), lässt sich aber jederzeit im Mitglied überschreiben. Für den vorhandenen Bestand einmalig den Befehl db:backfill:geschlecht ausführen, danach stimmt die Geschlechter-Auswertung im Dashboard.",
+      },
     ],
   },
   {

@@ -13,6 +13,7 @@ import { memberSourceRecordsTable } from "~/server/db/schema/member-source-recor
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { deriveGeschlecht } from "~/server/domain/member";
 import { generateMemberNumber } from "~/server/domain/member-number";
 import { slugify, splitAbteilung } from "~/server/importer/abteilung-splitter";
 import { aggregateMgsolln, statusFor } from "~/server/importer/aggregate-mgsolln";
@@ -302,7 +303,15 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
           try {
             [inserted] = await db
               .insert(membersTable)
-              .values({ ...row, ...numberCol, importBatchId: batch.id } as never)
+              // Seed the explicit gender from the Anrede for brand-new rows only.
+              // Updates never touch `geschlecht`, so a value corrected in the app
+              // (or backfilled) survives every future re-import.
+              .values({
+                ...row,
+                ...numberCol,
+                geschlecht: deriveGeschlecht(cleanCols.anrede),
+                importBatchId: batch.id,
+              } as never)
               .returning({ id: membersTable.id });
           } catch (e) {
             lastError = e;

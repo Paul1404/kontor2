@@ -201,4 +201,147 @@ export const dashboardRouter = {
       };
     }),
   ),
+
+  /**
+   * Trend and finance aggregates for the Auswertungen section: member
+   * development over the last ten years, Eintritte/Austritte per year,
+   * Beitragsvolumen and Zahlungsquote per billing year, the Mahnstufen-Funnel,
+   * the Zahlart split (Lastschrift vs Rechnung) and an age pyramid by gender.
+   * Cached longer than the KPIs -- these move slowly and are heavier to compute.
+   */
+  insights: authedProc.input(v.void()).handler(async ({ context }) =>
+    cached(CACHE_NS.dashboard, "insights", 300, async () => {
+      const [membersOverTime, revenueRows, funnelRows, zahlartRows, pyramidRows] =
+        await Promise.all([
+          context.db.execute<{
+            year: number;
+            aktiv: number;
+            eintritte: number;
+            austritte: number;
+          }>(sql`
+        select y::int as year,
+          (select count(*) from ${membersTable}
+             where deleted_at is null and eintritt is not null
+               and extract(year from eintritt) <= y
+               and (austritt is null or extract(year from austritt) > y)
+               and (verstorben_am is null or extract(year from verstorben_am) > y))::int as aktiv,
+          (select count(*) from ${membersTable}
+             where deleted_at is null and extract(year from eintritt) = y)::int as eintritte,
+          (select count(*) from ${membersTable}
+             where deleted_at is null and extract(year from austritt) = y)::int as austritte
+        from generate_series(extract(year from current_date)::int - 9,
+                             extract(year from current_date)::int) as y
+        order by y
+      `),
+          context.db.execute<{ year: number; soll: number; bezahlt: number; offen: number }>(sql`
+        select billing_year as year,
+               sum(amount)::float8 as soll,
+               sum(paid_amount)::float8 as bezahlt,
+               sum(open_amount)::float8 as offen
+        from soll_stellungen
+        where status <> 'cancelled'
+        group by billing_year
+        order by billing_year desc
+        limit 8
+      `),
+          context.db.execute<{ mahnstufe: number; anzahl: number; offen: number }>(sql`
+        select mahnstufe, count(*)::int as anzahl, coalesce(sum(open_amount), 0)::float8 as offen
+        from soll_stellungen
+        where status in ('open', 'returned') and open_amount > 0
+        group by mahnstufe
+        order by mahnstufe
+      `),
+          context.db.execute<{ lastschrift: number; rechnung: number }>(sql`
+        select
+          (select count(*) from ${membersTable} m
+             where m.deleted_at is null and m.austritt is null and m.verstorben_am is null
+               and exists (select 1 from contracts c where c.member_id = m.id and c.is_direct_debit = true
+                            and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date)))::int as lastschrift,
+          (select count(*) from ${membersTable} m
+             where m.deleted_at is null and m.austritt is null and m.verstorben_am is null
+               and exists (select 1 from contracts c where c.member_id = m.id
+                            and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date))
+               and not exists (select 1 from contracts c where c.member_id = m.id and c.is_direct_debit = true
+                            and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date)))::int as rechnung
+      `),
+          context.db.execute<{ bucket: string; m: number; w: number; d: number }>(sql`
+        select bucket,
+          sum(case when g = 'm' then 1 else 0 end)::int as m,
+          sum(case when g = 'w' then 1 else 0 end)::int as w,
+          sum(case when g is null or g not in ('m', 'w') then 1 else 0 end)::int as d
+        from (
+          select case
+            when ${membersTable.geburtsdatum} is null then 'unbekannt'
+            when extract(year from age(${membersTable.geburtsdatum})) < 18 then '0-17'
+            when extract(year from age(${membersTable.geburtsdatum})) < 30 then '18-29'
+            when extract(year from age(${membersTable.geburtsdatum})) < 45 then '30-44'
+            when extract(year from age(${membersTable.geburtsdatum})) < 60 then '45-59'
+            when extract(year from age(${membersTable.geburtsdatum})) < 75 then '60-74'
+            else '75+'
+          end as bucket,
+          ${membersTable.geschlecht}::text as g
+          from ${membersTable}
+          where ${memberNotDeleted()}
+            and ${membersTable.austritt} is null
+            and ${membersTable.verstorbenAm} is null
+        ) t
+        group by bucket
+      `),
+        ]);
+
+      const overTime = membersOverTime as unknown as Array<{
+        year: number;
+        aktiv: number;
+        eintritte: number;
+        austritte: number;
+      }>;
+      const revenue = (
+        revenueRows as unknown as Array<{
+          year: number;
+          soll: number;
+          bezahlt: number;
+          offen: number;
+        }>
+      )
+        .map((r) => ({
+          year: Number(r.year),
+          soll: Number(r.soll),
+          bezahlt: Number(r.bezahlt),
+          offen: Number(r.offen),
+        }))
+        .sort((a, b) => a.year - b.year);
+      const funnel = (
+        funnelRows as unknown as Array<{ mahnstufe: number; anzahl: number; offen: number }>
+      ).map((r) => ({
+        mahnstufe: Number(r.mahnstufe),
+        anzahl: Number(r.anzahl),
+        offen: Number(r.offen),
+      }));
+      const zahlart = (
+        zahlartRows as unknown as Array<{ lastschrift: number; rechnung: number }>
+      )[0] ?? {
+        lastschrift: 0,
+        rechnung: 0,
+      };
+      const PYRAMID_ORDER = ["0-17", "18-29", "30-44", "45-59", "60-74", "75+", "unbekannt"];
+      const pyramid = (
+        pyramidRows as unknown as Array<{ bucket: string; m: number; w: number; d: number }>
+      )
+        .map((r) => ({ bucket: r.bucket, m: Number(r.m), w: Number(r.w), d: Number(r.d) }))
+        .sort((a, b) => PYRAMID_ORDER.indexOf(a.bucket) - PYRAMID_ORDER.indexOf(b.bucket));
+
+      return {
+        membersOverTime: overTime.map((r) => ({
+          year: Number(r.year),
+          aktiv: Number(r.aktiv),
+          eintritte: Number(r.eintritte),
+          austritte: Number(r.austritte),
+        })),
+        revenueByYear: revenue,
+        dunningFunnel: funnel,
+        zahlart: { lastschrift: Number(zahlart.lastschrift), rechnung: Number(zahlart.rechnung) },
+        agePyramid: pyramid,
+      };
+    }),
+  ),
 };
