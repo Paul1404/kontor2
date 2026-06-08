@@ -24,3 +24,4 @@ export * from "./rundschreiben";
 export * from "./sepa";
 export * from "./settings";
 export * from "./snapshots";
+export * from "./tasks";

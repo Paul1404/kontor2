@@ -24,6 +24,7 @@ import { sepaRouter } from "~/server/orpc/procedures/sepa";
 import { sepaReturnsRouter } from "~/server/orpc/procedures/sepa-returns";
 import { settingsRouter } from "~/server/orpc/procedures/settings";
 import { snapshotsRouter } from "~/server/orpc/procedures/snapshots";
+import { tasksRouter } from "~/server/orpc/procedures/tasks";
 import { verbandsmeldungRouter } from "~/server/orpc/procedures/verbandsmeldung";
 
 export const appRouter = {
@@ -50,6 +51,7 @@ export const appRouter = {
   reports: reportsRouter,
   rundschreiben: rundschreibenRouter,
   snapshots: snapshotsRouter,
+  tasks: tasksRouter,
   dsgvo: dsgvoRouter,
   verbandsmeldung: verbandsmeldungRouter,
   portal: portalRouter,

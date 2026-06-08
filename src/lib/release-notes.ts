@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.21.0",
+    date: "2026-06-08",
+    title: "Wiedervorlagen, Verlauf und Finanz-Werkzeuge",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Wiedervorlagen: Aufgaben mit Fälligkeit pro Mitglied anlegen (etwa IBAN nachfordern), direkt am Mitglied abhaken und in einer gemeinsamen Liste über alle Mitglieder abarbeiten. Überfällige werden in der Seitenleiste rot markiert.",
+      },
+    ],
+  },
+  {
     version: "0.20.0",
     date: "2026-06-08",
     title: "Verträge und SEPA-Mandate bearbeiten",

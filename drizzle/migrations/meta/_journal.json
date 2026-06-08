@@ -239,6 +239,13 @@
       "when": 1780909355233,
       "tag": "0033_gigantic_saracen",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1780911464208,
+      "tag": "0034_wild_jackal",
+      "breakpoints": true
     }
   ]
 }

@@ -26,6 +26,7 @@ import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
 import { DsgvoCard } from "~/components/forms/DsgvoCard";
 import { SepaCard } from "~/components/forms/SepaCard";
+import { WiedervorlagenCard } from "~/components/forms/WiedervorlagenCard";
 import { SnapshotsTab } from "~/components/snapshots/SnapshotsTab";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -493,6 +494,8 @@ function MemberDetailPage() {
             beziehungen={beziehungen as never}
             canEdit={canEdit}
           />
+
+          <WiedervorlagenCard memberId={member.id} canEdit={canEdit} />
         </div>
       ) : null}
 

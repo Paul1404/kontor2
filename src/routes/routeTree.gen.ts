@@ -20,6 +20,7 @@ import { Route as PortalProfilRouteImport } from './portal/profil'
 import { Route as PortalAbgemeldetRouteImport } from './portal/abgemeldet'
 import { Route as PortalAbgelaufenRouteImport } from './portal/abgelaufen'
 import { Route as InviteTokenRouteImport } from './invite.$token'
+import { Route as AppWiedervorlagenRouteImport } from './app/wiedervorlagen'
 import { Route as AppRundschreibenRouteImport } from './app/rundschreiben'
 import { Route as AppPortalAnfragenRouteImport } from './app/portal-anfragen'
 import { Route as AppImportRouteImport } from './app/import'
@@ -116,6 +117,11 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppWiedervorlagenRoute = AppWiedervorlagenRouteImport.update({
+  id: '/wiedervorlagen',
+  path: '/wiedervorlagen',
+  getParentRoute: () => AppRouteRoute,
 } as any)
 const AppRundschreibenRoute = AppRundschreibenRouteImport.update({
   id: '/rundschreiben',
@@ -347,6 +353,7 @@ export interface FileRoutesByFullPath {
   '/app/import': typeof AppImportRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/app/rundschreiben': typeof AppRundschreibenRoute
+  '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
   '/invite/$token': typeof InviteTokenRoute
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
@@ -399,6 +406,7 @@ export interface FileRoutesByTo {
   '/app/import': typeof AppImportRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/app/rundschreiben': typeof AppRundschreibenRoute
+  '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
   '/invite/$token': typeof InviteTokenRoute
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
@@ -454,6 +462,7 @@ export interface FileRoutesById {
   '/app/import': typeof AppImportRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/app/rundschreiben': typeof AppRundschreibenRoute
+  '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
   '/invite/$token': typeof InviteTokenRoute
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
@@ -510,6 +519,7 @@ export interface FileRouteTypes {
     | '/app/import'
     | '/app/portal-anfragen'
     | '/app/rundschreiben'
+    | '/app/wiedervorlagen'
     | '/invite/$token'
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
@@ -562,6 +572,7 @@ export interface FileRouteTypes {
     | '/app/import'
     | '/app/portal-anfragen'
     | '/app/rundschreiben'
+    | '/app/wiedervorlagen'
     | '/invite/$token'
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
@@ -616,6 +627,7 @@ export interface FileRouteTypes {
     | '/app/import'
     | '/app/portal-anfragen'
     | '/app/rundschreiben'
+    | '/app/wiedervorlagen'
     | '/invite/$token'
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
@@ -754,6 +766,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/invite/$token'
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/app/wiedervorlagen': {
+      id: '/app/wiedervorlagen'
+      path: '/wiedervorlagen'
+      fullPath: '/app/wiedervorlagen'
+      preLoaderRoute: typeof AppWiedervorlagenRouteImport
+      parentRoute: typeof AppRouteRoute
     }
     '/app/rundschreiben': {
       id: '/app/rundschreiben'
@@ -1051,6 +1070,7 @@ interface AppRouteRouteChildren {
   AppImportRoute: typeof AppImportRoute
   AppPortalAnfragenRoute: typeof AppPortalAnfragenRoute
   AppRundschreibenRoute: typeof AppRundschreibenRoute
+  AppWiedervorlagenRoute: typeof AppWiedervorlagenRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAdminErweitertRoute: typeof AppAdminErweitertRoute
   AppAdminSnapshotsRoute: typeof AppAdminSnapshotsRoute
@@ -1088,6 +1108,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppImportRoute: AppImportRoute,
   AppPortalAnfragenRoute: AppPortalAnfragenRoute,
   AppRundschreibenRoute: AppRundschreibenRoute,
+  AppWiedervorlagenRoute: AppWiedervorlagenRoute,
   AppIndexRoute: AppIndexRoute,
   AppAdminErweitertRoute: AppAdminErweitertRoute,
   AppAdminSnapshotsRoute: AppAdminSnapshotsRoute,
