@@ -1,5 +1,20 @@
 const DE = "de-DE";
 
+/**
+ * The single placeholder for an empty/unknown value in any DISPLAY context.
+ * This em-dash glyph is the one deliberate dash exception in the house style.
+ * Never render "k.A.", "-", "?", "n/a" or a blank string for a missing value.
+ * (Form input defaults using `?? ""` are fine; this is about rendered output.)
+ */
+export const EMPTY_VALUE = "—";
+
+/** Render a value for display, falling back to the empty-value glyph. */
+export function orEmpty(value: string | number | null | undefined): string {
+  if (value == null) return EMPTY_VALUE;
+  const s = String(value).trim();
+  return s === "" ? EMPTY_VALUE : s;
+}
+
 // All dates are stored as UTC midnight (Drizzle date columns + our
 // ingestion path normalize to that). Render them pinned to the club's
 // timezone so a date typed in as 2020-01-15 always shows as 15.01.2020,

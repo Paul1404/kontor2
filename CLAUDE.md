@@ -77,7 +77,15 @@ changelog stuck at 0.4.0 while many features shipped.
 ## House style reminders (from the global file, worth repeating)
 
 - No em-dashes or en-dashes anywhere in UI copy. Use a period or two sentences.
+- Empty/unknown values in display contexts render as the `EMPTY_VALUE` glyph
+  (`—`) from `~/lib/format` (the one deliberate dash exception). Never use
+  `k.A.`, `-`, `?`, `n/a`, or a blank string for a rendered missing value. Use
+  `orEmpty()` for plain strings. Form input defaults (`?? ""`) are fine; this
+  rule is about rendered output.
+- Use the typographic ellipsis `…`, not three dots `...`, in UI copy.
 - Icons via `lucide-react`, never emojis.
+- Icon-only buttons need an `aria-label` (a `title` tooltip is not an
+  accessible name).
 - German UI copy: short, direct, human. No "leverage", "seamless", "robust".
 - Errors from procedures use `ORPCError` with uppercase codes, never plain
   `Error`.

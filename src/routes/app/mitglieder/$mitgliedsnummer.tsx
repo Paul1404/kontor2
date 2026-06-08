@@ -41,7 +41,7 @@ import { toast } from "~/components/ui/toaster";
 import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/audit-labels";
 import { formatLand } from "~/lib/country";
 import { triggerDownload } from "~/lib/download";
-import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
+import { EMPTY_VALUE, formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 import { usePageShortcut } from "~/lib/use-global-shortcuts";
 import { useRecentMembers } from "~/lib/use-recent-members";
@@ -222,11 +222,15 @@ function MemberDetailPage() {
             {member.mitgliedsnummer ? (
               <>
                 <span className="text-muted-foreground/50">·</span>
-                <span title="Frühere Linear-Nummer">alt {member.mitgliedsnummer}</span>
+                <span title="Frühere Linear-Mitgliedsnummer">
+                  Alt-Nr. <span className="tabular-nums">{member.mitgliedsnummer}</span>
+                </span>
               </>
             ) : null}
             <span className="text-muted-foreground/50">·</span>
-            <span title="Interne Adressnummer">AdrNr {member.adrNr}</span>
+            <span title="Interne Adressnummer">
+              AdrNr <span className="tabular-nums">{member.adrNr}</span>
+            </span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -449,7 +453,10 @@ function MemberDetailPage() {
                 <Field label="Website" value={member.www} href={buildWebsiteHref(member.www)} />
                 <Field label="Eintritt" value={formatDate(member.eintritt)} />
                 <Field label="Austritt" value={formatDate(member.austritt)} />
-                <Field label="Spender" value={member.spender === "J" ? "Ja" : "Nein"} />
+                <Field
+                  label="Spender"
+                  value={member.spender == null ? null : member.spender === "J" ? "Ja" : "Nein"}
+                />
               </CardContent>
             </Card>
 
@@ -933,7 +940,7 @@ function Field({
 }) {
   const isEmpty = value == null || value === "";
   const display = isEmpty ? (
-    <span className="text-muted-foreground">k.A.</span>
+    <span className="text-muted-foreground">{EMPTY_VALUE}</span>
   ) : href ? (
     <a
       href={href}

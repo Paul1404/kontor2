@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronRight, GitMerge, ListChecks, Loader2, ShieldCheck, Wrench } from "lucide-react";
+import {
+  ChevronRight,
+  GitMerge,
+  ListChecks,
+  Loader2,
+  ShieldCheck,
+  Users,
+  Wrench,
+} from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -8,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
+import { ABTEILUNG_NONE_FILTER } from "~/lib/abteilung-filter";
 import { cn } from "~/lib/cn";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -183,8 +192,85 @@ function DatenpflegeSection() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <FeeTypeMergeCard />
         <AbteilungMergeCard />
+        <KeineAbteilungBackfillCard />
       </div>
     </div>
+  );
+}
+
+function KeineAbteilungBackfillCard() {
+  const qc = useQueryClient();
+  // Active members without any department membership. Mirrors the "Ohne
+  // Abteilung" filter (members.list defaults to status "aktiv").
+  const count = useQuery({
+    queryKey: ["members.list", "ohne-abteilung-count"],
+    queryFn: () => orpc.members.list({ abteilungId: ABTEILUNG_NONE_FILTER, pageSize: 1 }),
+  });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const backfill = useMutation({
+    mutationFn: () => orpc.abteilungen.backfillKeineAbteilung(),
+    onSuccess: (r) => {
+      toast.success("Keine Abteilung zugeordnet.", {
+        description: `${r.assigned} Mitglied(er) der Abteilung "Keine Abteilung" zugeordnet.`,
+      });
+      setConfirmOpen(false);
+      qc.invalidateQueries({ queryKey: ["abteilungen.list"] });
+      qc.invalidateQueries({ queryKey: ["abteilungen"] });
+      qc.invalidateQueries({ queryKey: ["members.list"] });
+      qc.invalidateQueries({ queryKey: ["dataQuality.summary"] });
+    },
+    onError: (e: Error) => toast.error("Zuordnen fehlgeschlagen", { description: e.message }),
+  });
+
+  const open = count.data?.total ?? 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Users className="size-4 text-muted-foreground" /> Keine Abteilung zuordnen
+        </CardTitle>
+        <CardDescription>
+          Ordnet aktive Mitglieder ohne Sparte der Abteilung "Keine Abteilung" zu. Legt die
+          Abteilung bei Bedarf an. Wiederholbar.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">
+          {count.isLoading ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="size-4 animate-spin" /> Zähle Mitglieder…
+            </span>
+          ) : open > 0 ? (
+            <>
+              Aktuell <span className="font-semibold tabular-nums text-foreground">{open}</span>{" "}
+              aktive Mitglieder ohne Abteilung.
+            </>
+          ) : (
+            "Alle aktiven Mitglieder haben eine Abteilung."
+          )}
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={backfill.isPending || open === 0}
+          onClick={() => setConfirmOpen(true)}
+          className="self-start"
+        >
+          <Users className="size-4" /> Zuordnen
+        </Button>
+      </CardContent>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(o) => !backfill.isPending && setConfirmOpen(o)}
+        title="Keine Abteilung zuordnen?"
+        description={`${open} aktive Mitglieder ohne Sparte werden der Abteilung "Keine Abteilung" zugeordnet. Die Abteilung wird bei Bedarf angelegt.`}
+        confirmLabel="Zuordnen"
+        loading={backfill.isPending}
+        onConfirm={() => backfill.mutate()}
+      />
+    </Card>
   );
 }
 

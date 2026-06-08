@@ -196,7 +196,7 @@ function NewDunningRunPage() {
         </CardHeader>
         <CardContent>
           {preview.isLoading ? (
-            <p className="text-sm text-muted-foreground">Wird geladen...</p>
+            <p className="text-sm text-muted-foreground">Wird geladen…</p>
           ) : preview.isError ? (
             <QueryError onRetry={() => preview.refetch()} />
           ) : !preview.data || preview.data.items.length === 0 ? (
@@ -281,7 +281,7 @@ function NewDunningRunPage() {
             disabled={selected.size === 0 || commit.isPending}
             onClick={() => setConfirmOpen(true)}
           >
-            {commit.isPending ? "Wird erstellt..." : `${LEVEL_LABELS[level]} erstellen`}
+            {commit.isPending ? "Wird erstellt…" : `${LEVEL_LABELS[level]} erstellen`}
           </Button>
         </CardContent>
       </Card>

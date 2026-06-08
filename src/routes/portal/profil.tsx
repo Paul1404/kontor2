@@ -90,7 +90,7 @@ function PortalProfilePage() {
   });
 
   if (me.isLoading) {
-    return <p className="text-sm text-muted-foreground">Wird geladen...</p>;
+    return <p className="text-sm text-muted-foreground">Wird geladen…</p>;
   }
   if (!me.data?.member) {
     return (

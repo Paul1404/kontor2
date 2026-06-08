@@ -182,6 +182,7 @@ export function BeziehungenCard({
                         variant="ghost"
                         onClick={() => setConfirmTarget({ id: b.id, name })}
                         disabled={pendingDeleteId === b.id}
+                        aria-label="Beziehung entfernen"
                         title="Beziehung entfernen"
                       >
                         {pendingDeleteId === b.id ? (
@@ -203,6 +204,7 @@ export function BeziehungenCard({
         onOpenChange={(o) => {
           if (!o && !remove.isPending) setConfirmTarget(null);
         }}
+        aria-label="Beziehung entfernen"
         title="Beziehung entfernen"
         description={confirmTarget ? `Beziehung zu ${confirmTarget.name} entfernen?` : ""}
         confirmLabel="Entfernen"

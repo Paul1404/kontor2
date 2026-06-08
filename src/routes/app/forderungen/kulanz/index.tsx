@@ -198,7 +198,7 @@ function KulanzPage() {
         </CardHeader>
         <CardContent>
           {preview.isLoading ? (
-            <p className="text-sm text-muted-foreground">Wird geladen...</p>
+            <p className="text-sm text-muted-foreground">Wird geladen…</p>
           ) : preview.isError ? (
             <QueryError onRetry={() => preview.refetch()} />
           ) : !preview.data || preview.data.items.length === 0 ? (

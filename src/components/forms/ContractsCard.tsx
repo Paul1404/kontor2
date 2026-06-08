@@ -128,6 +128,7 @@ export function ContractsCard({
                           variant="ghost"
                           onClick={() => setEditTarget(v)}
                           disabled={isDeleting}
+                          aria-label="Vertrag bearbeiten"
                           title="Vertrag bearbeiten"
                         >
                           <Pencil className="size-4" />
@@ -137,6 +138,7 @@ export function ContractsCard({
                           variant="ghost"
                           onClick={() => setConfirmTarget(v)}
                           disabled={isDeleting}
+                          aria-label="Vertrag löschen"
                           title="Vertrag löschen"
                         >
                           {isDeleting ? (
@@ -159,6 +161,7 @@ export function ContractsCard({
         onOpenChange={(o) => {
           if (!o && !remove.isPending) setConfirmTarget(null);
         }}
+        aria-label="Vertrag löschen"
         title="Vertrag löschen"
         description={
           confirmTarget

@@ -113,7 +113,7 @@ function RuecklaeuferPage() {
         </CardHeader>
         <CardContent>
           {list.isLoading ? (
-            <p className="text-sm text-muted-foreground">Wird geladen...</p>
+            <p className="text-sm text-muted-foreground">Wird geladen…</p>
           ) : list.isError ? (
             <QueryError onRetry={() => list.refetch()} />
           ) : !list.data || list.data.rows.length === 0 ? (
@@ -250,7 +250,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
               </div>
               <div className="max-h-72 overflow-y-auto rounded-lg border">
                 {candidates.isLoading ? (
-                  <p className="p-3 text-sm text-muted-foreground">Wird geladen...</p>
+                  <p className="p-3 text-sm text-muted-foreground">Wird geladen…</p>
                 ) : !candidates.data || candidates.data.length === 0 ? (
                   <p className="p-3 text-sm text-muted-foreground">Keine offenen Lastschriften.</p>
                 ) : (

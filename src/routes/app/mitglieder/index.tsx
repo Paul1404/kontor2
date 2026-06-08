@@ -14,6 +14,8 @@ import {
   Loader2,
   Plus,
   Search,
+  ShieldBan,
+  Trash2,
   UserCheck,
   UserMinus,
   X,
@@ -30,7 +32,7 @@ import { SkeletonTableRows } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { ABTEILUNG_NONE_FILTER } from "~/lib/abteilung-filter";
 import { triggerDownload } from "~/lib/download";
-import { formatDate } from "~/lib/format";
+import { EMPTY_VALUE, formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 import {
@@ -185,6 +187,7 @@ function MembersListPage() {
   const anchorRef = useRef<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkAbteilungId, setBulkAbteilungId] = useState("");
+  const [bulkSperre, setBulkSperre] = useState("");
   const [confirm, setConfirm] = useState<{
     title: string;
     description: string;
@@ -374,7 +377,10 @@ function MembersListPage() {
     action:
       | { type: "setAktivPasiv"; value: "A" | "P" }
       | { type: "addAbteilung"; abteilungId: string }
-      | { type: "removeAbteilung"; abteilungId: string },
+      | { type: "removeAbteilung"; abteilungId: string }
+      | { type: "setDunningBlocked"; value: boolean }
+      | { type: "setDirectDebitBlocked"; value: boolean }
+      | { type: "softDelete" },
     successVerb: string,
   ) {
     const ids = [...selected];
@@ -787,6 +793,86 @@ function MembersListPage() {
             </Button>
           </div>
           <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+          <div className="flex items-center gap-1.5">
+            <ShieldBan className="size-4 text-muted-foreground" />
+            <select
+              value={bulkSperre}
+              onChange={(e) => setBulkSperre(e.target.value)}
+              className="h-9 min-w-0 max-w-48 rounded-lg border border-input bg-card px-2 text-sm shadow-soft focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+              aria-label="Sperre für Massenaktion"
+            >
+              <option value="">Sperre wählen…</option>
+              <option value="mahn-on">Mahnsperre setzen</option>
+              <option value="mahn-off">Mahnsperre aufheben</option>
+              <option value="einzug-on">Einzug aussetzen</option>
+              <option value="einzug-off">Einzug freigeben</option>
+            </select>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={bulkBusy || !bulkSperre}
+              onClick={() => {
+                const map: Record<
+                  string,
+                  {
+                    action: Parameters<typeof runBulk>[0];
+                    title: string;
+                    verb: string;
+                  }
+                > = {
+                  "mahn-on": {
+                    action: { type: "setDunningBlocked", value: true },
+                    title: "Mahnsperre setzen",
+                    verb: "mit Mahnsperre versehen",
+                  },
+                  "mahn-off": {
+                    action: { type: "setDunningBlocked", value: false },
+                    title: "Mahnsperre aufheben",
+                    verb: "Mahnsperre aufgehoben",
+                  },
+                  "einzug-on": {
+                    action: { type: "setDirectDebitBlocked", value: true },
+                    title: "Einzug aussetzen",
+                    verb: "Einzug ausgesetzt",
+                  },
+                  "einzug-off": {
+                    action: { type: "setDirectDebitBlocked", value: false },
+                    title: "Einzug freigeben",
+                    verb: "Einzug freigegeben",
+                  },
+                };
+                const choice = map[bulkSperre];
+                if (!choice) return;
+                setConfirm({
+                  title: choice.title,
+                  description: `${choice.title} für ${selectedCount} ausgewählte Mitglieder? Bereits passende werden übersprungen.`,
+                  destructive: false,
+                  run: () => runBulk(choice.action, choice.verb),
+                });
+              }}
+            >
+              Anwenden
+            </Button>
+          </div>
+          <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={bulkBusy}
+            onClick={() =>
+              setConfirm({
+                title: "In den Papierkorb verschieben",
+                description: `${selectedCount} ausgewählte Mitglieder in den Papierkorb verschieben? Lässt sich über die Papierkorb-Ansicht wiederherstellen.`,
+                destructive: true,
+                run: () => runBulk({ type: "softDelete" }, "in den Papierkorb verschoben"),
+              })
+            }
+          >
+            <Trash2 className="size-4" /> Papierkorb
+          </Button>
+          <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
           <Button
             type="button"
             variant="outline"
@@ -947,7 +1033,7 @@ function MembersListPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">{[m.plz, m.ort].filter(Boolean).join(" ")}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{m.email ?? ""}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{m.email || EMPTY_VALUE}</td>
                       <td className="px-4 py-3 text-muted-foreground">{formatDate(m.eintritt)}</td>
                       <td className="px-4 py-3">
                         <InlineStatusEdit

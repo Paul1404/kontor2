@@ -195,7 +195,7 @@ function ForderungenPage() {
         </CardHeader>
         <CardContent>
           {open.isLoading ? (
-            <p className="text-sm text-muted-foreground">Wird geladen...</p>
+            <p className="text-sm text-muted-foreground">Wird geladen…</p>
           ) : open.isError ? (
             <QueryError onRetry={() => open.refetch()} />
           ) : !open.data || open.data.members.length === 0 ? (

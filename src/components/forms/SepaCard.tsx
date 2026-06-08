@@ -6,7 +6,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { formatDate, toDateInput } from "~/lib/format";
+import { EMPTY_VALUE, formatDate, toDateInput } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 type Mandate = {
@@ -97,7 +97,7 @@ export function SepaCard({
                   </span>
                   <span className="tabular-nums font-medium">{s.mandatsNr}</span>
                   <span className="text-xs text-muted-foreground">
-                    {s.lastschriftart ?? ""} {s.typ ? `· ${s.typ}` : ""}
+                    {[s.lastschriftart, s.typ].filter(Boolean).join(" · ")}
                   </span>
                   {s.letzteVerwendung ? (
                     <span className="text-xs text-muted-foreground">
@@ -107,7 +107,7 @@ export function SepaCard({
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={s.widerrufenAm || s.isDeleted ? "warning" : "outline"}>
-                    {s.widerrufenAm || s.isDeleted ? "Widerrufen" : (s.status ?? "?")}
+                    {s.widerrufenAm || s.isDeleted ? "Widerrufen" : (s.status ?? EMPTY_VALUE)}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
                     gültig ab {formatDate(s.gueltigAb)}

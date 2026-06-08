@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { QueryErrorRow } from "~/components/ui/query-error";
 import { exportCsvFile } from "~/lib/export";
-import { formatDate } from "~/lib/format";
+import { EMPTY_VALUE, formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
@@ -165,7 +165,7 @@ function GeburtstagePage() {
                         ) : null}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{r.ort ?? ""}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{r.ort || EMPTY_VALUE}</td>
                   </tr>
                 ))
               )}

@@ -41,6 +41,33 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.28.0",
+    date: "2026-06-08",
+    title: "Massenbearbeitung und UI-Feinschliff",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Mitgliederliste kann für die Auswahl jetzt die Mahnsperre und die Einzugssperre setzen oder aufheben und Mitglieder gesammelt in den Papierkorb verschieben.",
+      },
+      {
+        category: "feature",
+        description:
+          "Auf der Datenpflege gibt es einen Knopf, der bestehende aktive Mitglieder ohne Sparte der Abteilung Keine Abteilung zuordnet. Das holt die Mitglieder nach, die vor der Importänderung keine Zuordnung bekamen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Leere Felder werden überall einheitlich mit einem Strich dargestellt, statt mal k.A., mal Bindestrich, mal leer. Die alte Mitgliedsnummer steht klar beschriftet als Alt-Nr.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Kleinere Verbesserungen: einheitliche Auslassungspunkte, beschriftete Symbolschaltflächen für Screenreader und korrekte Bindestriche in der Bestandserhebung.",
+      },
+    ],
+  },
+  {
     version: "0.27.0",
     date: "2026-06-08",
     title: "Datenpflege und Keine Abteilung",

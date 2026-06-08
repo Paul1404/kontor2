@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { toast } from "~/components/ui/toaster";
 import { triggerDownload } from "~/lib/download";
-import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
+import { EMPTY_VALUE, formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
@@ -142,9 +142,9 @@ function FeeRunDetailPage() {
         <InfoTile label="Erstellt am" value={formatDateTime(r.createdAt)} />
         <InfoTile
           label="Bestätigt am"
-          value={r.committedAt ? formatDateTime(r.committedAt) : "-"}
+          value={r.committedAt ? formatDateTime(r.committedAt) : EMPTY_VALUE}
         />
-        <InfoTile label="MsgId" value={r.xmlMessageId ?? "-"} mono />
+        <InfoTile label="MsgId" value={r.xmlMessageId ?? EMPTY_VALUE} mono />
       </div>
 
       {r.status === "committed" && canEdit ? <PrenotificationCard id={id} /> : null}
@@ -191,7 +191,7 @@ function FeeRunDetailPage() {
                       </Link>
                       <div className="text-xs text-muted-foreground">#{memberRef(it)}</div>
                     </td>
-                    <td className="px-4 py-2 text-muted-foreground">{it.artName ?? "-"}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{it.artName || EMPTY_VALUE}</td>
                     <td className="px-4 py-2 text-right tabular-nums">
                       {formatCurrency(it.amount)}
                       {it.includesAufnahmegebuhr ? (
@@ -211,7 +211,7 @@ function FeeRunDetailPage() {
                           {it.returnReasonCode ?? "Rückläufer"}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">-</span>
+                        <span className="text-muted-foreground">{EMPTY_VALUE}</span>
                       )}
                     </td>
                   </tr>

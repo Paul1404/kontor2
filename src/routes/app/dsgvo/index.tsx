@@ -126,7 +126,7 @@ function DsgvoIndexPage() {
               ) : list.isLoading ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    Wird geladen...
+                    Wird geladen…
                   </td>
                 </tr>
               ) : (list.data?.rows ?? []).length === 0 ? (

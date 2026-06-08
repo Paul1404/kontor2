@@ -86,7 +86,7 @@ function MahnungDetailPage() {
   }
 
   if (detail.isLoading) {
-    return <p className="text-sm text-muted-foreground">Wird geladen...</p>;
+    return <p className="text-sm text-muted-foreground">Wird geladen…</p>;
   }
   if (!detail.data) {
     return <p className="text-sm text-muted-foreground">Mahnlauf nicht gefunden.</p>;
