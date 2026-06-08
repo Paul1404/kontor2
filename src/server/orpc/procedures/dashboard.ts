@@ -102,6 +102,8 @@ export const dashboardRouter = {
         // around December → January cleanly.
         context.db.execute<{
           id: string;
+          member_no: string | null;
+          kontakt_no: string | null;
           mitgliedsnummer: string | null;
           adr_nr: number;
           vorname: string | null;
@@ -110,10 +112,10 @@ export const dashboardRouter = {
           next_birthday: Date;
           turns: number;
         }>(sql`
-        select id, mitgliedsnummer, adr_nr, vorname, nachname, geburtsdatum, next_birthday,
+        select id, member_no, kontakt_no, mitgliedsnummer, adr_nr, vorname, nachname, geburtsdatum, next_birthday,
                extract(year from age(next_birthday, geburtsdatum))::int as turns
         from (
-          select id, mitgliedsnummer, adr_nr, vorname, nachname, geburtsdatum,
+          select id, member_no, kontakt_no, mitgliedsnummer, adr_nr, vorname, nachname, geburtsdatum,
             case
               when make_date(extract(year from current_date)::int,
                              extract(month from ${membersTable.geburtsdatum})::int,
@@ -186,6 +188,8 @@ export const dashboardRouter = {
         gender: genderArr,
         birthdays: birthdaysArr.map((b) => ({
           id: String(b.id),
+          memberNo: (b.member_no as string | null) ?? null,
+          kontaktNo: (b.kontakt_no as string | null) ?? null,
           mitgliedsnummer: (b.mitgliedsnummer as string | null) ?? null,
           adrNr: Number(b.adr_nr),
           vorname: (b.vorname as string | null) ?? null,

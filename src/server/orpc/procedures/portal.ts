@@ -314,6 +314,8 @@ export const portalRouter = {
             reviewedAt: portalChangeRequestsTable.reviewedAt,
             reviewedBy: portalChangeRequestsTable.reviewedBy,
             reviewerNotes: portalChangeRequestsTable.reviewerNotes,
+            memberNo: membersTable.memberNo,
+            kontaktNo: membersTable.kontaktNo,
             mitgliedsnummer: membersTable.mitgliedsnummer,
             adrNr: membersTable.adrNr,
             vorname: membersTable.vorname,

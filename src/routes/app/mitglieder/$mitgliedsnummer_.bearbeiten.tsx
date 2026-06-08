@@ -113,7 +113,9 @@ function EditMemberPage() {
           {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")} bearbeiten
         </h1>
         <p className="text-sm text-muted-foreground">
-          Mitgliedsnummer: <span className="tabular-nums">{member.mitgliedsnummer}</span> · AdrNr{" "}
+          {member.memberNo ? "Mitgliedsnummer" : "Kontaktnummer"}:{" "}
+          <span className="tabular-nums">{member.memberNo ?? member.kontaktNo}</span>
+          {member.mitgliedsnummer ? ` · alt ${member.mitgliedsnummer}` : ""} · intern AdrNr{" "}
           {member.adrNr}
         </p>
       </div>

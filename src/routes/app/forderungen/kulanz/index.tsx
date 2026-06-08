@@ -222,7 +222,7 @@ function KulanzPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         to="/app/mitglieder/$mitgliedsnummer"
-                        params={{ mitgliedsnummer: i.mitgliedsnummer ?? String(i.adrNr) }}
+                        params={{ mitgliedsnummer: i.reference }}
                         className="font-medium hover:underline"
                       >
                         {i.name}

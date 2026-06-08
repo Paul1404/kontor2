@@ -99,6 +99,8 @@ export const auditRouter = {
 
     type MemberLite = {
       id: string;
+      memberNo: string | null;
+      kontaktNo: string | null;
       mitgliedsnummer: string | null;
       adrNr: number;
       vorname: string | null;
@@ -112,6 +114,8 @@ export const auditRouter = {
       const rows2 = await context.db
         .select({
           id: membersTable.id,
+          memberNo: membersTable.memberNo,
+          kontaktNo: membersTable.kontaktNo,
           mitgliedsnummer: membersTable.mitgliedsnummer,
           adrNr: membersTable.adrNr,
           vorname: membersTable.vorname,
@@ -155,6 +159,8 @@ export const auditRouter = {
         target: target
           ? {
               memberId: target.id,
+              memberNo: target.memberNo,
+              kontaktNo: target.kontaktNo,
               mitgliedsnummer: target.mitgliedsnummer,
               adrNr: target.adrNr,
               vorname: target.vorname,

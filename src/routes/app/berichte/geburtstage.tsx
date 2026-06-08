@@ -8,6 +8,7 @@ import { Card, CardContent } from "~/components/ui/card";
 import { QueryErrorRow } from "~/components/ui/query-error";
 import { exportCsvFile } from "~/lib/export";
 import { formatDate } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/berichte/geburtstage")({
@@ -146,9 +147,7 @@ function GeburtstagePage() {
                 data.data.rows.map((r) => (
                   <tr key={r.id} className="transition-colors hover:bg-muted/30">
                     <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.tag}.</td>
-                    <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                      {r.mitgliedsnummer ?? "-"}
-                    </td>
+                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{memberRef(r)}</td>
                     <td className="px-4 py-3 font-medium">
                       {[r.nachname, r.vorname].filter(Boolean).join(", ")}
                     </td>

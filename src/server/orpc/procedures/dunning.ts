@@ -14,6 +14,7 @@ import {
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
+import { memberRef } from "~/server/domain/member";
 import {
   loadGuardianConnections,
   loadOpenPostings,
@@ -69,6 +70,8 @@ async function loadDunningEmailContext(db: DB, itemId: string) {
       pdfFilename: dunningItemsTable.pdfFilename,
       runDate: dunningRunsTable.runDate,
       memberId: membersTable.id,
+      memberNo: membersTable.memberNo,
+      kontaktNo: membersTable.kontaktNo,
       mitgliedsnummer: membersTable.mitgliedsnummer,
       adrNr: membersTable.adrNr,
       vorname: membersTable.vorname,
@@ -107,6 +110,8 @@ async function loadDunningEmailContext(db: DB, itemId: string) {
   // date, so a minor's mail goes to the guardian's address, mirroring the PDF.
   const member: MemberWithDebt = {
     memberId: row.memberId,
+    memberNo: row.memberNo,
+    kontaktNo: row.kontaktNo,
     mitgliedsnummer: row.mitgliedsnummer,
     adrNr: row.adrNr,
     vorname: row.vorname,
@@ -136,7 +141,7 @@ async function loadDunningEmailContext(db: DB, itemId: string) {
   const guardians = await loadGuardianConnections(db, [row.memberId]);
   const resolved = resolveRecipient(member, guardians.get(row.memberId) ?? null, asOf);
 
-  const mitgliedsnummer = row.mitgliedsnummer ?? `AdrNr ${row.adrNr}`;
+  const mitgliedsnummer = memberRef(row);
   const to = resolved.recipientEmail ?? "";
 
   const content: DunningEmailContent | null = to
@@ -239,6 +244,8 @@ export const dunningRouter = {
         const resolved = recipients.get(m.memberId);
         return {
           memberId: m.memberId,
+          memberNo: m.memberNo,
+          kontaktNo: m.kontaktNo,
           mitgliedsnummer: m.mitgliedsnummer,
           adrNr: m.adrNr,
           name:
@@ -268,6 +275,8 @@ export const dunningRouter = {
         items,
         blocked: blocked.map((m) => ({
           memberId: m.memberId,
+          memberNo: m.memberNo,
+          kontaktNo: m.kontaktNo,
           mitgliedsnummer: m.mitgliedsnummer,
           adrNr: m.adrNr,
           name:
@@ -446,6 +455,8 @@ export const dunningRouter = {
               logoDataUri,
             },
             member: {
+              memberNo: m.memberNo,
+              kontaktNo: m.kontaktNo,
               mitgliedsnummer: m.mitgliedsnummer,
               adrNr: m.adrNr,
               vorname: m.vorname,
@@ -470,7 +481,7 @@ export const dunningRouter = {
 
           const docRef = await allocateDocRef(tx, "MA", refYear);
           const { base64 } = await renderPdfBase64(MahnungDocument({ pkg: pdfInput, docRef }));
-          const filename = `Mahnung-${docRef}-${m.mitgliedsnummer ?? m.adrNr}.pdf`;
+          const filename = `Mahnung-${docRef}-${memberRef(m)}.pdf`;
 
           itemValues.push({
             dunningRunId: runRow.id,
@@ -585,6 +596,8 @@ export const dunningRouter = {
         sentAt: dunningItemsTable.sentAt,
         pdfFilename: dunningItemsTable.pdfFilename,
         memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
+        memberNo: membersTable.memberNo,
+        kontaktNo: membersTable.kontaktNo,
         mitgliedsnummer: membersTable.mitgliedsnummer,
         adrNr: membersTable.adrNr,
         eMail: membersTable.email,
@@ -620,6 +633,8 @@ export const dunningRouter = {
     const items = rows.map((r) => {
       const member: MemberWithDebt = {
         memberId: r.memberId,
+        memberNo: r.memberNo,
+        kontaktNo: r.kontaktNo,
         mitgliedsnummer: r.mitgliedsnummer,
         adrNr: r.adrNr,
         vorname: r.vorname,
@@ -659,6 +674,8 @@ export const dunningRouter = {
         sentAt: r.sentAt,
         pdfFilename: r.pdfFilename,
         memberName: r.memberName,
+        memberNo: r.memberNo,
+        kontaktNo: r.kontaktNo,
         mitgliedsnummer: r.mitgliedsnummer,
         adrNr: r.adrNr,
         eMail: r.eMail,

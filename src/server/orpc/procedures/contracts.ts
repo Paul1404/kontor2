@@ -5,6 +5,7 @@ import { appendAudit, diff } from "~/server/audit/log";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
+import { memberRef } from "~/server/domain/member";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
 import { vorstandProc } from "~/server/orpc/base";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
@@ -71,6 +72,8 @@ export const contractsRouter = {
           .select({
             id: membersTable.id,
             adrNr: membersTable.adrNr,
+            memberNo: membersTable.memberNo,
+            kontaktNo: membersTable.kontaktNo,
             mitgliedsnummer: membersTable.mitgliedsnummer,
           })
           .from(membersTable)
@@ -90,7 +93,7 @@ export const contractsRouter = {
             ...(patch as Record<string, unknown>),
             memberId: member.id,
             adrNr: member.adrNr,
-            mitglNr: member.mitgliedsnummer ?? null,
+            mitglNr: memberRef(member),
           } as never)
           .returning({ id: contractsTable.id });
         if (!row) {

@@ -7,6 +7,7 @@ import { allocateDocRef } from "~/server/db/doc-ref";
 import { cancellationLettersTable } from "~/server/db/schema/cancellations";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
+import { memberRef } from "~/server/domain/member";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { buildCancellationModel } from "~/server/pdf/cancellation-model";
 import { clubLogoDataUri } from "~/server/pdf/logo";
@@ -81,7 +82,7 @@ export const cancellationsRouter = {
         plz: member.plz,
         ort: member.ort,
         geburtsdatum: member.geburtsdatum,
-        mitgliedsnummer: member.mitgliedsnummer,
+        mitgliedsnummer: memberRef(member),
       },
       austrittDatum: input.austrittDatum,
       abteilung: input.abteilung,
@@ -110,7 +111,7 @@ export const cancellationsRouter = {
     const pdf = Buffer.from(base64, "base64");
 
     const id = randomUUID();
-    const idRef = member.mitgliedsnummer ?? String(member.adrNr);
+    const idRef = memberRef(member);
     const filename = `Austrittsbestaetigung-${docRef}-${safeFilenamePart(idRef)}.pdf`;
     const s3Key = `members/${member.id}/cancellations/${id}/${filename}`;
 

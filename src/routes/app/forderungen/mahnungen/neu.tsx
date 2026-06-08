@@ -10,6 +10,7 @@ import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/forderungen/mahnungen/neu")({
@@ -159,10 +160,7 @@ function NewDunningRunPage() {
               {preview.data.blocked.map((b) => (
                 <li key={b.memberId} className="flex items-center justify-between py-2">
                   <span>
-                    {b.name}{" "}
-                    <span className="text-xs text-muted-foreground">
-                      #{b.mitgliedsnummer ?? b.adrNr}
-                    </span>
+                    {b.name} <span className="text-xs text-muted-foreground">#{memberRef(b)}</span>
                   </span>
                   <span className="text-sm tabular-nums">{formatCurrency(b.openSum)}</span>
                 </li>
@@ -221,13 +219,13 @@ function NewDunningRunPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         to="/app/mitglieder/$mitgliedsnummer"
-                        params={{ mitgliedsnummer: i.mitgliedsnummer ?? String(i.adrNr) }}
+                        params={{ mitgliedsnummer: memberRef(i) }}
                         className="font-medium hover:underline"
                       >
                         {i.name}
                       </Link>
                       <span className="text-xs text-muted-foreground tabular-nums">
-                        #{i.mitgliedsnummer ?? i.adrNr}
+                        #{memberRef(i)}
                       </span>
                       {!i.hasAddress ? <Badge variant="warning">Anschrift fehlt</Badge> : null}
                       {i.minorWithoutGuardian ? (

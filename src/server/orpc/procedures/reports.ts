@@ -7,6 +7,7 @@ import { contractsTable } from "~/server/db/schema/contracts";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { membersTable } from "~/server/db/schema/members";
+import { memberRef } from "~/server/domain/member";
 import { type CsvColumn, toCsv } from "~/server/lib/csv";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import type { AppContext } from "~/server/orpc/context";
@@ -97,6 +98,8 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
 
 type BirthdayRow = {
   id: string;
+  memberNo: string | null;
+  kontaktNo: string | null;
   mitgliedsnummer: string | null;
   vorname: string | null;
   nachname: string | null;
@@ -142,6 +145,8 @@ async function loadGeburtstage(
   const rows = await db
     .select({
       id: membersTable.id,
+      memberNo: membersTable.memberNo,
+      kontaktNo: membersTable.kontaktNo,
       mitgliedsnummer: membersTable.mitgliedsnummer,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
@@ -163,6 +168,8 @@ async function loadGeburtstage(
 
 type JubileeMemberRow = {
   id: string;
+  memberNo: string | null;
+  kontaktNo: string | null;
   mitgliedsnummer: string | null;
   vorname: string | null;
   nachname: string | null;
@@ -191,6 +198,8 @@ async function loadEhrungen(
   const rows = await db
     .select({
       id: membersTable.id,
+      memberNo: membersTable.memberNo,
+      kontaktNo: membersTable.kontaktNo,
       mitgliedsnummer: membersTable.mitgliedsnummer,
       vorname: membersTable.vorname,
       nachname: membersTable.nachname,
@@ -215,6 +224,8 @@ async function loadEhrungen(
       )
       .map((r) => ({
         id: r.id,
+        memberNo: r.memberNo,
+        kontaktNo: r.kontaktNo,
         mitgliedsnummer: r.mitgliedsnummer,
         vorname: r.vorname,
         nachname: r.nachname,
@@ -400,7 +411,7 @@ export const reportsRouter = {
       const ids = [...new Set(input.ids)];
       const selected: MemberExportRow[] = await context.db
         .select({
-          mitgliedsnummer: membersTable.mitgliedsnummer,
+          mitgliedsnummer: sql<string>`coalesce(${membersTable.memberNo}, ${membersTable.kontaktNo}, ${membersTable.mitgliedsnummer}, 'A' || ${membersTable.adrNr})`,
           anrede: membersTable.anrede,
           titel: membersTable.titel1,
           vorname: membersTable.vorname,
@@ -444,7 +455,7 @@ export const reportsRouter = {
     const where = conditions.length > 0 ? and(...conditions) : undefined;
     const rows: MemberExportRow[] = await context.db
       .select({
-        mitgliedsnummer: membersTable.mitgliedsnummer,
+        mitgliedsnummer: sql<string>`coalesce(${membersTable.memberNo}, ${membersTable.kontaktNo}, ${membersTable.mitgliedsnummer}, 'A' || ${membersTable.adrNr})`,
         anrede: membersTable.anrede,
         titel: membersTable.titel1,
         vorname: membersTable.vorname,
@@ -479,7 +490,7 @@ export const reportsRouter = {
   geburtstageExport: authedProc.input(GeburtstageInput).handler(async ({ context, input }) => {
     const data = await loadGeburtstage(context.db, input);
     const content = toCsv(data.rows, [
-      { key: "mitgliedsnummer", label: "Mitgl.-Nr." },
+      { key: "mitgliedsnummer", label: "Mitgl.-Nr.", format: (_v, row) => memberRef(row) },
       { key: "nachname", label: "Nachname" },
       { key: "vorname", label: "Vorname" },
       {
@@ -515,7 +526,7 @@ export const reportsRouter = {
     const flat: FlatRow[] = data.groups.flatMap((g) =>
       g.members.map((m) => ({
         jubilaeum: g.jubilee,
-        mitgliedsnummer: m.mitgliedsnummer,
+        mitgliedsnummer: memberRef(m),
         nachname: m.nachname,
         vorname: m.vorname,
         ort: m.ort,

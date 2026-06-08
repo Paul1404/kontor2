@@ -4,6 +4,7 @@ import { Inbox, KeyRound, Pencil, ShieldCheck } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { formatDate } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/portal/")({
@@ -42,7 +43,7 @@ function PortalHome() {
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-            <Detail label="Mitgliedsnummer" value={m.mitgliedsnummer ?? `Adr. ${m.adrNr}`} />
+            <Detail label={m.memberNo ? "Mitgliedsnummer" : "Kontaktnummer"} value={memberRef(m)} />
             <Detail label="Eintritt" value={m.eintritt ? formatDate(m.eintritt) : "—"} />
             <Detail
               label="Geburtsdatum"

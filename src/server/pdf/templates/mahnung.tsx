@@ -1,4 +1,5 @@
 import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { memberRef } from "~/server/domain/member";
 import { LetterPage } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
@@ -79,6 +80,8 @@ export type MahnungInput = {
   };
   /** The member the dues belong to (drives Mitgliedsnummer + Verwendungszweck). */
   member: {
+    memberNo: string | null;
+    kontaktNo: string | null;
     mitgliedsnummer: string | null;
     adrNr: number;
     vorname: string | null;
@@ -141,7 +144,7 @@ function fmtIban(s: string): string {
 
 function subjectName(m: MahnungInput["member"]): string {
   const full = [m.vorname, m.nachname].filter(Boolean).join(" ").trim();
-  return full || m.kurzname || m.firma1 || `Mitglied ${m.mitgliedsnummer ?? m.adrNr}`;
+  return full || m.kurzname || m.firma1 || `Mitglied ${memberRef(m)}`;
 }
 
 function salutation(r: MahnungInput["recipient"]): string {
@@ -184,8 +187,8 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
         recipientNote={r.vertretungFor ? `gesetzliche Vertretung von ${r.vertretungFor}` : null}
         infoRows={[
           {
-            label: "Mitgliedsnummer",
-            value: pkg.member.mitgliedsnummer ?? `AdrNr ${pkg.member.adrNr}`,
+            label: pkg.member.memberNo ? "Mitgliedsnummer" : "Kontaktnummer",
+            value: memberRef(pkg.member),
           },
           { label: "Dokument", value: docRef },
           { label: "Datum", value: fmtDate(pkg.runDate) },
@@ -265,7 +268,8 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
           <View style={styles.paymentRow}>
             <Text style={styles.paymentKey}>Verwendung</Text>
             <Text style={styles.paymentValue}>
-              {title} · {subject} · Mitgliedsnr {pkg.member.mitgliedsnummer ?? pkg.member.adrNr}
+              {title} · {subject} · Mitgliedsnr {memberRef(pkg.member)}
+              {pkg.member.mitgliedsnummer ? ` (alt ${pkg.member.mitgliedsnummer})` : ""}
             </Text>
           </View>
         </View>

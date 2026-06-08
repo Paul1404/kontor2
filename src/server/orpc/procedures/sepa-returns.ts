@@ -71,6 +71,8 @@ export const sepaReturnsRouter = {
             sequenceType: feeRunItemsTable.sequenceType,
             billingYear: feeRunsTable.billingYear,
             memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
+            memberNo: membersTable.memberNo,
+            kontaktNo: membersTable.kontaktNo,
             mitgliedsnummer: membersTable.mitgliedsnummer,
             adrNr: membersTable.adrNr,
           })
@@ -129,6 +131,8 @@ export const sepaReturnsRouter = {
           debtorIbanLast4: feeRunItemsTable.debtorIbanLast4,
           memberId: feeRunItemsTable.memberId,
           memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
+          memberNo: membersTable.memberNo,
+          kontaktNo: membersTable.kontaktNo,
           mitgliedsnummer: membersTable.mitgliedsnummer,
           adrNr: membersTable.adrNr,
         })

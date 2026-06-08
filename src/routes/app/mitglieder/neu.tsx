@@ -26,7 +26,6 @@ function NewMemberPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [step, setStep] = useState<Step>("stamm");
-  const [mitgliedsnummer, setMitglnr] = useState("");
   const [stamm, setStamm] = useState<StammdatenValues>(EMPTY_STAMM);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -55,7 +54,6 @@ function NewMemberPage() {
           ? (feeTypes.data?.find((f) => f.art === beitragArt)?.bezeichnung ?? null)
           : null;
       return orpc.members.onboard({
-        mitgliedsnummer: mitgliedsnummer.trim().length > 0 ? mitgliedsnummer.trim() : null,
         patch: buildPatch(stamm, "") as never,
         abteilungen: selectedAbt.map((id) => ({ abteilungId: id, eintrittsdatum: eintritt })),
         contract:
@@ -74,7 +72,7 @@ function NewMemberPage() {
       await qc.invalidateQueries({ queryKey: ["members.list"] });
       navigate({
         to: "/app/mitglieder/$mitgliedsnummer",
-        params: { mitgliedsnummer: result.mitgliedsnummer ?? String(result.adrNr) },
+        params: { mitgliedsnummer: result.ref },
       });
     },
     onError: (e: unknown) => {
@@ -98,7 +96,7 @@ function NewMemberPage() {
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight">Neues Mitglied</h1>
         <p className="text-sm text-muted-foreground">
-          Mitgliedsnummer und AdrNr werden automatisch vergeben, wenn leer gelassen.
+          Die Mitgliedsnummer wird automatisch vergeben.
         </p>
       </div>
 
@@ -109,7 +107,6 @@ function NewMemberPage() {
           initial={stamm}
           submitting={false}
           submitLabel="Weiter"
-          mitglnrInput={{ value: mitgliedsnummer, onChange: setMitglnr }}
           onCancel={() => navigate({ to: "/app/mitglieder", search: () => ({}) as never })}
           onSubmit={(values) => {
             setStamm(values);

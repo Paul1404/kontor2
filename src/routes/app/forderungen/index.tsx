@@ -19,6 +19,7 @@ import { InfoBox } from "~/components/ui/info-box";
 import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/forderungen/")({
@@ -226,7 +227,7 @@ function ForderungenPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <Link
                             to="/app/mitglieder/$mitgliedsnummer"
-                            params={{ mitgliedsnummer: m.mitgliedsnummer ?? String(m.adrNr) }}
+                            params={{ mitgliedsnummer: memberRef(m) }}
                             className="font-medium hover:underline"
                           >
                             {[m.vorname, m.nachname].filter(Boolean).join(" ") ||
@@ -235,7 +236,7 @@ function ForderungenPage() {
                               `AdrNr ${m.adrNr}`}
                           </Link>
                           <span className="text-xs text-muted-foreground tabular-nums">
-                            #{m.mitgliedsnummer ?? m.adrNr}
+                            #{memberRef(m)}
                           </span>
                           <MahnstufeBadge stufe={m.currentMahnstufe} />
                           {m.dunningBlocked ? (
@@ -281,7 +282,7 @@ function ForderungenPage() {
                         </span>
                         <Link
                           to="/app/mitglieder/$mitgliedsnummer"
-                          params={{ mitgliedsnummer: m.mitgliedsnummer ?? String(m.adrNr) }}
+                          params={{ mitgliedsnummer: memberRef(m) }}
                           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
                         >
                           Mitglied <ExternalLink className="size-3" />

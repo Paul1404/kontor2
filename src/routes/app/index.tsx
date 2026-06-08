@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { QueryError } from "~/components/ui/query-error";
 import { Skeleton } from "~/components/ui/skeleton";
 import { formatDate } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/")({
@@ -160,11 +161,10 @@ function DashboardPage() {
                 <li key={b.id} className="flex items-center justify-between py-2">
                   <Link
                     to="/app/mitglieder/$mitgliedsnummer"
-                    params={{ mitgliedsnummer: b.mitgliedsnummer ?? String(b.adrNr) }}
+                    params={{ mitgliedsnummer: memberRef(b) }}
                     className="hover:underline"
                   >
-                    {[b.vorname, b.nachname].filter(Boolean).join(" ") ||
-                      (b.mitgliedsnummer ? `#${b.mitgliedsnummer}` : `AdrNr ${b.adrNr}`)}
+                    {[b.vorname, b.nachname].filter(Boolean).join(" ") || `#${memberRef(b)}`}
                   </Link>
                   <span className="text-muted-foreground tabular-nums">
                     {formatDate(b.nextBirthday)} · wird {b.turns}

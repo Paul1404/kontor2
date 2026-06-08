@@ -17,6 +17,7 @@ import {
   isHiddenField,
 } from "~/lib/audit-labels";
 import { formatDateTime } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 type Action = "create" | "update" | "delete" | "restore";
@@ -310,9 +311,9 @@ function AuditRow({ row }: { row: AuditRowData }) {
     .map(([k]) => fieldLabel(k))
     .join(", ");
 
+  const targetRef = row.target ? memberRef(row.target) : "";
   const targetName = row.target
-    ? [row.target.vorname, row.target.nachname].filter(Boolean).join(" ") ||
-      `#${row.target.mitgliedsnummer ?? ""}`
+    ? [row.target.vorname, row.target.nachname].filter(Boolean).join(" ") || `#${targetRef}`
     : null;
 
   return (
@@ -329,16 +330,12 @@ function AuditRow({ row }: { row: AuditRowData }) {
             {row.target ? (
               <Link
                 to="/app/mitglieder/$mitgliedsnummer"
-                params={{
-                  mitgliedsnummer: row.target.mitgliedsnummer ?? String(row.target.adrNr),
-                }}
+                params={{ mitgliedsnummer: targetRef }}
                 onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center gap-1 text-primary hover:underline"
               >
                 {targetName}
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  ({row.target.mitgliedsnummer ?? `AdrNr ${row.target.adrNr}`})
-                </span>
+                <span className="text-xs text-muted-foreground tabular-nums">({targetRef})</span>
                 <ExternalLink className="size-3" />
               </Link>
             ) : (

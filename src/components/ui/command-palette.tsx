@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "~/lib/cn";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 import { useRecentMembers } from "~/lib/use-recent-members";
 
@@ -140,6 +141,8 @@ const NAV_COMMANDS: NavCommand[] = [
 
 type MemberHit = {
   id: string;
+  memberNo: string | null;
+  kontaktNo: string | null;
   mitgliedsnummer: string | null;
   adrNr: number;
   vorname: string | null;
@@ -222,7 +225,7 @@ export function CommandPalette({ role }: { role: Role }) {
         setOpen(false);
         navigate({
           to: "/app/mitglieder/$mitgliedsnummer",
-          params: { mitgliedsnummer: hit.mitgliedsnummer ?? String(hit.adrNr) },
+          params: { mitgliedsnummer: memberRef(hit) },
         });
       }
       return;
@@ -317,7 +320,7 @@ export function CommandPalette({ role }: { role: Role }) {
                         key={hit.id}
                         icon={<Users className="size-4" />}
                         label={name}
-                        sublabel={`${hit.mitgliedsnummer ? `#${hit.mitgliedsnummer}` : "Kontakt"}${hit.ort ? ` · ${hit.ort}` : ""}`}
+                        sublabel={`#${memberRef(hit)}${hit.ort ? ` · ${hit.ort}` : ""}`}
                         active={i === highlight}
                         onMouseEnter={() => setHighlight(i)}
                         onClick={() => executeAt(i)}

@@ -12,6 +12,8 @@ import {
 function makeMember(overrides: Partial<MemberWithDebt> = {}): MemberWithDebt {
   return {
     memberId: "m1",
+    memberNo: "M-ABC100",
+    kontaktNo: null,
     mitgliedsnummer: "100",
     adrNr: 1,
     vorname: "Max",

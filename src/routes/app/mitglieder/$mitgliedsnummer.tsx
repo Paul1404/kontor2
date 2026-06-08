@@ -193,26 +193,32 @@ function MemberDetailPage() {
           <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
             {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")}
             <MemberStatusBadge member={member} />
-            {!member.mitgliedsnummer ? (
+            {!member.memberNo ? (
               <Badge variant="outline" title="Zahlt für ein Mitglied, ist aber selbst keines">
                 Kontakt
               </Badge>
             ) : null}
           </h1>
           <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-            {member.mitgliedsnummer ? (
+            {member.memberNo ? (
               <>
-                Mitgliedsnummer: <span className="tabular-nums">{member.mitgliedsnummer}</span>
-                <CopyButton value={member.mitgliedsnummer} label="Mitgliedsnummer" />
-                <span className="text-muted-foreground/50">·</span>
+                Mitgliedsnummer: <span className="tabular-nums">{member.memberNo}</span>
+                <CopyButton value={member.memberNo} label="Mitgliedsnummer" />
               </>
             ) : (
               <>
-                Kein Mitglied, nur Zahler/Kontakt
-                <span className="text-muted-foreground/50">·</span>
+                Kontaktnummer: <span className="tabular-nums">{member.kontaktNo}</span>
+                <CopyButton value={member.kontaktNo ?? ""} label="Kontaktnummer" />
               </>
             )}
-            <span>AdrNr {member.adrNr}</span>
+            {member.mitgliedsnummer ? (
+              <>
+                <span className="text-muted-foreground/50">·</span>
+                <span title="Frühere Linear-Nummer">alt {member.mitgliedsnummer}</span>
+              </>
+            ) : null}
+            <span className="text-muted-foreground/50">·</span>
+            <span title="Interne Adressnummer">AdrNr {member.adrNr}</span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
