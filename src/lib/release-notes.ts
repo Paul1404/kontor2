@@ -80,6 +80,11 @@ export const RELEASES: Release[] = [
         description:
           "Beitragslauf-Vorschau zeigt auf Wunsch einen Vorjahresvergleich: wer neu dazukommt, wer wegfällt und bei wem sich der Betrag ändert, mit Summen für beide Jahre. So lässt sich ein Lauf vor dem Abschluss prüfen.",
       },
+      {
+        category: "feature",
+        description:
+          "Serienbrief als PDF: Aus dem Rundschreiben lässt sich für alle Mitglieder ohne E-Mail ein fertiges PDF mit einem Brief je Empfänger im DIN-5008-Format erzeugen, mit denselben Platzhaltern wie die E-Mail. So ist jedes Mitglied digital oder per Post erreichbar.",
+      },
     ],
   },
   {

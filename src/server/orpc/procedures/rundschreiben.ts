@@ -7,9 +7,13 @@ import type { DB } from "~/server/db/client";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
+import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { rundschreibenRecipientsTable, rundschreibenTable } from "~/server/db/schema/rundschreiben";
 import { memberDisplayName, memberRef } from "~/server/domain/member";
 import { vorstandProc } from "~/server/orpc/base";
+import { clubLogoDataUri } from "~/server/pdf/logo";
+import { renderPdfBase64 } from "~/server/pdf/renderer";
+import { SerienbriefDocument } from "~/server/pdf/templates/serienbrief";
 
 /** Hard cap so a single send cannot fan out unbounded in one request. */
 const MAX_RECIPIENTS = 2000;
@@ -124,6 +128,71 @@ export const rundschreibenRouter = {
           plz: r.plz,
           ort: r.ort,
         }));
+    }),
+
+  /** Combined Serienbrief PDF: one DIN 5008 letter per postal-only member. */
+  serienbrief: vorstandProc
+    .input(
+      v.object({
+        subject: v.pipe(v.string(), v.minLength(1)),
+        body: v.pipe(v.string(), v.minLength(1)),
+        filter: FilterInput,
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const rows = (await loadSegment(context.db, input.filter)).filter((r) => !hasEmail(r));
+      if (rows.length === 0) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Keine Mitglieder ohne E-Mail im gewählten Segment.",
+        });
+      }
+      const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+      const vereinsname = org?.vereinsname ?? "Verein";
+      const senderLine = [
+        vereinsname,
+        org?.anschriftStrasse,
+        [org?.anschriftPlz, org?.anschriftOrt].filter(Boolean).join(" "),
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      const datum = new Date().toLocaleDateString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+
+      const letters = rows.map((r) => {
+        const vars = varsFor(r);
+        const name = memberDisplayName(r);
+        const recipientLines = [
+          [r.anrede, name].filter(Boolean).join(" ").trim() || name,
+          [r.strasse, r.hausnummer].filter(Boolean).join(" "),
+          [r.plz, r.ort].filter(Boolean).join(" "),
+        ].filter((l) => l.trim().length > 0);
+        return {
+          recipientLines,
+          reference: memberRef(r),
+          referenceLabel: r.memberNo ? "Mitgliedsnr." : "Kontaktnr.",
+          datum,
+          subject: renderTemplate(input.subject, vars),
+          paragraphs: renderTemplate(input.body, vars)
+            .split(/\n\s*\n/)
+            .map((p) => p.trim())
+            .filter((p) => p.length > 0),
+        };
+      });
+
+      const { base64 } = await renderPdfBase64(
+        SerienbriefDocument({
+          club: { vereinsname, senderLine, logoDataUri: clubLogoDataUri() },
+          letters,
+        }),
+      );
+      return {
+        filename: `serienbrief-${new Date().toISOString().slice(0, 10)}-${letters.length}-schreiben.pdf`,
+        base64,
+        count: letters.length,
+      };
     }),
 
   /** Send a test mail with sample merge values to the current user. */

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Loader2, Mails, Send, TestTube2, Users } from "lucide-react";
+import { FileText, Loader2, Mails, Send, TestTube2, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -10,6 +10,7 @@ import { Label } from "~/components/ui/label";
 import { QueryError } from "~/components/ui/query-error";
 import { Textarea } from "~/components/ui/textarea";
 import { toast } from "~/components/ui/toaster";
+import { triggerDownloadBase64 } from "~/lib/download";
 import { formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 import { MERGE_FIELDS, renderTemplate, SAMPLE_VARS } from "~/lib/rundschreiben";
@@ -105,6 +106,15 @@ function RundschreibenPage() {
     onError: (e: Error) => toast.error("Export fehlgeschlagen", { description: e.message }),
   });
 
+  const serienbrief = useMutation({
+    mutationFn: () => orpc.rundschreiben.serienbrief({ subject, body, filter }),
+    onSuccess: (r) => {
+      triggerDownloadBase64(r.filename, r.base64, "application/pdf");
+      toast.success(`Serienbrief erstellt: ${r.count} Schreiben.`);
+    },
+    onError: (e: Error) => toast.error("Serienbrief fehlgeschlagen", { description: e.message }),
+  });
+
   const canSend = subject.trim().length > 0 && body.trim().length > 0;
   const reach = preview.data?.withEmail ?? 0;
   const previewBody = renderTemplate(body || "", SAMPLE_VARS);
@@ -118,7 +128,7 @@ function RundschreibenPage() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Eine E-Mail an ein ganzes Segment. Platzhalter werden pro Mitglied ersetzt. Mitglieder
-          ohne E-Mail erreichst du per Serienbrief über den Adress-Export.
+          ohne E-Mail erreichst du als Serienbrief-PDF zum Ausdrucken.
         </p>
       </div>
 
@@ -283,15 +293,32 @@ function RundschreibenPage() {
                   An {reach} Empfänger senden
                 </Button>
                 {(preview.data?.withoutEmail ?? 0) > 0 ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => downloadPostal.mutate()}
-                    disabled={downloadPostal.isPending}
-                  >
-                    {downloadPostal.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-                    Postanschriften ({preview.data?.withoutEmail}) als CSV
-                  </Button>
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => serienbrief.mutate()}
+                      disabled={!canSend || serienbrief.isPending}
+                    >
+                      {serienbrief.isPending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <FileText className="size-4" />
+                      )}
+                      Serienbrief PDF ({preview.data?.withoutEmail})
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => downloadPostal.mutate()}
+                      disabled={downloadPostal.isPending}
+                    >
+                      {downloadPostal.isPending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : null}
+                      Postanschriften als CSV
+                    </Button>
+                  </>
                 ) : null}
               </div>
             </CardContent>
