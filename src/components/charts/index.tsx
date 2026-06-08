@@ -40,7 +40,10 @@ export function AreaChart({
 }) {
   const W = 720;
   const H = 260;
-  const pad = { l: 10, r: 10, t: 18, b: 26 };
+  // Wider left/right padding so the first and last x-axis labels (and the
+  // value label on the last point) sit inside the viewBox instead of being
+  // clipped at the edges.
+  const pad = { l: 18, r: 22, t: 22, b: 26 };
   const iw = W - pad.l - pad.r;
   const ih = H - pad.t - pad.b;
   if (data.length === 0) return <NoData />;
@@ -110,7 +113,9 @@ export function AreaChart({
           key={d.label}
           x={x(i)}
           y={H - 6}
-          textAnchor="middle"
+          // Anchor the outermost labels inward so they never spill past the
+          // viewBox edge and get clipped.
+          textAnchor={i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"}
           className="fill-muted-foreground"
           fill="currentColor"
           fontSize="11"
@@ -134,7 +139,7 @@ export function GroupedBarChart({
 }) {
   const W = 720;
   const H = 260;
-  const pad = { l: 10, r: 10, t: 16, b: 26 };
+  const pad = { l: 16, r: 16, t: 16, b: 26 };
   const iw = W - pad.l - pad.r;
   const ih = H - pad.t - pad.b;
   if (categories.length === 0) return <NoData />;
