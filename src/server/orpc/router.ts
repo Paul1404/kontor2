@@ -16,6 +16,7 @@ import { importRouter } from "~/server/orpc/procedures/import";
 import { kulanzRouter } from "~/server/orpc/procedures/kulanz";
 import { membersRouter } from "~/server/orpc/procedures/members";
 import { organizationSettingsRouter } from "~/server/orpc/procedures/organization-settings";
+import { paymentsRouter } from "~/server/orpc/procedures/payments";
 import { portalRouter } from "~/server/orpc/procedures/portal";
 import { relationshipsRouter } from "~/server/orpc/procedures/relationships";
 import { reportsRouter } from "~/server/orpc/procedures/reports";
@@ -49,6 +50,7 @@ export const appRouter = {
   settings: settingsRouter,
   organization: organizationSettingsRouter,
   feeRuns: feeRunsRouter,
+  payments: paymentsRouter,
   import: importRouter,
   reports: reportsRouter,
   search: searchRouter,

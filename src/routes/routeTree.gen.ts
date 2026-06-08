@@ -20,6 +20,7 @@ import { Route as PortalProfilRouteImport } from './portal/profil'
 import { Route as PortalAbgemeldetRouteImport } from './portal/abgemeldet'
 import { Route as PortalAbgelaufenRouteImport } from './portal/abgelaufen'
 import { Route as InviteTokenRouteImport } from './invite.$token'
+import { Route as AppZahlungsabgleichRouteImport } from './app/zahlungsabgleich'
 import { Route as AppWiedervorlagenRouteImport } from './app/wiedervorlagen'
 import { Route as AppRundschreibenRouteImport } from './app/rundschreiben'
 import { Route as AppPortalAnfragenRouteImport } from './app/portal-anfragen'
@@ -118,6 +119,11 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppZahlungsabgleichRoute = AppZahlungsabgleichRouteImport.update({
+  id: '/zahlungsabgleich',
+  path: '/zahlungsabgleich',
+  getParentRoute: () => AppRouteRoute,
 } as any)
 const AppWiedervorlagenRoute = AppWiedervorlagenRouteImport.update({
   id: '/wiedervorlagen',
@@ -360,6 +366,7 @@ export interface FileRoutesByFullPath {
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/app/rundschreiben': typeof AppRundschreibenRoute
   '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
+  '/app/zahlungsabgleich': typeof AppZahlungsabgleichRoute
   '/invite/$token': typeof InviteTokenRoute
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
@@ -414,6 +421,7 @@ export interface FileRoutesByTo {
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/app/rundschreiben': typeof AppRundschreibenRoute
   '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
+  '/app/zahlungsabgleich': typeof AppZahlungsabgleichRoute
   '/invite/$token': typeof InviteTokenRoute
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
@@ -471,6 +479,7 @@ export interface FileRoutesById {
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/app/rundschreiben': typeof AppRundschreibenRoute
   '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
+  '/app/zahlungsabgleich': typeof AppZahlungsabgleichRoute
   '/invite/$token': typeof InviteTokenRoute
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
@@ -529,6 +538,7 @@ export interface FileRouteTypes {
     | '/app/portal-anfragen'
     | '/app/rundschreiben'
     | '/app/wiedervorlagen'
+    | '/app/zahlungsabgleich'
     | '/invite/$token'
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
@@ -583,6 +593,7 @@ export interface FileRouteTypes {
     | '/app/portal-anfragen'
     | '/app/rundschreiben'
     | '/app/wiedervorlagen'
+    | '/app/zahlungsabgleich'
     | '/invite/$token'
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
@@ -639,6 +650,7 @@ export interface FileRouteTypes {
     | '/app/portal-anfragen'
     | '/app/rundschreiben'
     | '/app/wiedervorlagen'
+    | '/app/zahlungsabgleich'
     | '/invite/$token'
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
@@ -778,6 +790,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/invite/$token'
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/app/zahlungsabgleich': {
+      id: '/app/zahlungsabgleich'
+      path: '/zahlungsabgleich'
+      fullPath: '/app/zahlungsabgleich'
+      preLoaderRoute: typeof AppZahlungsabgleichRouteImport
+      parentRoute: typeof AppRouteRoute
     }
     '/app/wiedervorlagen': {
       id: '/app/wiedervorlagen'
@@ -1090,6 +1109,7 @@ interface AppRouteRouteChildren {
   AppPortalAnfragenRoute: typeof AppPortalAnfragenRoute
   AppRundschreibenRoute: typeof AppRundschreibenRoute
   AppWiedervorlagenRoute: typeof AppWiedervorlagenRoute
+  AppZahlungsabgleichRoute: typeof AppZahlungsabgleichRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAdminErweitertRoute: typeof AppAdminErweitertRoute
   AppAdminSnapshotsRoute: typeof AppAdminSnapshotsRoute
@@ -1129,6 +1149,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppPortalAnfragenRoute: AppPortalAnfragenRoute,
   AppRundschreibenRoute: AppRundschreibenRoute,
   AppWiedervorlagenRoute: AppWiedervorlagenRoute,
+  AppZahlungsabgleichRoute: AppZahlungsabgleichRoute,
   AppIndexRoute: AppIndexRoute,
   AppAdminErweitertRoute: AppAdminErweitertRoute,
   AppAdminSnapshotsRoute: AppAdminSnapshotsRoute,

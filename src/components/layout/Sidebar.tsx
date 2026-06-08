@@ -12,6 +12,7 @@ import {
   FileWarning,
   History,
   Inbox,
+  Landmark,
   Layers,
   LayoutDashboard,
   ListChecks,
@@ -64,6 +65,12 @@ const SECTIONS: NavSection[] = [
         to: "/app/forderungen",
         label: "Forderungen",
         icon: <FileWarning className="size-[18px]" />,
+        vorstandOnly: true,
+      },
+      {
+        to: "/app/zahlungsabgleich",
+        label: "Zahlungsabgleich",
+        icon: <Landmark className="size-[18px]" />,
         vorstandOnly: true,
       },
       {

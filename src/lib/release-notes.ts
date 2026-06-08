@@ -85,6 +85,11 @@ export const RELEASES: Release[] = [
         description:
           "Serienbrief als PDF: Aus dem Rundschreiben lässt sich für alle Mitglieder ohne E-Mail ein fertiges PDF mit einem Brief je Empfänger im DIN-5008-Format erzeugen, mit denselben Platzhaltern wie die E-Mail. So ist jedes Mitglied digital oder per Post erreichbar.",
       },
+      {
+        category: "feature",
+        description:
+          "Zahlungsabgleich: Den CSV-Export der Bankumsätze hochladen, Gutschriften werden automatisch offenen Posten zugeordnet (über Mitgliedsnummer, Name und Betrag). Sichere Treffer sind vorausgewählt, nach Bestätigung werden die Posten als bezahlt verbucht.",
+      },
     ],
   },
   {
