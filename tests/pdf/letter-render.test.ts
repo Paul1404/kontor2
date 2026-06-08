@@ -29,6 +29,7 @@ const posting = {
   falligkeitsdatum: "2025-01-15",
   description: "Beitrag 2025 (Erwachsene Aktiv)",
   openAmount: "60.00",
+  // Used by the Mahnung document (MahnungPosting); the Kulanz model ignores it.
   rueckgebuhr: "0.00",
 };
 
@@ -133,7 +134,6 @@ describe("DIN 5008 letter templates", () => {
       },
       member: { reference: "1234", isContact: false, name: "Erika Mustermann" },
       postings: [posting],
-      openSum: "60.00",
       runDate: "2026-06-04",
       deadlineDate: "2026-06-18",
       vereinsname: org.vereinsname,
@@ -152,12 +152,12 @@ describe("DIN 5008 letter templates", () => {
         vertretungFor: null,
       },
       member: { reference: "A4711", isContact: true, name: "Spedition Mustermann" },
-      postings: [{ ...posting, rueckgebuhr: "3.00" }],
-      openSum: "63.00",
+      postings: [posting],
       runDate: "2026-06-04",
       deadlineDate: "2026-06-18",
       vereinsname: org.vereinsname,
       kontaktEmail: "mitgliedschaft@untereuerheim.de",
+      sepaFee: "3.00",
       waiveReturnFee: true,
     });
     await expectValidPdf(

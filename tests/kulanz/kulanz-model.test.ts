@@ -25,17 +25,14 @@ const baseLetter = {
       falligkeitsdatum: "2024-03-01",
       description: "Beitrag (Aktiv)",
       openAmount: "30.00",
-      rueckgebuhr: "0.00",
     },
     {
       billingYear: 2025,
       falligkeitsdatum: "2025-03-01",
       description: "Beitrag (Aktiv)",
       openAmount: "30.00",
-      rueckgebuhr: "0.00",
     },
   ],
-  openSum: "60.00",
   runDate: "2026-06-04",
   deadlineDate: "2026-06-18",
   vereinsname: "SV Untereuerheim",
@@ -143,18 +140,10 @@ describe("buildKulanzLetterModel", () => {
     expect(m.feeWaiverNote).toBeNull();
   });
 
-  it("surfaces SEPA return fees as a separate line so the rows reconcile with the total", () => {
-    // 30,00 Beitrag + 3,00 R-Gebühr on the first posting, 30,00 on the second:
-    // openSum upstream already folds the fee in (63,00). The fee must show as
-    // its own line so the visible rows add up to the printed total.
-    const m = buildKulanzLetterModel({
-      ...baseLetter,
-      postings: [
-        { ...baseLetter.postings[0]!, rueckgebuhr: "3.00" },
-        { ...baseLetter.postings[1]!, rueckgebuhr: "0.00" },
-      ],
-      openSum: "63.00",
-    });
+  it("adds the flat SEPA fee as a separate line on top of the Beiträge", () => {
+    // 30,00 + 30,00 Beiträge plus a flat 3,00 SEPA fee from the org setting.
+    // The fee shows as its own line so the visible rows add up to the total.
+    const m = buildKulanzLetterModel({ ...baseLetter, sepaFee: "3.00" });
     expect(m.postings.map((p) => p.offen)).toEqual(["30,00 €", "30,00 €"]);
     expect(m.rueckgebuhr).toBe("3,00 €");
     expect(m.rueckgebuhrErlass).toBeNull();
@@ -162,14 +151,10 @@ describe("buildKulanzLetterModel", () => {
     expect(m.openSum).toBe("63,00 €");
   });
 
-  it("waives the SEPA return fee out of goodwill: adds it then subtracts it so the total nets to the Beitrag", () => {
+  it("waives the flat SEPA fee out of goodwill: adds it then subtracts it so the total nets to the Beitrag", () => {
     const m = buildKulanzLetterModel({
       ...baseLetter,
-      postings: [
-        { ...baseLetter.postings[0]!, rueckgebuhr: "3.00" },
-        { ...baseLetter.postings[1]!, rueckgebuhr: "0.00" },
-      ],
-      openSum: "63.00",
+      sepaFee: "3.00",
       waiveReturnFee: true,
     });
     // The fee shows as a positive line, then the Erlass subtracts it again, so
@@ -182,12 +167,16 @@ describe("buildKulanzLetterModel", () => {
     expect(m.openSum).toBe("60,00 €");
   });
 
-  it("ignores the waive flag when there is no SEPA return fee", () => {
-    const m = buildKulanzLetterModel({ ...baseLetter, waiveReturnFee: true });
+  it("prints no fee line and ignores the waive flag when the SEPA fee is zero or unset", () => {
+    const m = buildKulanzLetterModel({ ...baseLetter, sepaFee: "0", waiveReturnFee: true });
     expect(m.rueckgebuhr).toBeNull();
     expect(m.rueckgebuhrErlass).toBeNull();
     expect(m.feeWaiverNote).toBeNull();
     expect(m.openSum).toBe("60,00 €");
+
+    const noFee = buildKulanzLetterModel(baseLetter);
+    expect(noFee.rueckgebuhr).toBeNull();
+    expect(noFee.openSum).toBe("60,00 €");
   });
 
   it("builds the tear-off slip with member identity and club name", () => {

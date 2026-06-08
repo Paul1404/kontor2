@@ -62,15 +62,18 @@ export const kulanzRouter = {
     .input(v.optional(v.object({ onlyWithoutEmail: v.optional(v.boolean(), true) }), {}))
     .handler(async ({ context, input }) => {
       const runDate = todayUtc();
+      const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+      // Flat SEPA fee added to every Kulanz letter on top of the Beiträge.
+      const sepaFee = org?.sepaReturnFee ?? "0";
       const all = await loadOpenPostings(context.db, { cutoffDate: runDate });
       const eligible = all.filter((m) => !m.dunningBlocked);
       const recipients = await resolveRecipients(context.db, eligible, runDate);
 
       let items = eligible.map((m) => {
         const resolved = recipients.get(m.memberId);
-        // SEPA return fee portion of the open sum, so the UI can show the net
-        // when the operator chooses to waive it out of goodwill.
-        const feeSum = sumDecimal(m.postings.map((p) => p.rueckgebuhr));
+        // Bare Beitrag (postings) plus the flat SEPA fee, so the UI can show the
+        // net when the operator chooses to waive the fee out of goodwill.
+        const beitragSum = sumDecimal(m.postings.map((p) => p.openAmount));
         return {
           memberId: m.memberId,
           memberNo: m.memberNo,
@@ -80,8 +83,8 @@ export const kulanzRouter = {
           reference: memberRef(m),
           isContact: !m.memberNo,
           name: memberDisplayName(m),
-          openSum: m.openSum,
-          feeSum,
+          openSum: sumDecimal([beitragSum, sepaFee]),
+          feeSum: sepaFee,
           postingCount: m.postings.length,
           hasEmail: !!resolved?.recipientEmail,
           hasAddress: !!(resolved?.recipient.strasse && resolved.recipient.plz),
@@ -218,21 +221,25 @@ export const kulanzRouter = {
               falligkeitsdatum: p.falligkeitsdatum,
               description: descBySoll.get(p.sollStellungId) ?? `Mitgliedsbeitrag ${p.billingYear}`,
               openAmount: p.openAmount,
-              rueckgebuhr: p.rueckgebuhr,
             })),
-            openSum: m.openSum,
             runDate: runDateStr,
             deadlineDate: deadlineStr,
             vereinsname: org.vereinsname,
             kontaktEmail: mitgliedschaftEmail,
+            sepaFee: org.sepaReturnFee,
             waiveReturnFee: input.waiveReturnFee,
           }),
         );
+        // Record the requested total (Beiträge plus the flat fee, net of the
+        // waiver) so the history matches the letter the member received.
+        const memberBeitrag = sumDecimal(m.postings.map((p) => p.openAmount));
         snapshot.push({
           memberId: m.memberId,
           name: memberName,
           mitgliedsnummer: reference,
-          openSum: m.openSum,
+          openSum: input.waiveReturnFee
+            ? memberBeitrag
+            : sumDecimal([memberBeitrag, org.sepaReturnFee]),
         });
       }
 
@@ -248,11 +255,13 @@ export const kulanzRouter = {
       const id = randomUUID();
       const filename = `Kulanz-${safeFilenamePart(docRef)}-${eligible.length}-Schreiben.pdf`;
       const s3Key = `kulanz/${id}/${filename}`;
-      // Record the amount actually requested: net of the SEPA return fees when
-      // they were waived out of goodwill.
+      // Record the amount actually requested: the bare Beiträge plus one flat
+      // SEPA fee per letter, or just the Beiträge when the fee is waived out of
+      // goodwill across the run.
+      const beitragTotal = sumDecimal(eligible.flatMap((m) => m.postings.map((p) => p.openAmount)));
       const totalOpen = input.waiveReturnFee
-        ? sumDecimal(eligible.flatMap((m) => m.postings.map((p) => p.openAmount)))
-        : sumDecimal(eligible.map((m) => m.openSum));
+        ? beitragTotal
+        : sumDecimal([beitragTotal, ...eligible.map(() => org.sepaReturnFee)]);
 
       await putObject({ key: s3Key, body: pdf, contentType: "application/pdf" });
 

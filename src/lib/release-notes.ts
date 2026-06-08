@@ -55,6 +55,11 @@ export const RELEASES: Release[] = [
         description:
           "SEPA-Mandate sind bearbeitbar: Typ, Lastschriftart, Unterschriftsdatum sowie Gültig ab und Gültig bis lassen sich nachträglich anpassen.",
       },
+      {
+        category: "feature",
+        description:
+          "Der Kulanz-Brief weist jetzt auf jedem Schreiben die SEPA-Gebühr aus den Vereinsdaten als eigene Position aus und rechnet sie zum offenen Betrag hinzu. Beim Erlass aus Kulanz wird sie wieder abgezogen. Den Betrag pflegst du unter Einstellungen, Vereinsdaten.",
+      },
     ],
   },
   {
