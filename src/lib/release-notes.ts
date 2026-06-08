@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.23.0",
+    date: "2026-06-08",
+    title: "SEPA-Gebühr auf dem Kulanz-Brief mit sinnvollem Standard",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Rücklastschriftgebühr unter Vereinsdaten ist jetzt auf 3,00 Euro voreingestellt (übliches Rücklastschriftentgelt der Banken) und wird damit auf jedem Kulanz-Brief als SEPA-Gebühr ausgewiesen und zum offenen Betrag addiert. Stand der Wert bisher auf 0, wird er einmalig auf 3,00 Euro gesetzt. Du kannst ihn jederzeit unter Einstellungen, Vereinsdaten anpassen oder mit 0 wieder abschalten.",
+      },
+    ],
+  },
+  {
     version: "0.22.0",
     date: "2026-06-08",
     title: "Beziehungsnetzwerk und schärfere Datenprüfung",

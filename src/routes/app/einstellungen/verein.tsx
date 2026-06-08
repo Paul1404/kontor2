@@ -36,7 +36,7 @@ function VereinsdatenPage() {
     mahngebuhr1: "0",
     mahngebuhr2: "5",
     mahngebuhr3: "10",
-    sepaReturnFee: "0",
+    sepaReturnFee: "3.00",
     mahnFristTage: 14,
     beitragModus: "voll" as "voll" | "anteilig",
     anteilEinheit: "monat" as "monat" | "tag",
@@ -67,7 +67,7 @@ function VereinsdatenPage() {
         mahngebuhr1: cfg.data.mahngebuhr1 ?? "0",
         mahngebuhr2: cfg.data.mahngebuhr2 ?? "5",
         mahngebuhr3: cfg.data.mahngebuhr3 ?? "10",
-        sepaReturnFee: cfg.data.sepaReturnFee ?? "0",
+        sepaReturnFee: cfg.data.sepaReturnFee ?? "3.00",
         mahnFristTage: cfg.data.mahnFristTage ?? 14,
         beitragModus: cfg.data.beitragModus === "anteilig" ? "anteilig" : "voll",
         anteilEinheit: cfg.data.anteilEinheit === "tag" ? "tag" : "monat",
@@ -255,7 +255,7 @@ function VereinsdatenPage() {
                 </Field>
                 <Field
                   label="Rücklastschriftgebühr in €"
-                  hint="Standardwert, wenn ein SEPA-Rückläufer erfasst wird"
+                  hint="Gilt bei SEPA-Rückläufern und als SEPA-Gebühr auf dem Kulanz-Brief. 0 = keine Gebühr."
                 >
                   <Input
                     value={form.sepaReturnFee}
