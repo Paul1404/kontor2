@@ -1,4 +1,4 @@
-import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import type { DB } from "~/server/db/client";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import type { Contract } from "~/server/db/schema/contracts";
@@ -104,8 +104,12 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
         // Exclude soft-deleted members. The legacy Linear `geloscht` flag is
         // folded into the app's single `deletedAt`.
         memberNotDeleted(),
-        sql`(${contractsTable.vertragBegin} is null or ${contractsTable.vertragBegin} <= ${yearEnd})`,
-        sql`(${contractsTable.vertragEnde} is null or ${contractsTable.vertragEnde} > ${yearStart})`,
+        // Use Drizzle's typed operators (not raw `sql`) so the timestamp
+        // columns' encoder maps the JS Date to the format postgres-js expects.
+        // A raw Date interpolated into `sql` reaches the driver unconverted and
+        // throws ("must be of type string ... Received an instance of Date").
+        or(isNull(contractsTable.vertragBegin), lte(contractsTable.vertragBegin, yearEnd)),
+        or(isNull(contractsTable.vertragEnde), gt(contractsTable.vertragEnde, yearStart)),
       ),
     );
 

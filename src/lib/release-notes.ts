@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.25.2",
+    date: "2026-06-08",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die Vorschau für den Beitragslauf lädt wieder. Die Verträge im Abrechnungsjahr wurden wegen eines Datumsfehlers nicht abgefragt, die Vorschau brach mit einem Serverfehler ab.",
+      },
+    ],
+  },
+  {
     version: "0.25.1",
     date: "2026-06-08",
     changes: [
