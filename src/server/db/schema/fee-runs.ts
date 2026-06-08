@@ -44,9 +44,11 @@ export const sollStellungStatusEnum = pgEnum("soll_stellung_status", [
 ]);
 
 /**
- * Beitragslauf header. One row per attempt; only one `committed` run per
- * billing year is allowed -- enforced in the commit procedure, not at the
- * DB level, so cancelled runs can coexist freely with a new attempt.
+ * Beitragslauf header. One row per run. Runs are incremental: a contract that
+ * already has a live (non-cancelled) Sollstellung for the year is skipped, so
+ * several committed runs can share a billing year -- the initial run plus
+ * catch-up runs for members added or unblocked later. The `(contractId,
+ * billingYear)` unique on `soll_stellungen` is what prevents double-billing.
  *
  * Mirrors Linear `lastprot` (Datum, Falligkeitsdatum, GUID, XMLName, XMLData).
  */

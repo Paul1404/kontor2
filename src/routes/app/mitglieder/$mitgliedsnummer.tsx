@@ -201,6 +201,11 @@ function MemberDetailPage() {
                 Kontakt
               </Badge>
             ) : null}
+            {member.directDebitBlocked ? (
+              <Badge variant="warning" title="SEPA-Lastschrift ist für dieses Mitglied ausgesetzt">
+                Einzug ausgesetzt
+              </Badge>
+            ) : null}
           </h1>
           <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
             {member.memberNo ? (
