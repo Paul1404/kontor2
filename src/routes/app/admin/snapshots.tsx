@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { toast } from "~/components/ui/toaster";
 import { formatDateTime } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/admin/snapshots")({
@@ -157,6 +158,8 @@ type RunSnapshot = {
   createdAt: string | Date;
   byteSize: number;
   contentHash: string;
+  memberNo: string | null;
+  kontaktNo: string | null;
   mitgliedsnummer: string | null;
   adrNr: number;
   vorname: string | null;
@@ -319,7 +322,7 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
                       />
                     </td>
                     <td className="px-4 py-2 tabular-nums text-muted-foreground">
-                      {s.mitgliedsnummer ?? <span className="text-muted-foreground/60">—</span>}
+                      {memberRef(s) || <span className="text-muted-foreground/60">—</span>}
                     </td>
                     <td className="px-4 py-2">
                       {[s.vorname, s.nachname].filter(Boolean).join(" ") || "—"}
@@ -333,7 +336,7 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
                     <td className="px-4 py-2 text-right">
                       <Link
                         to="/app/mitglieder/$mitgliedsnummer"
-                        params={{ mitgliedsnummer: s.mitgliedsnummer ?? String(s.adrNr) }}
+                        params={{ mitgliedsnummer: memberRef(s) }}
                         className="text-xs text-primary hover:underline"
                       >
                         Mitglied →

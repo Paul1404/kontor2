@@ -11,6 +11,7 @@ import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { memberRef } from "~/server/domain/member";
 import { presignDownload } from "~/server/s3/client";
 
 /**
@@ -26,7 +27,7 @@ import { presignDownload } from "~/server/s3/client";
  */
 export type AuskunftsPackage = {
   generatedAt: string;
-  generatedFor: { memberId: string; mitgliedsnummer: string | null };
+  generatedFor: { memberId: string; ref: string; mitgliedsnummer: string | null };
   notice: string;
   member: Record<string, unknown>;
   abteilungen: Array<Record<string, unknown>>;
@@ -174,7 +175,11 @@ export async function buildAuskunftsPackage(
 
   const pkg: AuskunftsPackage = {
     generatedAt: new Date().toISOString(),
-    generatedFor: { memberId: memberRow.id, mitgliedsnummer: memberRow.mitgliedsnummer },
+    generatedFor: {
+      memberId: memberRow.id,
+      ref: memberRef(memberRow),
+      mitgliedsnummer: memberRow.mitgliedsnummer,
+    },
     notice:
       "Diese Datei enthält alle zu Ihrer Person gespeicherten Daten gemäß " +
       "Art. 15 DSGVO. IBAN-Felder wurden auf die letzten vier Ziffern maskiert, " +

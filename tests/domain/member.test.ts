@@ -52,9 +52,18 @@ describe("ageAt / isMinorAt", () => {
 });
 
 describe("memberRef", () => {
-  it("prefers the Mitgliedsnummer, falls back to A+adrNr", () => {
-    expect(memberRef({ mitgliedsnummer: "M-7", adrNr: 42 })).toBe("M-7");
-    expect(memberRef({ mitgliedsnummer: "M-7", adrNr: 42 })).toBe("M-7");
+  it("prefers the app-owned member number over everything else", () => {
+    expect(
+      memberRef({ memberNo: "M-AB1234", kontaktNo: null, mitgliedsnummer: "100", adrNr: 42 }),
+    ).toBe("M-AB1234");
+  });
+  it("uses the contact number for non-members", () => {
+    expect(
+      memberRef({ memberNo: null, kontaktNo: "K-CD5678", mitgliedsnummer: null, adrNr: 42 }),
+    ).toBe("K-CD5678");
+  });
+  it("falls back to the preserved legacy number, then A+adrNr", () => {
+    expect(memberRef({ mitgliedsnummer: "100", adrNr: 42 })).toBe("100");
     expect(memberRef({ mitgliedsnummer: "  ", adrNr: 42 })).toBe("A42");
     expect(memberRef({ mitgliedsnummer: null, adrNr: 42 })).toBe("A42");
   });
@@ -73,7 +82,16 @@ describe("memberDisplayName", () => {
     ).toBe("ACME");
     expect(
       memberDisplayName({ vorname: null, nachname: null, kurzname: null, firma1: null, adrNr: 9 }),
-    ).toBe("Mitglied 9");
+    ).toBe("Mitglied A9");
+    expect(
+      memberDisplayName({
+        vorname: null,
+        nachname: null,
+        kurzname: null,
+        firma1: null,
+        memberNo: "M-AB1234",
+      }),
+    ).toBe("Mitglied M-AB1234");
   });
 });
 

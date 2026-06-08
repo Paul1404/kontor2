@@ -16,6 +16,7 @@ import { organizationSettingsTable } from "~/server/db/schema/organization-setti
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { deriveStatus, type MemberStatus } from "~/server/domain/member";
+import { generateMemberNumber } from "~/server/domain/member-number";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
 import {
   planAustrittCascade,
@@ -320,7 +321,7 @@ export const membersRouter = {
     // pointing to or from this row. Used by admins to find Linear-import
     // leftovers.
     if (input.orphanOnly) {
-      conditions.push(isNull(membersTable.mitgliedsnummer) as never);
+      conditions.push(isNull(membersTable.memberNo) as never);
       conditions.push(
         sql`not exists (
           select 1 from ${relationshipsTable}
@@ -336,6 +337,8 @@ export const membersRouter = {
         or(
           ilike(membersTable.nachname, like),
           ilike(membersTable.vorname, like),
+          ilike(membersTable.memberNo, like),
+          ilike(membersTable.kontaktNo, like),
           ilike(membersTable.mitgliedsnummer, like),
           ilike(membersTable.email, like),
           ilike(membersTable.ort, like),
@@ -380,6 +383,8 @@ export const membersRouter = {
         .select({
           id: membersTable.id,
           adrNr: membersTable.adrNr,
+          memberNo: membersTable.memberNo,
+          kontaktNo: membersTable.kontaktNo,
           mitgliedsnummer: membersTable.mitgliedsnummer,
           anrede: membersTable.anrede,
           titel: membersTable.titel1,
@@ -412,20 +417,28 @@ export const membersRouter = {
   get: authedProc
     .input(v.object({ mitgliedsnummer: v.string() }))
     .handler(async ({ context, input }) => {
-      // Look up by mitgliedsnummer first (the normal member case). Legacy Linear
-      // "Zahler-only" entries — people who pay for someone else's contract
-      // but aren't members themselves — have no mitgliedsnummer; the list links
-      // them by numeric adrNr instead. Fall back to that when the input
-      // parses as an integer and no mitgliedsnummer match exists, so those rows
-      // are still openable from the list and bookmarkable.
+      // The route param holds the record's reference. Resolve it against the
+      // app-owned numbers first (member_no for members, kontakt_no for
+      // contacts), then fall back to the preserved legacy Linear number so
+      // references on old Mahnungen and bookmarks still open.
+      const ref = input.mitgliedsnummer;
       const rows = await context.db
         .select()
         .from(membersTable)
-        .where(eq(membersTable.mitgliedsnummer, input.mitgliedsnummer))
+        .where(
+          or(
+            eq(membersTable.memberNo, ref),
+            eq(membersTable.kontaktNo, ref),
+            eq(membersTable.mitgliedsnummer, ref),
+          ),
+        )
         .limit(1);
       let m = rows[0];
       if (!m) {
-        const adrNrParsed = Number(input.mitgliedsnummer);
+        // Transitional fallback: contacts used to be linked by bare numeric
+        // adrNr. Keep this so old contact bookmarks resolve; remove next
+        // release once links have rolled over to the K-number.
+        const adrNrParsed = Number(ref);
         if (Number.isInteger(adrNrParsed) && adrNrParsed > 0) {
           const fallback = await context.db
             .select()
@@ -778,7 +791,6 @@ export const membersRouter = {
   create: vorstandProc
     .input(
       v.object({
-        mitgliedsnummer: v.optional(v.nullable(v.string())),
         patch: StammdatenInput,
       }),
     )
@@ -790,117 +802,81 @@ export const membersRouter = {
         });
       }
 
-      // Single transaction: pick the next AdrNr/Mitgliedsnummer and insert
-      // atomically. Retry on serialization / unique-violation conflicts
-      // (two concurrent creates racing for the same AdrNr).
-      const MAX_RETRIES = 5;
-      let lastError: unknown = null;
-      for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
-        try {
-          const result = await context.db.transaction(async (tx) => {
-            const [maxRow] = await tx
-              .select({
-                maxAdrNr: sql<number>`coalesce(max(${membersTable.adrNr}), 0)::int`,
-                maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitgliedsnummer}, '\\D', '', 'g'), '')::int), 0)::int`,
-              })
-              .from(membersTable);
-            const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
-            const nextMitglnr =
-              input.mitgliedsnummer && input.mitgliedsnummer.trim().length > 0
-                ? input.mitgliedsnummer.trim()
-                : String((maxRow?.maxMitglnrInt ?? 0) + 1);
+      // Single transaction: allocate the internal AdrNr (still a sequential
+      // join key) and mint an opaque app-owned member number, then insert.
+      // `withUniqueRetry` re-runs the whole transaction on a 23505 so a racing
+      // AdrNr or a member_no collision picks fresh values on the next attempt.
+      const result = await withUniqueRetry(() =>
+        context.db.transaction(async (tx) => {
+          const [maxRow] = await tx
+            .select({
+              maxAdrNr: sql<number>`coalesce(max(${membersTable.adrNr}), 0)::int`,
+            })
+            .from(membersTable);
+          const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
+          const memberNo = generateMemberNumber("member");
 
-            if (nextMitglnr) {
-              // Only live members own a number. A soft-deleted row must not
-              // keep a Mitgliedsnummer reserved forever, otherwise the number
-              // is unusable until someone purges the (invisible) old row.
-              const [dupe] = await tx
-                .select({ id: membersTable.id })
-                .from(membersTable)
-                .where(and(eq(membersTable.mitgliedsnummer, nextMitglnr), memberNotDeleted()))
-                .limit(1);
-              if (dupe) {
-                throw new ORPCError("CONFLICT", {
-                  message: `Mitgliedsnummer ${nextMitglnr} ist bereits vergeben.`,
-                });
-              }
-            }
-
-            const now = new Date();
-            // Write the clean columns directly so a newly created member is
-            // consistent without waiting for an import. `email` is already in
-            // the patch.
-            const cleanCols = {
-              mitgliedsnummer: nextMitglnr,
-              status: memberStatusFromForm(
-                input.patch.aktivPasiv,
-                (patch.austritt as Date | null) ?? null,
-                (patch.verstorbenAm as Date | null) ?? null,
-              ),
-              dunningBlocked: false,
-            };
-            const [inserted] = await tx
-              .insert(membersTable)
-              .values({
-                ...(patch as Record<string, unknown>),
-                adrNr: nextAdrNr,
-                ...cleanCols,
-                createdAt: now,
-                updatedAt: now,
-              } as never)
-              .returning({ id: membersTable.id, mitgliedsnummer: membersTable.mitgliedsnummer });
-            if (!inserted) {
-              throw new ORPCError("INTERNAL_SERVER_ERROR", {
-                message: "Anlage fehlgeschlagen.",
-              });
-            }
-
-            const auditId = await appendAudit(tx, {
-              entityType: "member",
-              entityId: inserted.id,
-              action: "create",
-              source: "ui",
-              actorId: context.session!.user.id,
-              actorEmail: context.session!.user.email,
-              changes: diff(null, {
-                ...patch,
-                adrNr: nextAdrNr,
-                ...cleanCols,
-              }),
-              requestId: context.requestId ?? null,
-            });
-            await takeMemberSnapshot(tx, inserted.id, {
-              trigger: "mutation",
-              actorId: context.session!.user.id,
-              actorEmail: context.session!.user.email,
-              auditId,
-            });
-
-            return {
-              id: inserted.id,
-              mitgliedsnummer: inserted.mitgliedsnummer ?? nextMitglnr,
+          const now = new Date();
+          // Write the clean columns directly so a newly created member is
+          // consistent without waiting for an import. `email` is already in
+          // the patch. App-created members have no legacy Linear number, so
+          // `mitgliedsnummer` stays null.
+          const cleanCols = {
+            memberNo,
+            status: memberStatusFromForm(
+              input.patch.aktivPasiv,
+              (patch.austritt as Date | null) ?? null,
+              (patch.verstorbenAm as Date | null) ?? null,
+            ),
+            dunningBlocked: false,
+          };
+          const [inserted] = await tx
+            .insert(membersTable)
+            .values({
+              ...(patch as Record<string, unknown>),
               adrNr: nextAdrNr,
-            };
+              ...cleanCols,
+              createdAt: now,
+              updatedAt: now,
+            } as never)
+            .returning({ id: membersTable.id, memberNo: membersTable.memberNo });
+          if (!inserted) {
+            throw new ORPCError("INTERNAL_SERVER_ERROR", {
+              message: "Anlage fehlgeschlagen.",
+            });
+          }
+
+          const auditId = await appendAudit(tx, {
+            entityType: "member",
+            entityId: inserted.id,
+            action: "create",
+            source: "ui",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            changes: diff(null, {
+              ...patch,
+              adrNr: nextAdrNr,
+              ...cleanCols,
+            }),
+            requestId: context.requestId ?? null,
+          });
+          await takeMemberSnapshot(tx, inserted.id, {
+            trigger: "mutation",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            auditId,
           });
 
-          await invalidateMemberCaches();
-          return result;
-        } catch (e) {
-          lastError = e;
-          // Postgres unique violation = 23505. Retry — the next iteration
-          // will see the concurrent row's max and pick the next available.
-          const code =
-            (e as { code?: string; cause?: { code?: string } }).code ??
-            (e as { code?: string; cause?: { code?: string } }).cause?.code;
-          if (code !== "23505") throw e;
-        }
-      }
-      throw (
-        lastError ??
-        new ORPCError("CONFLICT", {
-          message: "Mitglied konnte wegen Konfliktes nicht angelegt werden.",
-        })
+          return {
+            id: inserted.id,
+            memberNo: inserted.memberNo ?? memberNo,
+            adrNr: nextAdrNr,
+          };
+        }),
       );
+
+      await invalidateMemberCaches();
+      return result;
     }),
 
   softDelete: vorstandProc
@@ -1201,6 +1177,8 @@ export const membersRouter = {
       const rows = await context.db
         .select({
           id: membersTable.id,
+          memberNo: membersTable.memberNo,
+          kontaktNo: membersTable.kontaktNo,
           mitgliedsnummer: membersTable.mitgliedsnummer,
           adrNr: membersTable.adrNr,
           vorname: membersTable.vorname,
@@ -1214,6 +1192,8 @@ export const membersRouter = {
             or(
               ilike(membersTable.nachname, like),
               ilike(membersTable.vorname, like),
+              ilike(membersTable.memberNo, like),
+              ilike(membersTable.kontaktNo, like),
               ilike(membersTable.mitgliedsnummer, like),
               ilike(membersTable.email, like),
             ),
@@ -1528,7 +1508,9 @@ export const membersRouter = {
   onboard: vorstandProc
     .input(
       v.object({
-        mitgliedsnummer: v.optional(v.nullable(v.string())),
+        // A real member gets an M-number; a non-member contact/payer gets a
+        // K-number. Member-specific fields are otherwise identical.
+        kind: v.optional(v.picklist(["member", "kontakt"]), "member"),
         patch: StammdatenInput,
         abteilungen: v.optional(v.array(OnboardAbteilung), []),
         contract: v.optional(v.nullable(OnboardContract), null),
@@ -1547,36 +1529,26 @@ export const membersRouter = {
       const actorEmail = context.session!.user.email;
       const eintrittIso = patch.eintritt instanceof Date ? toIsoDay(patch.eintritt) : null;
       const fallbackEintritt = eintrittIso ?? new Date().toISOString().slice(0, 10);
+      const isKontakt = input.kind === "kontakt";
 
       const result = await withUniqueRetry(() =>
         context.db.transaction(async (tx) => {
           const [maxRow] = await tx
             .select({
               maxAdrNr: sql<number>`coalesce(max(${membersTable.adrNr}), 0)::int`,
-              maxMitglnrInt: sql<number>`coalesce(max(nullif(regexp_replace(${membersTable.mitgliedsnummer}, '\\D', '', 'g'), '')::int), 0)::int`,
             })
             .from(membersTable);
           const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
-          const nextMitglnr =
-            input.mitgliedsnummer && input.mitgliedsnummer.trim().length > 0
-              ? input.mitgliedsnummer.trim()
-              : String((maxRow?.maxMitglnrInt ?? 0) + 1);
-
-          // Soft-deleted rows don't reserve their number (see create above).
-          const [dupe] = await tx
-            .select({ id: membersTable.id })
-            .from(membersTable)
-            .where(and(eq(membersTable.mitgliedsnummer, nextMitglnr), memberNotDeleted()))
-            .limit(1);
-          if (dupe) {
-            throw new ORPCError("CONFLICT", {
-              message: `Mitgliedsnummer ${nextMitglnr} ist bereits vergeben.`,
-            });
-          }
+          // Mint the opaque app-owned number for the chosen namespace. The
+          // partial unique index + withUniqueRetry handle the rare collision.
+          const memberNo = isKontakt ? null : generateMemberNumber("member");
+          const kontaktNo = isKontakt ? generateMemberNumber("kontakt") : null;
+          const ref = (memberNo ?? kontaktNo) as string;
 
           const now = new Date();
           const cleanCols = {
-            mitgliedsnummer: nextMitglnr,
+            memberNo,
+            kontaktNo,
             status: memberStatusFromForm(
               input.patch.aktivPasiv,
               (patch.austritt as Date | null) ?? null,
@@ -1593,7 +1565,11 @@ export const membersRouter = {
               createdAt: now,
               updatedAt: now,
             } as never)
-            .returning({ id: membersTable.id, mitgliedsnummer: membersTable.mitgliedsnummer });
+            .returning({
+              id: membersTable.id,
+              memberNo: membersTable.memberNo,
+              kontaktNo: membersTable.kontaktNo,
+            });
           if (!inserted) {
             throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
           }
@@ -1626,7 +1602,7 @@ export const membersRouter = {
             await tx.insert(contractsTable).values({
               memberId: inserted.id,
               adrNr: nextAdrNr,
-              mitglNr: inserted.mitgliedsnummer ?? nextMitglnr,
+              mitglNr: ref,
               vertragNr:
                 input.contract.vertragNr && input.contract.vertragNr.trim().length > 0
                   ? input.contract.vertragNr.trim()
@@ -1683,7 +1659,9 @@ export const membersRouter = {
 
           return {
             id: inserted.id,
-            mitgliedsnummer: inserted.mitgliedsnummer ?? nextMitglnr,
+            memberNo: inserted.memberNo ?? memberNo,
+            kontaktNo: inserted.kontaktNo ?? kontaktNo,
+            ref,
             adrNr: nextAdrNr,
           };
         }),

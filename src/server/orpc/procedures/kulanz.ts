@@ -73,10 +73,12 @@ export const kulanzRouter = {
         const feeSum = sumDecimal(m.postings.map((p) => p.rueckgebuhr));
         return {
           memberId: m.memberId,
+          memberNo: m.memberNo,
+          kontaktNo: m.kontaktNo,
           mitgliedsnummer: m.mitgliedsnummer,
           adrNr: m.adrNr,
-          reference: memberRef({ mitgliedsnummer: m.mitgliedsnummer, adrNr: m.adrNr }),
-          isContact: !m.mitgliedsnummer?.trim(),
+          reference: memberRef(m),
+          isContact: !m.memberNo,
           name: memberDisplayName(m),
           openSum: m.openSum,
           feeSum,
@@ -189,8 +191,8 @@ export const kulanzRouter = {
       for (const m of eligible) {
         const resolved = recipients.get(m.memberId);
         const memberName = memberDisplayName(m);
-        const reference = memberRef({ mitgliedsnummer: m.mitgliedsnummer, adrNr: m.adrNr });
-        const isContact = !m.mitgliedsnummer?.trim();
+        const reference = memberRef(m);
+        const isContact = !m.memberNo;
         const recipient = resolved?.recipient ?? {
           anrede: m.anrede,
           name: memberName,

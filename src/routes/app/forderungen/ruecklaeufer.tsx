@@ -10,6 +10,7 @@ import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/forderungen/ruecklaeufer")({
@@ -96,13 +97,13 @@ function RuecklaeuferPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         to="/app/mitglieder/$mitgliedsnummer"
-                        params={{ mitgliedsnummer: r.mitgliedsnummer ?? String(r.adrNr) }}
+                        params={{ mitgliedsnummer: memberRef(r) }}
                         className="font-medium hover:underline"
                       >
                         {r.memberName}
                       </Link>
                       <span className="text-xs text-muted-foreground tabular-nums">
-                        #{r.mitgliedsnummer ?? r.adrNr}
+                        #{memberRef(r)}
                       </span>
                       {r.reasonCode ? <Badge variant="warning">{r.reasonCode}</Badge> : null}
                     </div>
@@ -240,7 +241,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
                           <div className="flex items-center justify-between">
                             <span className="font-medium">{c.memberName}</span>
                             <span className="text-xs text-muted-foreground tabular-nums">
-                              #{c.mitgliedsnummer ?? c.adrNr}
+                              #{memberRef(c)}
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground">

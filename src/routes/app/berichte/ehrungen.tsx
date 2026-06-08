@@ -8,6 +8,7 @@ import { InfoBox } from "~/components/ui/info-box";
 import { QueryError } from "~/components/ui/query-error";
 import { exportCsvFile } from "~/lib/export";
 import { formatDate } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/berichte/ehrungen")({
@@ -151,7 +152,7 @@ function EhrungenPage() {
                     {g.members.map((m) => (
                       <tr key={m.id} className="transition-colors hover:bg-muted/30">
                         <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                          {m.mitgliedsnummer ?? "-"}
+                          {memberRef(m)}
                         </td>
                         <td className="px-4 py-3 font-medium">
                           {[m.nachname, m.vorname].filter(Boolean).join(", ")}

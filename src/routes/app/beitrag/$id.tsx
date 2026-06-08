@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { triggerDownload } from "~/lib/download";
 import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/beitrag/$id")({
@@ -179,14 +180,12 @@ function FeeRunDetailPage() {
                     <td className="px-4 py-2">
                       <Link
                         to="/app/mitglieder/$mitgliedsnummer"
-                        params={{ mitgliedsnummer: it.mitgliedsnummer ?? String(it.adrNr) }}
+                        params={{ mitgliedsnummer: memberRef(it) }}
                         className="font-medium hover:underline"
                       >
                         {it.memberName}
                       </Link>
-                      <div className="text-xs text-muted-foreground">
-                        {it.mitgliedsnummer ? `#${it.mitgliedsnummer}` : `AdrNr ${it.adrNr}`}
-                      </div>
+                      <div className="text-xs text-muted-foreground">#{memberRef(it)}</div>
                     </td>
                     <td className="px-4 py-2 text-muted-foreground">{it.artName ?? "-"}</td>
                     <td className="px-4 py-2 text-right tabular-nums">

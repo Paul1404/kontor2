@@ -187,6 +187,8 @@ export async function loadPortalMember(db: DB, memberId: string) {
   const [m] = await db
     .select({
       id: membersTable.id,
+      memberNo: membersTable.memberNo,
+      kontaktNo: membersTable.kontaktNo,
       mitgliedsnummer: membersTable.mitgliedsnummer,
       adrNr: membersTable.adrNr,
       anrede: membersTable.anrede,

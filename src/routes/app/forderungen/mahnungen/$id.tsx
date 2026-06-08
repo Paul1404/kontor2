@@ -9,6 +9,7 @@ import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/forderungen/mahnungen/$id")({
@@ -152,13 +153,13 @@ function MahnungDetailPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         to="/app/mitglieder/$mitgliedsnummer"
-                        params={{ mitgliedsnummer: i.mitgliedsnummer ?? String(i.adrNr) }}
+                        params={{ mitgliedsnummer: memberRef(i) }}
                         className="font-medium hover:underline"
                       >
                         {i.memberName}
                       </Link>
                       <span className="text-xs text-muted-foreground tabular-nums">
-                        #{i.mitgliedsnummer ?? i.adrNr}
+                        #{memberRef(i)}
                       </span>
                       <SentBadge channel={i.sentChannel} sentAt={i.sentAt} />
                     </div>

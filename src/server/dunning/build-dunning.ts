@@ -26,6 +26,8 @@ export type OpenPosting = {
 
 export type MemberWithDebt = {
   memberId: string;
+  memberNo: string | null;
+  kontaktNo: string | null;
   mitgliedsnummer: string | null;
   adrNr: number;
   vorname: string | null;
@@ -203,6 +205,8 @@ export async function loadOpenPostings(
       openAmount: sollStellungenTable.openAmount,
       status: sollStellungenTable.status,
       mahnstufe: sollStellungenTable.mahnstufe,
+      memberNo: membersTable.memberNo,
+      kontaktNo: membersTable.kontaktNo,
       mitgliedsnummer: membersTable.mitgliedsnummer,
       adrNr: membersTable.adrNr,
       vorname: membersTable.vorname,
@@ -277,6 +281,8 @@ export async function loadOpenPostings(
     if (!entry) {
       entry = {
         memberId: row.memberId,
+        memberNo: row.memberNo,
+        kontaktNo: row.kontaktNo,
         mitgliedsnummer: row.mitgliedsnummer,
         adrNr: row.adrNr,
         vorname: row.vorname,

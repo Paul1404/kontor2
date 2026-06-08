@@ -17,6 +17,7 @@ import { Input } from "~/components/ui/input";
 import { Skeleton } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDateTime } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/admin/erweitert")({
@@ -399,7 +400,7 @@ function PurgeSoftDeletedCard({ count, loading }: { count: number; loading: bool
                     {[s.vorname, s.nachname].filter(Boolean).join(" ") || `AdrNr ${s.adrNr}`}
                   </span>
                   <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                    {s.mitgliedsnummer ? `#${s.mitgliedsnummer}` : `AdrNr ${s.adrNr}`} ·{" "}
+                    {memberRef(s) ? `#${memberRef(s)}` : `AdrNr ${s.adrNr}`} ·{" "}
                     {s.deletedAt ? formatDateTime(s.deletedAt) : ""}
                   </span>
                 </li>

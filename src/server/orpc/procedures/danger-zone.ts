@@ -133,6 +133,8 @@ export const dangerZoneRouter = {
         .select({
           id: membersTable.id,
           adrNr: membersTable.adrNr,
+          memberNo: membersTable.memberNo,
+          kontaktNo: membersTable.kontaktNo,
           mitgliedsnummer: membersTable.mitgliedsnummer,
           vorname: membersTable.vorname,
           nachname: membersTable.nachname,

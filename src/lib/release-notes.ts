@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.19.0",
+    date: "2026-06-08",
+    title: "Eigene Mitglieds- und Kontaktnummern",
+    changes: [
+      {
+        category: "breaking",
+        description:
+          "Mitglieder und Kontakte haben jetzt app-eigene Nummern im Format M-XXXXXX bzw. K-XXXXXX statt der alten Linear-Nummern. Der gesamte Bestand wurde einmalig neu nummeriert. Die alte Mitgliedsnummer bleibt erhalten und durchsuchbar, damit Verweise auf alten Mahnungen und Zahlungen weiter auffindbar sind.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Reine Zahler und Kontakte ohne Mitgliedschaft bekommen eine eigene Kontaktnummer (K-...). Die frühere Notlösung über die interne Adressnummer entfällt.",
+      },
+    ],
+  },
+  {
     version: "0.18.4",
     date: "2026-06-07",
     changes: [

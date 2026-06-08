@@ -12,19 +12,19 @@
  * import and easy to test.
  */
 
+import { type MemberRefParts, memberRef } from "~/lib/member-ref";
+
+export { type MemberRefParts, memberRef };
+
 /** A member's lifecycle status, derived from dates + the legacy A/P flag. */
 export type MemberStatus = "aktiv" | "passiv" | "ausgetreten" | "verstorben";
 
 /** Minimal fields needed to render a member's name. */
-export type MemberNameParts = {
+export type MemberNameParts = MemberRefParts & {
   vorname: string | null;
   nachname: string | null;
   kurzname: string | null;
   firma1: string | null;
-  /** Legacy human-readable Mitgliedsnummer (Linear `MITGLNR`). */
-  mitgliedsnummer?: string | null;
-  /** Legacy address number (Linear `AdrNr`); the real unique key. */
-  adrNr?: number;
 };
 
 /** Fields needed to decide a member's lifecycle status. */
@@ -81,23 +81,13 @@ export function isMinorAt(birth: Date | string | null | undefined, asOf: Date): 
 }
 
 /**
- * Canonical, human-facing reference for a member. Prefer the Mitgliedsnummer;
- * legacy payer/contact rows without one fall back to "A" + the address number.
- */
-export function memberRef(parts: { mitgliedsnummer?: string | null; adrNr: number }): string {
-  const trimmed = parts.mitgliedsnummer?.trim();
-  if (trimmed) return trimmed;
-  return `A${parts.adrNr}`;
-}
-
-/**
  * Render a member's display name with the same fallback chain the app has
  * always used: full name, then Kurzname, then Firma, then a numeric reference.
  */
 export function memberDisplayName(m: MemberNameParts): string {
   const full = [m.vorname, m.nachname].filter(Boolean).join(" ").trim();
   if (full) return full;
-  return m.kurzname ?? m.firma1 ?? `Mitglied ${m.mitgliedsnummer ?? m.adrNr ?? ""}`.trim();
+  return m.kurzname ?? m.firma1 ?? `Mitglied ${memberRef(m)}`.trim();
 }
 
 /**

@@ -13,6 +13,7 @@ import { memberSourceRecordsTable } from "~/server/db/schema/member-source-recor
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { generateMemberNumber } from "~/server/domain/member-number";
 import { slugify, splitAbteilung } from "~/server/importer/abteilung-splitter";
 import { aggregateMgsolln, statusFor } from "~/server/importer/aggregate-mgsolln";
 import { batchInsert } from "~/server/importer/batch";
@@ -285,11 +286,33 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
           membersUpdated += 1;
         }
       } else {
-        const [inserted] = await db
-          .insert(membersTable)
-          .values({ ...row, importBatchId: batch.id } as never)
-          .returning({ id: membersTable.id });
-        if (!inserted) continue;
+        // Brand-new Linear row: mint an app-owned number so the invariant
+        // "every live row has a non-null app number" holds after future
+        // imports, not just the one-time backfill. A row with a legacy
+        // Mitgliedsnummer is a member (M-...), otherwise a contact (K-...).
+        // The importer is not per-row transactional, so retry the rare
+        // unique-collision here instead of leaning on a surrounding tx.
+        const isMember = !!String(cleanCols.mitgliedsnummer ?? "").trim();
+        let inserted: { id: string } | undefined;
+        let lastError: unknown = null;
+        for (let attempt = 0; attempt < 5 && !inserted; attempt += 1) {
+          const numberCol = isMember
+            ? { memberNo: generateMemberNumber("member") }
+            : { kontaktNo: generateMemberNumber("kontakt") };
+          try {
+            [inserted] = await db
+              .insert(membersTable)
+              .values({ ...row, ...numberCol, importBatchId: batch.id } as never)
+              .returning({ id: membersTable.id });
+          } catch (e) {
+            lastError = e;
+            const code =
+              (e as { code?: string; cause?: { code?: string } }).code ??
+              (e as { code?: string; cause?: { code?: string } }).cause?.code;
+            if (code !== "23505") throw e;
+          }
+        }
+        if (!inserted) throw lastError ?? new Error("Mitglied konnte nicht angelegt werden.");
         memberId = inserted.id;
         await appendAudit(db, {
           entityType: "member",

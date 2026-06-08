@@ -11,6 +11,7 @@ import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
 import { formatDateTime } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/portal-anfragen")({
@@ -192,14 +193,12 @@ function RequestRow({ row, onAction }: { row: Row; onAction: () => void }) {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               to="/app/mitglieder/$mitgliedsnummer"
-              params={{ mitgliedsnummer: row.mitgliedsnummer ?? String(row.adrNr) }}
+              params={{ mitgliedsnummer: memberRef(row) }}
               className="font-medium hover:underline"
             >
               {memberName}
             </Link>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              #{row.mitgliedsnummer ?? row.adrNr}
-            </span>
+            <span className="text-xs text-muted-foreground tabular-nums">#{memberRef(row)}</span>
             <StatusBadge status={row.status} />
           </div>
           <p className="text-xs text-muted-foreground">

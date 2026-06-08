@@ -9,6 +9,7 @@ import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { formatDate } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 type Beziehung = {
@@ -312,7 +313,7 @@ function AddRelationshipForm({
                     {[h.nachname, h.vorname].filter(Boolean).join(", ")}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {h.mitgliedsnummer ?? ""} {h.plz ?? ""} {h.ort ?? ""}
+                    {memberRef(h)} {h.plz ?? ""} {h.ort ?? ""}
                   </span>
                 </button>
               </li>

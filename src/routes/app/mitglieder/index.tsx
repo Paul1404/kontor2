@@ -29,6 +29,7 @@ import { SkeletonTableRows } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 import {
   createView,
@@ -49,6 +50,8 @@ type SortDir = "asc" | "desc";
 type MemberRow = {
   id: string;
   adrNr: number;
+  memberNo: string | null;
+  kontaktNo: string | null;
   mitgliedsnummer: string | null;
   vorname: string | null;
   nachname: string | null;
@@ -293,7 +296,7 @@ function MembersListPage() {
         e.preventDefault();
         navigate({
           to: "/app/mitglieder/$mitgliedsnummer",
-          params: { mitgliedsnummer: row.mitgliedsnummer ?? String(row.adrNr) },
+          params: { mitgliedsnummer: memberRef(row) },
         });
         return;
       }
@@ -909,12 +912,12 @@ function MembersListPage() {
                         </td>
                       ) : null}
                       <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                        {m.mitgliedsnummer ?? (
+                        {m.memberNo ?? (
                           <span
                             className="text-muted-foreground/60"
                             title="Kein Mitglied, nur Zahler/Kontakt"
                           >
-                            —
+                            {m.kontaktNo}
                           </span>
                         )}
                       </td>
@@ -922,7 +925,7 @@ function MembersListPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <Link
                             to="/app/mitglieder/$mitgliedsnummer"
-                            params={{ mitgliedsnummer: m.mitgliedsnummer ?? String(m.adrNr) }}
+                            params={{ mitgliedsnummer: memberRef(m) }}
                             className="font-medium text-primary hover:underline"
                           >
                             {[m.nachname, m.vorname].filter(Boolean).join(", ")}

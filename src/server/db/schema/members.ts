@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -93,12 +94,24 @@ export const membersTable = pgTable(
     hausnummer: text("hausnummer"),
     adresszusatz: text("adresszusatz"),
     www: text("www"),
+    // --- App-owned identifiers ----------------------------------------------
+    // `member_no` / `kontakt_no` are the app's own opaque numbers (M-XXXXXX /
+    // K-XXXXXX), minted by `~/server/domain/member-number`. A live row carries
+    // exactly one: real members get `member_no`, non-member contacts/payers get
+    // `kontakt_no`. `coalesce(member_no, kontakt_no)` is the user-facing
+    // reference and the route key. See `~/server/domain/member#memberRef`.
+    /** Opaque app-owned member number (M-...). Null for contacts. */
+    memberNo: text("member_no"),
+    /** Opaque app-owned contact number (K-...). Null for members. */
+    kontaktNo: text("kontakt_no"),
     // --- Clean, app-owned columns (Phase 1) ---------------------------------
     // These hold the normalized shape produced by `translateLinearMember`.
-    // They are backfilled from the legacy columns above and coexist with them
-    // until consumers are cut over; nothing reads them yet. See
-    // `~/server/domain/member` for the canonical derivations.
-    /** Clean name for the legacy `mitgliedsnummer`. The human-readable member number. */
+    /**
+     * Preserved legacy Linear member number (`MITGLNR`). No longer the primary
+     * identifier -- it is kept searchable so references on old Mahnungen and
+     * payments stay resolvable during the transition. The importer keeps writing
+     * this column from Linear; the app-owned number lives in `member_no`.
+     */
     mitgliedsnummer: text("mitgliedsnummer"),
     /** Clean name for `e_mail_name`, with the legacy `telefon3` fallback. */
     email: text("email"),
@@ -109,6 +122,9 @@ export const membersTable = pgTable(
   },
   (t) => [
     uniqueIndex("members_adr_nr_uk").on(t.adrNr),
+    // Partial unique: a soft-deleted row frees its number for reuse (v0.18.0).
+    uniqueIndex("members_member_no_uk").on(t.memberNo).where(sql`${t.deletedAt} is null`),
+    uniqueIndex("members_kontakt_no_uk").on(t.kontaktNo).where(sql`${t.deletedAt} is null`),
     index("members_nachname_vorname_idx").on(t.nachname, t.vorname),
     index("members_plz_idx").on(t.plz),
     index("members_austritt_idx").on(t.austritt),
