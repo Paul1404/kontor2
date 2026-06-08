@@ -28,8 +28,9 @@ function MuseumPage() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Eine kleine Ausstellung zum Schema der alten Linear Webverein-Datenbank, die diese App
-          abgelöst hat. Alle Zahlen und Spaltennamen sind echt, direkt aus dem
-          Original-Datenbankabzug. Nichts erfunden. Leider.
+          abgelöst hat. Beworben als zertifiziert, DSGVO-konform und intuitiv. Alle Zahlen und
+          Spaltennamen unten sind echt, direkt aus dem Original-Datenbankabzug. Nichts erfunden.
+          Leider.
         </p>
       </div>
 
@@ -68,7 +69,8 @@ function MuseumPage() {
       </div>
 
       <p className="pb-4 text-center text-xs text-muted-foreground">
-        Heute: ein paar saubere, normalisierte Tabellen. Damals: das hier.
+        Heute: ein paar saubere, normalisierte Tabellen. Damals: das hier. Für{" "}
+        {LEGACY_STATS.pricePerYearEur} € im Jahr. Diese App ist Eigenbau.
       </p>
     </div>
   );

@@ -1,21 +1,337 @@
-MIT License
+PROPRIETARY SOFTWARE LICENSE AGREEMENT
 
-Copyright (c) 2026 Paul Dresch
+Copyright (c) 2026 Paul Dresch. All rights reserved.
+Alle Rechte vorbehalten.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Licensor / Rights Holder ("Owner"):
+    Paul Dresch
+    Schweinfurter Weg 6
+    97508 Untereuerheim
+    Federal Republic of Germany (Bundesrepublik Deutschland)
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+THIS IS A LEGAL AGREEMENT. READ IT CAREFULLY. The software identified below is
+licensed, not sold. By accessing, downloading, copying, installing, executing,
+or otherwise using the Software, or any part of it, you ("you", "Licensee")
+agree to be bound by every term of this Agreement. If you do not agree, you must
+not access, copy, retain, or use the Software in any form, and you must promptly
+and permanently destroy all copies in your possession or control.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+PREAMBLE
+
+The Software is the original, proprietary work of the Owner. It is made
+available, if at all, on a strictly confidential and restricted basis. Access
+that you may have been granted to the Software or its source code (for example,
+through a private source-code repository, a deployment, or a backup) is an act
+of trust and does not transfer ownership and does not grant any license beyond
+what is expressly stated in writing by the Owner. Nothing in this Agreement
+shall be construed as conveying, by implication, estoppel, or otherwise, any
+license or right not expressly granted herein. All rights not expressly granted
+are reserved to the Owner.
+
+1. DEFINITIONS
+
+1.1 "Software" means the computer program(s) known as "svuwv" (a
+    Vereinsverwaltung / association-management application), including without
+    limitation all source code, object code, scripts, build artifacts,
+    container images, configuration, database schemas and migrations, user
+    interfaces, application programming interfaces, libraries authored by the
+    Owner, fonts and icons authored by the Owner, sample data, and any
+    accompanying documentation, comments, and release notes, together with all
+    corrections, updates, upgrades, patches, modifications, enhancements, and
+    new versions thereof that the Owner may make available.
+
+1.2 "Source Code" means the human-readable form of the Software and all
+    associated build and configuration files.
+
+1.3 "Documentation" means any technical or end-user documentation, in any form
+    or medium, that the Owner supplies or makes available in connection with the
+    Software, including this repository's README and inline code documentation.
+
+1.4 "Intellectual Property Rights" means all rights in and to copyrights and
+    related rights (including, under German law, Urheberrechte and related
+    Leistungsschutzrechte pursuant to the Urheberrechtsgesetz, UrhG), database
+    rights (sui generis, §§ 87a ff. UrhG), trademarks, trade names, design
+    rights, patents, trade secrets and know-how (Geschäftsgeheimnisse within the
+    meaning of the Geschäftsgeheimnisgesetz, GeschGehG), and any other
+    proprietary rights, whether registered or unregistered, anywhere in the
+    world, and all applications for and renewals or extensions of such rights.
+
+1.5 "Third-Party Components" means software components, libraries, packages, or
+    other materials that are not authored by the Owner and that are incorporated
+    into, referenced by, or distributed alongside the Software under their own
+    respective licenses (see Section 5).
+
+2. OWNERSHIP AND RESERVATION OF RIGHTS
+
+2.1 The Software is and at all times shall remain the sole and exclusive
+    property of the Owner. The Owner retains all right, title, and interest in
+    and to the Software and all Intellectual Property Rights therein.
+
+2.2 The Software is licensed, not sold. No title to or ownership of the
+    Software, or of any Intellectual Property Rights in the Software, is
+    transferred to you under this Agreement or by virtue of any access you have
+    been granted.
+
+2.3 The structure, organization, schema, and source code of the Software are
+    valuable trade secrets and confidential information of the Owner.
+
+3. SCOPE OF PERMITTED USE
+
+3.1 NO LICENSE BY DEFAULT. Except for a separate, express, written license
+    granted and signed by the Owner, you are granted NO license and NO right of
+    any kind to the Software. In the absence of such a separate written license,
+    every act listed in Section 4 is prohibited.
+
+3.2 Where the Owner has granted you a separate written license, your use of the
+    Software is permitted solely within the scope, for the purpose, for the
+    duration, and subject to the conditions and restrictions set out in that
+    written license, and otherwise remains subject to this Agreement. In the
+    event of a conflict, the separate written license governs only to the extent
+    of the specifically stated, conflicting term.
+
+3.3 Any permission, repository access, credential, or deployment access the
+    Owner provides is non-exclusive, non-transferable, non-sublicensable,
+    personal, and revocable at the Owner's sole discretion at any time, with or
+    without cause and without notice.
+
+4. RESTRICTIONS AND PROHIBITED CONDUCT
+
+Except, and only to the extent, expressly permitted by a separate written
+license signed by the Owner, or by mandatory applicable law that cannot be
+excluded by agreement, you shall NOT, and shall not permit or enable any third
+party to:
+
+4.1 use, run, execute, deploy, host, or operate the Software, in whole or in
+    part, for any purpose whatsoever;
+
+4.2 copy, reproduce, store, cache, or back up the Software, in whole or in part,
+    in any medium;
+
+4.3 modify, adapt, alter, translate, localize, port, or create derivative works
+    based upon the Software or any part of it;
+
+4.4 distribute, publish, disclose, transmit, lease, rent, lend, sell, resell,
+    assign, sublicense, time-share, offer as a service (SaaS), or otherwise make
+    the Software available to, or accessible by, any third party;
+
+4.5 decompile, disassemble, reverse engineer, or otherwise attempt to derive,
+    reconstruct, or discover the Source Code, underlying ideas, algorithms, file
+    formats, schema, or structure of any object-code or compiled form of the
+    Software, except, and only to the precise extent, that such activity is
+    expressly permitted by mandatory applicable law notwithstanding this
+    limitation (including, where and to the extent applicable, the narrow
+    interoperability exception under § 69e UrhG), and then only after first
+    requesting from the Owner the information necessary to achieve
+    interoperability and allowing the Owner a reasonable time to provide it;
+
+4.6 remove, obscure, alter, or fail to reproduce any copyright, trademark, or
+    other proprietary notice, legend, or marking on or in the Software;
+
+4.7 use the Software to develop, train, or improve any product or service that
+    competes with the Software, or use the Software for any benchmarking,
+    competitive analysis, or public disclosure of performance characteristics
+    without the Owner's prior written consent;
+
+4.8 circumvent, disable, or interfere with any license-control, security, access
+    -control, or authentication mechanism of the Software;
+
+4.9 use the Software in any manner that infringes the Intellectual Property
+    Rights or other rights of the Owner or any third party, or that violates any
+    applicable law or regulation, including applicable data-protection law.
+
+5. THIRD-PARTY AND OPEN-SOURCE COMPONENTS
+
+5.1 The Software incorporates or depends upon Third-Party Components that are
+    provided under their own license terms. Such Third-Party Components are not
+    covered by the grant restrictions of this Agreement to the extent their own
+    licenses apply, and your use of those components is governed by, and you must
+    comply with, their respective license terms.
+
+5.2 Nothing in this Agreement limits any rights you may have under, or imposes
+    obligations inconsistent with, the license of any Third-Party Component.
+    This Agreement applies to the Owner's own original contributions, the
+    Software as a compiled and composed whole, and all material authored by the
+    Owner.
+
+5.3 The Owner makes no representation or warranty regarding, and assumes no
+    liability for, any Third-Party Component.
+
+6. CONFIDENTIALITY
+
+6.1 The Software, the Source Code, and all non-public information relating to
+    them constitute confidential information and trade secrets of the Owner
+    (Geschäftsgeheimnisse within the meaning of the GeschGehG).
+
+6.2 You shall hold such information in strict confidence, use at least
+    reasonable care to protect it, not disclose it to any third party, and use
+    it solely as expressly permitted by the Owner in writing. This obligation
+    survives termination of this Agreement and continues for as long as the
+    information remains a trade secret.
+
+7. FEEDBACK
+
+If you provide the Owner with any suggestions, ideas, error reports, or other
+feedback relating to the Software ("Feedback"), you grant the Owner a perpetual,
+irrevocable, worldwide, royalty-free, fully paid-up, transferable, and
+sublicensable right to use, exploit, and incorporate such Feedback for any
+purpose, without any obligation or compensation to you.
+
+8. DATA PROTECTION
+
+The Software is designed to process personal data of association members. Where
+you are permitted to operate the Software, you alone are the controller
+(Verantwortlicher within the meaning of Art. 4 No. 7 of Regulation (EU)
+2016/679, GDPR / DSGVO, and the Bundesdatenschutzgesetz, BDSG) with respect to
+any personal data you process using the Software, and you are solely responsible
+for complying with all applicable data-protection law. The Owner does not act as
+your processor by virtue of authoring or licensing the Software and assumes no
+responsibility for your processing activities.
+
+9. NO WARRANTY (GEWÄHRLEISTUNGSAUSSCHLUSS)
+
+9.1 THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITH ALL FAULTS AND
+    WITHOUT WARRANTY OF ANY KIND. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE
+    LAW, THE OWNER EXPRESSLY DISCLAIMS ALL WARRANTIES AND CONDITIONS, WHETHER
+    EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING WITHOUT LIMITATION ANY
+    IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, SATISFACTORY QUALITY,
+    FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, QUIET ENJOYMENT, TITLE, AND
+    NON-INFRINGEMENT.
+
+9.2 The Owner does not warrant that the Software will meet your requirements,
+    that its operation will be uninterrupted, timely, secure, or error-free,
+    that defects will be corrected, or that the Software is free of harmful
+    components. Any reliance on the Software is at your own risk.
+
+9.3 The Software is not designed, manufactured, or intended for use in
+    hazardous environments or in any application in which the failure of the
+    Software could lead directly to death, personal injury, or severe physical
+    or environmental damage.
+
+10. LIMITATION OF LIABILITY (HAFTUNGSBESCHRÄNKUNG)
+
+10.1 TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE
+     OWNER BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR
+     PUNITIVE DAMAGES, OR FOR ANY LOSS OF PROFITS, REVENUE, DATA, GOODWILL, OR
+     BUSINESS INTERRUPTION, ARISING OUT OF OR IN CONNECTION WITH THIS AGREEMENT
+     OR THE USE OF, OR INABILITY TO USE, THE SOFTWARE, HOWEVER CAUSED AND ON ANY
+     THEORY OF LIABILITY, WHETHER IN CONTRACT, TORT (INCLUDING NEGLIGENCE),
+     STRICT LIABILITY, OR OTHERWISE, EVEN IF THE OWNER HAS BEEN ADVISED OF THE
+     POSSIBILITY OF SUCH DAMAGES.
+
+10.2 Because the Software is provided free of charge and licensed, not sold, the
+     Owner's aggregate liability, where liability is not otherwise excluded,
+     shall be limited to the fullest extent permitted by law.
+
+10.3 NOTHING in this Agreement excludes or limits the Owner's liability where
+     and to the extent such exclusion or limitation is prohibited by mandatory
+     applicable law. In particular, and without limiting the foregoing, under
+     German law the Owner remains liable: (a) for damages arising from injury to
+     life, body, or health caused by the Owner's negligent or intentional breach
+     of duty; (b) for damages caused intentionally or by gross negligence;
+     (c) for fraudulently concealed defects or defects whose absence the Owner
+     has expressly guaranteed; and (d) under the German Product Liability Act
+     (Produkthaftungsgesetz). For a free-of-charge provision of software, the
+     statutory privileges of §§ 521, 523, 524 BGB (limiting a donor's liability
+     to intent and gross negligence) apply in the Owner's favor to the extent
+     applicable.
+
+11. TERM AND TERMINATION
+
+11.1 This Agreement is effective upon your first access to or use of the
+     Software and continues until terminated.
+
+11.2 The Owner may terminate this Agreement and revoke any access or permission
+     at any time, with or without cause and without notice. This Agreement and
+     any permission granted terminate automatically and immediately, without
+     notice, if you breach any term of it.
+
+11.3 Upon termination, all rights and permissions granted to you cease
+     immediately, and you must promptly cease all use of the Software and
+     permanently destroy all copies of the Software and Source Code in your
+     possession or control, and, upon request, certify such destruction in
+     writing to the Owner.
+
+11.4 Sections 1, 2, 4, 6, 7, 9, 10, 11.3, 12, 13, 14, 15, and 16 through 20, and
+     any other provision that by its nature should survive, survive termination.
+
+12. INJUNCTIVE RELIEF
+
+You acknowledge that any breach of Section 4 or Section 6 may cause the Owner
+irreparable harm for which monetary damages would be an inadequate remedy.
+Accordingly, the Owner is entitled to seek injunctive and other equitable relief
+(including, under German law, Unterlassung and Beseitigung) without the
+necessity of posting a bond or proving actual damages, in addition to any other
+remedy available at law or in equity.
+
+13. EXPORT AND SANCTIONS COMPLIANCE
+
+You shall comply with all applicable export-control and sanctions laws and
+regulations, including those of the European Union and the Federal Republic of
+Germany, and shall not export, re-export, or make the Software available in
+violation of such laws.
+
+14. GOVERNING LAW AND JURISDICTION
+
+14.1 This Agreement and any non-contractual obligations arising out of or in
+     connection with it are governed by and construed in accordance with the
+     laws of the Federal Republic of Germany, excluding its conflict-of-laws
+     provisions and excluding the United Nations Convention on Contracts for the
+     International Sale of Goods (CISG).
+
+14.2 To the extent permitted by law, the exclusive place of jurisdiction for all
+     disputes arising out of or in connection with this Agreement shall be the
+     court competent for the Owner's place of residence (Schweinfurt, Germany).
+     The Owner additionally reserves the right to bring proceedings at the
+     Licensee's general place of jurisdiction. Mandatory consumer-protection
+     venues remain unaffected.
+
+15. SEVERABILITY (SALVATORISCHE KLAUSEL)
+
+If any provision of this Agreement is held to be invalid, illegal, or
+unenforceable, the validity, legality, and enforceability of the remaining
+provisions shall not in any way be affected or impaired. The invalid or
+unenforceable provision shall be deemed replaced by a valid and enforceable
+provision that comes closest to the economic and legal intent of the original.
+
+16. NO WAIVER
+
+No failure or delay by the Owner in exercising any right under this Agreement
+operates as a waiver of that right, and no single or partial exercise of any
+right precludes any further exercise of it or of any other right.
+
+17. ASSIGNMENT
+
+You may not assign, transfer, delegate, or otherwise dispose of this Agreement
+or any of your rights or obligations under it, in whole or in part, by operation
+of law or otherwise, without the Owner's prior written consent. Any purported
+assignment in violation of this Section is void. The Owner may freely assign or
+transfer this Agreement.
+
+18. ENTIRE AGREEMENT
+
+This Agreement, together with any separate written license signed by the Owner,
+constitutes the entire agreement between you and the Owner concerning the
+Software and supersedes all prior or contemporaneous understandings,
+communications, and agreements, whether written or oral, on that subject.
+Amendments are valid only if made in writing and signed by the Owner; this also
+applies to any amendment of this written-form requirement.
+
+19. LANGUAGE
+
+This Agreement is drawn up in the English language. German legal terms included
+in parentheses are provided for reference. Should a German-language translation
+be provided and any discrepancy arise, the parties shall interpret this
+Agreement in light of the meaning that best gives effect to mandatory German
+law.
+
+20. CONTACT
+
+For licensing inquiries, permissions, or any other matter relating to this
+Agreement, contact the Owner:
+
+    Paul Dresch
+    Schweinfurter Weg 6
+    97508 Untereuerheim
+    Germany
+
+END OF AGREEMENT

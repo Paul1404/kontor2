@@ -20,6 +20,8 @@ export const LEGACY_STATS = {
   adresseColumns: 247,
   /** Columns anywhere with "Konto" in the name. */
   kontoColumns: 192,
+  /** Linear's advertised price for the cloud version, EUR per year incl. VAT. */
+  pricePerYearEur: "292,80",
 } as const;
 
 export type Exhibit = {
@@ -118,5 +120,26 @@ export const LEGACY_EXHIBITS: Exhibit[] = [
       "FreistellungsbescheidGultigVon",
       "FreistellungsbescheidGultigBis",
     ],
+  },
+  {
+    title: '"100% Datensicherheit"',
+    stat: "Originalton",
+    blurb:
+      "So wirbt der Hersteller auf der Produktseite. Im selben Schema: die Kreditkartennummer samt Verfallsdatum und sechs Bankverbindungen pro Mitglied. Verschlüsselt war davon nichts.",
+    evidence: ["Kreditkartennummer", "Verfallsdatum", "Konto1…Konto6", "IBAN1…IBAN3"],
+  },
+  {
+    title: '"Einfach und intuitiv bedienbar"',
+    stat: "Originalton",
+    blurb:
+      "Ebenfalls von der Produktseite. Für eine einzige Adresse hält die Datenbank 247 Spalten bereit, darunter CheckBox1 bis CheckBox10 ganz ohne Beschriftung. Intuitiv war daran höchstens das Aufgeben.",
+    evidence: ["CheckBox1…CheckBox10", "FreeText1…FreeText4", "Attribut1…Attribut3"],
+  },
+  {
+    title: '"DSGVO konform"',
+    stat: "zertifiziert",
+    blurb:
+      "Mit Siegel beworben. Die Einwilligung zur Datenverarbeitung steht trotzdem zweimal im Schema: einmal richtig geschrieben, einmal mit Tippfehler. Welche von beiden zählt, weiß niemand.",
+    evidence: ["EinverstandnisDatenverarbeitung", "EinverstandisDatenverarbeitung"],
   },
 ];

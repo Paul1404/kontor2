@@ -1,9 +1,32 @@
 # SVUWV
 
-Vereinsverwaltung for SV 1945 Untereuerheim e.V. It replaces the legacy
-"Linear Webverein" desktop software with a single web app that runs the whole
-back office: members, contributions, SEPA, dunning, a self-service portal,
-DSGVO tooling, reports and an audit trail. Internal admin tool, German UI.
+Self-hosted Vereinsverwaltung for SV 1945 Untereuerheim e.V. It replaces
+Linear's commercial "Online Vereinsverwaltung" -- a per-seat cloud subscription
+advertised at 292,80 € a year -- with a single web app the club runs and owns
+outright. The entire Linear database was migrated losslessly, not re-keyed by
+hand.
+
+One app runs the whole back office: members, contributions, SEPA direct debit,
+dunning, a member self-service portal, DSGVO tooling, reports and an audit
+trail. Internal admin tool, German UI, React 19 on Bun.
+
+## Why this exists
+
+The club used Linear's hosted Vereinsverwaltung. The data sat in a vendor cloud,
+every extra Vorstand seat cost money, and the underlying schema was the kind you
+can admire in the hidden `/app/museum` route (247 columns for one address, a
+credit-card number in cleartext, the same consent field spelled two different
+ways). So the whole thing was rebuilt as software the club controls:
+
+- **Own your data.** It lives in your own Postgres, encrypted at rest (IBANs and
+  SMTP passwords are AES-256-GCM), not on someone else's "deutsches
+  Rechenzentrum".
+- **No per-seat pricing.** Unlimited accounts, three roles, invite-only signup.
+- **One container, one secret.** Deploys to Railway (or any Docker host) from a
+  single `APP_SECRET`; every other key is derived from it.
+- **Migrated once, completely.** Members, contracts, SEPA mandates and the
+  historical Sollstellungen and Lastschrift runs all came across, so there is
+  nothing to keep the old subscription alive for.
 
 ## At a glance
 
@@ -413,4 +436,6 @@ before the body is parsed.
 
 ## License
 
-MIT.
+Proprietary. Copyright (c) 2026 Paul Dresch. All rights reserved. See
+[LICENSE](LICENSE). No use, copying, modification, or distribution is permitted
+without the prior written permission of the owner.
