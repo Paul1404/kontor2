@@ -65,6 +65,11 @@ export const RELEASES: Release[] = [
         description:
           "Die Schnellsuche (Strg/Cmd K) findet jetzt auch Verträge und SEPA-Mandate und springt direkt zum zugehörigen Mitglied. Außerdem lässt sich der Suchbegriff mit einem Klick im Audit-Log nachschlagen.",
       },
+      {
+        category: "feature",
+        description:
+          "Neues Export-Center unter Berichte: Mitgliederliste, Geburtstage, Ehrungen, Abteilungs-Statistik und Finanzbericht als CSV an einer Stelle, jeweils mit Jahr- und Monatsauswahl.",
+      },
     ],
   },
   {

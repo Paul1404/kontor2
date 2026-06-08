@@ -43,6 +43,7 @@ import { Route as AppEinstellungenAbteilungenRouteImport } from './app/einstellu
 import { Route as AppDsgvoIdRouteImport } from './app/dsgvo/$id'
 import { Route as AppBerichteGeburtstageRouteImport } from './app/berichte/geburtstage'
 import { Route as AppBerichteFinanzenRouteImport } from './app/berichte/finanzen'
+import { Route as AppBerichteExportRouteImport } from './app/berichte/export'
 import { Route as AppBerichteEhrungenRouteImport } from './app/berichte/ehrungen'
 import { Route as AppBerichteBestandserhebungRouteImport } from './app/berichte/bestandserhebung'
 import { Route as AppBerichteAbteilungsStatistikRouteImport } from './app/berichte/abteilungs-statistik'
@@ -238,6 +239,11 @@ const AppBerichteFinanzenRoute = AppBerichteFinanzenRouteImport.update({
   path: '/berichte/finanzen',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppBerichteExportRoute = AppBerichteExportRouteImport.update({
+  id: '/berichte/export',
+  path: '/berichte/export',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppBerichteEhrungenRoute = AppBerichteEhrungenRouteImport.update({
   id: '/berichte/ehrungen',
   path: '/berichte/ehrungen',
@@ -373,6 +379,7 @@ export interface FileRoutesByFullPath {
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
   '/app/berichte/bestandserhebung': typeof AppBerichteBestandserhebungRoute
   '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
+  '/app/berichte/export': typeof AppBerichteExportRoute
   '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
   '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
   '/app/dsgvo/$id': typeof AppDsgvoIdRoute
@@ -426,6 +433,7 @@ export interface FileRoutesByTo {
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
   '/app/berichte/bestandserhebung': typeof AppBerichteBestandserhebungRoute
   '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
+  '/app/berichte/export': typeof AppBerichteExportRoute
   '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
   '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
   '/app/dsgvo/$id': typeof AppDsgvoIdRoute
@@ -482,6 +490,7 @@ export interface FileRoutesById {
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
   '/app/berichte/bestandserhebung': typeof AppBerichteBestandserhebungRoute
   '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
+  '/app/berichte/export': typeof AppBerichteExportRoute
   '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
   '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
   '/app/dsgvo/$id': typeof AppDsgvoIdRoute
@@ -539,6 +548,7 @@ export interface FileRouteTypes {
     | '/app/berichte/abteilungs-statistik'
     | '/app/berichte/bestandserhebung'
     | '/app/berichte/ehrungen'
+    | '/app/berichte/export'
     | '/app/berichte/finanzen'
     | '/app/berichte/geburtstage'
     | '/app/dsgvo/$id'
@@ -592,6 +602,7 @@ export interface FileRouteTypes {
     | '/app/berichte/abteilungs-statistik'
     | '/app/berichte/bestandserhebung'
     | '/app/berichte/ehrungen'
+    | '/app/berichte/export'
     | '/app/berichte/finanzen'
     | '/app/berichte/geburtstage'
     | '/app/dsgvo/$id'
@@ -647,6 +658,7 @@ export interface FileRouteTypes {
     | '/app/berichte/abteilungs-statistik'
     | '/app/berichte/bestandserhebung'
     | '/app/berichte/ehrungen'
+    | '/app/berichte/export'
     | '/app/berichte/finanzen'
     | '/app/berichte/geburtstage'
     | '/app/dsgvo/$id'
@@ -928,6 +940,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBerichteFinanzenRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/berichte/export': {
+      id: '/app/berichte/export'
+      path: '/berichte/export'
+      fullPath: '/app/berichte/export'
+      preLoaderRoute: typeof AppBerichteExportRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/berichte/ehrungen': {
       id: '/app/berichte/ehrungen'
       path: '/berichte/ehrungen'
@@ -1079,6 +1098,7 @@ interface AppRouteRouteChildren {
   AppBerichteAbteilungsStatistikRoute: typeof AppBerichteAbteilungsStatistikRoute
   AppBerichteBestandserhebungRoute: typeof AppBerichteBestandserhebungRoute
   AppBerichteEhrungenRoute: typeof AppBerichteEhrungenRoute
+  AppBerichteExportRoute: typeof AppBerichteExportRoute
   AppBerichteFinanzenRoute: typeof AppBerichteFinanzenRoute
   AppBerichteGeburtstageRoute: typeof AppBerichteGeburtstageRoute
   AppDsgvoIdRoute: typeof AppDsgvoIdRoute
@@ -1117,6 +1137,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppBerichteAbteilungsStatistikRoute: AppBerichteAbteilungsStatistikRoute,
   AppBerichteBestandserhebungRoute: AppBerichteBestandserhebungRoute,
   AppBerichteEhrungenRoute: AppBerichteEhrungenRoute,
+  AppBerichteExportRoute: AppBerichteExportRoute,
   AppBerichteFinanzenRoute: AppBerichteFinanzenRoute,
   AppBerichteGeburtstageRoute: AppBerichteGeburtstageRoute,
   AppDsgvoIdRoute: AppDsgvoIdRoute,
