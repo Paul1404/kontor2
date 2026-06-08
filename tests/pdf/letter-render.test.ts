@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildCancellationModel } from "~/server/pdf/cancellation-model";
+import { buildEhrungsurkundeModel } from "~/server/pdf/ehrungsurkunde-model";
 import { buildKulanzClubModel, buildKulanzLetterModel } from "~/server/pdf/kulanz-model";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { AustrittsbestaetigungDocument } from "~/server/pdf/templates/austrittsbestaetigung";
+import { EhrungsurkundeDocument } from "~/server/pdf/templates/ehrungsurkunde";
 import { KulanzSonderkuendigungDocument } from "~/server/pdf/templates/kulanz-sonderkuendigung";
 import { MahnungDocument } from "~/server/pdf/templates/mahnung";
 
@@ -167,5 +169,33 @@ describe("DIN 5008 letter templates", () => {
         docRef: "KS-2026-0001",
       }),
     );
+  });
+
+  it("renders the Ehrungsurkunde for both honor kinds", async () => {
+    const jubilaeum = buildEhrungsurkundeModel({
+      vereinsname: org.vereinsname,
+      ort: org.anschriftOrt,
+      logoDataUri: null,
+      empfaengerName: "Erika Mustermann",
+      kind: "vereinsjubilaeum",
+      jubilaeumJahre: 40,
+      titel: "40 Jahre Mitgliedschaft",
+      verliehenAm: "2025-03-15",
+      docRef: "EU-2025-0007",
+    });
+    await expectValidPdf(EhrungsurkundeDocument({ model: jubilaeum }));
+
+    const sonder = buildEhrungsurkundeModel({
+      vereinsname: org.vereinsname,
+      ort: null,
+      logoDataUri: null,
+      empfaengerName: "Max Mustermann",
+      kind: "sonderehrung",
+      jubilaeumJahre: null,
+      titel: "Goldene Ehrennadel",
+      verliehenAm: "2025-03-15",
+      docRef: "EU-2025-0008",
+    });
+    await expectValidPdf(EhrungsurkundeDocument({ model: sonder }));
   });
 });

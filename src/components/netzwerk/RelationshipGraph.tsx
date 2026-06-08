@@ -6,9 +6,16 @@
  * clusters are packed into a rough grid. That keeps families readable as
  * separate islands instead of one hairball, and it is fast and deterministic
  * (no physics simulation, no resize observer).
+ *
+ * Interaction: clicking a person selects them (it does not navigate) and opens
+ * a details panel listing their connections. Clicking a connection hops to that
+ * person, so the graph is explorable by tap alone -- which also makes it work
+ * on touch, where the hover highlight never fires. Opening the member page is
+ * an explicit button in the panel, so a stray click never yanks you off the
+ * canvas.
  */
 import { Link } from "@tanstack/react-router";
-import { Crosshair, Maximize2, Minus, Plus } from "lucide-react";
+import { Crosshair, ExternalLink, Maximize2, Minus, Plus, X } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { PALETTE } from "~/components/charts";
 import { cn } from "~/lib/cn";
@@ -188,6 +195,7 @@ function fitView(points: Point[], pad: number): View {
 
 export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges: GraphEdge[] }) {
   const { positions, bbox, families } = useMemo(() => computeLayout(nodes, edges), [nodes, edges]);
+  const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const posById = useMemo(() => {
     const m = new Map<string, Point>();
     nodes.forEach((node, i) => {
@@ -200,10 +208,14 @@ export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges:
   const initial = useMemo(() => fitView([...posById.values()], SPACING), [posById]);
   const [view, setView] = useState<View>(initial);
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const drag = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null);
+  // Distinguishes a pan from a tap so a click that ends a drag does not also
+  // select a node or clear the selection.
+  const dragged = useRef(false);
 
   const q = query.trim().toLowerCase();
   const matchedIds = useMemo(() => {
@@ -229,12 +241,57 @@ export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges:
     [posById],
   );
 
+  const neighborsOf = useCallback(
+    (id: string) => {
+      const set = new Set<string>([id]);
+      for (const e of edges) {
+        if (e.source === id) set.add(e.target);
+        if (e.target === id) set.add(e.source);
+      }
+      return set;
+    },
+    [edges],
+  );
+
+  const selectNode = useCallback(
+    (id: string, recenter = false) => {
+      setSelectedId(id);
+      if (recenter) recenterTo(neighborsOf(id));
+    },
+    [recenterTo, neighborsOf],
+  );
+
+  const selected = selectedId ? (nodeById.get(selectedId) ?? null) : null;
+
+  // Connections of the selected node, for the side panel. Sorted so Vertretungen
+  // surface first, then alphabetically by name.
+  const connections = useMemo(() => {
+    if (!selectedId) return [];
+    const out: { node: GraphNode; label: string | null; istVertreter: boolean }[] = [];
+    for (const e of edges) {
+      const otherId =
+        e.source === selectedId ? e.target : e.target === selectedId ? e.source : null;
+      if (!otherId) continue;
+      const node = nodeById.get(otherId);
+      if (node) out.push({ node, label: e.label, istVertreter: e.istVertreter });
+    }
+    out.sort(
+      (a, b) =>
+        Number(b.istVertreter) - Number(a.istVertreter) || a.node.name.localeCompare(b.node.name),
+    );
+    return out;
+  }, [selectedId, edges, nodeById]);
+
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
+    dragged.current = false;
     drag.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
   };
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!drag.current || !svgRef.current) return;
+    if (Math.abs(e.clientX - drag.current.x) + Math.abs(e.clientY - drag.current.y) > 4) {
+      dragged.current = true;
+    }
     const rect = svgRef.current.getBoundingClientRect();
     const scale = view.w / rect.width;
     setView((v) => ({
@@ -275,19 +332,16 @@ export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges:
     zoomBy(e.deltaY > 0 ? 1.12 : 0.89, cx, cy);
   };
 
-  const adjacentToHover = useMemo(() => {
-    if (!hoverId) return null;
-    const set = new Set<string>([hoverId]);
-    for (const e of edges) {
-      if (e.source === hoverId) set.add(e.target);
-      if (e.target === hoverId) set.add(e.source);
-    }
-    return set;
-  }, [hoverId, edges]);
+  // The selection wins over hover so the highlight is sticky and touch-friendly.
+  const focusId = selectedId ?? hoverId;
+  const focusNeighbors = useMemo(
+    () => (focusId ? neighborsOf(focusId) : null),
+    [focusId, neighborsOf],
+  );
 
   const isDimmed = (id: string) => {
     if (matchedIds && !matchedIds.has(id)) return true;
-    if (adjacentToHover && !adjacentToHover.has(id)) return true;
+    if (focusNeighbors && !focusNeighbors.has(id)) return true;
     return false;
   };
 
@@ -299,7 +353,10 @@ export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges:
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && matchedIds) recenterTo(matchedIds);
+              if (e.key === "Enter" && matchedIds) {
+                recenterTo(matchedIds);
+                if (matchedIds.size === 1) setSelectedId([...matchedIds][0] ?? null);
+              }
             }}
             placeholder="Person suchen…"
             className="h-9 w-52 rounded-lg border border-border bg-card px-3 text-sm outline-none focus:ring-2 focus:ring-brand/40"
@@ -328,7 +385,8 @@ export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges:
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-[radial-gradient(circle_at_1px_1px,theme(colors.border)_1px,transparent_0)] [background-size:24px_24px]">
+      <div className="relative overflow-hidden rounded-xl border border-border bg-[radial-gradient(circle_at_1px_1px,theme(colors.border)_1px,transparent_0)] [background-size:24px_24px]">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: pan/zoom data canvas; the click only clears the selection, which is also reachable via the panel's close button. Keyboard users reach people through the search box and the panel's real buttons and links. */}
         <svg
           ref={svgRef}
           viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
@@ -341,6 +399,10 @@ export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges:
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerUp}
           onWheel={onWheel}
+          onClick={() => {
+            // A click that did not pan and did not hit a node clears the selection.
+            if (!dragged.current) setSelectedId(null);
+          }}
         >
           <g>
             {edges.map((e) => {
@@ -348,7 +410,7 @@ export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges:
               const b = posById.get(e.target);
               if (!a || !b) return null;
               const dim = isDimmed(e.source) && isDimmed(e.target);
-              const active = hoverId != null && (e.source === hoverId || e.target === hoverId);
+              const active = focusId != null && (e.source === focusId || e.target === focusId);
               return (
                 <line
                   key={`${e.source}|${e.target}`}
@@ -372,17 +434,30 @@ export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges:
               const p = posById.get(node.id);
               if (!p) return null;
               const dim = isDimmed(node.id);
+              const isSelected = node.id === selectedId;
               const fill = node.isMember ? PALETTE.indigo : PALETTE.slate;
               return (
-                <Link
+                // biome-ignore lint/a11y/noStaticElementInteractions: SVG node in a pan/zoom canvas; an SVG group is the only sensible hit target. The same person is reachable by keyboard via the search box, and the opened panel exposes real buttons and links.
+                <g
                   key={node.id}
-                  to="/app/mitglieder/$mitgliedsnummer"
-                  params={{ mitgliedsnummer: node.reference }}
                   onMouseEnter={() => setHoverId(node.id)}
                   onMouseLeave={() => setHoverId((cur) => (cur === node.id ? null : cur))}
-                  style={{ opacity: dim ? 0.25 : 1 }}
-                  className="cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!dragged.current) selectNode(node.id);
+                  }}
+                  style={{ opacity: dim ? 0.25 : 1, cursor: "pointer" }}
                 >
+                  {isSelected ? (
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={(node.isMember ? 9 : 7) + 5}
+                      fill="none"
+                      className="stroke-brand"
+                      strokeWidth={2.5}
+                    />
+                  ) : null}
                   <circle
                     cx={p.x}
                     cy={p.y}
@@ -399,18 +474,99 @@ export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges:
                     className="fill-foreground"
                     fill="currentColor"
                     fontSize="12"
-                    fontWeight={500}
+                    fontWeight={isSelected ? 700 : 500}
                     style={{ paintOrder: "stroke" }}
                     stroke="var(--color-background, white)"
                     strokeWidth={3}
                   >
                     {node.name}
                   </text>
-                </Link>
+                </g>
               );
             })}
           </g>
         </svg>
+
+        {selected ? (
+          <div className="absolute right-3 top-3 z-10 flex max-h-[calc(68vh-1.5rem)] w-64 max-w-[78%] flex-col rounded-xl border border-border bg-card/95 shadow-elevated backdrop-blur">
+            <div className="flex items-start justify-between gap-2 border-b border-border p-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold tracking-tight">{selected.name}</div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5"
+                    style={{
+                      backgroundColor: `${selected.isMember ? PALETTE.indigo : PALETTE.slate}22`,
+                    }}
+                  >
+                    <span
+                      className="size-2 rounded-full"
+                      style={{
+                        backgroundColor: selected.isMember ? PALETTE.indigo : PALETTE.slate,
+                      }}
+                    />
+                    {selected.isMember ? "Mitglied" : "Kontakt"}
+                  </span>
+                  <span className="tabular-nums">#{selected.reference}</span>
+                  {selected.inactive ? <span>· inaktiv</span> : null}
+                </div>
+                {selected.ort ? (
+                  <div className="mt-1 truncate text-xs text-muted-foreground">{selected.ort}</div>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                aria-label="Schließen"
+                onClick={() => setSelectedId(null)}
+                className="-mr-1 -mt-1 shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <Link
+              to="/app/mitglieder/$mitgliedsnummer"
+              params={{ mitgliedsnummer: selected.reference }}
+              className="flex items-center gap-1.5 border-b border-border px-3 py-2 text-sm font-medium text-brand hover:underline"
+            >
+              <ExternalLink className="size-3.5" /> Mitglied öffnen
+            </Link>
+
+            <div className="flex min-h-0 flex-col">
+              <div className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {connections.length === 0
+                  ? "Keine Verbindungen"
+                  : `${connections.length} Verbindung${connections.length === 1 ? "" : "en"}`}
+              </div>
+              <ul className="flex flex-col gap-0.5 overflow-y-auto p-2 pt-1 scrollbar-thin">
+                {connections.map((c) => (
+                  <li key={c.node.id}>
+                    <button
+                      type="button"
+                      onClick={() => selectNode(c.node.id, true)}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-accent"
+                    >
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{
+                          backgroundColor: c.node.isMember ? PALETTE.indigo : PALETTE.slate,
+                        }}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm">{c.node.name}</span>
+                        {c.label || c.istVertreter ? (
+                          <span className="block truncate text-[11px] text-muted-foreground">
+                            {c.istVertreter ? "Vertretung" : c.label}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-muted-foreground">

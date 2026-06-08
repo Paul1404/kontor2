@@ -25,7 +25,7 @@ function NetzwerkPage() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Alle Verknüpfungen zwischen Mitgliedern und Kontakten als Karte. Ziehen zum Verschieben,
-          scrollen zum Zoomen, Klick öffnet das Mitglied.
+          scrollen zum Zoomen, Klick auf eine Person zeigt ihre Verbindungen.
         </p>
       </div>
 

@@ -1,5 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { FileWarning, History, Loader2, Mails, Pencil, ScrollText, Undo2 } from "lucide-react";
+import {
+  Award,
+  FileWarning,
+  History,
+  Loader2,
+  Mails,
+  Pencil,
+  ScrollText,
+  Undo2,
+} from "lucide-react";
 import type { ComponentType } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { QueryError } from "~/components/ui/query-error";
@@ -7,7 +16,7 @@ import { cn } from "~/lib/cn";
 import { formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
-type Kind = "audit" | "dunning" | "kulanz" | "rundschreiben" | "sepa_return";
+type Kind = "audit" | "dunning" | "kulanz" | "rundschreiben" | "sepa_return" | "ehrung";
 
 const ICONS: Record<Kind, ComponentType<{ className?: string }>> = {
   audit: Pencil,
@@ -15,6 +24,7 @@ const ICONS: Record<Kind, ComponentType<{ className?: string }>> = {
   kulanz: ScrollText,
   rundschreiben: Mails,
   sepa_return: Undo2,
+  ehrung: Award,
 };
 
 const TONES: Record<Kind, string> = {
@@ -23,6 +33,7 @@ const TONES: Record<Kind, string> = {
   kulanz: "bg-sky-500/15 text-sky-600 dark:text-sky-400",
   rundschreiben: "bg-brand/15 text-brand",
   sepa_return: "bg-red-500/15 text-red-600 dark:text-red-400",
+  ehrung: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
 };
 
 /** Merged chronological activity feed for one member. */

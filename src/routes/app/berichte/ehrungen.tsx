@@ -1,11 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Download, Loader2, Printer, Trophy } from "lucide-react";
-import { useState } from "react";
+import { Award, Check, Download, Loader2, Printer, Trophy } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
 import { QueryError } from "~/components/ui/query-error";
+import { toast } from "~/components/ui/toaster";
+import { triggerDownloadBase64 } from "~/lib/download";
+import { STANDARD_JUBILAEEN } from "~/lib/ehrungen";
 import { exportCsvFile } from "~/lib/export";
 import { formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
@@ -15,15 +19,74 @@ export const Route = createFileRoute("/app/berichte/ehrungen")({
   component: EhrungenPage,
 });
 
-const ALL_JUBILAEEN = [25, 40, 50, 60, 70, 75];
+const ALL_JUBILAEEN = [...STANDARD_JUBILAEEN];
+
+function honorKey(memberId: string, jubilee: number): string {
+  return `${memberId}:${jubilee}`;
+}
 
 function EhrungenPage() {
+  const qc = useQueryClient();
   const [year, setYear] = useState(new Date().getUTCFullYear());
   const [selected, setSelected] = useState<number[]>(ALL_JUBILAEEN);
+
+  const me = useQuery({ queryKey: ["me"], queryFn: () => orpc.auth.me() });
+  const canEdit = me.data?.role === "vorstand" || me.data?.role === "admin";
 
   const data = useQuery({
     queryKey: ["reports.ehrungen", { year, selected }],
     queryFn: () => orpc.reports.ehrungen({ year, jubilaeen: selected }),
+  });
+
+  const status = useQuery({
+    queryKey: ["ehrungen.statusForYear", { year, selected }],
+    queryFn: () => orpc.ehrungen.statusForYear({ year, jubilaeen: selected }),
+  });
+
+  // Lookup of recorded honors by member + jubilee, so each due row shows open
+  // vs honored without an extra request per row.
+  const honored = useMemo(() => {
+    const map = new Map<
+      string,
+      { ehrungId: string; verliehenAm: string | null; hasUrkunde: boolean }
+    >();
+    for (const h of status.data?.honored ?? []) {
+      if (h.jubilaeumJahre == null) continue;
+      map.set(honorKey(h.memberId, h.jubilaeumJahre), {
+        ehrungId: h.ehrungId,
+        verliehenAm: h.verliehenAm,
+        hasUrkunde: h.hasUrkunde,
+      });
+    }
+    return map;
+  }, [status.data]);
+
+  const invalidateStatus = () =>
+    qc.invalidateQueries({ queryKey: ["ehrungen.statusForYear", { year, selected }] });
+
+  const record = useMutation({
+    mutationFn: (vars: { memberId: string; jubilee: number }) =>
+      orpc.ehrungen.record({
+        memberId: vars.memberId,
+        kind: "vereinsjubilaeum",
+        jubilaeumJahre: vars.jubilee,
+        verliehenAm: new Date().toISOString().slice(0, 10),
+        jahr: year,
+      }),
+    onSuccess: async () => {
+      await invalidateStatus();
+      toast.success("Als geehrt vermerkt");
+    },
+    onError: (e: Error) => toast.error("Konnte nicht vermerkt werden", { description: e.message }),
+  });
+
+  const urkunde = useMutation({
+    mutationFn: (id: string) => orpc.ehrungen.urkunde({ id }),
+    onSuccess: async (r) => {
+      triggerDownloadBase64(r.filename, r.base64, "application/pdf");
+      await invalidateStatus();
+    },
+    onError: (e: Error) => toast.error("Urkunde fehlgeschlagen", { description: e.message }),
   });
 
   function toggle(j: number) {
@@ -36,6 +99,8 @@ function EhrungenPage() {
     return exportCsvFile(() => orpc.reports.ehrungenExport({ year, jubilaeen: selected }));
   }
 
+  const busy = record.isPending || urkunde.isPending;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3 print:hidden">
@@ -45,7 +110,7 @@ function EhrungenPage() {
           </h1>
           <p className="text-sm text-muted-foreground">
             Mitglieder mit anstehendem Vereinsjubiläum (25, 40, 50 Jahre und mehr) im gewählten
-            Jahr.
+            Jahr. Erfasste Ehrungen lassen sich als Urkunde drucken.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -70,9 +135,9 @@ function EhrungenPage() {
           Vereinsjubiläum. Geburtstage finden Sie unter <em>Geburtstage</em>.
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
-          Die Schalter oben filtern, welche Jubiläumsjahre berücksichtigt werden. Standardmäßig sind
-          alle aktiv. CSV-Export ist für die Erstellung von Urkunden und die Übergabe an die
-          Geehrten-Verwaltung gedacht.
+          Mit „Als geehrt vermerken“ halten Sie fest, dass die Ehrung vergeben wurde. Danach lässt
+          sich die Ehrenurkunde als PDF erzeugen. Bereits vermerkte Jubiläen erscheinen mit einem
+          Haken, damit niemand doppelt geehrt wird.
         </p>
       </InfoBox>
 
@@ -146,22 +211,64 @@ function EhrungenPage() {
                       <th className="px-4 py-3 font-medium">Ort</th>
                       <th className="px-4 py-3 font-medium">Eintritt</th>
                       <th className="px-4 py-3 font-medium">Jubiläumsdatum</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {g.members.map((m) => (
-                      <tr key={m.id} className="transition-colors hover:bg-muted/30">
-                        <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                          {memberRef(m)}
-                        </td>
-                        <td className="px-4 py-3 font-medium">
-                          {[m.nachname, m.vorname].filter(Boolean).join(", ")}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{m.ort ?? ""}</td>
-                        <td className="px-4 py-3 tabular-nums">{formatDate(m.eintritt)}</td>
-                        <td className="px-4 py-3 tabular-nums">{formatDate(m.jubilaeumsDatum)}</td>
-                      </tr>
-                    ))}
+                    {g.members.map((m) => {
+                      const honor = honored.get(honorKey(m.id, g.jubilee));
+                      return (
+                        <tr key={m.id} className="transition-colors hover:bg-muted/30">
+                          <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                            {memberRef(m)}
+                          </td>
+                          <td className="px-4 py-3 font-medium">
+                            {[m.nachname, m.vorname].filter(Boolean).join(", ")}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">{m.ort ?? ""}</td>
+                          <td className="px-4 py-3 tabular-nums">{formatDate(m.eintritt)}</td>
+                          <td className="px-4 py-3 tabular-nums">
+                            {formatDate(m.jubilaeumsDatum)}
+                          </td>
+                          <td className="px-4 py-3">
+                            {honor ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge variant="success" className="gap-1">
+                                  <Check className="size-3" /> Geehrt
+                                  {honor.verliehenAm ? ` ${formatDate(honor.verliehenAm)}` : ""}
+                                </Badge>
+                                {canEdit ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="print:hidden"
+                                    disabled={busy}
+                                    onClick={() => urkunde.mutate(honor.ehrungId)}
+                                    title="Ehrenurkunde erzeugen und herunterladen"
+                                  >
+                                    <Award className="size-4" /> Urkunde
+                                  </Button>
+                                ) : null}
+                              </div>
+                            ) : canEdit ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="print:hidden"
+                                disabled={busy}
+                                onClick={() =>
+                                  record.mutate({ memberId: m.id, jubilee: g.jubilee })
+                                }
+                              >
+                                Als geehrt vermerken
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">offen</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

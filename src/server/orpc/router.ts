@@ -10,6 +10,7 @@ import { dashboardRouter } from "~/server/orpc/procedures/dashboard";
 import { dataQualityRouter } from "~/server/orpc/procedures/data-quality";
 import { dsgvoRouter } from "~/server/orpc/procedures/dsgvo";
 import { dunningRouter } from "~/server/orpc/procedures/dunning";
+import { ehrungenRouter } from "~/server/orpc/procedures/ehrungen";
 import { feeRunsRouter } from "~/server/orpc/procedures/fee-runs";
 import { feeTypesRouter } from "~/server/orpc/procedures/fee-types";
 import { importRouter } from "~/server/orpc/procedures/import";
@@ -40,6 +41,7 @@ export const appRouter = {
   sepa: sepaRouter,
   sepaReturns: sepaReturnsRouter,
   dunning: dunningRouter,
+  ehrungen: ehrungenRouter,
   kulanz: kulanzRouter,
   dashboard: dashboardRouter,
   dataQuality: dataQualityRouter,
