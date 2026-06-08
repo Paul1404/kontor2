@@ -7,6 +7,7 @@ import {
   Clock,
   Coins,
   FileBarChart,
+  FileClock,
   FileLock2,
   FileSpreadsheet,
   FileWarning,
@@ -156,6 +157,12 @@ const SECTIONS: NavSection[] = [
         to: "/app/admin/snapshots",
         label: "Snapshots",
         icon: <History className="size-[18px]" />,
+        adminOnly: true,
+      },
+      {
+        to: "/app/admin/protokoll",
+        label: "Systemprotokoll",
+        icon: <FileClock className="size-[18px]" />,
         adminOnly: true,
       },
       {

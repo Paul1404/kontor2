@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.29.0",
+    date: "2026-06-08",
+    title: "Systemprotokoll",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Unter Verwaltung gibt es das Systemprotokoll. Es zeigt die Anwendungslogs aus dem laufenden Betrieb mit Stufe, Meldung, Zeitpunkt und allen technischen Feldern. So lassen sich Ereignisse und Fehler nachvollziehen, ohne auf die Serverkonsole zuzugreifen. Die Seite ist nur für Administratoren sichtbar.",
+      },
+      {
+        category: "feature",
+        description:
+          "Das Protokoll lässt sich nach Stufe, Zeitraum und Freitext filtern, nach einer Anfrage oder Prozedur eingrenzen und im Live-Modus automatisch aktualisieren. Über die Anfrage-ID lassen sich alle Einträge eines Vorgangs zusammenführen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Logs werden zusätzlich zur Konsole in der Datenbank gespeichert. Sie werden gebündelt geschrieben, damit der Betrieb nicht ausgebremst wird, und nach 14 Tagen oder beim Erreichen der Höchstmenge automatisch aufgeräumt. Sensible Werte wie IBANs oder Passwörter werden nie protokolliert.",
+      },
+    ],
+  },
+  {
     version: "0.28.0",
     date: "2026-06-08",
     title: "Massenbearbeitung und UI-Feinschliff",

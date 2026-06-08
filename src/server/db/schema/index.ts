@@ -1,4 +1,5 @@
 export * from "./abteilungen";
+export * from "./app-log";
 export * from "./attachments";
 export * from "./audit";
 export * from "./auth";

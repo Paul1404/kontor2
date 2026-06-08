@@ -2,6 +2,7 @@ import { auth, type Session } from "~/server/auth/auth";
 import { ensureBootstrapAdmin } from "~/server/auth/bootstrap";
 import { ensureSessionConfigLoaded } from "~/server/auth/session-config";
 import { type DB, db } from "~/server/db/client";
+import { registerDbLogSink } from "~/server/lib/log-sink-db";
 import { logger } from "~/server/lib/logger";
 import { startSnapshotScheduler } from "~/server/snapshots/scheduler";
 
@@ -20,6 +21,15 @@ export async function createContext(request: Request): Promise<AppContext> {
   // from ever being installed.
   if (!schedulerStarted) {
     schedulerStarted = true;
+    // Attach the persistent log sink before the scheduler so any failure it
+    // logs is captured in the DB feed too. Both are idempotent and lazy.
+    try {
+      registerDbLogSink();
+    } catch (err) {
+      logger.error("failed to register db log sink", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
     try {
       startSnapshotScheduler();
     } catch (err) {
