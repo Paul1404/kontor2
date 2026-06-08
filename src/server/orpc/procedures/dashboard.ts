@@ -11,6 +11,27 @@ function startOfMonth(): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
 }
 
+/**
+ * Effective gender code ('m' | 'w' | 'd' | 'unbekannt') for a member row.
+ *
+ * The explicit `geschlecht` column is the source of truth, but the legacy base
+ * was migrated with a blunt rule (only an exact "Herr"/"Frau" mapped, the rest
+ * became 'unbekannt'), so most rows read 'unbekannt' even when their Anrede is
+ * a clear marker. Rather than depend on a one-off backfill having been run in
+ * production, we fall back to deriving from the Anrede at query time whenever
+ * the column is null or 'unbekannt'. This mirrors `deriveGeschlecht` and keeps
+ * the dashboard honest: a real, untranslatable Anrede still reads 'unbekannt'.
+ */
+const effectiveGender = sql`case
+  when ${membersTable.geschlecht}::text in ('m', 'w', 'd') then ${membersTable.geschlecht}::text
+  when lower(btrim(${membersTable.anrede})) in ('herr', 'hr', 'hr.', 'herrn')
+       or lower(btrim(${membersTable.anrede})) like 'herr %' then 'm'
+  when lower(btrim(${membersTable.anrede})) in ('frau', 'fr', 'fr.')
+       or lower(btrim(${membersTable.anrede})) like 'frau %' then 'w'
+  when lower(btrim(${membersTable.anrede})) = 'divers' then 'd'
+  else 'unbekannt'
+end`;
+
 export const dashboardRouter = {
   stats: authedProc.input(v.void()).handler(async ({ context }) =>
     // Read-through cached: the KPIs are global (no per-user data) and run ~9
@@ -73,21 +94,24 @@ export const dashboardRouter = {
         group by bucket
         order by bucket
       `),
-        // Gender from the explicit `geschlecht` enum column. Members whose
-        // column is NULL (shouldn't happen post-backfill, but defensive)
-        // fall into "unbekannt".
+        // Gender from the effective code (explicit column, else derived from
+        // the Anrede). Anything that still can't be resolved reads "unbekannt"
+        // so the chart shows the genuine data gap.
         context.db.execute<{ gender: string; c: number }>(sql`
         select gender, count(*)::int as c from (
-          select case ${membersTable.geschlecht}::text
+          select case g
             when 'm' then 'männlich'
             when 'w' then 'weiblich'
             when 'd' then 'divers'
             else 'unbekannt'
           end as gender
-          from ${membersTable}
-          where ${memberNotDeleted()}
-            and ${membersTable.austritt} is null
-            and ${membersTable.verstorbenAm} is null
+          from (
+            select ${effectiveGender} as g
+            from ${membersTable}
+            where ${memberNotDeleted()}
+              and ${membersTable.austritt} is null
+              and ${membersTable.verstorbenAm} is null
+          ) s
         ) t
         group by gender
         order by case gender
@@ -279,7 +303,7 @@ export const dashboardRouter = {
             when extract(year from age(${membersTable.geburtsdatum})) < 75 then '60-74'
             else '75+'
           end as bucket,
-          ${membersTable.geschlecht}::text as g
+          ${effectiveGender} as g
           from ${membersTable}
           where ${memberNotDeleted()}
             and ${membersTable.austritt} is null

@@ -19,6 +19,7 @@ import {
   Mail,
   Mails,
   ScrollText,
+  Share2,
   ShieldCheck,
   UserCog,
   Users,
@@ -49,6 +50,12 @@ const SECTIONS: NavSection[] = [
     items: [
       { to: "/app", label: "Dashboard", icon: <LayoutDashboard className="size-[18px]" /> },
       { to: "/app/mitglieder", label: "Mitglieder", icon: <Users className="size-[18px]" /> },
+      {
+        to: "/app/netzwerk",
+        label: "Netzwerk",
+        icon: <Share2 className="size-[18px]" />,
+        vorstandOnly: true,
+      },
       {
         to: "/app/wiedervorlagen",
         label: "Wiedervorlagen",

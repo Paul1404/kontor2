@@ -18,11 +18,20 @@ import { vorstandProc } from "~/server/orpc/base";
 export const CATEGORY_IDS = [
   "lastschrift_ohne_mandat",
   "fehlende_iban",
-  "fehlende_email",
   "fehlende_adresse",
+  "name_fehlt",
+  "aktiv_ohne_vertrag",
   "minderjaehrig_ohne_vertretung",
-  "vertrag_ohne_beitragsart",
+  "geburtsdatum_unplausibel",
+  "eintritt_nach_austritt",
   "austritt_offene_vertraege",
+  "fehlende_email",
+  "email_ungueltig",
+  "email_mehrfach",
+  "plz_ungueltig",
+  "geschlecht_unbekannt",
+  "vertrag_ohne_beitragsart",
+  "mahnsperre_gesetzt",
   "moegliche_dubletten",
 ] as const;
 
@@ -54,15 +63,23 @@ export const CATEGORIES: CategoryMeta[] = [
     severity: "warn",
   },
   {
-    id: "fehlende_email",
-    label: "Keine E-Mail-Adresse",
-    description: "Aktive Mitglieder ohne E-Mail. Sie sind nur per Post erreichbar.",
-    severity: "info",
-  },
-  {
     id: "fehlende_adresse",
     label: "Unvollständige Anschrift",
     description: "Aktive Mitglieder ohne Straße, PLZ oder Ort. Postversand ist nicht möglich.",
+    severity: "warn",
+  },
+  {
+    id: "name_fehlt",
+    label: "Kein Name hinterlegt",
+    description:
+      "Aktive Mitglieder ohne Nachname, Firma oder Kurzname. Der Datensatz lässt sich kaum zuordnen.",
+    severity: "warn",
+  },
+  {
+    id: "aktiv_ohne_vertrag",
+    label: "Mitglied ohne Vertrag",
+    description:
+      "Aktive Mitglieder ohne einen laufenden Vertrag. Für sie wird kein Beitrag gestellt.",
     severity: "warn",
   },
   {
@@ -73,11 +90,17 @@ export const CATEGORIES: CategoryMeta[] = [
     severity: "warn",
   },
   {
-    id: "vertrag_ohne_beitragsart",
-    label: "Vertrag ohne Beitragsart",
+    id: "geburtsdatum_unplausibel",
+    label: "Geburtsdatum unplausibel",
     description:
-      "Aktive Mitglieder mit einem Vertrag ohne hinterlegte Bezeichnung der Beitragsart.",
-    severity: "info",
+      "Geburtsdatum liegt in der Zukunft oder ergibt ein Alter über 110 Jahre. Vermutlich ein Tippfehler.",
+    severity: "warn",
+  },
+  {
+    id: "eintritt_nach_austritt",
+    label: "Austritt vor Eintritt",
+    description: "Das Austrittsdatum liegt vor dem Eintrittsdatum. Die Daten widersprechen sich.",
+    severity: "warn",
   },
   {
     id: "austritt_offene_vertraege",
@@ -85,6 +108,53 @@ export const CATEGORIES: CategoryMeta[] = [
     description:
       "Ausgetretene Mitglieder, deren Vertrag weder gekündigt noch beendet ist. Der Austritt ist nicht sauber abgeschlossen.",
     severity: "warn",
+  },
+  {
+    id: "fehlende_email",
+    label: "Keine E-Mail-Adresse",
+    description: "Aktive Mitglieder ohne E-Mail. Sie sind nur per Post erreichbar.",
+    severity: "info",
+  },
+  {
+    id: "email_ungueltig",
+    label: "E-Mail unplausibel",
+    description:
+      "Hinterlegte E-Mail ohne erkennbares Format (kein @ oder keine Domain). Zustellung schlägt fehl.",
+    severity: "info",
+  },
+  {
+    id: "email_mehrfach",
+    label: "E-Mail mehrfach vergeben",
+    description:
+      "Dieselbe E-Mail liegt bei mehreren Mitgliedern. Oft eine Familienadresse, manchmal eine Dublette.",
+    severity: "info",
+  },
+  {
+    id: "plz_ungueltig",
+    label: "PLZ unplausibel",
+    description: "Inländische Postleitzahl, die nicht aus genau fünf Ziffern besteht.",
+    severity: "info",
+  },
+  {
+    id: "geschlecht_unbekannt",
+    label: "Geschlecht nicht bestimmbar",
+    description:
+      "Aktive Mitglieder ohne Geschlecht, bei denen auch die Anrede keinen Hinweis gibt. Anrede oder Geschlecht pflegen.",
+    severity: "info",
+  },
+  {
+    id: "vertrag_ohne_beitragsart",
+    label: "Vertrag ohne Beitragsart",
+    description:
+      "Aktive Mitglieder mit einem Vertrag ohne hinterlegte Bezeichnung der Beitragsart.",
+    severity: "info",
+  },
+  {
+    id: "mahnsperre_gesetzt",
+    label: "Mahnsperre gesetzt",
+    description:
+      "Aktive Mitglieder, die vom Mahnlauf ausgenommen sind. Gelegentlich prüfen, ob die Sperre noch gewollt ist.",
+    severity: "info",
   },
   {
     id: "moegliche_dubletten",
@@ -103,16 +173,40 @@ const ACTIVE_DD =
   "exists (select 1 from contracts c where c.member_id = members.id and c.is_direct_debit = true " +
   "and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date))";
 
+/** Any contract that is currently in force (not cancelled, not expired). */
+const ACTIVE_CONTRACT =
+  "exists (select 1 from contracts c where c.member_id = members.id " +
+  "and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date))";
+
+/**
+ * Anrede that maps to a gender, mirroring `deriveGeschlecht`. Used to decide
+ * when "Geschlecht nicht bestimmbar" is genuinely unfixable from the Anrede.
+ */
+const ANREDE_HAS_GENDER =
+  "(lower(btrim(coalesce(anrede, ''))) in ('herr','hr','hr.','herrn','frau','fr','fr.','divers') " +
+  "or lower(btrim(coalesce(anrede, ''))) like 'herr %' or lower(btrim(coalesce(anrede, ''))) like 'frau %')";
+
 /** WHERE clause per category. No user input -- safe to compose with sql.raw. */
 const WHERE: Record<CategoryId, string> = {
   lastschrift_ohne_mandat: `${ACTIVE} and ${ACTIVE_DD} and not exists (select 1 from sepa_mandates s where s.member_id = members.id and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null)`,
   fehlende_iban: `${ACTIVE} and ${ACTIVE_DD} and (iban1_last4 is null or btrim(iban1_last4) = '')`,
-  fehlende_email: `${ACTIVE} and (email is null or btrim(email) = '')`,
   fehlende_adresse: `${ACTIVE} and (strasse is null or btrim(strasse) = '' or plz is null or btrim(plz) = '' or ort is null or btrim(ort) = '')`,
+  name_fehlt: `${ACTIVE} and coalesce(btrim(nachname), '') = '' and coalesce(btrim(firma1), '') = '' and coalesce(btrim(kurzname), '') = ''`,
+  aktiv_ohne_vertrag: `${ACTIVE} and member_no is not null and not ${ACTIVE_CONTRACT}`,
   minderjaehrig_ohne_vertretung: `${ACTIVE} and geburtsdatum is not null and geburtsdatum > (current_date - interval '18 years') and (vertreter_name is null or btrim(vertreter_name) = '') and not exists (select 1 from relationships r where r.from_member_id = members.id and r.ist_vertreter = true)`,
-  vertrag_ohne_beitragsart: `${ACTIVE} and exists (select 1 from contracts c where c.member_id = members.id and (c.art_name is null or btrim(c.art_name) = ''))`,
+  geburtsdatum_unplausibel: `deleted_at is null and geburtsdatum is not null and (geburtsdatum > current_date or geburtsdatum < current_date - interval '110 years')`,
+  eintritt_nach_austritt:
+    "deleted_at is null and eintritt is not null and austritt is not null and austritt < eintritt",
   austritt_offene_vertraege:
     "deleted_at is null and austritt is not null and exists (select 1 from contracts c where c.member_id = members.id and c.gekuend_zum is null and c.vertrag_ende is null)",
+  fehlende_email: `${ACTIVE} and (email is null or btrim(email) = '')`,
+  email_ungueltig: `${ACTIVE} and email is not null and btrim(email) <> '' and btrim(email) !~ '^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$'`,
+  email_mehrfach:
+    "deleted_at is null and email is not null and btrim(email) <> '' and exists (select 1 from members m2 where m2.deleted_at is null and m2.id <> members.id and lower(btrim(m2.email)) = lower(btrim(members.email)))",
+  plz_ungueltig: `${ACTIVE} and plz is not null and btrim(plz) <> '' and (land is null or btrim(land) = '' or lower(btrim(land)) in ('de','d','deutschland','germany')) and btrim(plz) !~ '^[0-9]{5}$'`,
+  geschlecht_unbekannt: `${ACTIVE} and (geschlecht is null or geschlecht = 'unbekannt') and not ${ANREDE_HAS_GENDER}`,
+  vertrag_ohne_beitragsart: `${ACTIVE} and exists (select 1 from contracts c where c.member_id = members.id and (c.art_name is null or btrim(c.art_name) = ''))`,
+  mahnsperre_gesetzt: `${ACTIVE} and dunning_blocked = true`,
   moegliche_dubletten:
     "deleted_at is null and nachname is not null and geburtsdatum is not null and exists (select 1 from members m2 where m2.deleted_at is null and m2.id <> members.id and lower(m2.nachname) = lower(members.nachname) and lower(coalesce(m2.vorname, '')) = lower(coalesce(members.vorname, '')) and m2.geburtsdatum = members.geburtsdatum)",
 };

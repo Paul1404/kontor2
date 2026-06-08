@@ -24,6 +24,7 @@ import { Route as AppZahlungsabgleichRouteImport } from './app/zahlungsabgleich'
 import { Route as AppWiedervorlagenRouteImport } from './app/wiedervorlagen'
 import { Route as AppRundschreibenRouteImport } from './app/rundschreiben'
 import { Route as AppPortalAnfragenRouteImport } from './app/portal-anfragen'
+import { Route as AppNetzwerkRouteImport } from './app/netzwerk'
 import { Route as AppImportRouteImport } from './app/import'
 import { Route as AppDatenqualitaetRouteImport } from './app/datenqualitaet'
 import { Route as AppAuditRouteImport } from './app/audit'
@@ -138,6 +139,11 @@ const AppRundschreibenRoute = AppRundschreibenRouteImport.update({
 const AppPortalAnfragenRoute = AppPortalAnfragenRouteImport.update({
   id: '/portal-anfragen',
   path: '/portal-anfragen',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppNetzwerkRoute = AppNetzwerkRouteImport.update({
+  id: '/netzwerk',
+  path: '/netzwerk',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppImportRoute = AppImportRouteImport.update({
@@ -363,6 +369,7 @@ export interface FileRoutesByFullPath {
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
+  '/app/netzwerk': typeof AppNetzwerkRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/app/rundschreiben': typeof AppRundschreibenRoute
   '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
@@ -418,6 +425,7 @@ export interface FileRoutesByTo {
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
+  '/app/netzwerk': typeof AppNetzwerkRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/app/rundschreiben': typeof AppRundschreibenRoute
   '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
@@ -476,6 +484,7 @@ export interface FileRoutesById {
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
+  '/app/netzwerk': typeof AppNetzwerkRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/app/rundschreiben': typeof AppRundschreibenRoute
   '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
@@ -535,6 +544,7 @@ export interface FileRouteTypes {
     | '/app/audit'
     | '/app/datenqualitaet'
     | '/app/import'
+    | '/app/netzwerk'
     | '/app/portal-anfragen'
     | '/app/rundschreiben'
     | '/app/wiedervorlagen'
@@ -590,6 +600,7 @@ export interface FileRouteTypes {
     | '/app/audit'
     | '/app/datenqualitaet'
     | '/app/import'
+    | '/app/netzwerk'
     | '/app/portal-anfragen'
     | '/app/rundschreiben'
     | '/app/wiedervorlagen'
@@ -647,6 +658,7 @@ export interface FileRouteTypes {
     | '/app/audit'
     | '/app/datenqualitaet'
     | '/app/import'
+    | '/app/netzwerk'
     | '/app/portal-anfragen'
     | '/app/rundschreiben'
     | '/app/wiedervorlagen'
@@ -817,6 +829,13 @@ declare module '@tanstack/react-router' {
       path: '/portal-anfragen'
       fullPath: '/app/portal-anfragen'
       preLoaderRoute: typeof AppPortalAnfragenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/netzwerk': {
+      id: '/app/netzwerk'
+      path: '/netzwerk'
+      fullPath: '/app/netzwerk'
+      preLoaderRoute: typeof AppNetzwerkRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/import': {
@@ -1106,6 +1125,7 @@ interface AppRouteRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppDatenqualitaetRoute: typeof AppDatenqualitaetRoute
   AppImportRoute: typeof AppImportRoute
+  AppNetzwerkRoute: typeof AppNetzwerkRoute
   AppPortalAnfragenRoute: typeof AppPortalAnfragenRoute
   AppRundschreibenRoute: typeof AppRundschreibenRoute
   AppWiedervorlagenRoute: typeof AppWiedervorlagenRoute
@@ -1146,6 +1166,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppDatenqualitaetRoute: AppDatenqualitaetRoute,
   AppImportRoute: AppImportRoute,
+  AppNetzwerkRoute: AppNetzwerkRoute,
   AppPortalAnfragenRoute: AppPortalAnfragenRoute,
   AppRundschreibenRoute: AppRundschreibenRoute,
   AppWiedervorlagenRoute: AppWiedervorlagenRoute,

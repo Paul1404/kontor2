@@ -41,6 +41,33 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.22.0",
+    date: "2026-06-08",
+    title: "Beziehungsnetzwerk und schärfere Datenprüfung",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neue Ansicht Netzwerk: alle Verknüpfungen zwischen Mitgliedern und Kontakten als Karte. Ziehen zum Verschieben, scrollen zum Zoomen, Suche nach Personen, Klick öffnet das Mitglied. Vertretungen sind eigens hervorgehoben.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Datenqualität prüft jetzt neun weitere Punkte: fehlender Name, Mitglied ohne Vertrag, unplausibles Geburtsdatum, Austritt vor Eintritt, unplausible E-Mail, mehrfach vergebene E-Mail, unplausible PLZ, nicht bestimmbares Geschlecht und gesetzte Mahnsperre. Neuer Filter nach Warnungen und Hinweisen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Geschlecht im Dashboard wird jetzt aus der Anrede abgeleitet, wenn kein Geschlecht hinterlegt ist. Damit zeigt die Auswertung die echte Verteilung statt überall Unbekannt.",
+      },
+      {
+        category: "fix",
+        description:
+          "Diagramme schneiden die äußeren Jahreszahlen und den Wert am Rand nicht mehr ab.",
+      },
+    ],
+  },
+  {
     version: "0.21.0",
     date: "2026-06-08",
     title: "Wiedervorlagen, Verlauf und Finanz-Werkzeuge",

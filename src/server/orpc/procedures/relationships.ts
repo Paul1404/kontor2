@@ -1,11 +1,15 @@
 import { ORPCError } from "@orpc/server";
-import { and, eq, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import { escapeLike } from "~/server/db/like";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
+import { memberDisplayName, memberRef } from "~/server/domain/member";
 import { vorstandProc } from "~/server/orpc/base";
+
+/** Cap the graph so a pathological dataset cannot return everything at once. */
+const GRAPH_EDGE_LIMIT = 4000;
 
 function toDateOrNull(value: string | null | undefined, field: string): Date | null {
   if (!value) return null;
@@ -236,6 +240,91 @@ export const relationshipsRouter = {
       });
       return { ok: true };
     }),
+
+  /**
+   * The whole relationship network as nodes + undirected edges, for the canvas
+   * view. Only relationships where both ends resolve to a live (non-deleted)
+   * member are included; A->B and B->A collapse into one edge, flagged as a
+   * representative link if either direction carries `ist_vertreter`. Capped so
+   * a runaway dataset cannot blow up the payload.
+   */
+  graph: vorstandProc.input(v.void()).handler(async ({ context }) => {
+    const rels = (await context.db.execute(sql`
+      select r.from_member_id as from_id, r.to_member_id as to_id,
+             r.beziehung as beziehung, r.ist_vertreter as ist_vertreter
+      from relationships r
+      join members mf on mf.id = r.from_member_id and mf.deleted_at is null
+      join members mt on mt.id = r.to_member_id and mt.deleted_at is null
+      where r.to_member_id is not null
+      limit ${GRAPH_EDGE_LIMIT + 1}
+    `)) as unknown as Array<{
+      from_id: string;
+      to_id: string;
+      beziehung: string | null;
+      ist_vertreter: boolean;
+    }>;
+
+    const capped = rels.length > GRAPH_EDGE_LIMIT;
+    const edgeRows = capped ? rels.slice(0, GRAPH_EDGE_LIMIT) : rels;
+
+    // Collapse the two directions into one undirected edge.
+    const edgeMap = new Map<
+      string,
+      { source: string; target: string; label: string | null; istVertreter: boolean }
+    >();
+    const nodeIds = new Set<string>();
+    for (const r of edgeRows) {
+      nodeIds.add(r.from_id);
+      nodeIds.add(r.to_id);
+      const [a, b] = r.from_id < r.to_id ? [r.from_id, r.to_id] : [r.to_id, r.from_id];
+      const key = `${a}|${b}`;
+      const existing = edgeMap.get(key);
+      if (existing) {
+        existing.label = existing.label ?? r.beziehung;
+        existing.istVertreter = existing.istVertreter || r.ist_vertreter;
+      } else {
+        edgeMap.set(key, {
+          source: a,
+          target: b,
+          label: r.beziehung,
+          istVertreter: r.ist_vertreter,
+        });
+      }
+    }
+
+    if (nodeIds.size === 0) {
+      return { nodes: [], edges: [], capped: false };
+    }
+
+    const memberRows = await context.db
+      .select({
+        id: membersTable.id,
+        memberNo: membersTable.memberNo,
+        kontaktNo: membersTable.kontaktNo,
+        mitgliedsnummer: membersTable.mitgliedsnummer,
+        adrNr: membersTable.adrNr,
+        vorname: membersTable.vorname,
+        nachname: membersTable.nachname,
+        kurzname: membersTable.kurzname,
+        firma1: membersTable.firma1,
+        ort: membersTable.ort,
+        austritt: membersTable.austritt,
+        verstorbenAm: membersTable.verstorbenAm,
+      })
+      .from(membersTable)
+      .where(inArray(membersTable.id, [...nodeIds]));
+
+    const nodes = memberRows.map((m) => ({
+      id: m.id,
+      reference: memberRef(m),
+      name: memberDisplayName(m),
+      ort: m.ort,
+      isMember: m.memberNo != null,
+      inactive: m.austritt != null || m.verstorbenAm != null,
+    }));
+
+    return { nodes, edges: [...edgeMap.values()], capped };
+  }),
 
   /**
    * Search for a member to link to. Returns id, mitgliedsnummer, name; used by the

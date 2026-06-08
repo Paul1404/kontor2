@@ -16,12 +16,23 @@ export const Route = createFileRoute("/app/datenqualitaet")({
 type CategoryId =
   | "lastschrift_ohne_mandat"
   | "fehlende_iban"
-  | "fehlende_email"
   | "fehlende_adresse"
+  | "name_fehlt"
+  | "aktiv_ohne_vertrag"
   | "minderjaehrig_ohne_vertretung"
-  | "vertrag_ohne_beitragsart"
+  | "geburtsdatum_unplausibel"
+  | "eintritt_nach_austritt"
   | "austritt_offene_vertraege"
+  | "fehlende_email"
+  | "email_ungueltig"
+  | "email_mehrfach"
+  | "plz_ungueltig"
+  | "geschlecht_unbekannt"
+  | "vertrag_ohne_beitragsart"
+  | "mahnsperre_gesetzt"
   | "moegliche_dubletten";
+
+type SeverityFilter = "alle" | "warn" | "info";
 
 function DatenqualitaetPage() {
   const summary = useQuery({
@@ -29,6 +40,17 @@ function DatenqualitaetPage() {
     queryFn: () => orpc.dataQuality.summary(),
   });
   const [open, setOpen] = useState<CategoryId | null>(null);
+  const [filter, setFilter] = useState<SeverityFilter>("alle");
+  // Hide the long tail of clean checks by default so the page leads with the
+  // problems that actually need attention.
+  const [showClean, setShowClean] = useState(false);
+
+  const categories = summary.data?.categories ?? [];
+  const warnHits = categories.filter((c) => c.severity === "warn" && c.count > 0).length;
+  const infoHits = categories.filter((c) => c.severity === "info" && c.count > 0).length;
+  const visible = categories
+    .filter((c) => filter === "alle" || c.severity === filter)
+    .filter((c) => showClean || c.count > 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,24 +83,72 @@ function DatenqualitaetPage() {
           </CardContent>
         </Card>
       ) : summary.data ? (
-        <div className="flex flex-col gap-3">
-          <div className="text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground tabular-nums">{summary.data.total}</span>{" "}
-            offene Hinweise in {summary.data.categories.filter((c) => c.count > 0).length}{" "}
-            Kategorien.
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground tabular-nums">
+                {summary.data.total}
+              </span>{" "}
+              offene Hinweise.{" "}
+              <span className="font-medium text-amber-600 tabular-nums dark:text-amber-400">
+                {warnHits}
+              </span>{" "}
+              Warnungen,{" "}
+              <span className="font-medium text-foreground tabular-nums">{infoHits}</span> Hinweise.
+            </div>
+            <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-0.5 text-xs">
+              {(
+                [
+                  ["alle", "Alle"],
+                  ["warn", "Warnungen"],
+                  ["info", "Hinweise"],
+                ] as const
+              ).map(([val, lbl]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setFilter(val)}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 font-medium transition-colors",
+                    filter === val
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
           </div>
-          {summary.data.categories.map((c) => (
-            <CategorySection
-              key={c.id}
-              id={c.id as CategoryId}
-              label={c.label}
-              description={c.description}
-              severity={c.severity}
-              count={c.count}
-              open={open === c.id}
-              onToggle={() => setOpen((cur) => (cur === c.id ? null : (c.id as CategoryId)))}
-            />
-          ))}
+
+          <div className="flex flex-col gap-3">
+            {visible.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                Keine Treffer in dieser Auswahl.
+              </p>
+            ) : (
+              visible.map((c) => (
+                <CategorySection
+                  key={c.id}
+                  id={c.id as CategoryId}
+                  label={c.label}
+                  description={c.description}
+                  severity={c.severity}
+                  count={c.count}
+                  open={open === c.id}
+                  onToggle={() => setOpen((cur) => (cur === c.id ? null : (c.id as CategoryId)))}
+                />
+              ))
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowClean((v) => !v)}
+            className="self-start text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            {showClean ? "Saubere Prüfungen ausblenden" : "Auch saubere Prüfungen anzeigen"}
+          </button>
         </div>
       ) : null}
     </div>
@@ -192,15 +262,23 @@ type ListItem = {
 function detailFor(id: CategoryId, m: ListItem): string {
   switch (id) {
     case "fehlende_email":
+    case "name_fehlt":
+    case "aktiv_ohne_vertrag":
+    case "mahnsperre_gesetzt":
+    case "geschlecht_unbekannt":
+    case "plz_ungueltig":
       return m.ort ?? "";
     case "fehlende_adresse":
+    case "email_mehrfach":
+    case "email_ungueltig":
       return m.email ?? "";
     case "minderjaehrig_ohne_vertretung":
-      return m.geburtsdatum ? `geb. ${formatDate(m.geburtsdatum)}` : "";
-    case "austritt_offene_vertraege":
-      return m.austritt ? `Austritt ${formatDate(m.austritt)}` : "";
+    case "geburtsdatum_unplausibel":
     case "moegliche_dubletten":
       return m.geburtsdatum ? `geb. ${formatDate(m.geburtsdatum)}` : "";
+    case "eintritt_nach_austritt":
+    case "austritt_offene_vertraege":
+      return m.austritt ? `Austritt ${formatDate(m.austritt)}` : "";
     default:
       return m.ort ?? "";
   }
