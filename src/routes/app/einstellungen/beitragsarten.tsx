@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
+import { QueryError } from "~/components/ui/query-error";
 import { formatCurrency } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -261,6 +262,12 @@ function BeitragsartenSettingsPage() {
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="size-4 animate-spin" /> Wird geladen…
                     </span>
+                  </td>
+                </tr>
+              ) : list.isError ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-6">
+                    <QueryError onRetry={() => list.refetch()} />
                   </td>
                 </tr>
               ) : !list.data || list.data.length === 0 ? (

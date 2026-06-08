@@ -439,7 +439,7 @@ function CamtImport({ onDone }: { onDone: () => void }) {
         </div>
 
         {warnings.length > 0 ? (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+          <div className="rounded-lg border border-warning/40 bg-warning/5 p-3 text-sm">
             {warnings.map((w) => (
               <div key={w}>{w}</div>
             ))}

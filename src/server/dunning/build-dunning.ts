@@ -463,6 +463,8 @@ export async function loadGuardianConnections(
       tPlz: membersTable.plz,
       tOrt: membersTable.ort,
       tEmail: membersTable.email,
+      tDeletedAt: membersTable.deletedAt,
+      tStatus: membersTable.status,
     })
     .from(relationshipsTable)
     .leftJoin(membersTable, eq(membersTable.id, relationshipsTable.toMemberId))
@@ -475,20 +477,25 @@ export async function loadGuardianConnections(
 
   for (const r of rows) {
     if (out.has(r.fromMemberId)) continue; // first flag wins
+    // A linked guardian only contributes data while still an active member.
+    // A soft-deleted or deceased member must not receive a minor's Mahnung at
+    // their stale address/email, so we ignore the member side and fall back to
+    // the relationship's own fields (or skip the guardian entirely).
+    const linkedUsable = !!r.toMemberId && r.tDeletedAt == null && r.tStatus !== "verstorben";
     const name =
-      [r.tVorname, r.tNachname].filter(Boolean).join(" ").trim() ||
+      (linkedUsable ? [r.tVorname, r.tNachname].filter(Boolean).join(" ").trim() : "") ||
       (r.relName ?? r.relNachname ?? "").trim();
     if (!name) continue;
     // A linked member contributes its own email; an external contact carries
     // the relationship's email field.
-    const email = (r.toMemberId ? cleanEmail(r.tEmail) : null) ?? cleanEmail(r.relEmail);
+    const email = (linkedUsable ? cleanEmail(r.tEmail) : null) ?? cleanEmail(r.relEmail);
     out.set(r.fromMemberId, {
-      anrede: r.tAnrede ?? r.relAnrede ?? null,
+      anrede: (linkedUsable ? r.tAnrede : null) ?? r.relAnrede ?? null,
       name,
-      strasse: r.toMemberId ? r.tStrasse : null,
-      hausnummer: r.toMemberId ? r.tHausnummer : null,
-      plz: r.toMemberId ? r.tPlz : null,
-      ort: r.toMemberId ? r.tOrt : null,
+      strasse: linkedUsable ? r.tStrasse : null,
+      hausnummer: linkedUsable ? r.tHausnummer : null,
+      plz: linkedUsable ? r.tPlz : null,
+      ort: linkedUsable ? r.tOrt : null,
       email,
     });
   }

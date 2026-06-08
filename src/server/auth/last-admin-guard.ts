@@ -79,9 +79,10 @@ export async function guardAdminPluginRequest(request: Request): Promise<Respons
   if (typeof targetUserId !== "string") return null;
 
   // set-role specifically: only flag when the *new* role is not admin.
+  // better-auth accepts `role` as a string or string[], so normalize both.
   if (match.action === "demote") {
-    const newRole = body.role;
-    if (newRole === "admin") return null;
+    const roles = Array.isArray(body.role) ? body.role : [body.role];
+    if (roles.includes("admin")) return null;
   }
   // set-user-banned: only flag when the request actually bans (banned=true).
   if (match.action === "ban") {

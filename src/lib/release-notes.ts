@@ -41,6 +41,47 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.26.1",
+    date: "2026-06-08",
+    title: "Korrekturen und Feinschliff",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Mahnungen für Minderjährige gehen nicht mehr an einen gelöschten oder verstorbenen gesetzlichen Vertreter. Die Anschrift fällt dann auf das Mitglied selbst zurück.",
+      },
+      {
+        category: "fix",
+        description:
+          "Der Beitragslauf bricht mit klarer Meldung ab, wenn die Vereins-BIC fehlt, statt eine SEPA-Datei zu erzeugen, die die Bank ablehnt.",
+      },
+      {
+        category: "fix",
+        description:
+          "Die DSGVO-Löschfrist berücksichtigt jetzt auch Posten aus Beitragsläufen. So werden steuerlich aufzubewahrende Daten nicht zu früh gelöscht.",
+      },
+      {
+        category: "fix",
+        description:
+          "Die Anmeldung im Mitgliederportal setzt das Sitzungscookie hinter dem Server-Proxy wieder als Secure.",
+      },
+      {
+        category: "fix",
+        description:
+          "Die Liste der Beitragsarten zeigt bei einem Ladefehler eine Fehlermeldung mit Wiederholen statt fälschlich 'Noch keine Beitragsarten'.",
+      },
+      {
+        category: "fix",
+        description: "Im Portal lässt sich kein leerer Änderungsvorschlag mehr absenden.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Warnhinweise beim Zahlungsabgleich und bei Rücklastschriften nutzen die einheitliche Warnfarbe und passen sich dem Dunkelmodus an.",
+      },
+    ],
+  },
+  {
     version: "0.26.0",
     date: "2026-06-08",
     title: "Beitragslauf und Rücklastschriften",

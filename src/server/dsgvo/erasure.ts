@@ -6,7 +6,7 @@ import { auditLogTable } from "~/server/db/schema/audit";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { dsgvoRequestsTable } from "~/server/db/schema/dsgvo";
 import { dunningItemsTable } from "~/server/db/schema/dunning";
-import { sollStellungenTable } from "~/server/db/schema/fee-runs";
+import { feeRunItemsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { memberSourceRecordsTable } from "~/server/db/schema/member-source-records";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
@@ -44,11 +44,17 @@ async function lastFinancialEventAt(db: DBOrTx, memberId: string): Promise<Date 
     .select({ ts: sql<Date | null>`max(${sollStellungenTable.createdAt})` })
     .from(sollStellungenTable)
     .where(eq(sollStellungenTable.memberId, memberId));
+  const [itemRow] = await db
+    .select({ ts: sql<Date | null>`max(${feeRunItemsTable.createdAt})` })
+    .from(feeRunItemsTable)
+    .where(eq(feeRunItemsTable.memberId, memberId));
   const [sepaRow] = await db
     .select({ ts: sql<Date | null>`max(${sepaMandatesTable.letzteVerwendung})` })
     .from(sepaMandatesTable)
     .where(eq(sepaMandatesTable.memberId, memberId));
-  const candidates = [feeRow?.ts ?? null, sepaRow?.ts ?? null].filter((v): v is Date => v != null);
+  const candidates = [feeRow?.ts ?? null, itemRow?.ts ?? null, sepaRow?.ts ?? null].filter(
+    (v): v is Date => v != null,
+  );
   if (candidates.length === 0) return null;
   return candidates.reduce((a, b) => (a > b ? a : b));
 }

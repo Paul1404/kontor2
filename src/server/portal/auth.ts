@@ -234,6 +234,17 @@ export function clearPortalCookieHeader(isSecure: boolean): string {
   return parts.join("; ");
 }
 
+/**
+ * Whether the public connection is HTTPS. Behind a TLS-terminating proxy
+ * (Railway) the request reaches the app over plain HTTP, so `url.protocol` is
+ * `http:` even on a secure public connection. Trust `x-forwarded-proto` so the
+ * portal session cookie keeps its `Secure` attribute in production.
+ */
+export function isSecureRequest(request: Request): boolean {
+  if (request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() === "https") return true;
+  return new URL(request.url).protocol === "https:";
+}
+
 export function getPortalCookieFromHeaders(headers: Headers): string | null {
   const cookie = headers.get("cookie");
   if (!cookie) return null;

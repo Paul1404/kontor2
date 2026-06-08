@@ -103,6 +103,14 @@ function PortalProfilePage() {
     );
   }
 
+  // Mirror the payload-building comparison so the button only enables when an
+  // actual change would be submitted. Avoids empty "0 Feld(er)" proposals that
+  // the Vorstand then has to triage.
+  const dirtyCount = FIELDS.reduce((n, f) => {
+    const original = (me.data?.member?.[f.key] as string | null | undefined) ?? "";
+    return original !== form[f.key] ? n + 1 : n;
+  }, 0);
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -151,7 +159,7 @@ function PortalProfilePage() {
             </p>
           </div>
         </div>
-        <Button onClick={() => submit.mutate()} disabled={submit.isPending}>
+        <Button onClick={() => submit.mutate()} disabled={submit.isPending || dirtyCount === 0}>
           <Save className="size-4" /> Vorschlag absenden
         </Button>
       </div>
