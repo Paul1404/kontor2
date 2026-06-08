@@ -15,6 +15,25 @@ export function orEmpty(value: string | number | null | undefined): string {
   return s === "" ? EMPTY_VALUE : s;
 }
 
+/**
+ * Tidy a free-form phone number for display: trim and collapse runs of
+ * whitespace to a single space. Deliberately non-destructive (no regrouping of
+ * digits, since German area-code lengths vary), so a stored "0123  /  456" just
+ * reads as "0123 / 456". Returns null for empty input.
+ */
+export function formatPhone(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const s = value.trim().replace(/\s+/g, " ");
+  return s === "" ? null : s;
+}
+
+/** `tel:` href for a phone number, or null if there are too few digits. */
+export function telHref(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const cleaned = value.replace(/[^\d+]/g, "");
+  return cleaned.replace(/\D/g, "").length >= 3 ? `tel:${cleaned}` : null;
+}
+
 // All dates are stored as UTC midnight (Drizzle date columns + our
 // ingestion path normalize to that). Render them pinned to the club's
 // timezone so a date typed in as 2020-01-15 always shows as 15.01.2020,

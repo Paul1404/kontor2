@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
+import { SkeletonText } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { orpc } from "~/lib/orpc";
 
@@ -90,7 +91,7 @@ function PortalProfilePage() {
   });
 
   if (me.isLoading) {
-    return <p className="text-sm text-muted-foreground">Wird geladen…</p>;
+    return <SkeletonText lines={5} className="max-w-md" />;
   }
   if (!me.data?.member) {
     return (

@@ -65,6 +65,16 @@ export const RELEASES: Release[] = [
         description:
           "Kleinere Verbesserungen: einheitliche Auslassungspunkte, beschriftete Symbolschaltflächen für Screenreader und korrekte Bindestriche in der Bestandserhebung.",
       },
+      {
+        category: "improvement",
+        description:
+          "SEPA-Rückläufer zeigen den Rückgabegrund im Klartext, zum Beispiel AM04: Konto ohne Deckung, statt nur den Code.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Ladeanzeigen auf den Forderungs- und Portalseiten nutzen einheitliche Platzhalter, Telefonnummern werden sauberer dargestellt und der Mandatswiderruf nutzt den gestylten Bestätigungsdialog.",
+      },
     ],
   },
   {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isKeineAbteilung, KEINE_ABTEILUNG_NAME } from "./abteilung-filter";
+import { isKeineAbteilung, KEINE_ABTEILUNG_NAME } from "~/lib/abteilung-filter";
 
 describe("isKeineAbteilung", () => {
   it("matches the common Linear spellings of the no-department sentinel", () => {

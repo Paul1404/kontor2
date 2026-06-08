@@ -9,6 +9,7 @@ import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
+import { SkeletonText } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "~/components/ui/toaster";
 import { triggerDownloadBase64 } from "~/lib/download";
@@ -198,7 +199,7 @@ function KulanzPage() {
         </CardHeader>
         <CardContent>
           {preview.isLoading ? (
-            <p className="text-sm text-muted-foreground">Wird geladen…</p>
+            <SkeletonText lines={5} className="max-w-md" />
           ) : preview.isError ? (
             <QueryError onRetry={() => preview.refetch()} />
           ) : !preview.data || preview.data.items.length === 0 ? (

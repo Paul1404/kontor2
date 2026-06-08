@@ -41,7 +41,7 @@ import { toast } from "~/components/ui/toaster";
 import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/audit-labels";
 import { formatLand } from "~/lib/country";
 import { triggerDownload } from "~/lib/download";
-import { EMPTY_VALUE, formatCurrency, formatDate, formatDateTime } from "~/lib/format";
+import { EMPTY_VALUE, formatCurrency, formatDate, formatDateTime, formatPhone } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 import { usePageShortcut } from "~/lib/use-global-shortcuts";
 import { useRecentMembers } from "~/lib/use-recent-members";
@@ -434,13 +434,13 @@ function MemberDetailPage() {
                 <Field label="Land" value={formatLand(member.land)} />
                 <Field
                   label="Telefon"
-                  value={member.telefon1}
+                  value={formatPhone(member.telefon1)}
                   copyValue={member.telefon1}
                   href={buildTelHref(member.telefon1)}
                 />
                 <Field
                   label="Mobil"
-                  value={member.telefon2}
+                  value={formatPhone(member.telefon2)}
                   copyValue={member.telefon2}
                   href={buildTelHref(member.telefon2)}
                 />

@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { InfoBox } from "~/components/ui/info-box";
 import { QueryError } from "~/components/ui/query-error";
+import { SkeletonText } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
@@ -195,7 +196,7 @@ function ForderungenPage() {
         </CardHeader>
         <CardContent>
           {open.isLoading ? (
-            <p className="text-sm text-muted-foreground">Wird geladen…</p>
+            <SkeletonText lines={5} className="max-w-md" />
           ) : open.isError ? (
             <QueryError onRetry={() => open.refetch()} />
           ) : !open.data || open.data.members.length === 0 ? (
