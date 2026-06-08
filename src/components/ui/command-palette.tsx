@@ -7,6 +7,7 @@ import {
   FileBarChart,
   FileSpreadsheet,
   History,
+  Landmark,
   Layers,
   LayoutDashboard,
   Mail,
@@ -186,6 +187,12 @@ export function CommandPalette({ role }: { role: Role }) {
     enabled: open && trimmed.length >= 2,
     staleTime: 30_000,
   });
+  const entitySearch = useQuery({
+    queryKey: ["search.entities", trimmed],
+    queryFn: () => orpc.search.entities({ q: trimmed, limit: 6 }),
+    enabled: open && trimmed.length >= 2,
+    staleTime: 30_000,
+  });
 
   const filteredNav = useMemo(() => {
     const lowered = trimmed.toLowerCase();
@@ -197,11 +204,18 @@ export function CommandPalette({ role }: { role: Role }) {
   }, [trimmed, role]);
 
   const memberHits: MemberHit[] = (memberSearch.data?.rows as MemberHit[] | undefined) ?? [];
+  const contractHits = entitySearch.data?.contracts ?? [];
+  const mandateHits = entitySearch.data?.mandates ?? [];
+  // A single action to jump into the full audit log filtered by the query.
+  const auditActionCount = trimmed.length >= 2 ? 1 : 0;
 
   const navCount = filteredNav.length;
   const memberCount = memberHits.length;
+  const contractCount = contractHits.length;
+  const mandateCount = mandateHits.length;
   const recentCount = !trimmed ? Math.min(recent.length, 5) : 0;
-  const total = navCount + memberCount + recentCount;
+  const total =
+    navCount + memberCount + contractCount + mandateCount + auditActionCount + recentCount;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional — reset highlight whenever the query changes, even though setHighlight isn't itself derived from trimmed.
   useEffect(() => {
@@ -231,6 +245,36 @@ export function CommandPalette({ role }: { role: Role }) {
       return;
     }
     cursor -= memberCount;
+    if (cursor < contractCount) {
+      const hit = contractHits[cursor];
+      if (hit) {
+        setOpen(false);
+        navigate({
+          to: "/app/mitglieder/$mitgliedsnummer",
+          params: { mitgliedsnummer: hit.reference },
+        });
+      }
+      return;
+    }
+    cursor -= contractCount;
+    if (cursor < mandateCount) {
+      const hit = mandateHits[cursor];
+      if (hit) {
+        setOpen(false);
+        navigate({
+          to: "/app/mitglieder/$mitgliedsnummer",
+          params: { mitgliedsnummer: hit.reference },
+        });
+      }
+      return;
+    }
+    cursor -= mandateCount;
+    if (cursor < auditActionCount) {
+      setOpen(false);
+      navigate({ to: "/app/audit", search: () => ({ q: trimmed }) as never });
+      return;
+    }
+    cursor -= auditActionCount;
     if (cursor < recentCount) {
       const recentItem = recent[cursor];
       if (recentItem) {
@@ -279,7 +323,7 @@ export function CommandPalette({ role }: { role: Role }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKey}
-            placeholder="Mitglied suchen oder zu Seite navigieren…"
+            placeholder="Mitglieder, Verträge, Mandate oder Seite suchen…"
             className="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
@@ -289,7 +333,9 @@ export function CommandPalette({ role }: { role: Role }) {
         <div className="max-h-[60vh] overflow-y-auto p-2 scrollbar-thin">
           {total === 0 ? (
             <p className="px-3 py-4 text-sm text-muted-foreground">
-              {memberSearch.isLoading ? "Wird gesucht…" : "Keine Ergebnisse."}
+              {memberSearch.isLoading || entitySearch.isLoading
+                ? "Wird gesucht…"
+                : "Keine Ergebnisse."}
             </p>
           ) : (
             <>
@@ -327,6 +373,58 @@ export function CommandPalette({ role }: { role: Role }) {
                       />
                     );
                   })}
+                </Section>
+              ) : null}
+              {contractCount > 0 ? (
+                <Section label="Verträge">
+                  {contractHits.map((hit) => {
+                    const i = runningIndex++;
+                    return (
+                      <CommandItem
+                        key={hit.id}
+                        icon={<Coins className="size-4" />}
+                        label={`Vertrag ${hit.vertragNr}${hit.artName ? ` · ${hit.artName}` : ""}`}
+                        sublabel={`${hit.memberName} · #${hit.reference}`}
+                        active={i === highlight}
+                        onMouseEnter={() => setHighlight(i)}
+                        onClick={() => executeAt(i)}
+                      />
+                    );
+                  })}
+                </Section>
+              ) : null}
+              {mandateCount > 0 ? (
+                <Section label="SEPA-Mandate">
+                  {mandateHits.map((hit) => {
+                    const i = runningIndex++;
+                    return (
+                      <CommandItem
+                        key={hit.id}
+                        icon={<Landmark className="size-4" />}
+                        label={`Mandat ${hit.mandatsNr}`}
+                        sublabel={`${hit.memberName} · #${hit.reference}`}
+                        active={i === highlight}
+                        onMouseEnter={() => setHighlight(i)}
+                        onClick={() => executeAt(i)}
+                      />
+                    );
+                  })}
+                </Section>
+              ) : null}
+              {auditActionCount > 0 ? (
+                <Section label="Audit">
+                  {(() => {
+                    const i = runningIndex++;
+                    return (
+                      <CommandItem
+                        icon={<ScrollText className="size-4" />}
+                        label={`Im Audit-Log nach „${trimmed}" suchen`}
+                        active={i === highlight}
+                        onMouseEnter={() => setHighlight(i)}
+                        onClick={() => executeAt(i)}
+                      />
+                    );
+                  })()}
                 </Section>
               ) : null}
               {recentCount > 0 ? (

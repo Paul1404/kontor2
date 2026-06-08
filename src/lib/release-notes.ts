@@ -60,6 +60,11 @@ export const RELEASES: Release[] = [
         description:
           "Schnellbearbeitung in der Mitgliederliste: Status (aktiv/passiv) direkt am Eintrag umschalten und ein Mitglied per Klick einer Abteilung zuordnen, ohne die Detailseite zu öffnen.",
       },
+      {
+        category: "improvement",
+        description:
+          "Die Schnellsuche (Strg/Cmd K) findet jetzt auch Verträge und SEPA-Mandate und springt direkt zum zugehörigen Mitglied. Außerdem lässt sich der Suchbegriff mit einem Klick im Audit-Log nachschlagen.",
+      },
     ],
   },
   {
