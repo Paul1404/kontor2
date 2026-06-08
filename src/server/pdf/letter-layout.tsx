@@ -78,11 +78,10 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 2 },
   infoLabel: { fontSize: 8, color: "#666" },
   infoValue: { fontSize: 9, fontFamily: "Helvetica-Bold", textAlign: "right" },
-  // Textbereich: 25 mm left / 20 mm right margins. The lead spacer drops the
-  // first line to the DIN reference line (98,46 mm) on page 1 only; on the page
-  // padding (25 mm) carries continuation pages.
+  // Textbereich: 25 mm left / 20 mm right margins. A lead spacer drops the first
+  // line to `bodyStartMm` (DIN reference line 98,46 mm by default) on page 1
+  // only; on continuation pages the page padding (25 mm) carries the margin.
   body: { marginLeft: mm(25), marginRight: mm(20) },
-  lead: { height: mm(98.46) - mm(25) },
   subject: { fontFamily: "Helvetica-Bold", fontSize: 11, marginBottom: mm(6) },
   // Falz- und Lochmarken at the very left edge.
   foldMark: {
@@ -138,8 +137,19 @@ export type LetterPageProps = {
   subject: string;
   /** Fußzeilen-Text without the page number; the frame appends "Seite x/y". */
   footerText: string;
+  /**
+   * Vertical position (mm from the paper edge) of the first body line on page 1.
+   * Defaults to the DIN 5008 reference line at 98,46 mm. Content-heavy letters
+   * (e.g. the Kulanz cover page with table plus two boxes) may pass a smaller
+   * value to start a touch higher and stay a single page. The address window
+   * stays put either way, so a lower value never breaks the envelope fold.
+   */
+  bodyStartMm?: number;
   children: ReactNode;
 };
+
+/** DIN 5008 reference line for the first body line, in mm from the paper edge. */
+const DIN_REFERENCE_MM = 98.46;
 
 /**
  * One DIN 5008 letter page. Callers wrap one or more of these in a `<Document>`.
@@ -155,8 +165,10 @@ export function LetterPage({
   infoRows,
   subject,
   footerText,
+  bodyStartMm = DIN_REFERENCE_MM,
   children,
 }: LetterPageProps) {
+  const leadHeight = Math.max(0, mm(bodyStartMm) - mm(25));
   return (
     <Page size="A4" style={styles.page} wrap>
       <FoldAndHoleMarks />
@@ -186,7 +198,7 @@ export function LetterPage({
       </View>
 
       <View style={styles.body}>
-        <View style={styles.lead} />
+        <View style={{ height: leadHeight }} />
         <Text style={styles.subject}>{subject}</Text>
         {children}
       </View>
