@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.25.1",
+    date: "2026-06-08",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Fehlgeschlagene Server-Anfragen schreiben jetzt den tatsächlichen Grund ins Protokoll, nicht nur die Anfrage selbst. Datenbankfehler lassen sich damit ohne Rätselraten zuordnen.",
+      },
+    ],
+  },
+  {
     version: "0.25.0",
     date: "2026-06-08",
     changes: [
