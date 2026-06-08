@@ -99,7 +99,7 @@ function ReleaseSection({ release }: { release: Release }) {
     <section className="flex flex-col gap-3">
       <header className="flex items-baseline justify-between gap-3 border-b border-border/60 pb-1.5">
         <div className="flex items-baseline gap-2">
-          <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[12px] font-semibold tabular-nums text-primary">
+          <span className="rounded-md bg-primary px-2 py-0.5 text-[12px] font-semibold tabular-nums text-primary-foreground">
             {release.version}
           </span>
           {release.title ? <span className="text-sm font-medium">{release.title}</span> : null}

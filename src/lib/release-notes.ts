@@ -65,6 +65,16 @@ export const RELEASES: Release[] = [
         description:
           "Ein erfasster Rückläufer setzt die Mahnstufe der Sollstellung zurück. Die Mahnung beginnt damit wieder bei der Erinnerung statt auf der vorherigen Stufe.",
       },
+      {
+        category: "fix",
+        description:
+          "Die Versionsnummer in den Versionshinweisen war im hellen Modus schlecht lesbar. Sie steht jetzt als klar abgesetzte Plakette mit ausreichendem Kontrast.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Irgendwo in der App versteckt sich jetzt eine Kleinigkeit für neugierige Klicks.",
+      },
     ],
   },
   {

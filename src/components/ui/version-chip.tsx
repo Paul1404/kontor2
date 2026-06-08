@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { ReleaseNotesDialog } from "~/components/ui/release-notes-dialog";
 import { cn } from "~/lib/cn";
 import { CURRENT_VERSION, hasUnseenRelease } from "~/lib/release-notes";
@@ -19,6 +20,20 @@ export function VersionChip({
 }) {
   const [open, setOpen] = useState(false);
   const [unseen, setUnseen] = useState(false);
+  const navigate = useNavigate();
+  // Easter egg: seven rapid taps on the chip open the hidden schema museum.
+  const taps = useRef<number[]>([]);
+
+  function handleClick() {
+    const now = Date.now();
+    taps.current = [...taps.current.filter((t) => now - t < 2000), now];
+    if (taps.current.length >= 7) {
+      taps.current = [];
+      void navigate({ to: "/app/museum" });
+      return;
+    }
+    setOpen(true);
+  }
 
   useEffect(() => {
     setUnseen(hasUnseenRelease());
@@ -39,7 +54,7 @@ export function VersionChip({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleClick}
         className={cn(baseClasses, className)}
         aria-label="Versionshinweise öffnen"
       >
