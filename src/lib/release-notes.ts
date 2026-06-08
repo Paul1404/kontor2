@@ -60,6 +60,11 @@ export const RELEASES: Release[] = [
         description:
           "Der Kulanz-Brief weist jetzt auf jedem Schreiben die SEPA-Gebühr aus den Vereinsdaten als eigene Position aus und rechnet sie zum offenen Betrag hinzu. Beim Erlass aus Kulanz wird sie wieder abgezogen. Den Betrag pflegst du unter Einstellungen, Vereinsdaten.",
       },
+      {
+        category: "feature",
+        description:
+          "Neue Seite Datenqualität prüft den Bestand auf typische Lücken: Lastschrift ohne SEPA-Mandat oder IBAN, fehlende E-Mail oder Anschrift, Minderjährige ohne gesetzliche Vertretung, Verträge ohne Beitragsart, Austritte mit offenem Vertrag und mögliche Dubletten. Jeder Treffer verlinkt direkt zum Mitglied, die Anzahl offener Hinweise steht als Zähler in der Seitenleiste.",
+      },
     ],
   },
   {

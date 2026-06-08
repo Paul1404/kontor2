@@ -7,6 +7,7 @@ import { cancellationsRouter } from "~/server/orpc/procedures/cancellations";
 import { contractsRouter } from "~/server/orpc/procedures/contracts";
 import { dangerZoneRouter } from "~/server/orpc/procedures/danger-zone";
 import { dashboardRouter } from "~/server/orpc/procedures/dashboard";
+import { dataQualityRouter } from "~/server/orpc/procedures/data-quality";
 import { dsgvoRouter } from "~/server/orpc/procedures/dsgvo";
 import { dunningRouter } from "~/server/orpc/procedures/dunning";
 import { feeRunsRouter } from "~/server/orpc/procedures/fee-runs";
@@ -36,6 +37,7 @@ export const appRouter = {
   dunning: dunningRouter,
   kulanz: kulanzRouter,
   dashboard: dashboardRouter,
+  dataQuality: dataQualityRouter,
   audit: auditRouter,
   attachments: attachmentsRouter,
   banks: banksRouter,

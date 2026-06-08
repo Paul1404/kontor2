@@ -22,6 +22,7 @@ import { Route as PortalAbgelaufenRouteImport } from './portal/abgelaufen'
 import { Route as InviteTokenRouteImport } from './invite.$token'
 import { Route as AppPortalAnfragenRouteImport } from './app/portal-anfragen'
 import { Route as AppImportRouteImport } from './app/import'
+import { Route as AppDatenqualitaetRouteImport } from './app/datenqualitaet'
 import { Route as AppAuditRouteImport } from './app/audit'
 import { Route as ApiHealthRouteImport } from './api/health'
 import { Route as AppMitgliederIndexRouteImport } from './app/mitglieder/index'
@@ -123,6 +124,11 @@ const AppPortalAnfragenRoute = AppPortalAnfragenRouteImport.update({
 const AppImportRoute = AppImportRouteImport.update({
   id: '/import',
   path: '/import',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppDatenqualitaetRoute = AppDatenqualitaetRouteImport.update({
+  id: '/datenqualitaet',
+  path: '/datenqualitaet',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppAuditRoute = AppAuditRouteImport.update({
@@ -331,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
+  '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -381,6 +388,7 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
+  '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -434,6 +442,7 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
+  '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -488,6 +497,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/api/health'
     | '/app/audit'
+    | '/app/datenqualitaet'
     | '/app/import'
     | '/app/portal-anfragen'
     | '/invite/$token'
@@ -538,6 +548,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/api/health'
     | '/app/audit'
+    | '/app/datenqualitaet'
     | '/app/import'
     | '/app/portal-anfragen'
     | '/invite/$token'
@@ -590,6 +601,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/api/health'
     | '/app/audit'
+    | '/app/datenqualitaet'
     | '/app/import'
     | '/app/portal-anfragen'
     | '/invite/$token'
@@ -743,6 +755,13 @@ declare module '@tanstack/react-router' {
       path: '/import'
       fullPath: '/app/import'
       preLoaderRoute: typeof AppImportRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/datenqualitaet': {
+      id: '/app/datenqualitaet'
+      path: '/datenqualitaet'
+      fullPath: '/app/datenqualitaet'
+      preLoaderRoute: typeof AppDatenqualitaetRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/audit': {
@@ -1009,6 +1028,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
+  AppDatenqualitaetRoute: typeof AppDatenqualitaetRoute
   AppImportRoute: typeof AppImportRoute
   AppPortalAnfragenRoute: typeof AppPortalAnfragenRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -1044,6 +1064,7 @@ interface AppRouteRouteChildren {
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAuditRoute: AppAuditRoute,
+  AppDatenqualitaetRoute: AppDatenqualitaetRoute,
   AppImportRoute: AppImportRoute,
   AppPortalAnfragenRoute: AppPortalAnfragenRoute,
   AppIndexRoute: AppIndexRoute,
