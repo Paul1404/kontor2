@@ -5,6 +5,7 @@ import { portalSessionsTable } from "~/server/db/schema/portal";
 import {
   clearPortalCookieHeader,
   getPortalCookieFromHeaders,
+  isSecureRequest,
   resolvePortalSession,
 } from "~/server/portal/auth";
 
@@ -17,7 +18,7 @@ async function handle({ request }: { request: Request }) {
       .set({ revokedAt: new Date() })
       .where(eq(portalSessionsTable.id, session.sessionId));
   }
-  const isSecure = new URL(request.url).protocol === "https:";
+  const isSecure = isSecureRequest(request);
   return new Response(null, {
     status: 302,
     headers: {

@@ -170,6 +170,7 @@ export function EhrungenCard({ memberId, canEdit }: { memberId: string; canEdit:
                       size="sm"
                       onClick={() => urkunde.mutate(e.id)}
                       disabled={urkunde.isPending}
+                      aria-label="Ehrenurkunde erzeugen und herunterladen"
                       title="Ehrenurkunde erzeugen und herunterladen"
                     >
                       {urkunde.isPending && urkunde.variables === e.id ? (
@@ -185,6 +186,7 @@ export function EhrungenCard({ memberId, canEdit }: { memberId: string; canEdit:
                       type="button"
                       onClick={() => remove.mutate(e.id)}
                       className="rounded p-1 text-muted-foreground hover:text-destructive"
+                      aria-label="Löschen"
                       title="Löschen"
                     >
                       <Trash2 className="size-4" />

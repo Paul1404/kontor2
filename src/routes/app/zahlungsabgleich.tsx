@@ -125,7 +125,7 @@ function ZahlungsabgleichPage() {
       </Card>
 
       {warnings.length > 0 ? (
-        <Card className="border-amber-500/40 bg-amber-500/5">
+        <Card className="border-warning/40 bg-warning/5">
           <CardContent className="p-4 text-sm">
             {warnings.map((w) => (
               <div key={w}>{w}</div>

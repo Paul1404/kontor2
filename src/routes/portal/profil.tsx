@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
+import { SkeletonText } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { orpc } from "~/lib/orpc";
 
@@ -90,7 +91,7 @@ function PortalProfilePage() {
   });
 
   if (me.isLoading) {
-    return <p className="text-sm text-muted-foreground">Wird geladen...</p>;
+    return <SkeletonText lines={5} className="max-w-md" />;
   }
   if (!me.data?.member) {
     return (
@@ -102,6 +103,14 @@ function PortalProfilePage() {
       </p>
     );
   }
+
+  // Mirror the payload-building comparison so the button only enables when an
+  // actual change would be submitted. Avoids empty "0 Feld(er)" proposals that
+  // the Vorstand then has to triage.
+  const dirtyCount = FIELDS.reduce((n, f) => {
+    const original = (me.data?.member?.[f.key] as string | null | undefined) ?? "";
+    return original !== form[f.key] ? n + 1 : n;
+  }, 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -151,7 +160,7 @@ function PortalProfilePage() {
             </p>
           </div>
         </div>
-        <Button onClick={() => submit.mutate()} disabled={submit.isPending}>
+        <Button onClick={() => submit.mutate()} disabled={submit.isPending || dirtyCount === 0}>
           <Save className="size-4" /> Vorschlag absenden
         </Button>
       </div>

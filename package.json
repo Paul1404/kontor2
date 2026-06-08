@@ -1,7 +1,9 @@
 {
   "name": "svuwv",
-  "version": "0.26.0",
+  "version": "0.28.0",
   "private": true,
+  "license": "UNLICENSED",
+  "author": "Paul Dresch <paul.dresch@untereuerheim.com>",
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3000",

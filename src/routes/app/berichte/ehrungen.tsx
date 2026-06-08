@@ -11,7 +11,7 @@ import { toast } from "~/components/ui/toaster";
 import { triggerDownloadBase64 } from "~/lib/download";
 import { STANDARD_JUBILAEEN } from "~/lib/ehrungen";
 import { exportCsvFile } from "~/lib/export";
-import { formatDate } from "~/lib/format";
+import { EMPTY_VALUE, formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
@@ -225,7 +225,9 @@ function EhrungenPage() {
                           <td className="px-4 py-3 font-medium">
                             {[m.nachname, m.vorname].filter(Boolean).join(", ")}
                           </td>
-                          <td className="px-4 py-3 text-muted-foreground">{m.ort ?? ""}</td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {m.ort || EMPTY_VALUE}
+                          </td>
                           <td className="px-4 py-3 tabular-nums">{formatDate(m.eintritt)}</td>
                           <td className="px-4 py-3 tabular-nums">
                             {formatDate(m.jubilaeumsDatum)}

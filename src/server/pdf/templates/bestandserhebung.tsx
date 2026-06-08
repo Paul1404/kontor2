@@ -153,12 +153,12 @@ const AGE_LABELS: ReadonlyArray<{
   bucket: "0-6" | "7-14" | "15-18" | "19-26" | "27-40" | "41-60" | "61+" | "unbekannt";
   label: string;
 }> = [
-  { bucket: "0-6", label: "0–6" },
-  { bucket: "7-14", label: "7–14" },
-  { bucket: "15-18", label: "15–18" },
-  { bucket: "19-26", label: "19–26" },
-  { bucket: "27-40", label: "27–40" },
-  { bucket: "41-60", label: "41–60" },
+  { bucket: "0-6", label: "0-6" },
+  { bucket: "7-14", label: "7-14" },
+  { bucket: "15-18", label: "15-18" },
+  { bucket: "19-26", label: "19-26" },
+  { bucket: "27-40", label: "27-40" },
+  { bucket: "41-60", label: "41-60" },
   { bucket: "61+", label: "61+" },
   { bucket: "unbekannt", label: "unbek." },
 ];

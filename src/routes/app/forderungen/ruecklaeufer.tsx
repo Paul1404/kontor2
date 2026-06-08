@@ -18,25 +18,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
+import { SkeletonText } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
+import { SEPA_RETURN_REASON_OPTIONS, sepaReturnReasonLabel } from "~/lib/sepa-reason";
 
 export const Route = createFileRoute("/app/forderungen/ruecklaeufer")({
   component: RuecklaeuferPage,
 });
-
-const REASON_OPTIONS = [
-  { code: "AM04", label: "AM04: Konto ohne Deckung" },
-  { code: "MD06", label: "MD06: Erstattung vom Schuldner verlangt" },
-  { code: "AC04", label: "AC04: Konto geschlossen" },
-  { code: "AC06", label: "AC06: Konto gesperrt" },
-  { code: "MS02", label: "MS02: Widerspruch durch Schuldner" },
-  { code: "MS03", label: "MS03: kein Grund angegeben" },
-  { code: "MD01", label: "MD01: kein gültiges Mandat" },
-  { code: "RR01", label: "RR01: Name/Anschrift fehlt" },
-];
 
 function RuecklaeuferPage() {
   const qc = useQueryClient();
@@ -113,7 +104,7 @@ function RuecklaeuferPage() {
         </CardHeader>
         <CardContent>
           {list.isLoading ? (
-            <p className="text-sm text-muted-foreground">Wird geladen...</p>
+            <SkeletonText lines={5} className="max-w-md" />
           ) : list.isError ? (
             <QueryError onRetry={() => list.refetch()} />
           ) : !list.data || list.data.rows.length === 0 ? (
@@ -134,7 +125,14 @@ function RuecklaeuferPage() {
                       <span className="text-xs text-muted-foreground tabular-nums">
                         #{memberRef(r)}
                       </span>
-                      {r.reasonCode ? <Badge variant="warning">{r.reasonCode}</Badge> : null}
+                      {r.reasonCode ? (
+                        <Badge
+                          variant="warning"
+                          title={sepaReturnReasonLabel(r.reasonCode) ?? undefined}
+                        >
+                          {r.reasonCode}
+                        </Badge>
+                      ) : null}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Beitragsjahr {r.billingYear} · zurückgegeben {formatDate(r.returnedOn)} ·
@@ -250,7 +248,9 @@ function CreateForm({ onDone }: { onDone: () => void }) {
               </div>
               <div className="max-h-72 overflow-y-auto rounded-lg border">
                 {candidates.isLoading ? (
-                  <p className="p-3 text-sm text-muted-foreground">Wird geladen...</p>
+                  <div className="p-3">
+                    <SkeletonText lines={3} />
+                  </div>
                 ) : !candidates.data || candidates.data.length === 0 ? (
                   <p className="p-3 text-sm text-muted-foreground">Keine offenen Lastschriften.</p>
                 ) : (
@@ -298,7 +298,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
               className="h-9 rounded-lg border border-input bg-card px-3 text-sm shadow-soft"
             >
               <option value="">(kein Code)</option>
-              {REASON_OPTIONS.map((o) => (
+              {SEPA_RETURN_REASON_OPTIONS.map((o) => (
                 <option key={o.code} value={o.code}>
                   {o.label}
                 </option>
@@ -439,7 +439,7 @@ function CamtImport({ onDone }: { onDone: () => void }) {
         </div>
 
         {warnings.length > 0 ? (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+          <div className="rounded-lg border border-warning/40 bg-warning/5 p-3 text-sm">
             {warnings.map((w) => (
               <div key={w}>{w}</div>
             ))}
@@ -501,7 +501,12 @@ function CamtImport({ onDone }: { onDone: () => void }) {
                         </td>
                         <td className="px-3 py-2">
                           {r.reasonCode ? (
-                            <Badge variant="warning">{r.reasonCode}</Badge>
+                            <Badge
+                              variant="warning"
+                              title={sepaReturnReasonLabel(r.reasonCode) ?? undefined}
+                            >
+                              {r.reasonCode}
+                            </Badge>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
                           )}

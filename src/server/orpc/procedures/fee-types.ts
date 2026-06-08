@@ -1,9 +1,10 @@
 import { ORPCError } from "@orpc/server";
-import { asc, count, eq, sql } from "drizzle-orm";
+import { and, asc, count, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { withUniqueRetry } from "~/server/db/retry";
 import { contractsTable } from "~/server/db/schema/contracts";
+import { feeTypePriceHistoryTable } from "~/server/db/schema/fee-type-history";
 import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { adminProc, authedProc } from "~/server/orpc/base";
 import { CACHE_NS, cached, invalidateFeeTypeCaches } from "~/server/search/cache";
@@ -203,5 +204,104 @@ export const feeTypesRouter = {
       });
       await invalidateFeeTypeCaches();
       return { ok: true };
+    }),
+
+  /**
+   * Merge a junk/duplicate Beitragsart into a target one: every contract on the
+   * source `art` is reassigned to the target, the source price history is
+   * dropped, and the source fee type is deleted. This is the supported way to
+   * remove a legacy duplicate (e.g. "Erwachsene doppelt") that the plain delete
+   * refuses because contracts still reference it.
+   */
+  merge: adminProc
+    .input(
+      v.object({
+        fromArt: v.pipe(v.number(), v.integer()),
+        toArt: v.pipe(v.number(), v.integer()),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      if (input.fromArt === input.toArt) {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: "Quelle und Ziel müssen unterschiedlich sein.",
+        });
+      }
+      const result = await context.db.transaction(async (tx) => {
+        const [from] = await tx
+          .select()
+          .from(feeTypesTable)
+          .where(eq(feeTypesTable.art, input.fromArt))
+          .limit(1);
+        if (!from) {
+          throw new ORPCError("NOT_FOUND", { message: "Quell-Beitragsart nicht gefunden." });
+        }
+        const [to] = await tx
+          .select()
+          .from(feeTypesTable)
+          .where(eq(feeTypesTable.art, input.toArt))
+          .limit(1);
+        if (!to) {
+          throw new ORPCError("NOT_FOUND", { message: "Ziel-Beitragsart nicht gefunden." });
+        }
+
+        // A contract is keyed by (adr_nr, vertrag_nr, art). If a member already
+        // has a contract under the target art with the same vertrag_nr, moving
+        // the source contract would violate that unique index. Surface the
+        // conflict up front instead of failing mid-merge.
+        const [collision] = await tx
+          .select({ c: count() })
+          .from(contractsTable)
+          .where(
+            and(
+              eq(contractsTable.art, input.fromArt),
+              sql`exists (select 1 from contracts other where other.art = ${input.toArt}
+                and other.adr_nr = ${contractsTable.adrNr}
+                and other.vertrag_nr = ${contractsTable.vertragNr})`,
+            ),
+          );
+        if ((collision?.c ?? 0) > 0) {
+          throw new ORPCError("CONFLICT", {
+            message: `${collision?.c} Vertrag/Verträge existieren bereits unter der Ziel-Beitragsart. Bitte diese zuerst manuell bereinigen.`,
+          });
+        }
+
+        const moved = await tx
+          .update(contractsTable)
+          .set({
+            art: input.toArt,
+            // Refresh the denormalized name snapshot to the target, but keep the
+            // existing value if the target has no Bezeichnung.
+            artName: sql`coalesce(${to.bezeichnung}, ${contractsTable.artName})`,
+            updatedAt: new Date(),
+          })
+          .where(eq(contractsTable.art, input.fromArt))
+          .returning({ id: contractsTable.id });
+
+        await tx
+          .delete(feeTypePriceHistoryTable)
+          .where(eq(feeTypePriceHistoryTable.art, input.fromArt));
+        await tx.delete(feeTypesTable).where(eq(feeTypesTable.art, input.fromArt));
+
+        await appendAudit(tx, {
+          entityType: "fee_type",
+          entityId: String(input.fromArt),
+          // No dedicated "merge" audit action exists; the source is deleted, so
+          // record a delete and carry the merge target + count as synthetic keys.
+          action: "delete",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            ...diff(from as unknown as Record<string, unknown>, {}),
+            __mergedInto: { before: null, after: input.toArt },
+            __reassignedContracts: { before: null, after: moved.length },
+          },
+          requestId: context.requestId ?? null,
+        });
+
+        return { reassigned: moved.length, fromArt: input.fromArt, toArt: input.toArt };
+      });
+      await invalidateFeeTypeCaches();
+      return result;
     }),
 };

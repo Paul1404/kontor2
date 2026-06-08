@@ -186,6 +186,14 @@ export const feeRunsRouter = {
         message: "Vereins-IBAN ist nicht hinterlegt.",
       });
     }
+    // A blank creditor BIC produces `<BIC></BIC>` in the pain.008 and the bank
+    // rejects the whole file on upload, after the run is already committed.
+    // Fail before booking anything.
+    if (!org.vereinsBic?.trim()) {
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: "Vereins-BIC ist nicht hinterlegt.",
+      });
+    }
 
     // Bulk-load all mandate metadata up-front. With ~500 active debits,
     // doing this once is dramatically faster than one select-per-candidate

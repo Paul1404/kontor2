@@ -4,9 +4,10 @@ import { useId, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { formatDate, toDateInput } from "~/lib/format";
+import { EMPTY_VALUE, formatDate, toDateInput } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 type Mandate = {
@@ -43,13 +44,18 @@ export function SepaCard({
   // Per-row pending state so revoking one mandate doesn't spin the icon
   // on every other row in the list.
   const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
+  const [confirmRevoke, setConfirmRevoke] = useState<Mandate | null>(null);
   const revoke = useMutation({
     mutationFn: (id: string) => orpc.sepa.revoke({ id }),
     onSuccess: async () => {
       setPendingRevokeId(null);
+      setConfirmRevoke(null);
       await refresh();
     },
-    onError: () => setPendingRevokeId(null),
+    onError: () => {
+      setPendingRevokeId(null);
+      setConfirmRevoke(null);
+    },
   });
 
   return (
@@ -97,7 +103,7 @@ export function SepaCard({
                   </span>
                   <span className="tabular-nums font-medium">{s.mandatsNr}</span>
                   <span className="text-xs text-muted-foreground">
-                    {s.lastschriftart ?? ""} {s.typ ? `· ${s.typ}` : ""}
+                    {[s.lastschriftart, s.typ].filter(Boolean).join(" · ")}
                   </span>
                   {s.letzteVerwendung ? (
                     <span className="text-xs text-muted-foreground">
@@ -107,7 +113,7 @@ export function SepaCard({
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={s.widerrufenAm || s.isDeleted ? "warning" : "outline"}>
-                    {s.widerrufenAm || s.isDeleted ? "Widerrufen" : (s.status ?? "?")}
+                    {s.widerrufenAm || s.isDeleted ? "Widerrufen" : (s.status ?? EMPTY_VALUE)}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
                     gültig ab {formatDate(s.gueltigAb)}
@@ -119,6 +125,7 @@ export function SepaCard({
                         variant="ghost"
                         onClick={() => setEditTarget(s)}
                         disabled={pendingRevokeId === s.id}
+                        aria-label="Mandat bearbeiten"
                         title="Mandat bearbeiten"
                       >
                         <Pencil className="size-4" />
@@ -126,17 +133,9 @@ export function SepaCard({
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `SEPA-Mandat ${s.mandatsNr} widerrufen? Es kann danach nicht mehr für Lastschriften verwendet werden.`,
-                            )
-                          ) {
-                            setPendingRevokeId(s.id);
-                            revoke.mutate(s.id);
-                          }
-                        }}
+                        onClick={() => setConfirmRevoke(s)}
                         disabled={pendingRevokeId === s.id}
+                        aria-label="Mandat widerrufen"
                         title="Mandat widerrufen"
                       >
                         {pendingRevokeId === s.id ? (
@@ -153,6 +152,26 @@ export function SepaCard({
           </ul>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={confirmRevoke !== null}
+        onOpenChange={(o) => {
+          if (!o && !revoke.isPending) setConfirmRevoke(null);
+        }}
+        title="SEPA-Mandat widerrufen?"
+        description={
+          confirmRevoke
+            ? `Mandat ${confirmRevoke.mandatsNr} kann danach nicht mehr für Lastschriften verwendet werden.`
+            : undefined
+        }
+        confirmLabel="Widerrufen"
+        destructive
+        loading={revoke.isPending}
+        onConfirm={() => {
+          if (!confirmRevoke) return;
+          setPendingRevokeId(confirmRevoke.id);
+          revoke.mutate(confirmRevoke.id);
+        }}
+      />
     </Card>
   );
 }

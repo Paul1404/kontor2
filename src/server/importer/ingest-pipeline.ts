@@ -1,4 +1,5 @@
 import { eq, inArray, or, sql } from "drizzle-orm";
+import { isKeineAbteilung, KEINE_ABTEILUNG_NAME } from "~/lib/abteilung-filter";
 import { appendAudit, diff } from "~/server/audit/log";
 import type { DB } from "~/server/db/client";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
@@ -360,8 +361,12 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
           },
         });
 
-      // 2b. Abteilungen many-to-many derivation from the Linear string.
-      const names = splitAbteilung((row as Record<string, unknown>).abteilung as string | null);
+      // 2b. Abteilungen many-to-many derivation from the Linear string. A
+      // "Keine-Abteilung" token maps to the canonical "Keine Abteilung"
+      // department, same as the `interes` path below.
+      const names = splitAbteilung((row as Record<string, unknown>).abteilung as string | null).map(
+        (n) => (isKeineAbteilung(n) ? KEINE_ABTEILUNG_NAME : n),
+      );
       for (const name of names) {
         let aid = abteilungByName.get(name.toLowerCase());
         if (!aid) {
@@ -589,10 +594,11 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
         if (!mapped) continue;
         const memberId = adrNrToMemberId.get(mapped.adrNr);
         if (!memberId) continue;
-        const name = interNrToName.get(mapped.interesNr);
-        if (!name) continue;
-        // Linear's "no abteilung" sentinel.
-        if (/keine[-\s]?abteilung/i.test(name)) continue;
+        const rawName = interNrToName.get(mapped.interesNr);
+        if (!rawName) continue;
+        // Linear's "no abteilung" sentinel maps to a real "Keine Abteilung"
+        // department so those members stay findable instead of being dropped.
+        const name = isKeineAbteilung(rawName) ? KEINE_ABTEILUNG_NAME : rawName;
 
         let aid = abteilungByName.get(name.toLowerCase());
         if (!aid) {

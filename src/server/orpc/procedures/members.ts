@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { ABTEILUNG_NONE_FILTER } from "~/lib/abteilung-filter";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
 import { escapeLike } from "~/server/db/like";
@@ -354,7 +355,17 @@ export const membersRouter = {
     }
 
     let memberIdsByAbt: string[] | null = null;
-    if (input.abteilungId) {
+    if (input.abteilungId === ABTEILUNG_NONE_FILTER) {
+      // "Ohne Abteilung": members with no active department membership. Surfaces
+      // the Linear rows that carried no Abteilung (or only the "Keine-Abteilung"
+      // sentinel) so the office can find and fix them.
+      conditions.push(
+        sql`not exists (
+          select 1 from ${memberAbteilungenTable} ma
+          where ma.member_id = ${membersTable.id} and ma.austrittsdatum is null
+        )` as never,
+      );
+    } else if (input.abteilungId) {
       const rows = await context.db
         .select({ memberId: memberAbteilungenTable.memberId })
         .from(memberAbteilungenTable)
@@ -1010,6 +1021,9 @@ export const membersRouter = {
             type: v.literal("removeAbteilung"),
             abteilungId: v.pipe(v.string(), v.uuid()),
           }),
+          v.object({ type: v.literal("setDunningBlocked"), value: v.boolean() }),
+          v.object({ type: v.literal("setDirectDebitBlocked"), value: v.boolean() }),
+          v.object({ type: v.literal("softDelete") }),
         ]),
       }),
     )
@@ -1125,6 +1139,67 @@ export const membersRouter = {
                   after: { eintrittsdatum: today },
                 },
               },
+              requestId,
+            });
+            await takeMemberSnapshot(tx, memberId, {
+              trigger: "mutation",
+              actorId,
+              actorEmail,
+              auditId,
+            });
+            changed += 1;
+          } else if (
+            input.action.type === "setDunningBlocked" ||
+            input.action.type === "setDirectDebitBlocked"
+          ) {
+            // Bulk toggle a member flag (Mahnsperre / Einzugsperre). Skip rows
+            // already in the desired state so `changed` reflects real work.
+            const column =
+              input.action.type === "setDunningBlocked" ? "dunningBlocked" : "directDebitBlocked";
+            const current =
+              column === "dunningBlocked" ? existing.dunningBlocked : existing.directDebitBlocked;
+            if (current === input.action.value) {
+              skipped += 1;
+              continue;
+            }
+            await tx
+              .update(membersTable)
+              .set({ [column]: input.action.value, updatedAt: new Date() } as never)
+              .where(eq(membersTable.id, memberId));
+            const auditId = await appendAudit(tx, {
+              entityType: "member",
+              entityId: memberId,
+              action: "update",
+              source: "ui",
+              actorId,
+              actorEmail,
+              changes: { [column]: { before: current, after: input.action.value } },
+              requestId,
+            });
+            await takeMemberSnapshot(tx, memberId, {
+              trigger: "mutation",
+              actorId,
+              actorEmail,
+              auditId,
+            });
+            changed += 1;
+          } else if (input.action.type === "softDelete") {
+            // Bulk move to the Papierkorb. Reversible via the per-member
+            // restore; already-deleted rows are filtered out by the select
+            // above, so reaching here always means a real transition.
+            const now = new Date();
+            await tx
+              .update(membersTable)
+              .set({ deletedAt: now, updatedAt: now } as never)
+              .where(eq(membersTable.id, memberId));
+            const auditId = await appendAudit(tx, {
+              entityType: "member",
+              entityId: memberId,
+              action: "delete",
+              source: "ui",
+              actorId,
+              actorEmail,
+              changes: { deletedAt: { before: null, after: now.toISOString() } },
               requestId,
             });
             await takeMemberSnapshot(tx, memberId, {

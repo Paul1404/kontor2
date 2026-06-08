@@ -118,7 +118,7 @@ function PortalRequestsPage() {
         </CardHeader>
         <CardContent>
           {list.isLoading ? (
-            <p className="text-sm text-muted-foreground">Wird geladen...</p>
+            <p className="text-sm text-muted-foreground">Wird geladen…</p>
           ) : list.isError ? (
             <QueryError onRetry={() => list.refetch()} />
           ) : !list.data || list.data.rows.length === 0 ? (

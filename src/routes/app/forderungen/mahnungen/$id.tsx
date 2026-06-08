@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
+import { SkeletonText } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
@@ -86,7 +87,7 @@ function MahnungDetailPage() {
   }
 
   if (detail.isLoading) {
-    return <p className="text-sm text-muted-foreground">Wird geladen...</p>;
+    return <SkeletonText lines={5} className="max-w-md" />;
   }
   if (!detail.data) {
     return <p className="text-sm text-muted-foreground">Mahnlauf nicht gefunden.</p>;

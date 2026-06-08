@@ -152,7 +152,7 @@ function ImportPage() {
               ) : (
                 <Upload className="size-4" />
               )}
-              {upload.isPending ? "Wird verarbeitet..." : "Importieren"}
+              {upload.isPending ? "Wird verarbeitet…" : "Importieren"}
             </Button>
           </div>
 

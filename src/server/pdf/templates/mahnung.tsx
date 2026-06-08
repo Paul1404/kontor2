@@ -235,7 +235,7 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
           {Number.parseFloat(pkg.mahngebuhr) > 0 ? (
             <View style={styles.tableRow}>
               <Text style={styles.c1}> </Text>
-              <Text style={styles.c2}>{title} – Mahngebühr</Text>
+              <Text style={styles.c2}>{title}: Mahngebühr</Text>
               <Text style={styles.c3}> </Text>
               <Text style={styles.c4}>{fmtMoney(pkg.mahngebuhr)} €</Text>
             </View>

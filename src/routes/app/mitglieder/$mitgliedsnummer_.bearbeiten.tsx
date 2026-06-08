@@ -112,11 +112,23 @@ function EditMemberPage() {
         <h1 className="text-2xl font-semibold tracking-tight">
           {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")} bearbeiten
         </h1>
-        <p className="text-sm text-muted-foreground">
-          {member.memberNo ? "Mitgliedsnummer" : "Kontaktnummer"}:{" "}
-          <span className="tabular-nums">{member.memberNo ?? member.kontaktNo}</span>
-          {member.mitgliedsnummer ? ` · alt ${member.mitgliedsnummer}` : ""} · intern AdrNr{" "}
-          {member.adrNr}
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-muted-foreground">
+          <span>
+            {member.memberNo ? "Mitgliedsnummer" : "Kontaktnummer"}:{" "}
+            <span className="tabular-nums text-foreground">
+              {member.memberNo ?? member.kontaktNo}
+            </span>
+          </span>
+          {member.mitgliedsnummer ? (
+            <span title="Frühere Linear-Mitgliedsnummer">
+              <span className="text-muted-foreground/50">·</span> Alt-Nr.{" "}
+              <span className="tabular-nums">{member.mitgliedsnummer}</span>
+            </span>
+          ) : null}
+          <span title="Interne Adressnummer">
+            <span className="text-muted-foreground/50">·</span> AdrNr{" "}
+            <span className="tabular-nums">{member.adrNr}</span>
+          </span>
         </p>
       </div>
 

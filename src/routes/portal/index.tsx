@@ -3,7 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Inbox, KeyRound, Pencil, ShieldCheck } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { formatDate } from "~/lib/format";
+import { SkeletonText } from "~/components/ui/skeleton";
+import { EMPTY_VALUE, formatDate, formatPhone } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
@@ -19,7 +20,7 @@ function PortalHome() {
   });
 
   if (me.isLoading) {
-    return <p className="text-sm text-muted-foreground">Wird geladen...</p>;
+    return <SkeletonText lines={5} className="max-w-md" />;
   }
   if (!me.data?.member) {
     return <NotSignedIn />;
@@ -76,8 +77,8 @@ function PortalHome() {
               }
             />
             <Detail label="Land" value={m.land ?? "Deutschland"} />
-            <Detail label="Telefon" value={m.telefon1} />
-            <Detail label="Telefon mobil" value={m.telefon2} />
+            <Detail label="Telefon" value={formatPhone(m.telefon1)} />
+            <Detail label="Telefon mobil" value={formatPhone(m.telefon2)} />
           </dl>
         </CardContent>
       </Card>
@@ -116,7 +117,7 @@ function Detail({ label, value }: { label: string; value: string | null | undefi
       <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-0.5">{value ?? "—"}</dd>
+      <dd className="mt-0.5">{value == null || value === "" ? EMPTY_VALUE : value}</dd>
     </div>
   );
 }

@@ -165,6 +165,7 @@ function Row({
                   size="sm"
                   variant="ghost"
                   onClick={() => setAustritt.mutate(null)}
+                  aria-label="Austrittsdatum entfernen"
                   title="Austrittsdatum entfernen"
                   disabled={setAustritt.isPending}
                 >
@@ -181,6 +182,7 @@ function Row({
                 size="sm"
                 variant="ghost"
                 onClick={() => setEditingAustritt(true)}
+                aria-label="Austritt eintragen"
                 title="Austritt eintragen"
               >
                 {row.austrittsdatum ? (
@@ -198,6 +200,7 @@ function Row({
                   }
                 }}
                 disabled={remove.isPending}
+                aria-label="Mitgliedschaft entfernen"
                 title="Mitgliedschaft entfernen"
               >
                 {remove.isPending ? (

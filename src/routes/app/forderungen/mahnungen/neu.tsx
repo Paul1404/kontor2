@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
+import { SkeletonText } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
@@ -196,7 +197,7 @@ function NewDunningRunPage() {
         </CardHeader>
         <CardContent>
           {preview.isLoading ? (
-            <p className="text-sm text-muted-foreground">Wird geladen...</p>
+            <SkeletonText lines={5} className="max-w-md" />
           ) : preview.isError ? (
             <QueryError onRetry={() => preview.refetch()} />
           ) : !preview.data || preview.data.items.length === 0 ? (
@@ -281,7 +282,7 @@ function NewDunningRunPage() {
             disabled={selected.size === 0 || commit.isPending}
             onClick={() => setConfirmOpen(true)}
           >
-            {commit.isPending ? "Wird erstellt..." : `${LEVEL_LABELS[level]} erstellen`}
+            {commit.isPending ? "Wird erstellt…" : `${LEVEL_LABELS[level]} erstellen`}
           </Button>
         </CardContent>
       </Card>

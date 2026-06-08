@@ -7,7 +7,8 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
-import { formatCurrency } from "~/lib/format";
+import { QueryError } from "~/components/ui/query-error";
+import { EMPTY_VALUE, formatCurrency } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/einstellungen/beitragsarten")({
@@ -263,6 +264,12 @@ function BeitragsartenSettingsPage() {
                     </span>
                   </td>
                 </tr>
+              ) : list.isError ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-6">
+                    <QueryError onRetry={() => list.refetch()} />
+                  </td>
+                </tr>
               ) : !list.data || list.data.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
@@ -276,7 +283,9 @@ function BeitragsartenSettingsPage() {
                     <tr key={row.art} className="transition-colors hover:bg-muted/30">
                       <td className="px-4 py-3 tabular-nums text-muted-foreground">{row.art}</td>
                       <td className="px-4 py-3 font-medium">{row.bezeichnung ?? "—"}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{row.abteilung ?? ""}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {row.abteilung || EMPTY_VALUE}
+                      </td>
                       <td className="px-4 py-3 text-right tabular-nums">
                         {formatCurrency(row.betrag1)}
                       </td>

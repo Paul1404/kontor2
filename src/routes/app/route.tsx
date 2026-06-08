@@ -51,7 +51,7 @@ function AppLayout() {
   if (me.isLoading || !me.data) {
     return (
       <div className="flex h-screen items-center justify-center text-muted-foreground">
-        Wird geladen...
+        Wird geladen…
       </div>
     );
   }

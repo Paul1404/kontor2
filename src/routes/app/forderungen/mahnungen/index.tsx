@@ -5,6 +5,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
+import { SkeletonText } from "~/components/ui/skeleton";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -71,7 +72,7 @@ function MahnungenListPage() {
         </CardHeader>
         <CardContent>
           {list.isLoading ? (
-            <p className="text-sm text-muted-foreground">Wird geladen...</p>
+            <SkeletonText lines={5} className="max-w-md" />
           ) : !list.data || list.data.rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">Bisher keine Mahnläufe erstellt.</p>
           ) : (

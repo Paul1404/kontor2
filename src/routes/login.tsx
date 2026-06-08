@@ -122,7 +122,7 @@ function LoginPage() {
             ) : null}
             <Button type="submit" disabled={busy} className="w-full">
               {busy ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
-              {busy ? "Anmelden..." : "Anmelden"}
+              {busy ? "Anmelden…" : "Anmelden"}
             </Button>
           </form>
         </CardContent>

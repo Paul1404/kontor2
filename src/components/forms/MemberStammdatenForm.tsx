@@ -422,7 +422,7 @@ export function MemberStammdatenForm({
               <Input
                 value={values.iban1}
                 onChange={(e) => update("iban1", e.target.value)}
-                placeholder="DE..."
+                placeholder="DE…"
                 className="font-mono"
               />
             </FormField>

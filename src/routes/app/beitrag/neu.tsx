@@ -17,7 +17,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { QueryError } from "~/components/ui/query-error";
 import { triggerDownload } from "~/lib/download";
-import { formatCurrency } from "~/lib/format";
+import { EMPTY_VALUE, formatCurrency } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/beitrag/neu")({
@@ -567,7 +567,7 @@ function ExcludedList(props: { excluded: PreviewData["excluded"] }) {
               {props.excluded.map((e) => (
                 <tr key={`${e.memberId}-${e.contractId}`} className="border-b border-border">
                   <td className="px-4 py-2 font-medium">{e.memberName}</td>
-                  <td className="px-4 py-2 text-muted-foreground">{e.artName ?? "-"}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{e.artName || EMPTY_VALUE}</td>
                   <td className="px-4 py-2 text-xs text-muted-foreground">{e.reason}</td>
                 </tr>
               ))}

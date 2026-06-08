@@ -11,7 +11,7 @@ import { QueryError } from "~/components/ui/query-error";
 import { Textarea } from "~/components/ui/textarea";
 import { toast } from "~/components/ui/toaster";
 import { triggerDownloadBase64 } from "~/lib/download";
-import { formatDateTime } from "~/lib/format";
+import { EMPTY_VALUE, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 import { MERGE_FIELDS, renderTemplate, SAMPLE_VARS } from "~/lib/rundschreiben";
 
@@ -375,7 +375,9 @@ function RundschreibenPage() {
                     <td className="py-1.5 pr-3 text-muted-foreground tabular-nums">
                       {formatDateTime(h.createdAt)}
                     </td>
-                    <td className="py-1.5 text-muted-foreground">{h.createdByEmail ?? ""}</td>
+                    <td className="py-1.5 text-muted-foreground">
+                      {h.createdByEmail || EMPTY_VALUE}
+                    </td>
                   </tr>
                 ))}
               </tbody>

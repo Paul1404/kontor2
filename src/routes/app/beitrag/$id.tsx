@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { toast } from "~/components/ui/toaster";
 import { triggerDownload } from "~/lib/download";
-import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
+import { EMPTY_VALUE, formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
+import { sepaReturnReasonLabel } from "~/lib/sepa-reason";
 
 export const Route = createFileRoute("/app/beitrag/$id")({
   component: FeeRunDetailPage,
@@ -42,7 +43,7 @@ function FeeRunDetailPage() {
   if (detail.isLoading) {
     return (
       <div className="flex items-center gap-2 text-muted-foreground">
-        <Loader2 className="size-5 animate-spin" /> Lade...
+        <Loader2 className="size-5 animate-spin" /> Lädt…
       </div>
     );
   }
@@ -142,9 +143,9 @@ function FeeRunDetailPage() {
         <InfoTile label="Erstellt am" value={formatDateTime(r.createdAt)} />
         <InfoTile
           label="Bestätigt am"
-          value={r.committedAt ? formatDateTime(r.committedAt) : "-"}
+          value={r.committedAt ? formatDateTime(r.committedAt) : EMPTY_VALUE}
         />
-        <InfoTile label="MsgId" value={r.xmlMessageId ?? "-"} mono />
+        <InfoTile label="Nachrichten-ID" value={r.xmlMessageId ?? EMPTY_VALUE} mono />
       </div>
 
       {r.status === "committed" && canEdit ? <PrenotificationCard id={id} /> : null}
@@ -174,7 +175,7 @@ function FeeRunDetailPage() {
                   <th className="px-4 py-3 text-right font-medium">Betrag</th>
                   <th className="px-4 py-3 font-medium">Mandat</th>
                   <th className="px-4 py-3 font-medium">IBAN</th>
-                  <th className="px-4 py-3 font-medium">SeqTp</th>
+                  <th className="px-4 py-3 font-medium">Sequenz</th>
                   <th className="px-4 py-3 font-medium">Retoure</th>
                 </tr>
               </thead>
@@ -191,7 +192,7 @@ function FeeRunDetailPage() {
                       </Link>
                       <div className="text-xs text-muted-foreground">#{memberRef(it)}</div>
                     </td>
-                    <td className="px-4 py-2 text-muted-foreground">{it.artName ?? "-"}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{it.artName || EMPTY_VALUE}</td>
                     <td className="px-4 py-2 text-right tabular-nums">
                       {formatCurrency(it.amount)}
                       {it.includesAufnahmegebuhr ? (
@@ -207,11 +208,14 @@ function FeeRunDetailPage() {
                     </td>
                     <td className="px-4 py-2 text-xs">
                       {it.returnedAt ? (
-                        <span className="text-destructive">
+                        <span
+                          className="text-destructive"
+                          title={sepaReturnReasonLabel(it.returnReasonCode) ?? undefined}
+                        >
                           {it.returnReasonCode ?? "Rückläufer"}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">-</span>
+                        <span className="text-muted-foreground">{EMPTY_VALUE}</span>
                       )}
                     </td>
                   </tr>
