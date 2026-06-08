@@ -222,6 +222,12 @@ export function CommandPalette({ role }: { role: Role }) {
     setHighlight(0);
   }, [trimmed]);
 
+  // Keep the highlight in range when async results shrink the list, so Enter
+  // never fires a stale index that now points at a different (or no) item.
+  useEffect(() => {
+    setHighlight((h) => Math.min(h, Math.max(0, total - 1)));
+  }, [total]);
+
   function executeAt(index: number) {
     let cursor = index;
     if (cursor < navCount) {
@@ -360,7 +366,8 @@ export function CommandPalette({ role }: { role: Role }) {
                 <Section label="Mitglieder">
                   {memberHits.map((hit) => {
                     const i = runningIndex++;
-                    const name = [hit.vorname, hit.nachname].filter(Boolean).join(" ") || "—";
+                    const name =
+                      [hit.vorname, hit.nachname].filter(Boolean).join(" ") || "Ohne Namen";
                     return (
                       <CommandItem
                         key={hit.id}

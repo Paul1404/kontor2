@@ -80,9 +80,14 @@ export const timelineRouter = {
         context.db.execute<{ id: string; created_at: Date; doc_ref: string | null }>(sql`
           select id, created_at, doc_ref
           from kulanz_letters
-          where exists (
-            select 1 from jsonb_array_elements(recipients) e where e->>'memberId' = ${memberId}
-          )
+          where jsonb_typeof(recipients) = 'array'
+            and exists (
+              select 1
+              from jsonb_array_elements(
+                case when jsonb_typeof(recipients) = 'array' then recipients else '[]'::jsonb end
+              ) e
+              where e->>'memberId' = ${memberId}
+            )
           order by created_at desc
           limit 20
         `),

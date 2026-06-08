@@ -16,6 +16,14 @@ describe("parseGermanAmount", () => {
     expect(parseGermanAmount("1234.56")).toBeCloseTo(1234.56);
     expect(parseGermanAmount("42")).toBeCloseTo(42);
   });
+  it("treats a lone thousands dot as a grouper, not a decimal", () => {
+    expect(parseGermanAmount("1.234")).toBeCloseTo(1234);
+    expect(parseGermanAmount("1.234.567")).toBeCloseTo(1234567);
+  });
+  it("uses the rightmost separator as the decimal point", () => {
+    expect(parseGermanAmount("1,234.56")).toBeCloseTo(1234.56);
+    expect(parseGermanAmount("1.234,56")).toBeCloseTo(1234.56);
+  });
 });
 
 describe("parseBankCsv", () => {
@@ -91,6 +99,27 @@ describe("matchBankTransactions", () => {
     );
     expect(res[0]?.confidence).toBe("none");
     expect(res[1]?.posting).toBeNull();
+  });
+
+  it("does not match a surname as a substring of an unrelated word", () => {
+    const postings: OpenPosting[] = [
+      {
+        sollStellungId: "s1",
+        memberId: "m1",
+        reference: "M-000001",
+        mitgliedsnummer: "1",
+        nachname: "Mann",
+        memberName: "Otto Mann",
+        billingYear: 2026,
+        openAmount: 50,
+      },
+    ];
+    // "Mann" must not match inside "Mannheim" / "Hausmann".
+    const [p] = matchBankTransactions(
+      [{ line: 2, date: null, amount: 50, name: "Stadt Mannheim", purpose: "Hausmann GmbH" }],
+      postings,
+    );
+    expect(p?.posting).toBeNull();
   });
 
   it("does not assign the same posting to two transactions", () => {

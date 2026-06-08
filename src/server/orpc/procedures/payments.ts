@@ -98,10 +98,20 @@ export const paymentsRouter = {
       if (input.items.length === 0) {
         throw new ORPCError("BAD_REQUEST", { message: "Keine Zahlungen ausgewählt." });
       }
+      // Collapse duplicate postings in one request: a posting must only be
+      // booked once, so sum any repeated ids rather than applying twice.
+      const byId = new Map<string, number>();
+      for (const it of input.items) {
+        byId.set(it.sollStellungId, (byId.get(it.sollStellungId) ?? 0) + it.amount);
+      }
+      const items = [...byId.entries()].map(([sollStellungId, amount]) => ({
+        sollStellungId,
+        amount,
+      }));
       const result = await context.db.transaction(async (tx) => {
         let applied = 0;
         let skipped = 0;
-        for (const item of input.items) {
+        for (const item of items) {
           const [soll] = await tx
             .select()
             .from(sollStellungenTable)
@@ -133,7 +143,10 @@ export const paymentsRouter = {
             actorId: context.session!.user.id,
             actorEmail: context.session!.user.email,
             changes: {
-              zahlungseingang: { before: soll.openAmount, after: toAmount(newOpenCents) },
+              zahlungseingang: { before: null, after: toAmount(payCents) },
+              paidAmount: { before: soll.paidAmount, after: toAmount(newPaidCents) },
+              openAmount: { before: soll.openAmount, after: toAmount(newOpenCents) },
+              status: { before: soll.status, after: newStatus },
               billingYear: { before: null, after: soll.billingYear },
             },
             requestId: context.requestId ?? null,

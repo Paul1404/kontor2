@@ -67,8 +67,15 @@ function ZahlungsabgleichPage() {
     match.mutate(text);
   }
 
-  const selectable = useMemo(
+  // Every matched line can be ticked manually; "select all" only picks the
+  // high-confidence ones so an amount-mismatched medium guess is never booked
+  // in bulk by accident.
+  const matchedLines = useMemo(
     () => (proposals ?? []).filter((p) => p.match).map((p) => p.line),
+    [proposals],
+  );
+  const highLines = useMemo(
+    () => (proposals ?? []).filter((p) => p.match && p.confidence === "high").map((p) => p.line),
     [proposals],
   );
   const selectedCount = selected.size;
@@ -131,7 +138,7 @@ function ZahlungsabgleichPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">
-              {proposals.length} Buchungen · {selectable.length} zugeordnet
+              {proposals.length} Buchungen · {matchedLines.length} zugeordnet
             </CardTitle>
             <Button
               type="button"
@@ -154,10 +161,11 @@ function ZahlungsabgleichPage() {
                     <th className="px-3 py-2">
                       <input
                         type="checkbox"
-                        aria-label="Alle zugeordneten auswählen"
-                        checked={selectedCount > 0 && selectedCount === selectable.length}
+                        aria-label="Alle sicheren Treffer auswählen"
+                        title="Alle sicheren Treffer auswählen"
+                        checked={highLines.length > 0 && highLines.every((l) => selected.has(l))}
                         onChange={(e) =>
-                          setSelected(e.target.checked ? new Set(selectable) : new Set())
+                          setSelected(e.target.checked ? new Set(highLines) : new Set())
                         }
                       />
                     </th>
@@ -188,7 +196,7 @@ function ZahlungsabgleichPage() {
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <div className="font-medium">{p.name || "—"}</div>
+                          <div className="font-medium">{p.name || "Ohne Namen"}</div>
                           <div className="max-w-md truncate text-xs text-muted-foreground">
                             {p.purpose}
                           </div>

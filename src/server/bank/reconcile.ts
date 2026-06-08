@@ -39,16 +39,27 @@ export type MatchProposal = {
   reason: string;
 };
 
-/** German amount "1.234,56" / "-12,50" / "1234.56" -> number, or NaN. */
+/** German amount "1.234,56" / "-12,50" / "1234.56" / "1.234" -> number, or NaN. */
 export function parseGermanAmount(raw: string): number {
   const s = raw.trim().replace(/\s|€|EUR/gi, "");
   if (!s) return Number.NaN;
-  // If it uses a decimal comma, strip dots (thousands) and swap comma for dot.
-  if (/,\d{1,2}$/.test(s)) {
-    return Number.parseFloat(s.replace(/\./g, "").replace(",", "."));
+  const lastComma = s.lastIndexOf(",");
+  const lastDot = s.lastIndexOf(".");
+  // The rightmost separator is the decimal point only when it is followed by
+  // exactly one or two digits; otherwise both separators are thousands groupers
+  // ("1.234" -> 1234, not 1.234). This keeps whole-euro amounts with a
+  // thousands dot from being parsed 1000x too small.
+  const decimalIdx = Math.max(lastComma, lastDot);
+  if (decimalIdx >= 0) {
+    const trailing = s.length - decimalIdx - 1;
+    if (trailing >= 1 && trailing <= 2) {
+      const intPart = s.slice(0, decimalIdx).replace(/[.,]/g, "");
+      const fracPart = s.slice(decimalIdx + 1);
+      return Number.parseFloat(`${intPart}.${fracPart}`);
+    }
   }
-  // Otherwise drop thousands commas and parse as plain.
-  return Number.parseFloat(s.replace(/,/g, ""));
+  // No decimal separator: every dot/comma is a thousands grouper.
+  return Number.parseFloat(s.replace(/[.,]/g, ""));
 }
 
 function splitCsvLine(line: string, delim: string): string[] {
@@ -151,6 +162,15 @@ export function parseBankCsv(text: string): ParseResult {
 
 const cents = (n: number) => Math.round(n * 100);
 
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Whole-token match: `needle` bounded by non-alphanumeric (or string ends). */
+function containsToken(hay: string, needle: string): boolean {
+  return new RegExp(`(^|[^a-z0-9])${escapeRe(needle)}([^a-z0-9]|$)`, "i").test(hay);
+}
+
 /**
  * Propose a matching open posting for each incoming credit. Greedy: each
  * posting is consumed by at most one row, and a high-confidence reference+amount
@@ -176,10 +196,13 @@ export function matchBankTransactions(
       const ref = p.reference.toLowerCase();
       const mgl = (p.mitgliedsnummer ?? "").toLowerCase();
       const name = (p.nachname ?? "").toLowerCase();
-      const refHit =
-        (ref.length >= 3 && hay.includes(ref)) || (mgl.length >= 3 && hay.includes(mgl));
-      const nameHit = name.length >= 3 && hay.includes(name);
-      return refHit || nameHit;
+      // The app reference (M-/K-...) is distinctive enough for a substring hit;
+      // member numbers and surnames must match as a whole token so a short name
+      // like "Bauer" cannot accidentally match unrelated purpose text.
+      const refHit = ref.length >= 4 && hay.includes(ref);
+      const mglHit = mgl.length >= 3 && containsToken(hay, mgl);
+      const nameHit = name.length >= 4 && containsToken(hay, name);
+      return refHit || mglHit || nameHit;
     });
 
     // Prefer an exact amount match among the reference/name candidates.

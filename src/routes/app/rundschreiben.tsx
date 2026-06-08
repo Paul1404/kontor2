@@ -65,7 +65,13 @@ function RundschreibenPage() {
   });
 
   const send = useMutation({
-    mutationFn: () => orpc.rundschreiben.send({ subject, body, filter }),
+    mutationFn: () =>
+      orpc.rundschreiben.send({
+        subject,
+        body,
+        filter,
+        expectedRecipients: preview.data?.withEmail,
+      }),
     onSuccess: async (r) => {
       setConfirmOpen(false);
       toast.success(

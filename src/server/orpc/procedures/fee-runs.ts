@@ -169,7 +169,7 @@ export const feeRunsRouter = {
 
     if (preview.candidates.length === 0) {
       throw new ORPCError("BAD_REQUEST", {
-        message: "Keine berechtigten Posten -- nichts zu erzeugen.",
+        message: "Keine berechtigten Posten. Es gibt nichts zu erzeugen.",
       });
     }
 

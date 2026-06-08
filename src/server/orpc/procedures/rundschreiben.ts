@@ -230,6 +230,9 @@ export const rundschreibenRouter = {
         subject: v.pipe(v.string(), v.minLength(1)),
         body: v.pipe(v.string(), v.minLength(1)),
         filter: FilterInput,
+        // The recipient count the user saw in the confirm dialog. If the segment
+        // drifted since, we refuse to send rather than blast a different group.
+        expectedRecipients: v.optional(v.number()),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -243,6 +246,11 @@ export const rundschreibenRouter = {
       if (rows.length === 0) {
         throw new ORPCError("PRECONDITION_FAILED", {
           message: "Keine Empfänger mit E-Mail-Adresse im gewählten Segment.",
+        });
+      }
+      if (input.expectedRecipients != null && input.expectedRecipients !== rows.length) {
+        throw new ORPCError("CONFLICT", {
+          message: `Die Empfängerzahl hat sich geändert (jetzt ${rows.length}). Bitte die Vorschau erneut prüfen.`,
         });
       }
       if (rows.length > MAX_RECIPIENTS) {
