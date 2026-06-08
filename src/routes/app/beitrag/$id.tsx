@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Coins, Download, Loader2, XCircle } from "lucide-react";
+import { BellRing, Coins, Download, Loader2, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { toast } from "~/components/ui/toaster";
 import { triggerDownload } from "~/lib/download";
 import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
@@ -145,6 +147,8 @@ function FeeRunDetailPage() {
         <InfoTile label="MsgId" value={r.xmlMessageId ?? "-"} mono />
       </div>
 
+      {r.status === "committed" && canEdit ? <PrenotificationCard id={id} /> : null}
+
       {r.notes ? (
         <Card>
           <CardHeader>
@@ -218,6 +222,86 @@ function FeeRunDetailPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function PrenotificationCard({ id }: { id: string }) {
+  const qc = useQueryClient();
+  const [confirm, setConfirm] = useState(false);
+  const info = useQuery({
+    queryKey: ["feeRuns.prenotifyInfo", id],
+    queryFn: () => orpc.feeRuns.prenotifyInfo({ id }),
+  });
+  const send = useMutation({
+    mutationFn: () => orpc.feeRuns.sendPrenotifications({ id }),
+    onSuccess: async (r) => {
+      setConfirm(false);
+      toast.success(
+        `Vorabankündigung versendet: ${r.sent} zugestellt${r.failed > 0 ? `, ${r.failed} fehlgeschlagen` : ""}${r.skipped > 0 ? `, ${r.skipped} ohne E-Mail` : ""}.`,
+      );
+      await qc.invalidateQueries({ queryKey: ["feeRuns.prenotifyInfo", id] });
+    },
+    onError: (e: Error) => {
+      setConfirm(false);
+      toast.error("Versand fehlgeschlagen", { description: e.message });
+    },
+  });
+
+  const withEmail = info.data?.withEmail ?? 0;
+  const prenotifiedAt = info.data?.prenotifiedAt ?? null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <BellRing className="size-4 text-brand" /> SEPA-Vorabankündigung
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">
+          Kündigt jedem Zahler den Einzug per E-Mail an (Betrag, Fälligkeit, Mandatsreferenz).
+          Pflicht vor dem Einzug.
+        </p>
+        <div className="text-sm">
+          <span className="font-semibold tabular-nums">{withEmail}</span> Zahler per E-Mail
+          erreichbar
+          {info.data && info.data.withoutEmail > 0 ? (
+            <span className="text-muted-foreground"> · {info.data.withoutEmail} ohne E-Mail</span>
+          ) : null}
+        </div>
+        {prenotifiedAt ? (
+          <div className="text-xs text-muted-foreground">
+            Zuletzt versendet am {formatDateTime(prenotifiedAt)}
+          </div>
+        ) : null}
+        <div>
+          <Button
+            type="button"
+            variant={prenotifiedAt ? "outline" : "default"}
+            onClick={() => setConfirm(true)}
+            disabled={send.isPending || withEmail === 0}
+          >
+            {send.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <BellRing className="size-4" />
+            )}
+            {prenotifiedAt ? "Erneut senden" : "Vorabankündigung senden"}
+          </Button>
+        </div>
+      </CardContent>
+      <ConfirmDialog
+        open={confirm}
+        onOpenChange={(o) => {
+          if (!send.isPending) setConfirm(o);
+        }}
+        title="Vorabankündigung senden"
+        description={`Die Vorabankündigung geht an ${withEmail} Zahler per E-Mail. Fortfahren?`}
+        confirmLabel="Senden"
+        loading={send.isPending}
+        onConfirm={() => send.mutate()}
+      />
+    </Card>
   );
 }
 

@@ -70,6 +70,11 @@ export const RELEASES: Release[] = [
         description:
           "Neues Export-Center unter Berichte: Mitgliederliste, Geburtstage, Ehrungen, Abteilungs-Statistik und Finanzbericht als CSV an einer Stelle, jeweils mit Jahr- und Monatsauswahl.",
       },
+      {
+        category: "feature",
+        description:
+          "SEPA-Vorabankündigung: Am abgeschlossenen Beitragslauf lässt sich jedem Zahler der bevorstehende Einzug per E-Mail ankündigen (Betrag, Fälligkeit, Mandatsreferenz, Gläubiger-ID). Der Versandzeitpunkt wird am Lauf vermerkt.",
+      },
     ],
   },
   {

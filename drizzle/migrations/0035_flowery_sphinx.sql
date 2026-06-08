@@ -1,0 +1,1 @@
+ALTER TABLE "fee_runs" ADD COLUMN "prenotified_at" timestamp with time zone;
