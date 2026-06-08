@@ -20,6 +20,7 @@ export * from "./members";
 export * from "./organization-settings";
 export * from "./portal";
 export * from "./relationships";
+export * from "./rundschreiben";
 export * from "./sepa";
 export * from "./settings";
 export * from "./snapshots";

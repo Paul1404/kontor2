@@ -19,6 +19,7 @@ import { organizationSettingsRouter } from "~/server/orpc/procedures/organizatio
 import { portalRouter } from "~/server/orpc/procedures/portal";
 import { relationshipsRouter } from "~/server/orpc/procedures/relationships";
 import { reportsRouter } from "~/server/orpc/procedures/reports";
+import { rundschreibenRouter } from "~/server/orpc/procedures/rundschreiben";
 import { sepaRouter } from "~/server/orpc/procedures/sepa";
 import { sepaReturnsRouter } from "~/server/orpc/procedures/sepa-returns";
 import { settingsRouter } from "~/server/orpc/procedures/settings";
@@ -47,6 +48,7 @@ export const appRouter = {
   feeRuns: feeRunsRouter,
   import: importRouter,
   reports: reportsRouter,
+  rundschreiben: rundschreibenRouter,
   snapshots: snapshotsRouter,
   dsgvo: dsgvoRouter,
   verbandsmeldung: verbandsmeldungRouter,

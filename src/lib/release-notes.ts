@@ -75,6 +75,11 @@ export const RELEASES: Release[] = [
         description:
           "Das Geschlecht wird jetzt korrekt als eigenes Merkmal geführt und nicht mehr mit der Anrede verwechselt. Bei Import und Neuanlage wird es aus der Anrede abgeleitet (Herr, Frau), lässt sich aber jederzeit im Mitglied überschreiben. Für den vorhandenen Bestand einmalig den Befehl db:backfill:geschlecht ausführen, danach stimmt die Geschlechter-Auswertung im Dashboard.",
       },
+      {
+        category: "feature",
+        description:
+          "Neue Rundschreiben-Funktion: eine E-Mail an ein ganzes Segment (aktiv, passiv, einzelne Abteilung) mit Platzhaltern für Anrede, Vorname, Nachname und Mitgliedsnummer. Vorschau, Testmail an sich selbst, Versandprotokoll je Empfänger und ein Adress-Export für Mitglieder ohne E-Mail, damit auch sie per Serienbrief erreichbar bleiben.",
+      },
     ],
   },
   {

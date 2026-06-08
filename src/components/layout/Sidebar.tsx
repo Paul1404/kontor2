@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Mail,
+  Mails,
   ScrollText,
   ShieldCheck,
   UserCog,
@@ -62,6 +63,12 @@ const SECTIONS: NavSection[] = [
         to: "/app/berichte",
         label: "Berichte",
         icon: <FileBarChart className="size-[18px]" />,
+        vorstandOnly: true,
+      },
+      {
+        to: "/app/rundschreiben",
+        label: "Rundschreiben",
+        icon: <Mails className="size-[18px]" />,
         vorstandOnly: true,
       },
       {

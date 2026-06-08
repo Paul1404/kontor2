@@ -20,6 +20,7 @@ import { Route as PortalProfilRouteImport } from './portal/profil'
 import { Route as PortalAbgemeldetRouteImport } from './portal/abgemeldet'
 import { Route as PortalAbgelaufenRouteImport } from './portal/abgelaufen'
 import { Route as InviteTokenRouteImport } from './invite.$token'
+import { Route as AppRundschreibenRouteImport } from './app/rundschreiben'
 import { Route as AppPortalAnfragenRouteImport } from './app/portal-anfragen'
 import { Route as AppImportRouteImport } from './app/import'
 import { Route as AppDatenqualitaetRouteImport } from './app/datenqualitaet'
@@ -115,6 +116,11 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppRundschreibenRoute = AppRundschreibenRouteImport.update({
+  id: '/rundschreiben',
+  path: '/rundschreiben',
+  getParentRoute: () => AppRouteRoute,
 } as any)
 const AppPortalAnfragenRoute = AppPortalAnfragenRouteImport.update({
   id: '/portal-anfragen',
@@ -340,6 +346,7 @@ export interface FileRoutesByFullPath {
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
+  '/app/rundschreiben': typeof AppRundschreibenRoute
   '/invite/$token': typeof InviteTokenRoute
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
@@ -391,6 +398,7 @@ export interface FileRoutesByTo {
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
+  '/app/rundschreiben': typeof AppRundschreibenRoute
   '/invite/$token': typeof InviteTokenRoute
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
@@ -445,6 +453,7 @@ export interface FileRoutesById {
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
+  '/app/rundschreiben': typeof AppRundschreibenRoute
   '/invite/$token': typeof InviteTokenRoute
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
@@ -500,6 +509,7 @@ export interface FileRouteTypes {
     | '/app/datenqualitaet'
     | '/app/import'
     | '/app/portal-anfragen'
+    | '/app/rundschreiben'
     | '/invite/$token'
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
@@ -551,6 +561,7 @@ export interface FileRouteTypes {
     | '/app/datenqualitaet'
     | '/app/import'
     | '/app/portal-anfragen'
+    | '/app/rundschreiben'
     | '/invite/$token'
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
@@ -604,6 +615,7 @@ export interface FileRouteTypes {
     | '/app/datenqualitaet'
     | '/app/import'
     | '/app/portal-anfragen'
+    | '/app/rundschreiben'
     | '/invite/$token'
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
@@ -742,6 +754,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/invite/$token'
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/app/rundschreiben': {
+      id: '/app/rundschreiben'
+      path: '/rundschreiben'
+      fullPath: '/app/rundschreiben'
+      preLoaderRoute: typeof AppRundschreibenRouteImport
+      parentRoute: typeof AppRouteRoute
     }
     '/app/portal-anfragen': {
       id: '/app/portal-anfragen'
@@ -1031,6 +1050,7 @@ interface AppRouteRouteChildren {
   AppDatenqualitaetRoute: typeof AppDatenqualitaetRoute
   AppImportRoute: typeof AppImportRoute
   AppPortalAnfragenRoute: typeof AppPortalAnfragenRoute
+  AppRundschreibenRoute: typeof AppRundschreibenRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAdminErweitertRoute: typeof AppAdminErweitertRoute
   AppAdminSnapshotsRoute: typeof AppAdminSnapshotsRoute
@@ -1067,6 +1087,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppDatenqualitaetRoute: AppDatenqualitaetRoute,
   AppImportRoute: AppImportRoute,
   AppPortalAnfragenRoute: AppPortalAnfragenRoute,
+  AppRundschreibenRoute: AppRundschreibenRoute,
   AppIndexRoute: AppIndexRoute,
   AppAdminErweitertRoute: AppAdminErweitertRoute,
   AppAdminSnapshotsRoute: AppAdminSnapshotsRoute,

@@ -67,6 +67,27 @@ function transporterFor(cfg: SmtpDispatchConfig): Transporter {
   return t;
 }
 
+/**
+ * Shared sender for ad-hoc mail (e.g. Rundschreiben). Reuses the cached
+ * transporter and the configured From. Returns null when SMTP is unconfigured
+ * so callers can surface a friendly precondition error.
+ */
+export async function getMailer(): Promise<{
+  send: (opts: { to: string; subject: string; text: string }) => Promise<void>;
+  from: string;
+} | null> {
+  const cfg = await loadSmtpConfig();
+  if (!cfg) return null;
+  const t = transporterFor(cfg);
+  const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
+  return {
+    from,
+    send: async (opts) => {
+      await t.sendMail({ from, to: opts.to, subject: opts.subject, text: opts.text });
+    },
+  };
+}
+
 export async function sendInviteEmail(opts: {
   to: string;
   acceptUrl: string;
