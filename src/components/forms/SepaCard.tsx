@@ -1,12 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Ban, Loader2, Plus } from "lucide-react";
+import { Ban, Loader2, Pencil, Plus } from "lucide-react";
 import { useId, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { formatDate } from "~/lib/format";
+import { formatDate, toDateInput } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 type Mandate = {
@@ -15,7 +15,9 @@ type Mandate = {
   status: string | null;
   typ: string | null;
   lastschriftart: string | null;
+  unterschriftDatum?: string | Date | null;
   gueltigAb: string | Date | null;
+  gultigBis?: string | Date | null;
   widerrufenAm: string | Date | null;
   letzteVerwendung?: string | Date | null;
   isDeleted: boolean | null;
@@ -34,6 +36,7 @@ export function SepaCard({
 }) {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
+  const [editTarget, setEditTarget] = useState<Mandate | null>(null);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
 
@@ -71,6 +74,17 @@ export function SepaCard({
           />
         ) : null}
 
+        {editTarget && canEdit ? (
+          <EditMandateForm
+            mandate={editTarget}
+            onCancel={() => setEditTarget(null)}
+            onSaved={async () => {
+              setEditTarget(null);
+              await refresh();
+            }}
+          />
+        ) : null}
+
         {mandate.length === 0 ? (
           <p className="text-sm text-muted-foreground">Keine Mandate.</p>
         ) : (
@@ -99,28 +113,39 @@ export function SepaCard({
                     gültig ab {formatDate(s.gueltigAb)}
                   </span>
                   {canEdit && !s.widerrufenAm && !s.isDeleted ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            `SEPA-Mandat ${s.mandatsNr} widerrufen? Es kann danach nicht mehr für Lastschriften verwendet werden.`,
-                          )
-                        ) {
-                          setPendingRevokeId(s.id);
-                          revoke.mutate(s.id);
-                        }
-                      }}
-                      disabled={pendingRevokeId === s.id}
-                      title="Mandat widerrufen"
-                    >
-                      {pendingRevokeId === s.id ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Ban className="size-4 text-destructive" />
-                      )}
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditTarget(s)}
+                        disabled={pendingRevokeId === s.id}
+                        title="Mandat bearbeiten"
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `SEPA-Mandat ${s.mandatsNr} widerrufen? Es kann danach nicht mehr für Lastschriften verwendet werden.`,
+                            )
+                          ) {
+                            setPendingRevokeId(s.id);
+                            revoke.mutate(s.id);
+                          }
+                        }}
+                        disabled={pendingRevokeId === s.id}
+                        title="Mandat widerrufen"
+                      >
+                        {pendingRevokeId === s.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Ban className="size-4 text-destructive" />
+                        )}
+                      </Button>
+                    </>
                   ) : null}
                 </div>
               </li>
@@ -271,6 +296,151 @@ function AddMandateForm({
             <Plus className="size-4" />
           )}
           Anlegen
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function EditMandateForm({
+  mandate,
+  onCancel,
+  onSaved,
+}: {
+  mandate: Mandate;
+  onCancel: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  // Mandatsreferenz is the mandate's identity and stays fixed. To use a
+  // different reference, revoke this mandate and create a new one.
+  const [typ, setTyp] = useState(mandate.typ ?? "CORE");
+  const [lastschriftart, setLastschriftart] = useState(mandate.lastschriftart ?? "Wiederkehrend");
+  const [unterschriftDatum, setUnterschriftDatum] = useState(
+    toDateInput(mandate.unterschriftDatum),
+  );
+  const [gueltigAb, setGueltigAb] = useState(toDateInput(mandate.gueltigAb));
+  const [gultigBis, setGultigBis] = useState(toDateInput(mandate.gultigBis));
+  const [error, setError] = useState<string | null>(null);
+  const typId = useId();
+  const lastschriftartId = useId();
+  const unterschriftId = useId();
+  const gueltigAbId = useId();
+  const gultigBisId = useId();
+
+  const save = useMutation({
+    mutationFn: () =>
+      orpc.sepa.update({
+        id: mandate.id,
+        patch: {
+          typ: typ || null,
+          lastschriftart: lastschriftart || null,
+          unterschriftDatum: unterschriftDatum || null,
+          gueltigAb: gueltigAb || null,
+          gultigBis: gultigBis || null,
+        },
+      }),
+    onSuccess: () => onSaved(),
+    onError: (e: unknown) => setError(e instanceof Error ? e.message : "Speichern fehlgeschlagen."),
+  });
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">
+        Mandat bearbeiten · {mandate.mandatsNr}
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={typId} className="text-xs uppercase tracking-wide text-muted-foreground">
+            Typ
+          </Label>
+          <select
+            id={typId}
+            value={typ}
+            onChange={(e) => setTyp(e.target.value)}
+            className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+          >
+            <option value="CORE">CORE: Privatpersonen (Standard)</option>
+            <option value="B2B">B2B: Firmenkunden</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor={lastschriftartId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Lastschriftart
+          </Label>
+          <select
+            id={lastschriftartId}
+            value={lastschriftart}
+            onChange={(e) => setLastschriftart(e.target.value)}
+            className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+          >
+            <option value="Wiederkehrend">Wiederkehrend</option>
+            <option value="Einmalig">Einmalig</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor={unterschriftId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Unterschrift
+          </Label>
+          <Input
+            id={unterschriftId}
+            type="date"
+            value={unterschriftDatum}
+            onChange={(e) => setUnterschriftDatum(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor={gueltigAbId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Gültig ab
+          </Label>
+          <Input
+            id={gueltigAbId}
+            type="date"
+            value={gueltigAb}
+            onChange={(e) => setGueltigAb(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor={gultigBisId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Gültig bis
+          </Label>
+          <Input
+            id={gultigBisId}
+            type="date"
+            value={gultigBis}
+            onChange={(e) => setGultigBis(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+          Abbrechen
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => {
+            setError(null);
+            save.mutate();
+          }}
+          disabled={save.isPending}
+        >
+          {save.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+          Speichern
         </Button>
       </div>
     </div>

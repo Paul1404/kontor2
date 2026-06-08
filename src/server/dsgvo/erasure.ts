@@ -1,8 +1,9 @@
 import { ORPCError } from "@orpc/server";
-import { and, desc, eq, ne, sql } from "drizzle-orm";
+import { and, desc, eq, ne, or, sql } from "drizzle-orm";
 import { appendAudit, type Changes } from "~/server/audit/log";
 import type { DBOrTx } from "~/server/db/client";
 import { auditLogTable } from "~/server/db/schema/audit";
+import { contractsTable } from "~/server/db/schema/contracts";
 import { dsgvoRequestsTable } from "~/server/db/schema/dsgvo";
 import { dunningItemsTable } from "~/server/db/schema/dunning";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
@@ -149,9 +150,11 @@ export async function executeErasure(
     .where(eq(dunningItemsTable.memberId, memberId))
     .returning({ id: dunningItemsTable.id });
 
-  // 4. Relationship rows where this member is the linked party carry their
-  //    name/contact/notes in plaintext (the Linear `verkn` payload). Scrub
-  //    those columns; the row stays so the other side keeps its link.
+  // 4. Relationship rows carry name/contact/notes in plaintext (the Linear
+  //    `verkn` payload). Scrub both directions: rows where this member is the
+  //    linked party (`toMemberId`) AND the member's own outgoing rows
+  //    (`fromMemberId`), which describe a third party tied to the erased member.
+  //    The rows stay so the other side keeps its structural link.
   const scrubbedRels = await db
     .update(relationshipsTable)
     .set({
@@ -166,8 +169,37 @@ export async function executeErasure(
       notiz: null,
       matchcode: null,
     })
-    .where(eq(relationshipsTable.toMemberId, memberId))
+    .where(
+      or(
+        eq(relationshipsTable.toMemberId, memberId),
+        eq(relationshipsTable.fromMemberId, memberId),
+      ),
+    )
     .returning({ id: relationshipsTable.id });
+
+  // 4b. Contracts hold the alternative account holder's name, account, bank and
+  //     full postal address (the `*Kih` / `*V` columns) plus free-text purposes
+  //     that can contain names. Null them so an Art. 17 erasure leaves no
+  //     bank/third-party PII behind. The row itself stays for financial history.
+  const scrubbedContracts = await db
+    .update(contractsTable)
+    .set({
+      ktoInhV: null,
+      kontoV: null,
+      blzV: null,
+      bankV: null,
+      abwKontoInh: null,
+      strasseKih: null,
+      plzKih: null,
+      ortKih: null,
+      emailKih: null,
+      verwZw1: null,
+      verwZw2: null,
+      verwZw3: null,
+      verwZw4: null,
+    })
+    .where(eq(contractsTable.memberId, memberId))
+    .returning({ id: contractsTable.id });
 
   // The erasure audit entry records WHAT was cleared, never the cleared values
   // -- the before-values are exactly the PII we are removing.
@@ -182,6 +214,8 @@ export async function executeErasure(
     changes.__dunningItems = { before: `${deletedDunning.length}`, after: null };
   if (scrubbedRels.length > 0)
     changes.__relationships = { before: `${scrubbedRels.length}`, after: null };
+  if (scrubbedContracts.length > 0)
+    changes.__contracts = { before: `${scrubbedContracts.length}`, after: null };
   if (opts.forceOverride && opts.overrideReason) {
     changes.__override = { before: null, after: opts.overrideReason };
   }

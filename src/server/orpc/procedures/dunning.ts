@@ -854,7 +854,10 @@ export const dunningRouter = {
         const now = new Date();
 
         for (const row of existing) {
-          if (row.status === "paid") {
+          // A cancelled posting is void; flipping it to paid would resurrect a
+          // settled debt as a booked payment. Only dunnable/already-collected
+          // postings can be marked paid.
+          if (row.status === "paid" || row.status === "cancelled") {
             skipped += 1;
             continue;
           }

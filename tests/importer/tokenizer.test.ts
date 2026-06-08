@@ -145,6 +145,9 @@ describe("coercion helpers", () => {
     expect(coerceDecimal("1.000.000,00")).toBe("1000000");
     expect(coerceDecimal("162.00000000")).toBe("162");
     expect(coerceDecimal("5,50")).toBe("5.5");
+    // A lone thousands dot is a grouper, not a decimal point.
+    expect(coerceDecimal("1.234")).toBe("1234");
+    expect(coerceDecimal("1.234.567")).toBe("1234567");
   });
   it("coerceDate handles common Linear formats and zero-date", () => {
     expect(coerceDate("0000-00-00 00:00:00")).toBe(null);

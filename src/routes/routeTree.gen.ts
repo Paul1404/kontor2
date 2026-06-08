@@ -20,8 +20,12 @@ import { Route as PortalProfilRouteImport } from './portal/profil'
 import { Route as PortalAbgemeldetRouteImport } from './portal/abgemeldet'
 import { Route as PortalAbgelaufenRouteImport } from './portal/abgelaufen'
 import { Route as InviteTokenRouteImport } from './invite.$token'
+import { Route as AppZahlungsabgleichRouteImport } from './app/zahlungsabgleich'
+import { Route as AppWiedervorlagenRouteImport } from './app/wiedervorlagen'
+import { Route as AppRundschreibenRouteImport } from './app/rundschreiben'
 import { Route as AppPortalAnfragenRouteImport } from './app/portal-anfragen'
 import { Route as AppImportRouteImport } from './app/import'
+import { Route as AppDatenqualitaetRouteImport } from './app/datenqualitaet'
 import { Route as AppAuditRouteImport } from './app/audit'
 import { Route as ApiHealthRouteImport } from './api/health'
 import { Route as AppMitgliederIndexRouteImport } from './app/mitglieder/index'
@@ -40,6 +44,7 @@ import { Route as AppEinstellungenAbteilungenRouteImport } from './app/einstellu
 import { Route as AppDsgvoIdRouteImport } from './app/dsgvo/$id'
 import { Route as AppBerichteGeburtstageRouteImport } from './app/berichte/geburtstage'
 import { Route as AppBerichteFinanzenRouteImport } from './app/berichte/finanzen'
+import { Route as AppBerichteExportRouteImport } from './app/berichte/export'
 import { Route as AppBerichteEhrungenRouteImport } from './app/berichte/ehrungen'
 import { Route as AppBerichteBestandserhebungRouteImport } from './app/berichte/bestandserhebung'
 import { Route as AppBerichteAbteilungsStatistikRouteImport } from './app/berichte/abteilungs-statistik'
@@ -115,6 +120,21 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppZahlungsabgleichRoute = AppZahlungsabgleichRouteImport.update({
+  id: '/zahlungsabgleich',
+  path: '/zahlungsabgleich',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppWiedervorlagenRoute = AppWiedervorlagenRouteImport.update({
+  id: '/wiedervorlagen',
+  path: '/wiedervorlagen',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppRundschreibenRoute = AppRundschreibenRouteImport.update({
+  id: '/rundschreiben',
+  path: '/rundschreiben',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppPortalAnfragenRoute = AppPortalAnfragenRouteImport.update({
   id: '/portal-anfragen',
   path: '/portal-anfragen',
@@ -123,6 +143,11 @@ const AppPortalAnfragenRoute = AppPortalAnfragenRouteImport.update({
 const AppImportRoute = AppImportRouteImport.update({
   id: '/import',
   path: '/import',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppDatenqualitaetRoute = AppDatenqualitaetRouteImport.update({
+  id: '/datenqualitaet',
+  path: '/datenqualitaet',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppAuditRoute = AppAuditRouteImport.update({
@@ -218,6 +243,11 @@ const AppBerichteGeburtstageRoute = AppBerichteGeburtstageRouteImport.update({
 const AppBerichteFinanzenRoute = AppBerichteFinanzenRouteImport.update({
   id: '/berichte/finanzen',
   path: '/berichte/finanzen',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBerichteExportRoute = AppBerichteExportRouteImport.update({
+  id: '/berichte/export',
+  path: '/berichte/export',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppBerichteEhrungenRoute = AppBerichteEhrungenRouteImport.update({
@@ -331,8 +361,12 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
+  '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
+  '/app/rundschreiben': typeof AppRundschreibenRoute
+  '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
+  '/app/zahlungsabgleich': typeof AppZahlungsabgleichRoute
   '/invite/$token': typeof InviteTokenRoute
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
@@ -352,6 +386,7 @@ export interface FileRoutesByFullPath {
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
   '/app/berichte/bestandserhebung': typeof AppBerichteBestandserhebungRoute
   '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
+  '/app/berichte/export': typeof AppBerichteExportRoute
   '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
   '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
   '/app/dsgvo/$id': typeof AppDsgvoIdRoute
@@ -381,8 +416,12 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
+  '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
+  '/app/rundschreiben': typeof AppRundschreibenRoute
+  '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
+  '/app/zahlungsabgleich': typeof AppZahlungsabgleichRoute
   '/invite/$token': typeof InviteTokenRoute
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
@@ -402,6 +441,7 @@ export interface FileRoutesByTo {
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
   '/app/berichte/bestandserhebung': typeof AppBerichteBestandserhebungRoute
   '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
+  '/app/berichte/export': typeof AppBerichteExportRoute
   '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
   '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
   '/app/dsgvo/$id': typeof AppDsgvoIdRoute
@@ -434,8 +474,12 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
+  '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
+  '/app/rundschreiben': typeof AppRundschreibenRoute
+  '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
+  '/app/zahlungsabgleich': typeof AppZahlungsabgleichRoute
   '/invite/$token': typeof InviteTokenRoute
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
@@ -455,6 +499,7 @@ export interface FileRoutesById {
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
   '/app/berichte/bestandserhebung': typeof AppBerichteBestandserhebungRoute
   '/app/berichte/ehrungen': typeof AppBerichteEhrungenRoute
+  '/app/berichte/export': typeof AppBerichteExportRoute
   '/app/berichte/finanzen': typeof AppBerichteFinanzenRoute
   '/app/berichte/geburtstage': typeof AppBerichteGeburtstageRoute
   '/app/dsgvo/$id': typeof AppDsgvoIdRoute
@@ -488,8 +533,12 @@ export interface FileRouteTypes {
     | '/setup'
     | '/api/health'
     | '/app/audit'
+    | '/app/datenqualitaet'
     | '/app/import'
     | '/app/portal-anfragen'
+    | '/app/rundschreiben'
+    | '/app/wiedervorlagen'
+    | '/app/zahlungsabgleich'
     | '/invite/$token'
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
@@ -509,6 +558,7 @@ export interface FileRouteTypes {
     | '/app/berichte/abteilungs-statistik'
     | '/app/berichte/bestandserhebung'
     | '/app/berichte/ehrungen'
+    | '/app/berichte/export'
     | '/app/berichte/finanzen'
     | '/app/berichte/geburtstage'
     | '/app/dsgvo/$id'
@@ -538,8 +588,12 @@ export interface FileRouteTypes {
     | '/setup'
     | '/api/health'
     | '/app/audit'
+    | '/app/datenqualitaet'
     | '/app/import'
     | '/app/portal-anfragen'
+    | '/app/rundschreiben'
+    | '/app/wiedervorlagen'
+    | '/app/zahlungsabgleich'
     | '/invite/$token'
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
@@ -559,6 +613,7 @@ export interface FileRouteTypes {
     | '/app/berichte/abteilungs-statistik'
     | '/app/berichte/bestandserhebung'
     | '/app/berichte/ehrungen'
+    | '/app/berichte/export'
     | '/app/berichte/finanzen'
     | '/app/berichte/geburtstage'
     | '/app/dsgvo/$id'
@@ -590,8 +645,12 @@ export interface FileRouteTypes {
     | '/setup'
     | '/api/health'
     | '/app/audit'
+    | '/app/datenqualitaet'
     | '/app/import'
     | '/app/portal-anfragen'
+    | '/app/rundschreiben'
+    | '/app/wiedervorlagen'
+    | '/app/zahlungsabgleich'
     | '/invite/$token'
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
@@ -611,6 +670,7 @@ export interface FileRouteTypes {
     | '/app/berichte/abteilungs-statistik'
     | '/app/berichte/bestandserhebung'
     | '/app/berichte/ehrungen'
+    | '/app/berichte/export'
     | '/app/berichte/finanzen'
     | '/app/berichte/geburtstage'
     | '/app/dsgvo/$id'
@@ -731,6 +791,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/zahlungsabgleich': {
+      id: '/app/zahlungsabgleich'
+      path: '/zahlungsabgleich'
+      fullPath: '/app/zahlungsabgleich'
+      preLoaderRoute: typeof AppZahlungsabgleichRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/wiedervorlagen': {
+      id: '/app/wiedervorlagen'
+      path: '/wiedervorlagen'
+      fullPath: '/app/wiedervorlagen'
+      preLoaderRoute: typeof AppWiedervorlagenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/rundschreiben': {
+      id: '/app/rundschreiben'
+      path: '/rundschreiben'
+      fullPath: '/app/rundschreiben'
+      preLoaderRoute: typeof AppRundschreibenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/portal-anfragen': {
       id: '/app/portal-anfragen'
       path: '/portal-anfragen'
@@ -743,6 +824,13 @@ declare module '@tanstack/react-router' {
       path: '/import'
       fullPath: '/app/import'
       preLoaderRoute: typeof AppImportRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/datenqualitaet': {
+      id: '/app/datenqualitaet'
+      path: '/datenqualitaet'
+      fullPath: '/app/datenqualitaet'
+      preLoaderRoute: typeof AppDatenqualitaetRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/audit': {
@@ -869,6 +957,13 @@ declare module '@tanstack/react-router' {
       path: '/berichte/finanzen'
       fullPath: '/app/berichte/finanzen'
       preLoaderRoute: typeof AppBerichteFinanzenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/export': {
+      id: '/app/berichte/export'
+      path: '/berichte/export'
+      fullPath: '/app/berichte/export'
+      preLoaderRoute: typeof AppBerichteExportRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/berichte/ehrungen': {
@@ -1009,8 +1104,12 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
+  AppDatenqualitaetRoute: typeof AppDatenqualitaetRoute
   AppImportRoute: typeof AppImportRoute
   AppPortalAnfragenRoute: typeof AppPortalAnfragenRoute
+  AppRundschreibenRoute: typeof AppRundschreibenRoute
+  AppWiedervorlagenRoute: typeof AppWiedervorlagenRoute
+  AppZahlungsabgleichRoute: typeof AppZahlungsabgleichRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAdminErweitertRoute: typeof AppAdminErweitertRoute
   AppAdminSnapshotsRoute: typeof AppAdminSnapshotsRoute
@@ -1019,6 +1118,7 @@ interface AppRouteRouteChildren {
   AppBerichteAbteilungsStatistikRoute: typeof AppBerichteAbteilungsStatistikRoute
   AppBerichteBestandserhebungRoute: typeof AppBerichteBestandserhebungRoute
   AppBerichteEhrungenRoute: typeof AppBerichteEhrungenRoute
+  AppBerichteExportRoute: typeof AppBerichteExportRoute
   AppBerichteFinanzenRoute: typeof AppBerichteFinanzenRoute
   AppBerichteGeburtstageRoute: typeof AppBerichteGeburtstageRoute
   AppDsgvoIdRoute: typeof AppDsgvoIdRoute
@@ -1044,8 +1144,12 @@ interface AppRouteRouteChildren {
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAuditRoute: AppAuditRoute,
+  AppDatenqualitaetRoute: AppDatenqualitaetRoute,
   AppImportRoute: AppImportRoute,
   AppPortalAnfragenRoute: AppPortalAnfragenRoute,
+  AppRundschreibenRoute: AppRundschreibenRoute,
+  AppWiedervorlagenRoute: AppWiedervorlagenRoute,
+  AppZahlungsabgleichRoute: AppZahlungsabgleichRoute,
   AppIndexRoute: AppIndexRoute,
   AppAdminErweitertRoute: AppAdminErweitertRoute,
   AppAdminSnapshotsRoute: AppAdminSnapshotsRoute,
@@ -1054,6 +1158,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppBerichteAbteilungsStatistikRoute: AppBerichteAbteilungsStatistikRoute,
   AppBerichteBestandserhebungRoute: AppBerichteBestandserhebungRoute,
   AppBerichteEhrungenRoute: AppBerichteEhrungenRoute,
+  AppBerichteExportRoute: AppBerichteExportRoute,
   AppBerichteFinanzenRoute: AppBerichteFinanzenRoute,
   AppBerichteGeburtstageRoute: AppBerichteGeburtstageRoute,
   AppDsgvoIdRoute: AppDsgvoIdRoute,

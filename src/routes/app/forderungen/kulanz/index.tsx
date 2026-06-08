@@ -153,7 +153,7 @@ function KulanzPage() {
           />
           <Switch
             id="waive-return-fee"
-            label="SEPA-Rücklastgebühr erlassen"
+            label="SEPA-Gebühr erlassen"
             description="Aus Kulanz nur den offenen Beitrag fordern."
             checked={waiveReturnFee}
             onChange={(e) => setWaiveReturnFee(e.target.checked)}
@@ -263,7 +263,7 @@ function KulanzPage() {
             </span>
             {waiveReturnFee && Number.parseFloat(filteredTotals.feeSum) > 0 ? (
               <span className="text-xs text-muted-foreground">
-                Erlassene SEPA-Rücklastgebühr:{" "}
+                Erlassene SEPA-Gebühr:{" "}
                 <span className="tabular-nums">{formatCurrency(filteredTotals.feeSum)}</span>
               </span>
             ) : null}
@@ -321,7 +321,7 @@ function KulanzPage() {
         }}
         title="Sammelbrief erzeugen"
         description={`${filteredTotals.count} Schreiben mit Kündigungsbestätigung erzeugen?${
-          waiveReturnFee ? " Die SEPA-Rücklastgebühr wird aus Kulanz erlassen." : ""
+          waiveReturnFee ? " Die SEPA-Gebühr wird aus Kulanz erlassen." : ""
         } Es werden keine Mahnstufen verändert.`}
         confirmLabel="Erzeugen"
         loading={generate.isPending}

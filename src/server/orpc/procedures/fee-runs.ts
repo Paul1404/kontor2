@@ -2,14 +2,17 @@ import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import { getMailer } from "~/server/auth/send-invite";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { feeRunItemsTable, feeRunsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { memberDisplayName } from "~/server/domain/member";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { buildFeeRunPreview } from "~/server/sepa/build-fee-run";
 import { buildPain008, type Pain008Item } from "~/server/sepa/pain008";
+import { buildPrenotificationEmail } from "~/server/sepa/prenotification";
 
 const PreviewInput = v.object({
   billingYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
@@ -59,6 +62,69 @@ export const feeRunsRouter = {
     });
   }),
 
+  /**
+   * Compare what this year's run would produce against last year's postings,
+   * per contract: who is new, who fell away, and whose amount changed. Lets the
+   * Vorstand sanity-check a Beitragslauf before committing.
+   */
+  simulate: vorstandProc.input(PreviewInput).handler(async ({ context, input }) => {
+    const preview = await buildFeeRunPreview(context.db, {
+      billingYear: input.billingYear,
+      falligkeitsdatum: parseFalligkeit(input.falligkeitsdatum),
+      mandateOverrides: input.mandateOverrides,
+    });
+
+    const prevRows = await context.db
+      .select({
+        contractId: sollStellungenTable.contractId,
+        amount: sollStellungenTable.amount,
+        name: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
+      })
+      .from(sollStellungenTable)
+      .innerJoin(membersTable, eq(membersTable.id, sollStellungenTable.memberId))
+      .where(
+        and(
+          eq(sollStellungenTable.billingYear, input.billingYear - 1),
+          ne(sollStellungenTable.status, "cancelled"),
+        ),
+      );
+
+    const cents = (s: string) => Math.round(Number.parseFloat(s) * 100);
+    const prevByContract = new Map(prevRows.map((p) => [p.contractId, p]));
+    const thisByContract = new Map(preview.candidates.map((c) => [c.contractId, c]));
+
+    const added: Array<{ name: string; amount: string }> = [];
+    const changed: Array<{ name: string; from: string; to: string }> = [];
+    let unchangedCount = 0;
+    for (const c of preview.candidates) {
+      const prev = prevByContract.get(c.contractId);
+      if (!prev) {
+        added.push({ name: c.debtorName, amount: c.amount });
+      } else if (cents(prev.amount) !== cents(c.amount)) {
+        changed.push({ name: c.debtorName, from: prev.amount, to: c.amount });
+      } else {
+        unchangedCount += 1;
+      }
+    }
+    const removed = prevRows
+      .filter((p) => !thisByContract.has(p.contractId))
+      .map((p) => ({ name: p.name, amount: p.amount }));
+
+    const prevTotalCents = prevRows.reduce((s, p) => s + cents(p.amount), 0);
+    return {
+      thisYear: { count: preview.totals.count, total: preview.totals.grandTotal },
+      lastYear: {
+        year: input.billingYear - 1,
+        count: prevRows.length,
+        total: (prevTotalCents / 100).toFixed(2),
+      },
+      added: added.sort((a, b) => a.name.localeCompare(b.name)),
+      removed: removed.sort((a, b) => a.name.localeCompare(b.name)),
+      changed: changed.sort((a, b) => a.name.localeCompare(b.name)),
+      unchangedCount,
+    };
+  }),
+
   commit: vorstandProc.input(CommitInput).handler(async ({ context, input }) => {
     // Singleton org settings must exist before generating XML.
     const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
@@ -103,7 +169,7 @@ export const feeRunsRouter = {
 
     if (preview.candidates.length === 0) {
       throw new ORPCError("BAD_REQUEST", {
-        message: "Keine berechtigten Posten -- nichts zu erzeugen.",
+        message: "Keine berechtigten Posten. Es gibt nichts zu erzeugen.",
       });
     }
 
@@ -531,6 +597,121 @@ export const feeRunsRouter = {
       });
 
       return { ok: true };
+    }),
+
+  /** Counts for the pre-notification UI: how many debtors are reachable by email. */
+  prenotifyInfo: vorstandProc
+    .input(v.object({ id: v.string() }))
+    .handler(async ({ context, input }) => {
+      const [run] = await context.db
+        .select({
+          status: feeRunsTable.status,
+          falligkeitsdatum: feeRunsTable.falligkeitsdatum,
+          prenotifiedAt: feeRunsTable.prenotifiedAt,
+        })
+        .from(feeRunsTable)
+        .where(eq(feeRunsTable.id, input.id))
+        .limit(1);
+      if (!run) throw new ORPCError("NOT_FOUND", { message: "Beitragslauf nicht gefunden." });
+      const rows = await context.db
+        .select({ email: membersTable.email })
+        .from(feeRunItemsTable)
+        .innerJoin(membersTable, eq(membersTable.id, feeRunItemsTable.memberId))
+        .where(eq(feeRunItemsTable.feeRunId, input.id));
+      const withEmail = rows.filter((r) => !!r.email?.trim() && r.email.includes("@")).length;
+      return {
+        status: run.status,
+        falligkeitsdatum: run.falligkeitsdatum,
+        prenotifiedAt: run.prenotifiedAt,
+        total: rows.length,
+        withEmail,
+        withoutEmail: rows.length - withEmail,
+      };
+    }),
+
+  /** Send the SEPA pre-notification (Vorabankündigung) to every debtor with an email. */
+  sendPrenotifications: vorstandProc
+    .input(v.object({ id: v.string() }))
+    .handler(async ({ context, input }) => {
+      const [run] = await context.db
+        .select()
+        .from(feeRunsTable)
+        .where(eq(feeRunsTable.id, input.id))
+        .limit(1);
+      if (!run) throw new ORPCError("NOT_FOUND", { message: "Beitragslauf nicht gefunden." });
+      if (run.status !== "committed") {
+        throw new ORPCError("CONFLICT", {
+          message: "Vorabankündigungen nur für abgeschlossene Läufe möglich.",
+        });
+      }
+      const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+      const mailer = await getMailer();
+      if (!mailer) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "SMTP ist nicht konfiguriert. Bitte unter Einstellungen > SMTP einrichten.",
+        });
+      }
+
+      const items = await context.db
+        .select({
+          amount: feeRunItemsTable.amount,
+          mandateRef: feeRunItemsTable.mandateRef,
+          email: membersTable.email,
+          vorname: membersTable.vorname,
+          nachname: membersTable.nachname,
+          kurzname: membersTable.kurzname,
+          firma1: membersTable.firma1,
+          memberNo: membersTable.memberNo,
+          kontaktNo: membersTable.kontaktNo,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
+          adrNr: membersTable.adrNr,
+        })
+        .from(feeRunItemsTable)
+        .innerJoin(membersTable, eq(membersTable.id, feeRunItemsTable.memberId))
+        .where(eq(feeRunItemsTable.feeRunId, input.id));
+
+      let sent = 0;
+      let failed = 0;
+      let skipped = 0;
+      for (const it of items) {
+        const to = it.email?.trim();
+        if (!to?.includes("@")) {
+          skipped += 1;
+          continue;
+        }
+        const { subject, text } = buildPrenotificationEmail({
+          recipientName: memberDisplayName(it),
+          vereinsname: org?.vereinsname ?? "Ihr Verein",
+          glaeubigerId: org?.glaeubigerId ?? null,
+          mandateRef: it.mandateRef,
+          amount: it.amount,
+          falligkeitsdatum: run.falligkeitsdatum,
+          billingYear: run.billingYear,
+        });
+        try {
+          await mailer.send({ to, subject, text });
+          sent += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+
+      await context.db
+        .update(feeRunsTable)
+        .set({ prenotifiedAt: new Date() })
+        .where(eq(feeRunsTable.id, input.id));
+      await appendAudit(context.db, {
+        entityType: "fee_run",
+        entityId: input.id,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: { prenotificationsSent: { before: null, after: sent } },
+        requestId: context.requestId ?? null,
+      });
+
+      return { sent, failed, skipped, total: items.length };
     }),
 };
 

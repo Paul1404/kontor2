@@ -32,6 +32,31 @@ export function formatDateTime(value: Date | string | null | undefined): string 
   });
 }
 
+function utcDateString(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
+    d.getUTCDate(),
+  ).padStart(2, "0")}`;
+}
+
+/**
+ * Format a stored date for an `<input type="date">` value (YYYY-MM-DD).
+ * For string values take the calendar date verbatim. Round-tripping through
+ * `new Date(...).toISOString()` re-interprets a naive timestamp in the local
+ * timezone and can shift the day (e.g. "2020-01-15T00:00:00" -> "2020-01-14"
+ * west of UTC). Dates are stored as UTC midnight, so read Date objects with
+ * the UTC getters.
+ */
+export function toDateInput(value: string | Date | null | undefined): string {
+  if (!value) return "";
+  if (typeof value === "string") {
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    const parsed = new Date(value);
+    return Number.isFinite(parsed.getTime()) ? utcDateString(parsed) : "";
+  }
+  return Number.isFinite(value.getTime()) ? utcDateString(value) : "";
+}
+
 export function formatIbanMask(last4: string | null | undefined): string {
   if (!last4) return "";
   // Note: this mask assumes a DE IBAN (22 chars). Non-DE members would

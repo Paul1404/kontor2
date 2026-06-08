@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AbteilungenCard } from "~/components/forms/AbteilungenCard";
+import { AktivitaetTimeline } from "~/components/forms/AktivitaetTimeline";
 import { AttachmentsCard } from "~/components/forms/AttachmentsCard";
 import { AustrittDialog } from "~/components/forms/AustrittDialog";
 import { AustrittsbestaetigungCard } from "~/components/forms/AustrittsbestaetigungCard";
@@ -26,6 +27,7 @@ import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
 import { DsgvoCard } from "~/components/forms/DsgvoCard";
 import { SepaCard } from "~/components/forms/SepaCard";
+import { WiedervorlagenCard } from "~/components/forms/WiedervorlagenCard";
 import { SnapshotsTab } from "~/components/snapshots/SnapshotsTab";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -493,6 +495,8 @@ function MemberDetailPage() {
             beziehungen={beziehungen as never}
             canEdit={canEdit}
           />
+
+          <WiedervorlagenCard memberId={member.id} canEdit={canEdit} />
         </div>
       ) : null}
 
@@ -542,6 +546,8 @@ function MemberDetailPage() {
 
       {tab === "verlauf" ? (
         <div role="tabpanel" className="flex flex-col gap-6">
+          <AktivitaetTimeline memberId={member.id} />
+
           <SnapshotsTab
             memberId={member.id}
             mitgliedsnummer={mitgliedsnummer}

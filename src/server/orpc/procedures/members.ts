@@ -15,7 +15,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
-import { deriveStatus, type MemberStatus } from "~/server/domain/member";
+import { deriveGeschlecht, deriveStatus, type MemberStatus } from "~/server/domain/member";
 import { generateMemberNumber } from "~/server/domain/member-number";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
 import {
@@ -313,8 +313,12 @@ export const membersRouter = {
     }
     if (!input.deletedOnly && input.status === "passiv") {
       // The normalized status already means "passive and neither exited nor
-      // deceased" (deriveStatus precedence), so one check is enough.
+      // deceased" (deriveStatus precedence). The date guards are belt-and-braces
+      // in case status ever drifts from the exit/death dates (e.g. a raw field
+      // restore that wrote `austritt` without re-deriving status).
       conditions.push(eq(membersTable.status, "passiv") as never);
+      conditions.push(isNull(membersTable.austritt) as never);
+      conditions.push(isNull(membersTable.verstorbenAm) as never);
     }
 
     // "Verwaiste Kontakte" filter: Kontakt (no mitgliedsnummer) AND no relationship
@@ -432,6 +436,10 @@ export const membersRouter = {
             eq(membersTable.mitgliedsnummer, ref),
           ),
         )
+        // A soft-deleted row can share a reused number with a live one (the
+        // unique indexes are partial on deletedAt IS NULL). Prefer the live row
+        // so a reference never resolves to the deleted predecessor.
+        .orderBy(sql`${membersTable.deletedAt} asc nulls first`)
         .limit(1);
       let m = rows[0];
       if (!m) {
@@ -711,8 +719,15 @@ export const membersRouter = {
         // unchanged row compares equal to the millisecond.
         if (input.expectedUpdatedAt) {
           const expectedMs = new Date(input.expectedUpdatedAt).getTime();
+          if (!Number.isFinite(expectedMs)) {
+            throw new ORPCError("VALIDATION_FAILED", {
+              message: "Ungültiger Bearbeitungsstand. Bitte Seite neu laden.",
+            });
+          }
           const currentMs = existing.updatedAt?.getTime() ?? null;
-          if (Number.isFinite(expectedMs) && currentMs !== null && currentMs !== expectedMs) {
+          // A missing current timestamp or a mismatch both mean we can't prove
+          // the row is unchanged -- refuse rather than silently clobber.
+          if (currentMs === null || currentMs !== expectedMs) {
             throw new ORPCError("CONFLICT", {
               message:
                 "Die Daten wurden zwischenzeitlich von jemand anderem geändert. Bitte Seite neu laden und erneut speichern.",
@@ -800,6 +815,11 @@ export const membersRouter = {
         throw new ORPCError("VALIDATION_FAILED", {
           message: "Vor- oder Nachname ist erforderlich.",
         });
+      }
+      // Seed the explicit gender from the Anrede when the form left it open, so
+      // a new member is not silently "unbekannt" on the dashboard.
+      if (patch.geschlecht == null) {
+        patch.geschlecht = deriveGeschlecht(input.patch.anrede);
       }
 
       // Single transaction: allocate the internal AdrNr (still a sequential
@@ -1523,6 +1543,9 @@ export const membersRouter = {
         throw new ORPCError("VALIDATION_FAILED", {
           message: "Vor- oder Nachname ist erforderlich.",
         });
+      }
+      if (patch.geschlecht == null) {
+        patch.geschlecht = deriveGeschlecht(input.patch.anrede);
       }
 
       const actorId = context.session!.user.id;

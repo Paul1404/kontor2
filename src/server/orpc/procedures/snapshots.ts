@@ -27,6 +27,16 @@ const NON_RESTORABLE_FIELDS = new Set([
   "updatedAt",
   "lastImportedAt",
   "importBatchId",
+  // Identifiers and soft-delete state are lifecycle-owned, not field-restorable.
+  // Restoring a stale member_no/kontakt_no could collide with a number since
+  // reused by another live member (the unique indexes are partial on
+  // deletedAt IS NULL); restoring adr_nr would desync the member from its
+  // contracts/SEPA/relationships and the next import; restoring deletedAt could
+  // silently (un)delete a live member.
+  "memberNo",
+  "kontaktNo",
+  "adrNr",
+  "deletedAt",
 ]);
 
 function buildRestorePatch(snapshotMember: Record<string, unknown>): Record<string, unknown> {

@@ -66,6 +66,8 @@ export const feeRunsTable = pgTable(
     xmlFilename: text("xml_filename"),
     xmlContent: text("xml_content"),
     notes: text("notes"),
+    /** When the SEPA pre-notification (Vorabankündigung) emails were last sent. */
+    prenotifiedAt: timestamp("prenotified_at", { withTimezone: true }),
     /** Provenance. `linear_import` rows aren't editable / re-submittable. */
     source: feeRunSourceEnum("source").notNull().default("app"),
     /**

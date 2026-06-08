@@ -1,7 +1,9 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   AlertTriangle,
   Building2,
+  ClipboardList,
   Clock,
   Coins,
   FileBarChart,
@@ -10,9 +12,12 @@ import {
   FileWarning,
   History,
   Inbox,
+  Landmark,
   Layers,
   LayoutDashboard,
+  ListChecks,
   Mail,
+  Mails,
   ScrollText,
   ShieldCheck,
   UserCog,
@@ -22,6 +27,7 @@ import {
 import { type ReactNode, useEffect } from "react";
 import { VersionChip } from "~/components/ui/version-chip";
 import { cn } from "~/lib/cn";
+import { orpc } from "~/lib/orpc";
 import { useRecentMembers } from "~/lib/use-recent-members";
 
 type NavItem = {
@@ -44,6 +50,12 @@ const SECTIONS: NavSection[] = [
       { to: "/app", label: "Dashboard", icon: <LayoutDashboard className="size-[18px]" /> },
       { to: "/app/mitglieder", label: "Mitglieder", icon: <Users className="size-[18px]" /> },
       {
+        to: "/app/wiedervorlagen",
+        label: "Wiedervorlagen",
+        icon: <ClipboardList className="size-[18px]" />,
+        vorstandOnly: true,
+      },
+      {
         to: "/app/beitrag",
         label: "Beitragsläufe",
         icon: <Coins className="size-[18px]" />,
@@ -56,9 +68,27 @@ const SECTIONS: NavSection[] = [
         vorstandOnly: true,
       },
       {
+        to: "/app/zahlungsabgleich",
+        label: "Zahlungsabgleich",
+        icon: <Landmark className="size-[18px]" />,
+        vorstandOnly: true,
+      },
+      {
         to: "/app/berichte",
         label: "Berichte",
         icon: <FileBarChart className="size-[18px]" />,
+        vorstandOnly: true,
+      },
+      {
+        to: "/app/rundschreiben",
+        label: "Rundschreiben",
+        icon: <Mails className="size-[18px]" />,
+        vorstandOnly: true,
+      },
+      {
+        to: "/app/datenqualitaet",
+        label: "Datenqualität",
+        icon: <ListChecks className="size-[18px]" />,
         vorstandOnly: true,
       },
       { to: "/app/audit", label: "Audit Log", icon: <ScrollText className="size-[18px]" /> },
@@ -144,6 +174,25 @@ function SidebarBody({
 }) {
   const { location } = useRouterState();
   const { recent } = useRecentMembers();
+  // Open data-quality issues drive a badge on the nav item. Vorstand+ only;
+  // kept warm for 5 minutes so navigation does not re-run the check.
+  const canSeeDq = role === "vorstand" || role === "admin";
+  const dq = useQuery({
+    queryKey: ["dataQuality.summary"],
+    queryFn: () => orpc.dataQuality.summary(),
+    enabled: canSeeDq,
+    staleTime: 5 * 60 * 1000,
+  });
+  const dqCount = dq.data?.total ?? 0;
+  // Open Wiedervorlagen drive a badge; overdue ones turn it red.
+  const tasks = useQuery({
+    queryKey: ["tasks.counts"],
+    queryFn: () => orpc.tasks.counts(),
+    enabled: canSeeDq,
+    staleTime: 5 * 60 * 1000,
+  });
+  const taskOpen = tasks.data?.open ?? 0;
+  const taskOverdue = tasks.data?.overdue ?? 0;
   return (
     <>
       <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
@@ -216,6 +265,23 @@ function SidebarBody({
                       {n.icon}
                     </span>
                     {n.label}
+                    {n.to === "/app/datenqualitaet" && dqCount > 0 ? (
+                      <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500/15 px-1.5 text-[11px] font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                        {dqCount}
+                      </span>
+                    ) : null}
+                    {n.to === "/app/wiedervorlagen" && taskOpen > 0 ? (
+                      <span
+                        className={cn(
+                          "ml-auto inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums",
+                          taskOverdue > 0
+                            ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                            : "bg-sidebar-accent text-sidebar-foreground/80",
+                        )}
+                      >
+                        {taskOpen}
+                      </span>
+                    ) : null}
                   </Link>
                 );
               })}

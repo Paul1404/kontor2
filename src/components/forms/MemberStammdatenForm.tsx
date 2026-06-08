@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { LAND_OPTIONS } from "~/lib/country";
+import { toDateInput } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export type StammdatenValues = {
@@ -75,28 +76,6 @@ export const EMPTY_STAMM: StammdatenValues = {
   vertreterOrt: "",
   notes: "",
 };
-
-function toDateInput(value: string | Date | null | undefined): string {
-  if (!value) return "";
-  // For string values take the calendar date verbatim. Round-tripping through
-  // `new Date(...).toISOString()` re-interprets a naive timestamp in the local
-  // timezone and can shift the day (e.g. "2020-01-15T00:00:00" -> "2020-01-14"
-  // west of UTC). Dates are stored as UTC midnight, so read Date objects with
-  // the UTC getters.
-  if (typeof value === "string") {
-    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-    const parsed = new Date(value);
-    return Number.isFinite(parsed.getTime()) ? utcDateString(parsed) : "";
-  }
-  return Number.isFinite(value.getTime()) ? utcDateString(value) : "";
-}
-
-function utcDateString(d: Date): string {
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
-    d.getUTCDate(),
-  ).padStart(2, "0")}`;
-}
 
 function calcAge(yyyymmdd: string): string {
   const m = yyyymmdd.match(/^(\d{4})-(\d{2})-(\d{2})$/);

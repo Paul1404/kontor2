@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { formatCurrency, formatDate } from "~/lib/format";
+import { formatCurrency, formatDate, toDateInput } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 type Contract = {
@@ -15,9 +15,12 @@ type Contract = {
   art: number;
   artName: string | null;
   betrag: string | null;
+  aufnahmegeb?: string | null;
+  sollstellung?: string | null;
   vertragBegin: string | Date | null;
   vertragEnde: string | Date | null;
   gekuendAm: string | Date | null;
+  gekuendZum?: string | Date | null;
 };
 
 export function ContractsCard({
@@ -33,6 +36,7 @@ export function ContractsCard({
 }) {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
+  const [editTarget, setEditTarget] = useState<Contract | null>(null);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
 
@@ -76,6 +80,17 @@ export function ContractsCard({
           />
         ) : null}
 
+        {editTarget && canEdit ? (
+          <EditContractForm
+            contract={editTarget}
+            onCancel={() => setEditTarget(null)}
+            onSaved={async () => {
+              setEditTarget(null);
+              await refresh();
+            }}
+          />
+        ) : null}
+
         {vertraege.length === 0 ? (
           <p className="text-sm text-muted-foreground">Keine Verträge.</p>
         ) : (
@@ -87,7 +102,7 @@ export function ContractsCard({
                 <th className="py-1 pr-3 text-right">Betrag</th>
                 <th className="py-1 px-3">Beginn</th>
                 <th className="py-1 px-3">Ende</th>
-                {canEdit ? <th className="py-1 w-10" /> : null}
+                {canEdit ? <th className="py-1 w-20" /> : null}
               </tr>
             </thead>
             <tbody>
@@ -107,7 +122,16 @@ export function ContractsCard({
                       {formatDate(v.vertragEnde) || (v.gekuendAm ? formatDate(v.gekuendAm) : "")}
                     </td>
                     {canEdit ? (
-                      <td className="py-1 text-right">
+                      <td className="py-1 text-right whitespace-nowrap">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditTarget(v)}
+                          disabled={isDeleting}
+                          title="Vertrag bearbeiten"
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -306,6 +330,170 @@ function AddContractForm({
             <Plus className="size-4" />
           )}
           Anlegen
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function EditContractForm({
+  contract,
+  onCancel,
+  onSaved,
+}: {
+  contract: Contract;
+  onCancel: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  // Beitragsart stays fixed here: it drives Bezeichnung and Betrag and is the
+  // contract's identity. To change it, delete and re-create. Everything else
+  // about the running contract is editable in place.
+  const [vertragNr, setVertragNr] = useState(contract.vertragNr);
+  const [betrag, setBetrag] = useState(contract.betrag ?? "");
+  const [vertragBegin, setVertragBegin] = useState(toDateInput(contract.vertragBegin));
+  const [vertragEnde, setVertragEnde] = useState(toDateInput(contract.vertragEnde));
+  const [gekuendAm, setGekuendAm] = useState(toDateInput(contract.gekuendAm));
+  const [gekuendZum, setGekuendZum] = useState(toDateInput(contract.gekuendZum));
+  const [error, setError] = useState<string | null>(null);
+  const vertragNrId = useId();
+  const betragId = useId();
+  const beginId = useId();
+  const endeId = useId();
+  const gekuendAmId = useId();
+  const gekuendZumId = useId();
+
+  const save = useMutation({
+    mutationFn: () => {
+      if (!vertragNr.trim()) throw new Error("Vertragsnummer ist erforderlich.");
+      return orpc.contracts.update({
+        id: contract.id,
+        patch: {
+          vertragNr: vertragNr.trim(),
+          art: contract.art,
+          artName: contract.artName ?? null,
+          betrag: betrag.trim() || null,
+          // Preserve fields not exposed in this form so the full-overwrite
+          // update on the server does not null them out.
+          aufnahmegeb: contract.aufnahmegeb ?? null,
+          sollstellung: contract.sollstellung ?? null,
+          vertragBegin: vertragBegin || null,
+          vertragEnde: vertragEnde || null,
+          gekuendAm: gekuendAm || null,
+          gekuendZum: gekuendZum || null,
+        },
+      });
+    },
+    onSuccess: () => onSaved(),
+    onError: (e: unknown) => setError(e instanceof Error ? e.message : "Speichern fehlgeschlagen."),
+  });
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">
+        Vertrag bearbeiten · {contract.artName ?? `Art ${contract.art}`}
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor={vertragNrId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Vertragsnummer
+          </Label>
+          <Input
+            id={vertragNrId}
+            value={vertragNr}
+            onChange={(e) => setVertragNr(e.target.value)}
+            required
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor={betragId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Betrag (EUR)
+          </Label>
+          <Input
+            id={betragId}
+            inputMode="decimal"
+            value={betrag}
+            onChange={(e) => setBetrag(e.target.value)}
+            placeholder="z. B. 60,00"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor={beginId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Beginn
+          </Label>
+          <Input
+            id={beginId}
+            type="date"
+            value={vertragBegin}
+            onChange={(e) => setVertragBegin(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={endeId} className="text-xs uppercase tracking-wide text-muted-foreground">
+            Ende
+          </Label>
+          <Input
+            id={endeId}
+            type="date"
+            value={vertragEnde}
+            onChange={(e) => setVertragEnde(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor={gekuendAmId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Gekündigt am
+          </Label>
+          <Input
+            id={gekuendAmId}
+            type="date"
+            value={gekuendAm}
+            onChange={(e) => setGekuendAm(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor={gekuendZumId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Gekündigt zum
+          </Label>
+          <Input
+            id={gekuendZumId}
+            type="date"
+            value={gekuendZum}
+            onChange={(e) => setGekuendZum(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+          Abbrechen
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => {
+            setError(null);
+            save.mutate();
+          }}
+          disabled={!vertragNr.trim() || save.isPending}
+        >
+          {save.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+          Speichern
         </Button>
       </div>
     </div>

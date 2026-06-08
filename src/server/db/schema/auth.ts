@@ -58,12 +58,17 @@ export const verifications = pgTable("verifications", {
 });
 
 /**
- * Admin-issued invites. The token is what the user receives by mail and brings
- * back to /invite/:token to set a password and become a user.
+ * Admin-issued invites. The raw token is mailed to the user and brought back to
+ * /invite/:token to set a password. Only the SHA-256 hash is stored, never the
+ * raw token, so a database/backup leak cannot be replayed to self-provision an
+ * account (mirrors the portal magic-link design).
  */
 export const invitations = pgTable("invitations", {
   id: text("id").primaryKey(),
-  token: text("token").notNull().unique(),
+  /** Deprecated: legacy plaintext token column. New invites leave this null. */
+  token: text("token"),
+  /** SHA-256 of the raw token; the value actually looked up. */
+  tokenHash: text("token_hash").unique(),
   email: text("email").notNull(),
   role: roleEnum("role").notNull(),
   invitedBy: text("invited_by")

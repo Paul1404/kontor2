@@ -15,8 +15,6 @@ export type KulanzPosting = {
   falligkeitsdatum: string;
   description: string;
   openAmount: string;
-  /** SEPA return fee already folded into the member's openSum, if any. */
-  rueckgebuhr: string;
 };
 
 export type KulanzClubInput = {
@@ -81,7 +79,6 @@ export type KulanzLetterInput = {
     name: string;
   };
   postings: KulanzPosting[];
-  openSum: string;
   /** Letter date (ISO yyyy-mm-dd). */
   runDate: string;
   /** Payment deadline (ISO yyyy-mm-dd). */
@@ -90,8 +87,14 @@ export type KulanzLetterInput = {
   /** Contact mailbox for a formless cancellation by email, or null. */
   kontaktEmail: string | null;
   /**
-   * Waive the SEPA return fee out of goodwill: drop it from the amount due and
-   * state in the letter that it was erlassen. Off by default.
+   * Flat SEPA fee (org setting `sepaReturnFee`) added to every Kulanz letter on
+   * top of the Beiträge, shown as its own line. "0", null or undefined means no
+   * fee line is printed.
+   */
+  sepaFee?: string | null;
+  /**
+   * Waive the SEPA fee out of goodwill: drop it from the amount due and state in
+   * the letter that it was erlassen. Off by default.
    */
   waiveReturnFee?: boolean;
 };
@@ -121,15 +124,15 @@ export type KulanzLetterModel = {
   verwendungszweck: string;
   postings: KulanzPostingRow[];
   /**
-   * Combined SEPA return fees as a separate positive line, or null when there
-   * are none. Shown whenever a fee exists; when waived, `rueckgebuhrErlass`
-   * subtracts the same amount again on the following line.
+   * Flat SEPA fee as a separate positive line, or null when no fee is set.
+   * Shown on every letter; when waived, `rueckgebuhrErlass` subtracts the same
+   * amount again on the following line.
    */
   rueckgebuhr: string | null;
   /**
-   * Goodwill waiver of the SEPA return fee as a negative line ("-3,00 €"), or
-   * null when nothing is waived. Pairs with `rueckgebuhr` so the rows net out
-   * to the bare Beitrag.
+   * Goodwill waiver of the SEPA fee as a negative line ("-3,00 €"), or null when
+   * nothing is waived. Pairs with `rueckgebuhr` so the rows net out to the bare
+   * Beitrag.
    */
   rueckgebuhrErlass: string | null;
   /** Sentence stating the fee was waived, shown when `rueckgebuhrErlass` is set. */
@@ -248,23 +251,25 @@ export function buildKulanzLetterModel(input: KulanzLetterInput): KulanzLetterMo
     offen: `${fmtKulanzMoney(p.openAmount)} €`,
   }));
 
-  // SEPA return fees are folded into the member's openSum upstream, but the
-  // posting rows only show the Beitrag. Surface the combined fee as its own
-  // positive line so the visible rows reconcile with the printed total. When
-  // waived out of goodwill, a second line subtracts the same amount again, so
-  // the goodwill is visible in the table and the total drops to the bare Beitrag.
-  let feeCents = 0;
-  for (const p of input.postings) feeCents += Math.round(Number.parseFloat(p.rueckgebuhr) * 100);
+  // A flat SEPA fee (org setting) is added to every Kulanz letter on top of the
+  // Beiträge and surfaced as its own positive line. When waived out of goodwill,
+  // a second line subtracts the same amount again, so the goodwill is visible in
+  // the table and the total drops back to the bare Beitrag.
+  const beitragCents = input.postings.reduce(
+    (sum, p) => sum + Math.round(Number.parseFloat(p.openAmount) * 100),
+    0,
+  );
+  const feeRaw = Math.round(Number.parseFloat(input.sepaFee ?? "0") * 100);
+  const feeCents = Number.isFinite(feeRaw) && feeRaw > 0 ? feeRaw : 0;
   const waive = !!input.waiveReturnFee && feeCents > 0;
   const feeFmt = feeCents > 0 ? `${fmtKulanzMoney((feeCents / 100).toFixed(2))} €` : null;
   const rueckgebuhr = feeFmt;
   const rueckgebuhrErlass = waive ? `-${feeFmt}` : null;
 
-  const openSumCents = Math.round(Number.parseFloat(input.openSum) * 100);
-  const dueCents = waive ? openSumCents - feeCents : openSumCents;
+  const dueCents = waive ? beitragCents : beitragCents + feeCents;
 
   const feeWaiverNote = waive
-    ? `Die SEPA-Rücklastgebühr in Höhe von ${feeFmt} erlassen wir Ihnen aus Kulanz. ` +
+    ? `Die SEPA-Gebühr in Höhe von ${feeFmt} erlassen wir Ihnen aus Kulanz. ` +
       `Bitte überweisen Sie nur den offenen Mitgliedsbeitrag.`
     : null;
 

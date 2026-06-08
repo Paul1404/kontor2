@@ -80,6 +80,32 @@ export function isMinorAt(birth: Date | string | null | undefined, asOf: Date): 
   return age !== null && age < 18;
 }
 
+/** The explicit gender enum value, independent of the Anrede. */
+export type Geschlecht = "m" | "w" | "d" | "unbekannt";
+
+/**
+ * Best-effort gender from the free-text Anrede. Linear stored no explicit
+ * gender column -- only the Anrede ("Herr"/"Frau") -- so this is the single
+ * signal available at import time. Returns the enum value, or null when the
+ * Anrede is not a clear gender marker (e.g. "Familie", "Firma", a bare title,
+ * or empty). We keep that honest as "unknown" rather than guessing, so the
+ * dashboard shows the real data gap instead of inventing a 50/50 split.
+ *
+ * This is a derivation, not the source of truth: a Vorstand can always correct
+ * `geschlecht` in the edit form, and the importer never overwrites a value that
+ * is already set.
+ */
+export function deriveGeschlecht(anrede: string | null | undefined): "m" | "w" | "d" | null {
+  const a = (anrede ?? "").trim().toLowerCase();
+  if (!a) return null;
+  if (a === "herr" || a === "hr" || a === "hr." || a === "herrn" || a.startsWith("herr ")) {
+    return "m";
+  }
+  if (a === "frau" || a === "fr" || a === "fr." || a.startsWith("frau ")) return "w";
+  if (a === "divers") return "d";
+  return null;
+}
+
 /**
  * Render a member's display name with the same fallback chain the app has
  * always used: full name, then Kurzname, then Firma, then a numeric reference.

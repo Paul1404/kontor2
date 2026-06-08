@@ -124,14 +124,14 @@ function KulanzLetterPage({
         {letter.rueckgebuhr ? (
           <View style={styles.tableRow} wrap={false}>
             <Text style={styles.c1}> </Text>
-            <Text style={styles.c2}>SEPA-Rücklastgebühr</Text>
+            <Text style={styles.c2}>SEPA-Gebühr</Text>
             <Text style={styles.c3}>{letter.rueckgebuhr}</Text>
           </View>
         ) : null}
         {letter.rueckgebuhrErlass ? (
           <View style={styles.tableRow} wrap={false}>
             <Text style={styles.c1}> </Text>
-            <Text style={styles.c2}>SEPA-Rücklastgebühr (aus Kulanz erlassen)</Text>
+            <Text style={styles.c2}>SEPA-Gebühr (aus Kulanz erlassen)</Text>
             <Text style={styles.c3}>{letter.rueckgebuhrErlass}</Text>
           </View>
         ) : null}

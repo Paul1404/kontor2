@@ -236,6 +236,10 @@ export async function loadOpenPostings(
         // Skip soft-deleted members; a deleted member must never receive a
         // Mahnung. The legacy `geloscht` flag is folded into `deletedAt`.
         memberNotDeleted(),
+        // Never dun a deceased member -- a Mahnung addressed to the dead is a
+        // DSGVO and reputational problem. Exited members may still owe from
+        // before they left, so they are intentionally not excluded here.
+        ne(membersTable.status, "verstorben"),
       ),
     )
     .orderBy(membersTable.nachname, membersTable.vorname, sollStellungenTable.billingYear);

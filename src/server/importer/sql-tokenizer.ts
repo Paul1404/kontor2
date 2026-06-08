@@ -366,6 +366,11 @@ export function coerceDecimal(value: Cell): string | null {
   if (s.includes(",")) {
     if (s.includes(".")) s = s.replace(/\./g, "");
     s = s.replace(",", ".");
+  } else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) {
+    // No comma but a clean thousands grouping ("1.234", "1.234.567"): the dots
+    // are groupers, not a decimal point, so "1.234" is 1234 not 1.234. A lone
+    // "1.23" (two trailing digits) is left as a decimal.
+    s = s.replace(/\./g, "");
   }
   const n = Number(s);
   return Number.isFinite(n) ? String(n) : null;

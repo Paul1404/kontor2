@@ -41,6 +41,105 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.21.0",
+    date: "2026-06-08",
+    title: "Wiedervorlagen, Verlauf und Finanz-Werkzeuge",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Sicherheit: Einladungs-Links werden jetzt nur noch als Hash gespeichert, nicht mehr im Klartext. Bereits versendete, noch offene Einladungen werden dadurch ungültig und müssen einmalig neu verschickt werden.",
+      },
+      {
+        category: "feature",
+        description:
+          "Wiedervorlagen: Aufgaben mit Fälligkeit pro Mitglied anlegen (etwa IBAN nachfordern), direkt am Mitglied abhaken und in einer gemeinsamen Liste über alle Mitglieder abarbeiten. Überfällige werden in der Seitenleiste rot markiert.",
+      },
+      {
+        category: "feature",
+        description:
+          "Neuer Aktivitäts-Verlauf am Mitglied im Reiter Verlauf: Änderungen, Mahnungen, Kulanz-Schreiben, Rundschreiben und SEPA-Rückläufer in einer gemeinsamen Zeitleiste, neueste zuerst.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Schnellbearbeitung in der Mitgliederliste: Status (aktiv/passiv) direkt am Eintrag umschalten und ein Mitglied per Klick einer Abteilung zuordnen, ohne die Detailseite zu öffnen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Schnellsuche (Strg/Cmd K) findet jetzt auch Verträge und SEPA-Mandate und springt direkt zum zugehörigen Mitglied. Außerdem lässt sich der Suchbegriff mit einem Klick im Audit-Log nachschlagen.",
+      },
+      {
+        category: "feature",
+        description:
+          "Neues Export-Center unter Berichte: Mitgliederliste, Geburtstage, Ehrungen, Abteilungs-Statistik und Finanzbericht als CSV an einer Stelle, jeweils mit Jahr- und Monatsauswahl.",
+      },
+      {
+        category: "feature",
+        description:
+          "SEPA-Vorabankündigung: Am abgeschlossenen Beitragslauf lässt sich jedem Zahler der bevorstehende Einzug per E-Mail ankündigen (Betrag, Fälligkeit, Mandatsreferenz, Gläubiger-ID). Der Versandzeitpunkt wird am Lauf vermerkt.",
+      },
+      {
+        category: "feature",
+        description:
+          "Beitragslauf-Vorschau zeigt auf Wunsch einen Vorjahresvergleich: wer neu dazukommt, wer wegfällt und bei wem sich der Betrag ändert, mit Summen für beide Jahre. So lässt sich ein Lauf vor dem Abschluss prüfen.",
+      },
+      {
+        category: "feature",
+        description:
+          "Serienbrief als PDF: Aus dem Rundschreiben lässt sich für alle Mitglieder ohne E-Mail ein fertiges PDF mit einem Brief je Empfänger im DIN-5008-Format erzeugen, mit denselben Platzhaltern wie die E-Mail. So ist jedes Mitglied digital oder per Post erreichbar.",
+      },
+      {
+        category: "feature",
+        description:
+          "Zahlungsabgleich: Den CSV-Export der Bankumsätze hochladen, Gutschriften werden automatisch offenen Posten zugeordnet (über Mitgliedsnummer, Name und Betrag). Sichere Treffer sind vorausgewählt, nach Bestätigung werden die Posten als bezahlt verbucht.",
+      },
+    ],
+  },
+  {
+    version: "0.20.0",
+    date: "2026-06-08",
+    title: "Verträge und SEPA-Mandate bearbeiten",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Bestehende Verträge lassen sich jetzt direkt bearbeiten: Vertragsnummer, Betrag, Beginn, Ende und Kündigungsdaten ändern, ohne den Vertrag löschen und neu anlegen zu müssen.",
+      },
+      {
+        category: "feature",
+        description:
+          "SEPA-Mandate sind bearbeitbar: Typ, Lastschriftart, Unterschriftsdatum sowie Gültig ab und Gültig bis lassen sich nachträglich anpassen.",
+      },
+      {
+        category: "feature",
+        description:
+          "Der Kulanz-Brief weist jetzt auf jedem Schreiben die SEPA-Gebühr aus den Vereinsdaten als eigene Position aus und rechnet sie zum offenen Betrag hinzu. Beim Erlass aus Kulanz wird sie wieder abgezogen. Den Betrag pflegst du unter Einstellungen, Vereinsdaten.",
+      },
+      {
+        category: "feature",
+        description:
+          "Neue Seite Datenqualität prüft den Bestand auf typische Lücken: Lastschrift ohne SEPA-Mandat oder IBAN, fehlende E-Mail oder Anschrift, Minderjährige ohne gesetzliche Vertretung, Verträge ohne Beitragsart, Austritte mit offenem Vertrag und mögliche Dubletten. Jeder Treffer verlinkt direkt zum Mitglied, die Anzahl offener Hinweise steht als Zähler in der Seitenleiste.",
+      },
+      {
+        category: "feature",
+        description:
+          "Das Dashboard hat einen neuen Bereich Auswertungen: Mitgliederentwicklung über zehn Jahre, Ein- und Austritte pro Jahr, Beitragsvolumen mit Soll und Bezahlt, Zahlart-Verteilung und offene Posten nach Mahnstufe. Die Altersstruktur zeigt jetzt eine Pyramide nach Geschlecht.",
+      },
+      {
+        category: "fix",
+        description:
+          "Das Geschlecht wird jetzt korrekt als eigenes Merkmal geführt und nicht mehr mit der Anrede verwechselt. Bei Import und Neuanlage wird es aus der Anrede abgeleitet (Herr, Frau), lässt sich aber jederzeit im Mitglied überschreiben. Für den vorhandenen Bestand einmalig den Befehl db:backfill:geschlecht ausführen, danach stimmt die Geschlechter-Auswertung im Dashboard.",
+      },
+      {
+        category: "feature",
+        description:
+          "Neue Rundschreiben-Funktion: eine E-Mail an ein ganzes Segment (aktiv, passiv, einzelne Abteilung) mit Platzhaltern für Anrede, Vorname, Nachname und Mitgliedsnummer. Vorschau, Testmail an sich selbst, Versandprotokoll je Empfänger und ein Adress-Export für Mitglieder ohne E-Mail, damit auch sie per Serienbrief erreichbar bleiben.",
+      },
+    ],
+  },
+  {
     version: "0.19.0",
     date: "2026-06-08",
     title: "Eigene Mitglieds- und Kontaktnummern",
