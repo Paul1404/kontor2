@@ -313,8 +313,12 @@ export const membersRouter = {
     }
     if (!input.deletedOnly && input.status === "passiv") {
       // The normalized status already means "passive and neither exited nor
-      // deceased" (deriveStatus precedence), so one check is enough.
+      // deceased" (deriveStatus precedence). The date guards are belt-and-braces
+      // in case status ever drifts from the exit/death dates (e.g. a raw field
+      // restore that wrote `austritt` without re-deriving status).
       conditions.push(eq(membersTable.status, "passiv") as never);
+      conditions.push(isNull(membersTable.austritt) as never);
+      conditions.push(isNull(membersTable.verstorbenAm) as never);
     }
 
     // "Verwaiste Kontakte" filter: Kontakt (no mitgliedsnummer) AND no relationship
@@ -432,6 +436,10 @@ export const membersRouter = {
             eq(membersTable.mitgliedsnummer, ref),
           ),
         )
+        // A soft-deleted row can share a reused number with a live one (the
+        // unique indexes are partial on deletedAt IS NULL). Prefer the live row
+        // so a reference never resolves to the deleted predecessor.
+        .orderBy(sql`${membersTable.deletedAt} asc nulls first`)
         .limit(1);
       let m = rows[0];
       if (!m) {
@@ -711,8 +719,15 @@ export const membersRouter = {
         // unchanged row compares equal to the millisecond.
         if (input.expectedUpdatedAt) {
           const expectedMs = new Date(input.expectedUpdatedAt).getTime();
+          if (!Number.isFinite(expectedMs)) {
+            throw new ORPCError("VALIDATION_FAILED", {
+              message: "Ungültiger Bearbeitungsstand. Bitte Seite neu laden.",
+            });
+          }
           const currentMs = existing.updatedAt?.getTime() ?? null;
-          if (Number.isFinite(expectedMs) && currentMs !== null && currentMs !== expectedMs) {
+          // A missing current timestamp or a mismatch both mean we can't prove
+          // the row is unchanged -- refuse rather than silently clobber.
+          if (currentMs === null || currentMs !== expectedMs) {
             throw new ORPCError("CONFLICT", {
               message:
                 "Die Daten wurden zwischenzeitlich von jemand anderem geändert. Bitte Seite neu laden und erneut speichern.",

@@ -77,8 +77,11 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
     conditions.push(isNull(membersTable.verstorbenAm) as never);
   }
   if (input.status === "passiv") {
-    // The normalized status already implies neither exited nor deceased.
+    // The normalized status already implies neither exited nor deceased; the
+    // date guards keep the export correct even if status ever drifts.
     conditions.push(eq(membersTable.status, "passiv") as never);
+    conditions.push(isNull(membersTable.austritt) as never);
+    conditions.push(isNull(membersTable.verstorbenAm) as never);
   }
   conditions.push(memberNotDeleted() as never);
   if (input.q.trim()) {

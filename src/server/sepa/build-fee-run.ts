@@ -1,9 +1,9 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import type { DB } from "~/server/db/client";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import type { Contract } from "~/server/db/schema/contracts";
 import { contractsTable } from "~/server/db/schema/contracts";
-import { feeRunItemsTable } from "~/server/db/schema/fee-runs";
+import { feeRunItemsTable, feeRunsTable } from "~/server/db/schema/fee-runs";
 import type { Member } from "~/server/db/schema/members";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
@@ -137,10 +137,15 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
     const seen = await db
       .select({ contractId: feeRunItemsTable.contractId })
       .from(feeRunItemsTable)
+      .innerJoin(feeRunsTable, eq(feeRunsTable.id, feeRunItemsTable.feeRunId))
       .where(
         and(
           inArray(feeRunItemsTable.contractId, contractIds),
           eq(feeRunItemsTable.includesAufnahmegebuhr, true),
+          // A cancelled run's items still exist but never collected the fee, so
+          // they must not count as "already charged" -- otherwise re-committing
+          // after a cancel silently drops the Aufnahmegebühr.
+          ne(feeRunsTable.status, "cancelled"),
         ),
       );
     for (const s of seen) aufnGesehen.add(s.contractId);
