@@ -40,6 +40,7 @@ describe("buildEhrungsurkundeModel", () => {
     ort: "Untereuerheim",
     logoDataUri: null,
     empfaengerName: "Max Mustermann",
+    mitgliedsnummer: "98765",
     verliehenAm: "2025-03-15",
     docRef: "EU-2025-0007",
   };
@@ -62,6 +63,18 @@ describe("buildEhrungsurkundeModel", () => {
     expect(m.ehrungTitel).toBe("25 Jahre Mitgliedschaft");
     expect(m.wuerdigung).toContain("25 Jahre");
     expect(m.ortDatumZeile).toBe("Untereuerheim, den 15.03.2025");
+    expect(m.legacyMitgliedsnummer).toBe("98765");
+  });
+
+  it("leaves the legacy Mitgliedsnummer null when the member has none", () => {
+    const m = buildEhrungsurkundeModel({
+      ...base,
+      mitgliedsnummer: null,
+      kind: "sonderehrung",
+      jubilaeumJahre: null,
+      titel: "Goldene Ehrennadel",
+    });
+    expect(m.legacyMitgliedsnummer).toBeNull();
   });
 
   it("honors merit for a Sonderehrung and drops the town when unset", () => {

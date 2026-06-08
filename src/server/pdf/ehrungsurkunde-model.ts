@@ -5,6 +5,8 @@
  * house style.
  */
 
+import { altMitgliedsnummer } from "~/lib/member-ref";
+
 export type EhrungsurkundeInput = {
   vereinsname: string;
   /** Town the certificate is dated in (Vereinssitz), or null. */
@@ -12,6 +14,8 @@ export type EhrungsurkundeInput = {
   logoDataUri: string | null;
   /** Honored member's display name. */
   empfaengerName: string;
+  /** Preserved legacy Linear Mitgliedsnummer, printed small in the footer. */
+  mitgliedsnummer: string | null;
   kind: "vereinsjubilaeum" | "sonderehrung";
   /** Years of membership for a Vereinsjubiläum, else null. */
   jubilaeumJahre: number | null;
@@ -27,6 +31,8 @@ export type EhrungsurkundeModel = {
   vereinsname: string;
   logoDataUri: string | null;
   docRef: string;
+  /** Legacy Linear Mitgliedsnummer shown small in the footer, or null. */
+  legacyMitgliedsnummer: string | null;
   /** Large heading. */
   ueberschrift: string;
   /** Lead line above the name. */
@@ -66,6 +72,7 @@ export function buildEhrungsurkundeModel(input: EhrungsurkundeInput): Ehrungsurk
     vereinsname: input.vereinsname,
     logoDataUri: input.logoDataUri,
     docRef: input.docRef,
+    legacyMitgliedsnummer: altMitgliedsnummer(input.mitgliedsnummer, ""),
     ueberschrift: "Ehrenurkunde",
     verleihtZeile: `Der ${input.vereinsname} verleiht`,
     empfaengerName: input.empfaengerName,

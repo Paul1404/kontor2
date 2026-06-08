@@ -94,6 +94,9 @@ function KulanzLetterPage({
       }
       infoRows={[
         { label: letter.referenceLabel, value: letter.reference },
+        ...(letter.legacyMitgliedsnummer
+          ? [{ label: "Mitgliedsnummer (alt)", value: letter.legacyMitgliedsnummer }]
+          : []),
         { label: "Dokument", value: docRef },
         { label: "Datum", value: letter.datum },
       ]}
@@ -212,6 +215,9 @@ function KulanzResponsePage({
       recipientLines={club.rueckantwort.adresseLines}
       infoRows={[
         { label: letter.referenceLabel, value: letter.reference },
+        ...(letter.legacyMitgliedsnummer
+          ? [{ label: "Mitgliedsnummer (alt)", value: letter.legacyMitgliedsnummer }]
+          : []),
         { label: "Dokument", value: docRef },
         { label: "Datum", value: letter.datum },
       ]}

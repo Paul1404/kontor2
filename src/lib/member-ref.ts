@@ -25,3 +25,21 @@ export function memberRef(parts: MemberRefParts): string {
     (parts.adrNr != null ? `A${parts.adrNr}` : "")
   );
 }
+
+/**
+ * The legacy Linear Mitgliedsnummer to print as its own "Mitgliedsnummer (alt)"
+ * line on documents, or null when there is none. During the transition the
+ * app-owned number is the headline, but members still recognize their old
+ * Linear number, so letters carry both. Suppressed when the legacy number is
+ * already what `shownRef` displays (a member without an app number, where
+ * `memberRef` falls back to the legacy value), so the page never shows the same
+ * number twice. Pass an empty `shownRef` when no primary reference is printed.
+ */
+export function altMitgliedsnummer(
+  mitgliedsnummer: string | null | undefined,
+  shownRef: string,
+): string | null {
+  const value = mitgliedsnummer?.trim();
+  if (!value) return null;
+  return value === shownRef.trim() ? null : value;
+}

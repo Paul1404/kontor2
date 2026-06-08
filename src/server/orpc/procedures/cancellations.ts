@@ -83,6 +83,7 @@ export const cancellationsRouter = {
         ort: member.ort,
         geburtsdatum: member.geburtsdatum,
         mitgliedsnummer: memberRef(member),
+        legacyMitgliedsnummer: member.mitgliedsnummer,
       },
       austrittDatum: input.austrittDatum,
       abteilung: input.abteilung,

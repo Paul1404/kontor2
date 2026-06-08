@@ -154,6 +154,9 @@ export function EhrungsurkundeDocument({ model }: EhrungsurkundeProps) {
 
         <Text style={styles.footer}>
           {model.vereinsname} · Dokument {model.docRef}
+          {model.legacyMitgliedsnummer
+            ? ` · Mitgliedsnummer (alt) ${model.legacyMitgliedsnummer}`
+            : ""}
         </Text>
       </Page>
     </Document>

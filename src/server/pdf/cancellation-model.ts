@@ -9,6 +9,8 @@
  * to svuwv's data and stack.
  */
 
+import { altMitgliedsnummer } from "~/lib/member-ref";
+
 export type CancellationFamilyMemberInput = {
   vorname: string;
   nachname: string;
@@ -40,7 +42,10 @@ export type CancellationInput = {
     plz: string | null;
     ort: string | null;
     geburtsdatum: Date | string | null;
+    /** The reference shown to the member (app number preferred). */
     mitgliedsnummer: string | null;
+    /** Preserved legacy Linear Mitgliedsnummer, printed as a separate "(alt)" line. */
+    legacyMitgliedsnummer?: string | null;
   };
   /** Austrittstermin, accepts ISO (yyyy-mm-dd) or an already formatted string. */
   austrittDatum: string;
@@ -89,6 +94,8 @@ export type CancellationModel = {
   istEmpfaengerAbweichend: boolean;
   isFamily: boolean;
   member: { vorname: string; nachname: string; geburtsdatum: string; mitgliedsnummer: string };
+  /** Legacy Linear Mitgliedsnummer for the info block, or null when none/duplicate. */
+  legacyMitgliedsnummer: string | null;
   abteilung: string;
   austrittDatum: string;
   familienmitglieder: CancellationModelFamilyMember[];
@@ -262,6 +269,7 @@ export function buildCancellationModel(input: CancellationInput): CancellationMo
       geburtsdatum: formatGermanDate(m.geburtsdatum),
       mitgliedsnummer: m.mitgliedsnummer ?? "",
     },
+    legacyMitgliedsnummer: altMitgliedsnummer(m.legacyMitgliedsnummer, m.mitgliedsnummer ?? ""),
     abteilung: (input.abteilung ?? "").trim(),
     austrittDatum: austritt,
     familienmitglieder,

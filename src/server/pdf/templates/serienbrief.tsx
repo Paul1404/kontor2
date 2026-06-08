@@ -21,6 +21,8 @@ export type SerienbriefLetter = {
   recipientLines: string[];
   reference: string;
   referenceLabel: string;
+  /** Legacy Linear Mitgliedsnummer as a separate "(alt)" line, or null. */
+  legacyMitgliedsnummer: string | null;
   datum: string;
   subject: string;
   paragraphs: string[];
@@ -35,6 +37,9 @@ function SerienbriefPage({ club, letter }: { club: SerienbriefClub; letter: Seri
       recipientLines={letter.recipientLines}
       infoRows={[
         { label: letter.referenceLabel, value: letter.reference },
+        ...(letter.legacyMitgliedsnummer
+          ? [{ label: "Mitgliedsnummer (alt)", value: letter.legacyMitgliedsnummer }]
+          : []),
         { label: "Datum", value: letter.datum },
       ]}
       subject={letter.subject}

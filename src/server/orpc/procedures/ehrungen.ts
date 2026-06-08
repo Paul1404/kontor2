@@ -235,6 +235,7 @@ export const ehrungenRouter = {
       ort: org.anschriftOrt,
       logoDataUri: clubLogoDataUri(),
       empfaengerName,
+      mitgliedsnummer: member.mitgliedsnummer,
       kind: ehrung.kind,
       jubilaeumJahre: ehrung.jubilaeumJahre,
       titel: ehrung.titel,

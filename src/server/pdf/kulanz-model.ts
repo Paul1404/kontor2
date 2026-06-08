@@ -10,6 +10,8 @@
  * the react-pdf template renders.
  */
 
+import { altMitgliedsnummer } from "~/lib/member-ref";
+
 export type KulanzPosting = {
   billingYear: number;
   falligkeitsdatum: string;
@@ -77,6 +79,8 @@ export type KulanzLetterInput = {
     /** True when this row is a contact/payer with no real Mitgliedsnummer. */
     isContact: boolean;
     name: string;
+    /** Preserved legacy Linear Mitgliedsnummer, shown as a separate "(alt)" line. */
+    mitgliedsnummer: string | null;
   };
   postings: KulanzPosting[];
   /** Letter date (ISO yyyy-mm-dd). */
@@ -113,6 +117,11 @@ export type KulanzLetterModel = {
   reference: string;
   /** Label for that value: "Mitgliedsnummer" for members, "Referenz" for contacts. */
   referenceLabel: string;
+  /**
+   * Legacy Linear Mitgliedsnummer to print as a separate "Mitgliedsnummer (alt)"
+   * line, or null when there is none or it already equals `reference`.
+   */
+  legacyMitgliedsnummer: string | null;
   datum: string;
   intro: string;
   kulanz: string;
@@ -279,6 +288,7 @@ export function buildKulanzLetterModel(input: KulanzLetterInput): KulanzLetterMo
     salutation: kulanzSalutation(r.anrede, r.name),
     reference: input.member.reference,
     referenceLabel,
+    legacyMitgliedsnummer: altMitgliedsnummer(input.member.mitgliedsnummer, input.member.reference),
     datum: fmtKulanzDate(input.runDate),
     intro,
     kulanz,

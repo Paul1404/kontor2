@@ -51,6 +51,9 @@ export function AustrittsbestaetigungDocument({ model, docRef }: Austrittsbestae
     ...(model.member.mitgliedsnummer
       ? [{ label: "Mitgliedsnummer", value: model.member.mitgliedsnummer }]
       : []),
+    ...(model.legacyMitgliedsnummer
+      ? [{ label: "Mitgliedsnummer (alt)", value: model.legacyMitgliedsnummer }]
+      : []),
     { label: "Dokument", value: docRef },
     { label: "Datum", value: datum },
   ];
