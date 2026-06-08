@@ -50,6 +50,11 @@ export const RELEASES: Release[] = [
         description:
           "Wiedervorlagen: Aufgaben mit Fälligkeit pro Mitglied anlegen (etwa IBAN nachfordern), direkt am Mitglied abhaken und in einer gemeinsamen Liste über alle Mitglieder abarbeiten. Überfällige werden in der Seitenleiste rot markiert.",
       },
+      {
+        category: "feature",
+        description:
+          "Neuer Aktivitäts-Verlauf am Mitglied im Reiter Verlauf: Änderungen, Mahnungen, Kulanz-Schreiben, Rundschreiben und SEPA-Rückläufer in einer gemeinsamen Zeitleiste, neueste zuerst.",
+      },
     ],
   },
   {
