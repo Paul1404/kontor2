@@ -12,6 +12,7 @@ import { dataQualityRouter } from "~/server/orpc/procedures/data-quality";
 import { dsgvoRouter } from "~/server/orpc/procedures/dsgvo";
 import { dunningRouter } from "~/server/orpc/procedures/dunning";
 import { ehrungenRouter } from "~/server/orpc/procedures/ehrungen";
+import { emailLogRouter } from "~/server/orpc/procedures/email-log";
 import { feeRunsRouter } from "~/server/orpc/procedures/fee-runs";
 import { feeTypesRouter } from "~/server/orpc/procedures/fee-types";
 import { importRouter } from "~/server/orpc/procedures/import";
@@ -50,6 +51,7 @@ export const appRouter = {
   dataQuality: dataQualityRouter,
   audit: auditRouter,
   logs: logsRouter,
+  emailLog: emailLogRouter,
   attachments: attachmentsRouter,
   banks: banksRouter,
   cancellations: cancellationsRouter,

@@ -6,6 +6,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { portalChangeRequestsTable, portalTokensTable } from "~/server/db/schema/portal";
 import { env } from "~/server/env";
+import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { base, observability, vorstandProc } from "~/server/orpc/base";
 import {
   buildPortalUrl,
@@ -226,6 +227,23 @@ export const portalRouter = {
           portalUrl,
           expiresAt,
         });
+      }
+      if (input.sendEmail) {
+        await recordEmail(
+          {
+            kind: EMAIL_KIND.portalInvite,
+            ...(targetEmail
+              ? statusFromSend(mailResult)
+              : { status: "skipped" as const, detail: "no_recipient" }),
+            recipient: targetEmail,
+            subject: "Zugang zum Mitgliederportal",
+            entityType: "member",
+            entityId: member.id,
+            actorEmail: context.session!.user.email,
+            requestId: context.requestId ?? null,
+          },
+          context.db,
+        );
       }
 
       await appendAudit(context.db, {

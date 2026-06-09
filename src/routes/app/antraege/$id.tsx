@@ -1,6 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Ban, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Ban,
+  CheckCircle2,
+  Download,
+  Loader2,
+  Mail,
+  MailCheck,
+  MailWarning,
+  MailX,
+} from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -20,6 +30,44 @@ function fmtDate(value: string | Date | null | undefined): string {
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("de-DE");
 }
+
+function fmtDateTime(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+}
+
+const FILE_KIND_LABEL: Record<string, string> = {
+  generated_pdf: "Beitrittserklärung (PDF)",
+  signed_scan: "Unterschriebenes Dokument",
+  approved_pdf: "Genehmigte Beitrittserklärung",
+  signature_image: "Unterschriftsbild",
+};
+
+const EMAIL_KIND_LABEL: Record<string, string> = {
+  antrag_confirmation: "Bestätigung an Antragsteller",
+  antrag_club_notification: "Benachrichtigung an Verein",
+  antrag_approval: "Genehmigung",
+  antrag_decline: "Ablehnung",
+};
+
+type EmailStatusMeta = { label: string; cls: string; icon: typeof Mail };
+const EMAIL_STATUS_SKIPPED: EmailStatusMeta = {
+  label: "Übersprungen",
+  cls: "text-muted-foreground",
+  icon: MailWarning,
+};
+const EMAIL_STATUS: Record<string, EmailStatusMeta> = {
+  sent: { label: "Versendet", cls: "text-success", icon: MailCheck },
+  failed: { label: "Fehlgeschlagen", cls: "text-destructive", icon: MailX },
+  skipped: EMAIL_STATUS_SKIPPED,
+};
+
+const EMAIL_DETAIL_LABEL: Record<string, string> = {
+  smtp_not_configured: "Kein E-Mail-Versand eingerichtet",
+  no_recipient: "Keine E-Mail-Adresse hinterlegt",
+};
 
 function AntragDetailPage() {
   const { id } = Route.useParams();
@@ -66,6 +114,12 @@ function AntragDetailPage() {
       invalidate();
     },
     onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Ablehnung fehlgeschlagen."),
+  });
+
+  const downloadFile = useMutation({
+    mutationFn: (fileId: string) => orpc.applications.fileUrl({ id: fileId }),
+    onSuccess: (res) => window.open(res.url, "_blank", "noopener,noreferrer"),
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Download fehlgeschlagen."),
   });
 
   if (detail.isError) {
@@ -132,6 +186,75 @@ function AntragDetailPage() {
           {a.mitgliedsnummer ? <Row label="Mitgliedsnummer">{a.mitgliedsnummer}</Row> : null}
         </CardContent>
       </Card>
+
+      {a.files.filter((f) => f.kind !== "signature_image").length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Dokumente</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {a.files
+              .filter((f) => f.kind !== "signature_image")
+              .map((f) => (
+                <div
+                  key={f.id}
+                  className="flex items-center justify-between gap-4 rounded-lg border border-border/60 px-3 py-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{FILE_KIND_LABEL[f.kind] ?? f.kind}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {f.filename ?? "—"} · {fmtDateTime(f.uploadedAt)}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={downloadFile.isPending}
+                    onClick={() => downloadFile.mutate(f.id)}
+                  >
+                    <Download className="size-4" />
+                    Öffnen
+                  </Button>
+                </div>
+              ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {a.emails.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="size-5" /> E-Mail-Verlauf
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {a.emails.map((m) => {
+              const status = EMAIL_STATUS[m.status] ?? EMAIL_STATUS_SKIPPED;
+              const StatusIcon = status.icon;
+              return (
+                <div
+                  key={m.id}
+                  className="flex items-start justify-between gap-4 rounded-lg border border-border/60 px-3 py-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{EMAIL_KIND_LABEL[m.kind] ?? m.kind}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {m.recipient ?? "—"} · {fmtDateTime(m.createdAt)}
+                      {m.detail ? ` · ${EMAIL_DETAIL_LABEL[m.detail] ?? m.detail}` : ""}
+                    </p>
+                  </div>
+                  <span className={`flex shrink-0 items-center gap-1 text-xs ${status.cls}`}>
+                    <StatusIcon className="size-4" />
+                    {status.label}
+                  </span>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {!terminal ? (
         <>

@@ -51,6 +51,18 @@ const UpdateInput = v.object({
   beitragsstaffel: v.optional(v.nullable(BeitragsstaffelInput), null),
   antragBenachrichtigungAktiv: v.optional(v.boolean(), true),
   antragVorstandEmail: v.optional(v.nullable(v.string()), null),
+  /** PNG data URI, max ~512 KB encoded, or null to clear. */
+  antragGegenzeichnungBild: v.optional(
+    v.nullable(
+      v.pipe(
+        v.string(),
+        v.regex(/^data:image\/(png|jpeg);base64,/, "Nur PNG- oder JPEG-Bilder erlaubt."),
+        v.maxLength(700_000, "Bild zu groß (max. ca. 500 KB)."),
+      ),
+    ),
+    null,
+  ),
+  antragGegenzeichnerName: v.optional(v.nullable(v.string()), null),
 });
 
 export const organizationSettingsRouter = {
@@ -110,6 +122,8 @@ export const organizationSettingsRouter = {
       beitragsstaffel: input.beitragsstaffel,
       antragBenachrichtigungAktiv: input.antragBenachrichtigungAktiv,
       antragVorstandEmail: input.antragVorstandEmail,
+      antragGegenzeichnungBild: input.antragGegenzeichnungBild,
+      antragGegenzeichnerName: input.antragGegenzeichnerName,
       updatedAt: new Date(),
       updatedBy: context.session!.user.id,
     };
@@ -122,7 +136,13 @@ export const organizationSettingsRouter = {
 
     // `vereinsIban` is transparently decrypted by the `encryptedText` Drizzle
     // custom type, so `existing.vereinsIban` is already the plaintext IBAN.
-    const beforeForAudit = existing ?? null;
+    // Replace the countersignature image with a presence marker so the audit
+    // log keeps a "changed/cleared" signal without storing a 500 KB data URI.
+    const mask = (v: string | null | undefined) => (v ? "[Bild gesetzt]" : null);
+    const beforeForAudit = existing
+      ? { ...existing, antragGegenzeichnungBild: mask(existing.antragGegenzeichnungBild) }
+      : null;
+    const nextForAudit = { ...next, antragGegenzeichnungBild: mask(next.antragGegenzeichnungBild) };
 
     await appendAudit(context.db, {
       entityType: "organization_settings",
@@ -131,7 +151,7 @@ export const organizationSettingsRouter = {
       source: "ui",
       actorId: context.session!.user.id,
       actorEmail: context.session!.user.email,
-      changes: diff(beforeForAudit, next),
+      changes: diff(beforeForAudit, nextForAudit),
       requestId: context.requestId ?? null,
     });
 

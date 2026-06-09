@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, CheckCircle2, Loader2, Save, XCircle } from "lucide-react";
+import { Building2, CheckCircle2, Loader2, Save, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -74,6 +74,8 @@ function VereinsdatenPage() {
     beitragsstaffel: DEFAULT_STAFFEL,
     antragBenachrichtigungAktiv: true,
     antragVorstandEmail: "",
+    antragGegenzeichnungBild: "",
+    antragGegenzeichnerName: "",
   });
   const [msg, setMsg] = useState<Msg | null>(null);
 
@@ -109,6 +111,8 @@ function VereinsdatenPage() {
         beitragsstaffel: cfg.data.beitragsstaffel ?? DEFAULT_STAFFEL,
         antragBenachrichtigungAktiv: cfg.data.antragBenachrichtigungAktiv ?? true,
         antragVorstandEmail: cfg.data.antragVorstandEmail ?? "",
+        antragGegenzeichnungBild: cfg.data.antragGegenzeichnungBild ?? "",
+        antragGegenzeichnerName: cfg.data.antragGegenzeichnerName ?? "",
       });
     }
   }, [cfg.data]);
@@ -153,6 +157,8 @@ function VereinsdatenPage() {
         },
         antragBenachrichtigungAktiv: form.antragBenachrichtigungAktiv,
         antragVorstandEmail: form.antragVorstandEmail || null,
+        antragGegenzeichnungBild: form.antragGegenzeichnungBild || null,
+        antragGegenzeichnerName: form.antragGegenzeichnerName || null,
       }),
     onSuccess: () => {
       setMsg({ kind: "ok", text: "Vereinsdaten gespeichert." });
@@ -615,6 +621,72 @@ function VereinsdatenPage() {
                     })
                   }
                 />
+              </div>
+
+              <h4 className="mb-3 mt-5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Gegenzeichnung des Vorstands
+              </h4>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Wird beim Genehmigen in die Beitrittserklärung eingebettet. Ohne Bild zeigt das
+                genehmigte PDF nur die Unterschrift des Antragstellers.
+              </p>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <Field
+                  label="Name unter der Unterschrift"
+                  hint="z. B. Max Mustermann, 1. Vorsitzender"
+                >
+                  <Input
+                    value={form.antragGegenzeichnerName}
+                    onChange={(e) => setForm({ ...form, antragGegenzeichnerName: e.target.value })}
+                    placeholder="Max Mustermann, 1. Vorsitzender"
+                  />
+                </Field>
+                <Field
+                  label="Unterschriftsbild (PNG oder JPEG, max. 500 KB)"
+                  hint="Am besten ein freigestelltes Bild der Unterschrift auf weißem Grund."
+                >
+                  <div className="flex flex-col gap-2">
+                    {form.antragGegenzeichnungBild ? (
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={form.antragGegenzeichnungBild}
+                          alt="Vorschau der Gegenzeichnung"
+                          className="h-12 rounded border border-border bg-white object-contain px-2"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setForm({ ...form, antragGegenzeichnungBild: "" })}
+                        >
+                          <Trash2 className="size-4" />
+                          Entfernen
+                        </Button>
+                      </div>
+                    ) : null}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-card file:px-3 file:py-1.5 file:text-sm"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 500_000) {
+                          setMsg({ kind: "error", text: "Bild zu groß (max. 500 KB)." });
+                          e.target.value = "";
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () =>
+                          setForm((f) => ({
+                            ...f,
+                            antragGegenzeichnungBild: String(reader.result),
+                          }));
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </div>
+                </Field>
               </div>
             </div>
 

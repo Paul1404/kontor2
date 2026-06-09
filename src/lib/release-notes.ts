@@ -41,6 +41,33 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.35.0",
+    date: "2026-06-09",
+    title: "Versandprotokoll, Gegenzeichnung und Antrags-Dokumente",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neues Versandprotokoll unter Verwaltung: alle von der App versendeten E-Mails an einer Stelle, mit Status (versendet, übersprungen, fehlgeschlagen). Erfasst werden Antragsbestätigungen, Vereinsbenachrichtigungen, Genehmigungen und Ablehnungen, Mahnungen, Benutzereinladungen, Portalzugänge und Test-E-Mails.",
+      },
+      {
+        category: "feature",
+        description:
+          "Der Vorstand kann eine Gegenzeichnung als Bild hinterlegen. Sie wird beim Genehmigen in die Beitrittserklärung eingebettet, zusammen mit der Unterschrift des Antragstellers, und dem Antragsteller als genehmigtes PDF zugeschickt.",
+      },
+      {
+        category: "feature",
+        description:
+          "Die Antrags-Detailseite zeigt jetzt alle erzeugten Dokumente zum Öffnen sowie den E-Mail-Verlauf des Antrags aus dem Versandprotokoll.",
+      },
+      {
+        category: "internal",
+        description:
+          "Neuer Generator für Testanträge und ein Hinweis, dass die alte svums-Schnittstelle abgelöst ist.",
+      },
+    ],
+  },
+  {
     version: "0.34.1",
     date: "2026-06-09",
     changes: [

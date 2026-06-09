@@ -15,14 +15,19 @@ import { allocateDocRef } from "~/server/db/doc-ref";
 import { escapeLike } from "~/server/db/like";
 import { withUniqueRetry } from "~/server/db/retry";
 import { abteilungenTable } from "~/server/db/schema/abteilungen";
+import { emailLogTable } from "~/server/db/schema/email-log";
 import { membersTable } from "~/server/db/schema/members";
 import {
   type AntragKind,
   type AntragStatus,
+  type MembershipApplication,
   membershipApplicationFilesTable,
   membershipApplicationsTable,
 } from "~/server/db/schema/membership-applications";
-import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
+import {
+  type OrganizationSettings,
+  organizationSettingsTable,
+} from "~/server/db/schema/organization-settings";
 import {
   type Antragstyp,
   detectAntragstyp,
@@ -36,14 +41,18 @@ import { env } from "~/server/env";
 import { lookupBankByIban } from "~/server/lib/blz";
 import { toCsv } from "~/server/lib/csv";
 import { logger } from "~/server/lib/logger";
-import { sendApplicationMails } from "~/server/mail/send-application-mail";
-import { publicProc, vorstandProc } from "~/server/orpc/base";
+import { EMAIL_KIND, type EmailLogEntry, recordEmail } from "~/server/mail/email-log";
+import {
+  sendApplicationDocumentMail,
+  sendApplicationMails,
+} from "~/server/mail/send-application-mail";
+import { errorLogFields, publicProc, vorstandProc } from "~/server/orpc/base";
 import { buildBeitrittModel } from "~/server/pdf/beitrittserklaerung-model";
 import { clubLogoDataUri } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { BeitrittserklaerungDocument } from "~/server/pdf/templates/beitrittserklaerung";
 import { rateLimit } from "~/server/redis/client";
-import { putObject } from "~/server/s3/client";
+import { getObject, presignDownload, putObject } from "~/server/s3/client";
 import { invalidateMemberCaches } from "~/server/search/cache";
 import { formatIbanGrouped, normalizeIban, validateIban } from "~/server/sepa/iban";
 
@@ -119,6 +128,13 @@ function anredeFromGeschlecht(g: "m" | "w" | "d" | "unbekannt" | null): string |
   return null;
 }
 
+/** Split a `data:<mime>;base64,<data>` URI into its mime type and raw bytes. */
+function parseDataUri(uri: string): { mime: string; body: Buffer } | null {
+  const m = /^data:([^;]+);base64,(.+)$/s.exec(uri);
+  if (!m) return null;
+  return { mime: m[1]!, body: Buffer.from(m[2]!, "base64") };
+}
+
 async function loadActiveAbteilungen(db: DBOrTx, ids: string[]): Promise<Map<string, string>> {
   if (ids.length === 0) return new Map();
   const rows = await db
@@ -130,6 +146,120 @@ async function loadActiveAbteilungen(db: DBOrTx, ids: string[]): Promise<Map<str
     .from(abteilungenTable)
     .where(inArray(abteilungenTable.id, ids));
   return new Map(rows.filter((r) => !r.inaktiv).map((r) => [r.id, r.name]));
+}
+
+/**
+ * Render the genehmigte Beitrittserklärung: the original application data with
+ * the applicant's signature re-embedded from the stored `signature_image` and
+ * the Vorstands-Gegenzeichnung from the organization settings. Stores it in S3
+ * as an `approved_pdf` file and returns the bytes for the welcome mail.
+ */
+async function buildApprovedPdf(
+  db: DBOrTx,
+  app: MembershipApplication,
+  org: OrganizationSettings,
+  approvedAt: Date,
+): Promise<Buffer> {
+  const allAbtIds = [
+    ...new Set([
+      ...(app.abteilungen ?? []),
+      ...(app.partnerAbteilungen ?? []),
+      ...(app.kinder ?? []).flatMap((k) => k.abteilungen),
+    ]),
+  ];
+  const abtNames = await loadActiveAbteilungen(db, allAbtIds);
+
+  // Re-embed the applicant's signature if we kept it (online path only).
+  let signatureDataUri: string | null = null;
+  const [sigFile] = await db
+    .select({
+      s3Key: membershipApplicationFilesTable.s3Key,
+      mimeType: membershipApplicationFilesTable.mimeType,
+    })
+    .from(membershipApplicationFilesTable)
+    .where(
+      and(
+        eq(membershipApplicationFilesTable.applicationId, app.id),
+        eq(membershipApplicationFilesTable.kind, "signature_image"),
+      ),
+    )
+    .orderBy(desc(membershipApplicationFilesTable.uploadedAt))
+    .limit(1);
+  if (sigFile) {
+    const bytes = await getObject(sigFile.s3Key);
+    signatureDataUri = `data:${sigFile.mimeType ?? "image/png"};base64,${bytes.toString("base64")}`;
+  }
+
+  const fee = calculateFee({
+    kategorie: app.mitgliedschaftTyp,
+    elternteilMitglied: app.elternteilMitglied,
+    staffel: org.beitragsstaffel,
+  });
+
+  const model = buildBeitrittModel({
+    antragsnummer: app.antragsnummer,
+    antragstyp: app.antragstyp,
+    geschlecht: app.geschlecht,
+    vorname: app.vorname,
+    nachname: app.nachname,
+    geburtsdatum: app.geburtsdatum,
+    strasse: app.strasse,
+    hausnummer: app.hausnummer,
+    plz: app.plz,
+    ort: app.ort,
+    telefon: app.telefon,
+    email: app.email,
+    erziehungsberechtigterVorname: app.erziehungsberechtigterVorname,
+    erziehungsberechtigterNachname: app.erziehungsberechtigterNachname,
+    partnerVorname: app.partnerVorname,
+    partnerNachname: app.partnerNachname,
+    partnerGeburtsdatum: app.partnerGeburtsdatum,
+    partnerAbteilungen: (app.partnerAbteilungen ?? []).map((id) => abtNames.get(id) ?? id),
+    kinder: (app.kinder ?? []).map((k) => ({
+      ...k,
+      abteilungen: (k.abteilungen ?? []).map((id) => abtNames.get(id) ?? id),
+    })),
+    abteilungen: (app.abteilungen ?? []).map((id) => abtNames.get(id) ?? id),
+    mitgliedschaftLabel: fee.label,
+    jahresbeitrag: app.jahresbeitrag ?? fee.betrag,
+    kontoinhaber: app.kontoinhaber,
+    ibanFormatted: app.iban ? formatIbanGrouped(app.iban) : null,
+    bic: app.bic,
+    kreditinstitut: app.kreditinstitut,
+    mandatsreferenz: app.mandatsreferenz,
+    consentAt: app.consentAt,
+    signatureDataUri,
+    countersignatureDataUri: org.antragGegenzeichnungBild,
+    countersignerName: org.antragGegenzeichnerName,
+    approvedAt,
+    club: {
+      vereinsname: org.vereinsname,
+      ort: org.anschriftOrt ?? "",
+      anschriftStrasse: org.anschriftStrasse,
+      anschriftPlz: org.anschriftPlz,
+      anschriftOrt: org.anschriftOrt,
+      kontaktEmail: org.mitgliedschaftEmail ?? org.kontaktEmail,
+      kontaktTelefon: org.kontaktTelefon,
+      glaeubigerId: org.glaeubigerId,
+      datenschutzUrl: org.datenschutzUrl,
+      satzungUrl: org.satzungUrl,
+      logoDataUri: clubLogoDataUri(),
+    },
+  });
+
+  const { base64 } = await renderPdfBase64(BeitrittserklaerungDocument({ model }));
+  const pdf = Buffer.from(base64, "base64");
+  const s3Key = `applications/${app.id}/${app.antragsnummer}-genehmigt.pdf`;
+  await putObject({ key: s3Key, body: pdf, contentType: "application/pdf" });
+  await db.insert(membershipApplicationFilesTable).values({
+    applicationId: app.id,
+    kind: "approved_pdf",
+    s3Key,
+    filename: `Beitrittserklaerung-${app.antragsnummer}-genehmigt.pdf`,
+    mimeType: "application/pdf",
+    sizeBytes: pdf.byteLength,
+  });
+  return pdf;
 }
 
 export const applicationsRouter = {
@@ -464,6 +594,24 @@ export const applicationsRouter = {
         sizeBytes: pdf.byteLength,
       });
 
+      // Keep the raw inline signature on its own so the genehmigte PDF can
+      // re-embed it later next to the Vorstands-Gegenzeichnung.
+      if (hasSignature && input.unterschriftBase64) {
+        const sig = parseDataUri(input.unterschriftBase64);
+        if (sig) {
+          const sigKey = `applications/${inserted.id}/signature.${sig.mime === "image/jpeg" ? "jpg" : "png"}`;
+          await putObject({ key: sigKey, body: sig.body, contentType: sig.mime });
+          await context.db.insert(membershipApplicationFilesTable).values({
+            applicationId: inserted.id,
+            kind: "signature_image",
+            s3Key: sigKey,
+            filename: `signature-${inserted.antragsnummer}.png`,
+            mimeType: sig.mime,
+            sizeBytes: sig.body.byteLength,
+          });
+        }
+      }
+
       // Paper path (no inline signature): hand out a 30-day upload link.
       if (!hasSignature) {
         const token = await issueUploadToken(context.db, { applicationId: inserted.id });
@@ -495,6 +643,15 @@ export const applicationsRouter = {
           .set({ emailSent: true })
           .where(eq(membershipApplicationsTable.id, inserted.id));
       }
+      await recordEmail(
+        mailRes.records.map((r) => ({
+          ...r,
+          entityType: "membership_application",
+          entityId: inserted.id,
+          requestId: context.requestId ?? null,
+        })),
+        context.db,
+      );
     } catch (err) {
       logger.error("application.submit.post_commit_failed", {
         antragsnummer: inserted.antragsnummer,
@@ -667,18 +824,80 @@ export const applicationsRouter = {
       return { rows, total, page: input.page, pageSize: input.pageSize };
     }),
 
-  /** Full application detail. IBAN is masked to the last four digits. */
+  /** Full application detail with files and the email log. IBAN is masked. */
   get: vorstandProc
     .input(v.object({ id: v.pipe(v.string(), v.uuid()) }))
     .handler(async ({ context, input }) => {
       const t = membershipApplicationsTable;
       const [row] = await context.db.select().from(t).where(eq(t.id, input.id)).limit(1);
       if (!row) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+      const [files, emails] = await Promise.all([
+        context.db
+          .select({
+            id: membershipApplicationFilesTable.id,
+            kind: membershipApplicationFilesTable.kind,
+            filename: membershipApplicationFilesTable.filename,
+            mimeType: membershipApplicationFilesTable.mimeType,
+            sizeBytes: membershipApplicationFilesTable.sizeBytes,
+            uploadedAt: membershipApplicationFilesTable.uploadedAt,
+          })
+          .from(membershipApplicationFilesTable)
+          .where(eq(membershipApplicationFilesTable.applicationId, input.id))
+          .orderBy(desc(membershipApplicationFilesTable.uploadedAt)),
+        context.db
+          .select({
+            id: emailLogTable.id,
+            kind: emailLogTable.kind,
+            status: emailLogTable.status,
+            recipient: emailLogTable.recipient,
+            subject: emailLogTable.subject,
+            detail: emailLogTable.detail,
+            createdAt: emailLogTable.createdAt,
+          })
+          .from(emailLogTable)
+          .where(
+            and(
+              eq(emailLogTable.entityType, "membership_application"),
+              eq(emailLogTable.entityId, input.id),
+            ),
+          )
+          .orderBy(desc(emailLogTable.createdAt)),
+      ]);
       const { iban, ...rest } = row;
       return {
         ...rest,
         ibanMasked: row.ibanLast4 ? `**** **** **** **** ${row.ibanLast4}` : null,
+        files,
+        emails,
       };
+    }),
+
+  /**
+   * Presigned download URL for one application file. The signature image is
+   * deliberately not downloadable on its own; it only ever leaves the system
+   * embedded in the generated/approved PDF.
+   */
+  fileUrl: vorstandProc
+    .input(v.object({ id: v.pipe(v.string(), v.uuid()) }))
+    .handler(async ({ context, input }) => {
+      const [file] = await context.db
+        .select({
+          s3Key: membershipApplicationFilesTable.s3Key,
+          filename: membershipApplicationFilesTable.filename,
+          kind: membershipApplicationFilesTable.kind,
+        })
+        .from(membershipApplicationFilesTable)
+        .where(eq(membershipApplicationFilesTable.id, input.id))
+        .limit(1);
+      if (!file || file.kind === "signature_image") {
+        throw new ORPCError("NOT_FOUND", { message: "Datei nicht gefunden." });
+      }
+      const url = await presignDownload({
+        key: file.s3Key,
+        filename: file.filename ?? "antrag.pdf",
+        expiresSeconds: 300,
+      });
+      return { url, filename: file.filename ?? "antrag.pdf" };
     }),
 
   /** Edit notes and move the application through the non-terminal statuses. */
@@ -731,23 +950,53 @@ export const applicationsRouter = {
         .set({ status: "abgelehnt", adminDeclineReason: input.reason, updatedAt: new Date() })
         .where(eq(t.id, input.id));
 
+      const subject = `Ihr Aufnahmeantrag (${app.antragsnummer})`;
+      const base = {
+        kind: EMAIL_KIND.antragDecline,
+        subject,
+        entityType: "membership_application",
+        entityId: app.id,
+        actorEmail: context.session!.user.email,
+        requestId: context.requestId ?? null,
+      } satisfies Partial<EmailLogEntry>;
+      let record: EmailLogEntry;
       if (app.email) {
         const mailer = await getMailer();
         const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
-        await mailer
-          ?.send({
-            to: app.email,
-            subject: `Ihr Aufnahmeantrag (${app.antragsnummer})`,
-            text: [
-              `Hallo ${app.vorname} ${app.nachname},`,
-              "",
-              `Ihr Aufnahmeantrag beim ${org?.vereinsname ?? "Verein"} konnte leider nicht angenommen werden.`,
-              "",
-              `Begründung: ${input.reason}`,
-            ].join("\n"),
-          })
-          .catch(() => undefined);
+        if (!mailer) {
+          record = {
+            ...base,
+            status: "skipped",
+            recipient: app.email,
+            detail: "smtp_not_configured",
+          };
+        } else {
+          try {
+            await mailer.send({
+              to: app.email,
+              subject,
+              text: [
+                `Hallo ${app.vorname} ${app.nachname},`,
+                "",
+                `Ihr Aufnahmeantrag beim ${org?.vereinsname ?? "Verein"} konnte leider nicht angenommen werden.`,
+                "",
+                `Begründung: ${input.reason}`,
+              ].join("\n"),
+            });
+            record = { ...base, status: "sent", recipient: app.email };
+          } catch (err) {
+            record = {
+              ...base,
+              status: "failed",
+              recipient: app.email,
+              detail: err instanceof Error ? err.message : String(err),
+            };
+          }
+        }
+      } else {
+        record = { ...base, status: "skipped", detail: "no_recipient" };
       }
+      await recordEmail(record, context.db);
       return { ok: true };
     }),
 
@@ -924,22 +1173,71 @@ export const applicationsRouter = {
 
       await invalidateMemberCaches();
 
+      const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+      const approvedAt = new Date();
+
+      // Render the genehmigte Beitrittserklärung: the applicant's signature
+      // (re-embedded from the stored image) plus the Vorstands-Gegenzeichnung.
+      // Best-effort -- a render/storage hiccup must not undo the approval.
+      let approvedPdf: Buffer | null = null;
+      try {
+        if (org) {
+          approvedPdf = await buildApprovedPdf(context.db, app, org, approvedAt);
+        }
+      } catch (err) {
+        logger.error("application.approve.pdf_failed", {
+          antragsnummer: app.antragsnummer,
+          ...errorLogFields(err),
+        });
+      }
+
       if (app.email) {
-        const mailer = await getMailer();
-        const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
-        await mailer
-          ?.send({
-            to: app.email,
+        const sent = await sendApplicationDocumentMail({
+          to: app.email,
+          subject: `Willkommen beim ${org?.vereinsname ?? "Verein"}`,
+          text: [
+            `Hallo ${app.vorname} ${app.nachname},`,
+            "",
+            `Ihr Aufnahmeantrag wurde angenommen. Ihre Mitgliedsnummer: ${result.refs.join(", ")}.`,
+            "",
+            ...(approvedPdf ? ["Die genehmigte Beitrittserklärung finden Sie im Anhang.", ""] : []),
+            "Herzlich willkommen.",
+          ].join("\n"),
+          pdf: approvedPdf
+            ? {
+                filename: `Beitrittserklaerung-${app.antragsnummer}-genehmigt.pdf`,
+                content: approvedPdf,
+                contentType: "application/pdf",
+              }
+            : null,
+        });
+        await recordEmail(
+          {
+            kind: EMAIL_KIND.antragApproval,
+            status: sent.status,
+            recipient: app.email,
             subject: `Willkommen beim ${org?.vereinsname ?? "Verein"}`,
-            text: [
-              `Hallo ${app.vorname} ${app.nachname},`,
-              "",
-              `Ihr Aufnahmeantrag wurde angenommen. Ihre Mitgliedsnummer: ${result.refs.join(", ")}.`,
-              "",
-              "Herzlich willkommen.",
-            ].join("\n"),
-          })
-          .catch(() => undefined);
+            detail: sent.detail,
+            entityType: "membership_application",
+            entityId: app.id,
+            actorEmail,
+            requestId: context.requestId ?? null,
+          },
+          context.db,
+        );
+      } else {
+        await recordEmail(
+          {
+            kind: EMAIL_KIND.antragApproval,
+            status: "skipped",
+            detail: "no_recipient",
+            entityType: "membership_application",
+            entityId: app.id,
+            actorEmail,
+            requestId: context.requestId ?? null,
+          },
+          context.db,
+        );
       }
 
       return { memberId: result.primaryId, mitgliedsnummer: result.refs.join(", ") };

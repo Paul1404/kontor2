@@ -1,6 +1,6 @@
 {
   "name": "svuwv",
-  "version": "0.34.1",
+  "version": "0.35.0",
   "private": true,
   "license": "UNLICENSED",
   "author": "Paul Dresch <paul.dresch@untereuerheim.com>",
@@ -25,6 +25,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:prod": "bun scripts/migrate.prod.ts",
     "db:backfill:geschlecht": "bun scripts/backfill-geschlecht.ts",
+    "db:seed:antraege": "bun scripts/seed-antraege.ts",
     "db:studio": "drizzle-kit studio",
     "icons:generate": "bun scripts/generate-icons.ts"
   },

@@ -31,6 +31,7 @@ import {
   type DunningEmailContent,
   sendDunningEmail,
 } from "~/server/dunning/send-dunning-email";
+import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import { clubLogoDataUri } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
@@ -784,6 +785,19 @@ export const dunningRouter = {
       }
 
       const sent = await sendDunningEmail({ content, pdfBase64: row.pdfBase64 });
+      await recordEmail(
+        {
+          kind: EMAIL_KIND.dunning,
+          ...statusFromSend(sent),
+          recipient: content.to,
+          subject: content.subject,
+          entityType: "dunning_item",
+          entityId: input.itemId,
+          actorEmail: context.session!.user.email,
+          requestId: context.requestId ?? null,
+        },
+        context.db,
+      );
       if (!sent.ok) {
         const message =
           sent.reason === "smtp_not_configured"
