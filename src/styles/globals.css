@@ -200,11 +200,161 @@
   .motion-slide-in-right {
     animation: svuwv-slide-in-right 160ms cubic-bezier(0.16, 1, 0.3, 1);
   }
+
+  /*
+   * Richer motion set for the public Beitritts-Antrag. Step transitions,
+   * spring pops for confirmations, the staggered Abteilungs-Chips, the bank
+   * reveal, and the celebratory success screen (drawn check + confetti).
+   * Every class is disabled under prefers-reduced-motion further down.
+   */
+  @keyframes svuwv-step-forward {
+    from {
+      opacity: 0;
+      transform: translateX(22px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes svuwv-step-backward {
+    from {
+      opacity: 0;
+      transform: translateX(-22px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes svuwv-pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.5);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes svuwv-fee-pop {
+    0% {
+      transform: scale(1);
+    }
+    45% {
+      transform: scale(1.04);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  @keyframes svuwv-reveal-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes svuwv-chip-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes svuwv-draw-ring {
+    from {
+      stroke-dashoffset: 176;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes svuwv-draw-tick {
+    from {
+      stroke-dashoffset: 48;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes svuwv-confetti-fall {
+    0% {
+      transform: translateY(-12vh) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(96vh) rotate(var(--confetti-rot, 540deg));
+      opacity: 0;
+    }
+  }
+
+  .motion-step-forward {
+    animation: svuwv-step-forward 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .motion-step-backward {
+    animation: svuwv-step-backward 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .motion-pop-in {
+    animation: svuwv-pop-in 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .motion-fee-pop {
+    animation: svuwv-fee-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .motion-reveal-up {
+    animation: svuwv-reveal-up 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .motion-chip-in {
+    animation: svuwv-chip-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .success-check .success-ring {
+    stroke-dasharray: 176;
+    stroke-dashoffset: 176;
+    animation: svuwv-draw-ring 600ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .success-check .success-tick {
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    animation: svuwv-draw-tick 360ms cubic-bezier(0.22, 1, 0.36, 1) 480ms forwards;
+  }
+
+  .confetti-piece {
+    position: absolute;
+    top: 0;
+    width: 8px;
+    height: 14px;
+    border-radius: 2px;
+    will-change: transform, opacity;
+    animation: svuwv-confetti-fall var(--confetti-dur, 3s) ease-in var(--confetti-delay, 0s)
+      forwards;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .motion-fade-in,
     .motion-zoom-in,
-    .motion-slide-in-right {
+    .motion-slide-in-right,
+    .motion-step-forward,
+    .motion-step-backward,
+    .motion-pop-in,
+    .motion-fee-pop,
+    .motion-reveal-up,
+    .motion-chip-in {
       animation: none;
+    }
+    .success-check .success-ring,
+    .success-check .success-tick {
+      animation: none;
+      stroke-dashoffset: 0;
+    }
+    .confetti-piece {
+      display: none;
     }
   }
 }

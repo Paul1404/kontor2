@@ -16,7 +16,7 @@ export function AbteilungPicker({
   }
   return (
     <div className="flex flex-wrap gap-2">
-      {abteilungen.map((a) => {
+      {abteilungen.map((a, i) => {
         const active = selected.includes(a.id);
         return (
           <button
@@ -24,14 +24,15 @@ export function AbteilungPicker({
             type="button"
             onClick={() => onToggle(a.id)}
             aria-pressed={active}
+            style={{ animationDelay: `${i * 35}ms` }}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors",
+              "motion-chip-in inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-all active:scale-95",
               active
-                ? "border-primary bg-primary/10 text-foreground"
+                ? "border-primary bg-primary/10 text-foreground shadow-soft"
                 : "border-border text-muted-foreground hover:border-ring/40",
             )}
           >
-            {active ? <Check className="size-3.5 text-primary" /> : null}
+            {active ? <Check className="motion-pop-in size-3.5 text-primary" /> : null}
             {a.name}
           </button>
         );

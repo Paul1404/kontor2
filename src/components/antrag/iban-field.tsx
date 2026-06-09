@@ -1,4 +1,4 @@
-import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, Landmark, Loader2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -29,11 +29,13 @@ export function IbanField({
   error?: string;
 }) {
   const [state, setState] = useState<"idle" | "loading" | "valid" | "invalid">("idle");
+  const [bank, setBank] = useState<string | null>(null);
 
   useEffect(() => {
     const clean = value.replace(/\s/g, "").toUpperCase();
     if (clean.length < 15) {
       setState("idle");
+      setBank(null);
       return;
     }
     setState("loading");
@@ -42,9 +44,11 @@ export function IbanField({
         const res = await orpc.applications.lookupIban({ iban: clean });
         if (!res.valid) {
           setState("invalid");
+          setBank(null);
           return;
         }
         setState("valid");
+        setBank(res.name);
         onResolved({ bic: res.bic, name: res.name });
       } catch {
         // Network blip: don't block submission on the lookup.
@@ -76,10 +80,21 @@ export function IbanField({
           ) : null}
         </span>
       </div>
-      {error ? <span className="text-xs text-destructive">{error}</span> : null}
-      {state === "invalid" && !error ? (
-        <span className="text-xs text-destructive">IBAN-Prüfsumme ist ungültig.</span>
+      {bank && state === "valid" ? (
+        <span className="motion-pop-in inline-flex w-fit items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
+          <Landmark className="size-3.5" /> {bank}
+        </span>
       ) : null}
+      {error ? (
+        <span className="text-xs text-destructive">{error}</span>
+      ) : state === "invalid" ? (
+        <span className="text-xs text-destructive">IBAN-Prüfsumme ist ungültig.</span>
+      ) : (
+        <span className="text-xs font-normal text-muted-foreground">
+          Die IBAN finden Sie auf Ihrer Bankkarte oder im Online-Banking. BIC und Kreditinstitut
+          werden danach automatisch ergänzt.
+        </span>
+      )}
     </Label>
   );
 }

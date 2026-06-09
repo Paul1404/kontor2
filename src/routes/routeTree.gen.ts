@@ -33,6 +33,7 @@ import { Route as AppDatenqualitaetRouteImport } from './app/datenqualitaet'
 import { Route as AppAuditRouteImport } from './app/audit'
 import { Route as ApiHealthRouteImport } from './api/health'
 import { Route as AntragStatusRouteImport } from './antrag/status'
+import { Route as AntragPapierformularRouteImport } from './antrag/papierformular'
 import { Route as AppMitgliederIndexRouteImport } from './app/mitglieder/index'
 import { Route as AppForderungenIndexRouteImport } from './app/forderungen/index'
 import { Route as AppDsgvoIndexRouteImport } from './app/dsgvo/index'
@@ -193,6 +194,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
 const AntragStatusRoute = AntragStatusRouteImport.update({
   id: '/status',
   path: '/status',
+  getParentRoute: () => AntragRouteRoute,
+} as any)
+const AntragPapierformularRoute = AntragPapierformularRouteImport.update({
+  id: '/papierformular',
+  path: '/papierformular',
   getParentRoute: () => AntragRouteRoute,
 } as any)
 const AppMitgliederIndexRoute = AppMitgliederIndexRouteImport.update({
@@ -421,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/portal': typeof PortalRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
@@ -485,6 +492,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
@@ -553,6 +561,7 @@ export interface FileRoutesById {
   '/portal': typeof PortalRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
@@ -622,6 +631,7 @@ export interface FileRouteTypes {
     | '/portal'
     | '/login'
     | '/setup'
+    | '/antrag/papierformular'
     | '/antrag/status'
     | '/api/health'
     | '/app/audit'
@@ -686,6 +696,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/setup'
+    | '/antrag/papierformular'
     | '/antrag/status'
     | '/api/health'
     | '/app/audit'
@@ -753,6 +764,7 @@ export interface FileRouteTypes {
     | '/portal'
     | '/login'
     | '/setup'
+    | '/antrag/papierformular'
     | '/antrag/status'
     | '/api/health'
     | '/app/audit'
@@ -1000,6 +1012,13 @@ declare module '@tanstack/react-router' {
       path: '/status'
       fullPath: '/antrag/status'
       preLoaderRoute: typeof AntragStatusRouteImport
+      parentRoute: typeof AntragRouteRoute
+    }
+    '/antrag/papierformular': {
+      id: '/antrag/papierformular'
+      path: '/papierformular'
+      fullPath: '/antrag/papierformular'
+      preLoaderRoute: typeof AntragPapierformularRouteImport
       parentRoute: typeof AntragRouteRoute
     }
     '/app/mitglieder/': {
@@ -1293,12 +1312,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AntragRouteRouteChildren {
+  AntragPapierformularRoute: typeof AntragPapierformularRoute
   AntragStatusRoute: typeof AntragStatusRoute
   AntragIndexRoute: typeof AntragIndexRoute
   AntragUploadTokenRoute: typeof AntragUploadTokenRoute
 }
 
 const AntragRouteRouteChildren: AntragRouteRouteChildren = {
+  AntragPapierformularRoute: AntragPapierformularRoute,
   AntragStatusRoute: AntragStatusRoute,
   AntragIndexRoute: AntragIndexRoute,
   AntragUploadTokenRoute: AntragUploadTokenRoute,

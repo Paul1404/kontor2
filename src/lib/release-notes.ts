@@ -41,6 +41,53 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.37.0",
+    date: "2026-06-09",
+    title: "Beitrittsformular mit mehr Politur",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Das öffentliche Beitrittsformular führt jetzt klarer durch: ein kurzer Überblick „So funktioniert's“ am Anfang, eine hervorgehobene Tarifkarte mit Jahresbeitrag, ein Fortschrittsbalken über die drei Schritte und sanfte Übergänge zwischen ihnen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Nach dem Absenden gibt es eine eigene Bestätigungsseite mit Antragsnummer zum Kopieren und einer Übersicht der nächsten Schritte. Die Statusseite zeigt den Fortschritt als Zeitleiste.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Bei der IBAN-Eingabe wird die erkannte Bank direkt angezeigt, und die Abteilungsauswahl ist deutlicher als aktiv markiert.",
+      },
+      {
+        category: "feature",
+        description:
+          "Eingaben im Beitrittsformular werden automatisch zwischengespeichert und beim erneuten Öffnen wiederhergestellt, solange der Browser-Tab offen bleibt.",
+      },
+      {
+        category: "feature",
+        description:
+          "Die Unterschrift lässt sich jetzt im Vollbild zeichnen, was besonders auf dem Smartphone angenehmer ist.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Vor dem Absenden weist das Formular dezent darauf hin, wenn zu Name und Geburtsdatum bereits ein Antrag oder eine Mitgliedschaft bestehen könnte.",
+      },
+      {
+        category: "feature",
+        description:
+          "Die Adresseingabe im Beitrittsformular schlägt jetzt Straßen vor und ergänzt den Ort automatisch anhand der Postleitzahl (über OpenStreetMap).",
+      },
+      {
+        category: "feature",
+        description:
+          "Wer die Beitrittserklärung schon auf Papier ausgefüllt hat, kann unter /antrag/papierformular einen Scan hochladen, ohne das Online-Formular auszufüllen. Der Antrag landet als Papier-Scan im Bereich Anträge zur Erfassung durch den Vorstand.",
+      },
+    ],
+  },
+  {
     version: "0.36.0",
     date: "2026-06-09",
     title: "Klareres Online-Beitrittsformular",
