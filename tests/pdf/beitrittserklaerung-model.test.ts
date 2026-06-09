@@ -106,4 +106,33 @@ describe("buildBeitrittModel", () => {
     });
     expect(m.consentText).toContain("10.01.2026");
   });
+
+  it("leaves countersignature and approval empty by default", () => {
+    const m = buildBeitrittModel({
+      ...base,
+      antragstyp: "einzel",
+      geschlecht: "m",
+      vorname: "Max",
+      nachname: "Mustermann",
+    });
+    expect(m.countersignatureDataUri).toBeNull();
+    expect(m.countersignerName).toBeNull();
+    expect(m.approvedAt).toBe("");
+  });
+
+  it("carries the Vorstand countersignature and approval date when approved", () => {
+    const m = buildBeitrittModel({
+      ...base,
+      antragstyp: "einzel",
+      geschlecht: "m",
+      vorname: "Max",
+      nachname: "Mustermann",
+      countersignatureDataUri: "data:image/png;base64,AAA",
+      countersignerName: "  Erika Vorstand, 1. Vorsitzende  ",
+      approvedAt: new Date("2026-02-15T09:00:00Z"),
+    });
+    expect(m.countersignatureDataUri).toBe("data:image/png;base64,AAA");
+    expect(m.countersignerName).toBe("Erika Vorstand, 1. Vorsitzende");
+    expect(m.approvedAt).toBe("15.02.2026");
+  });
 });

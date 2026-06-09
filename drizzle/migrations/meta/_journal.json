@@ -309,6 +309,13 @@
       "when": 1780995881842,
       "tag": "0043_left_scalphunter",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1781004293479,
+      "tag": "0044_magical_shriek",
+      "breakpoints": true
     }
   ]
 }

@@ -182,9 +182,46 @@ export const membershipApplicationFilesTable = pgTable(
   (t) => [index("membership_application_files_app_idx").on(t.applicationId)],
 );
 
+export const antragEmailKindEnum = pgEnum("antrag_email_kind", [
+  "confirmation",
+  "club_notification",
+  "approval",
+  "decline",
+]);
+
+export const antragEmailStatusEnum = pgEnum("antrag_email_status", ["sent", "failed", "skipped"]);
+
+/**
+ * One row per mail the application flow tried to send (applicant confirmation,
+ * club notification, approval, decline). Lets the Vorstand see on the detail
+ * page whether a mail actually went out, was skipped (no SMTP / no recipient),
+ * or failed -- without digging through the Systemprotokoll. Best-effort: a
+ * failure to write the log never blocks the action that triggered the mail.
+ */
+export const membershipApplicationEmailsTable = pgTable(
+  "membership_application_emails",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    applicationId: uuid("application_id")
+      .notNull()
+      .references(() => membershipApplicationsTable.id, { onDelete: "cascade" }),
+    kind: antragEmailKindEnum("kind").notNull(),
+    status: antragEmailStatusEnum("status").notNull(),
+    recipient: text("recipient"),
+    subject: text("subject"),
+    /** Reason on a failed/skipped send (e.g. "smtp_not_configured"). */
+    detail: text("detail"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("membership_application_emails_app_idx").on(t.applicationId, t.createdAt)],
+);
+
 export type MembershipApplication = typeof membershipApplicationsTable.$inferSelect;
 export type MembershipApplicationToken = typeof membershipApplicationTokensTable.$inferSelect;
 export type MembershipApplicationFile = typeof membershipApplicationFilesTable.$inferSelect;
+export type MembershipApplicationEmail = typeof membershipApplicationEmailsTable.$inferSelect;
+export type AntragEmailKind = (typeof antragEmailKindEnum.enumValues)[number];
+export type AntragEmailStatus = (typeof antragEmailStatusEnum.enumValues)[number];
 export type AntragStatus = (typeof antragStatusEnum.enumValues)[number];
 export type AntragTyp = (typeof antragTypEnum.enumValues)[number];
 export type MitgliedschaftTyp = (typeof mitgliedschaftTypEnum.enumValues)[number];

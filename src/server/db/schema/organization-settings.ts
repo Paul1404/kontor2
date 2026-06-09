@@ -107,6 +107,14 @@ export const organizationSettingsTable = pgTable("organization_settings", {
    * `mitgliedschaftEmail`, dann `kontaktEmail` zurückgegriffen.
    */
   antragVorstandEmail: text("antrag_vorstand_email"),
+  /**
+   * Gegenzeichnung des Vorstands für die Beitrittserklärung: ein PNG als
+   * data-URI. Wird beim Genehmigen in das amtliche Antrags-PDF eingebettet.
+   * Leer: das genehmigte PDF zeigt nur die Unterschrift des Antragstellers.
+   */
+  antragGegenzeichnungBild: text("antrag_gegenzeichnung_bild"),
+  /** Name unter der Vorstands-Gegenzeichnung (z. B. "Max Mustermann, 1. Vorsitzender"). */
+  antragGegenzeichnerName: text("antrag_gegenzeichner_name"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
 });

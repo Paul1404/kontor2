@@ -38,6 +38,7 @@ const styles = StyleSheet.create({
   feeRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
   feeLabel: { fontFamily: "Helvetica-Bold" },
   small: { fontSize: 8.5, color: "#444", marginTop: 6, lineHeight: 1.45 },
+  approvedNote: { marginTop: 14, fontFamily: "Helvetica-Bold", fontSize: 9.5, color: "#15803d" },
   signBlock: { marginTop: 26, flexDirection: "row", gap: 24 },
   signCol: { flex: 1 },
   signImage: { height: 48, objectFit: "contain", marginBottom: 4 },
@@ -160,6 +161,10 @@ export function BeitrittserklaerungDocument({ model }: BeitrittserklaerungProps)
 
         <Text style={styles.small}>{model.consentText}</Text>
 
+        {model.approvedAt ? (
+          <Text style={styles.approvedNote}>Genehmigt am {model.approvedAt}.</Text>
+        ) : null}
+
         <View style={styles.signBlock} wrap={false}>
           <View style={styles.signCol}>
             {model.signatureDataUri ? (
@@ -172,8 +177,16 @@ export function BeitrittserklaerungDocument({ model }: BeitrittserklaerungProps)
             </Text>
           </View>
           <View style={styles.signCol}>
-            <View style={{ height: 48 }} />
-            <Text style={styles.signLine}>Ort, Datum</Text>
+            {model.countersignatureDataUri ? (
+              <Image src={model.countersignatureDataUri} style={styles.signImage} />
+            ) : (
+              <View style={{ height: 48 }} />
+            )}
+            <Text style={styles.signLine}>
+              {model.countersignatureDataUri
+                ? `Für den Verein${model.countersignerName ? ` (${model.countersignerName})` : ""}`
+                : "Ort, Datum"}
+            </Text>
           </View>
         </View>
 

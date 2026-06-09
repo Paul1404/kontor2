@@ -85,6 +85,14 @@ export function presignDownload(opts: {
   );
 }
 
+/** Read an object's bytes back from the bucket (e.g. a stored signature PNG). */
+export async function getObject(key: string): Promise<Buffer> {
+  const res = await s3Client().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+  const bytes = await res.Body?.transformToByteArray();
+  if (!bytes) throw new Error(`empty object: ${key}`);
+  return Buffer.from(bytes);
+}
+
 export async function deleteObject(key: string): Promise<void> {
   await s3Client().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
 }

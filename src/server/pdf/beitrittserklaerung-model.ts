@@ -60,6 +60,12 @@ export type BeitrittInput = {
   consentAt: Date | null;
   /** Inline signature as a PNG data URI, or null for the paper path. */
   signatureDataUri?: string | null;
+  /** Vorstand countersignature (PNG data URI), embedded on the approved PDF. */
+  countersignatureDataUri?: string | null;
+  /** Name under the countersignature, e.g. "Max Mustermann, 1. Vorsitzender". */
+  countersignerName?: string | null;
+  /** Approval date; when set the PDF is the genehmigte Beitrittserklärung. */
+  approvedAt?: Date | string | null;
   club: BeitrittClub;
   today?: Date;
 };
@@ -86,6 +92,10 @@ export type BeitrittModel = {
   consentText: string;
   signatureDataUri: string | null;
   unterschriftName: string;
+  countersignatureDataUri: string | null;
+  countersignerName: string | null;
+  /** Formatted approval date, or empty when the PDF is not yet approved. */
+  approvedAt: string;
 };
 
 const GESCHLECHT_ANREDE: Record<string, string> = { m: "Herr", w: "Frau" };
@@ -200,5 +210,8 @@ export function buildBeitrittModel(input: BeitrittInput): BeitrittModel {
     consentText: consentParts.join(" "),
     signatureDataUri: input.signatureDataUri ?? null,
     unterschriftName: contactName,
+    countersignatureDataUri: input.countersignatureDataUri ?? null,
+    countersignerName: input.countersignerName?.trim() || null,
+    approvedAt: input.approvedAt ? formatGermanDate(input.approvedAt) : "",
   };
 }
