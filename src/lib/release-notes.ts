@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.29.1",
+    date: "2026-06-09",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Das Nachtragen der Abteilung „Keine Abteilung“ im Adminbereich schlug mit einem Datenbankfehler fehl. Mitglieder ohne aktive Abteilung werden jetzt wieder korrekt zugeordnet.",
+      },
+    ],
+  },
+  {
     version: "0.29.0",
     date: "2026-06-08",
     title: "Systemprotokoll",

@@ -341,7 +341,7 @@ export const abteilungenRouter = {
       // today. on conflict keeps it idempotent.
       const inserted = await tx.execute(sql`
         insert into member_abteilungen (member_id, abteilung_id, eintrittsdatum)
-        select m.id, ${abt.id}, coalesce(to_char(m.eintritt, 'YYYY-MM-DD'), ${today})
+        select m.id, ${abt.id}, coalesce(m.eintritt::date, ${today}::date)
         from members m
         where m.deleted_at is null and m.austritt is null and m.verstorben_am is null
           and not exists (
