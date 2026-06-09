@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.39.0",
+    date: "2026-06-09",
+    title: "Zurückgelastete Beiträge erneut einziehen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Eine zurückgelastete Sollstellung lässt sich jetzt erneut per SEPA einziehen, ohne sie vorher löschen zu müssen. Unter Beitragsläufe gibt es dafür den Punkt Erneut einziehen. Korrigieren Sie beim Mitglied zuerst die IBAN oder das Mandat, wählen Sie die Posten aus und erzeugen Sie eine neue pain.008-Datei für den Bankupload.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Wiedereinzug-Liste zeigt zu jedem Rückläufer direkt an, ob er einziehbar ist. Fehlt ein Mandat oder eine IBAN, ist der Einzug ausgesetzt oder läuft der Vertrag auf Rechnung, steht der Grund dahinter und der Posten kann nicht ausgewählt werden.",
+      },
+    ],
+  },
+  {
     version: "0.38.0",
     date: "2026-06-09",
     title: "Frischeres Erscheinungsbild und ruhigeres Formular",

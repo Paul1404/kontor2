@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Coins, Download, Loader2, Plus } from "lucide-react";
+import { Coins, Download, Loader2, Plus, RotateCcw } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
@@ -18,6 +18,7 @@ type RunRow = {
   billingYear: number;
   falligkeitsdatum: string;
   status: "draft" | "committed" | "submitted" | "cancelled";
+  kind: "regular" | "recollection";
   itemCount: number;
   totalAmount: string;
   xmlFilename: string | null;
@@ -47,11 +48,18 @@ function FeeRunsListPage() {
           </p>
         </div>
         {canRun ? (
-          <Link to="/app/beitrag/neu">
-            <Button>
-              <Plus className="size-4" /> Neuer Lauf
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/app/beitrag/erneut-einziehen">
+              <Button variant="outline">
+                <RotateCcw className="size-4" /> Erneut einziehen
+              </Button>
+            </Link>
+            <Link to="/app/beitrag/neu">
+              <Button>
+                <Plus className="size-4" /> Neuer Lauf
+              </Button>
+            </Link>
+          </div>
         ) : null}
       </div>
 
@@ -119,7 +127,14 @@ function FeeRunsListPage() {
                 <tbody>
                   {(list.data.rows as RunRow[]).map((r) => (
                     <tr key={r.id} className="border-b border-border last:border-b-0">
-                      <td className="px-4 py-3 font-medium tabular-nums">{r.billingYear}</td>
+                      <td className="px-4 py-3 font-medium tabular-nums">
+                        <div className="flex items-center gap-2">
+                          {r.billingYear}
+                          {r.kind === "recollection" ? (
+                            <Badge variant="secondary">Wiedereinzug</Badge>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 tabular-nums">{formatDate(r.falligkeitsdatum)}</td>
                       <td className="px-4 py-3 tabular-nums">{r.itemCount}</td>
                       <td className="px-4 py-3 text-right tabular-nums">

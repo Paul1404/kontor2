@@ -56,6 +56,7 @@ import { Route as AppBerichteEhrungenRouteImport } from './app/berichte/ehrungen
 import { Route as AppBerichteBestandserhebungRouteImport } from './app/berichte/bestandserhebung'
 import { Route as AppBerichteAbteilungsStatistikRouteImport } from './app/berichte/abteilungs-statistik'
 import { Route as AppBeitragNeuRouteImport } from './app/beitrag/neu'
+import { Route as AppBeitragErneutEinziehenRouteImport } from './app/beitrag/erneut-einziehen'
 import { Route as AppBeitragIdRouteImport } from './app/beitrag/$id'
 import { Route as AppAntraegeIdRouteImport } from './app/antraege/$id'
 import { Route as AppAdminVersandprotokollRouteImport } from './app/admin/versandprotokoll'
@@ -318,6 +319,12 @@ const AppBeitragNeuRoute = AppBeitragNeuRouteImport.update({
   path: '/beitrag/neu',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppBeitragErneutEinziehenRoute =
+  AppBeitragErneutEinziehenRouteImport.update({
+    id: '/beitrag/erneut-einziehen',
+    path: '/beitrag/erneut-einziehen',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 const AppBeitragIdRoute = AppBeitragIdRouteImport.update({
   id: '/beitrag/$id',
   path: '/beitrag/$id',
@@ -459,6 +466,7 @@ export interface FileRoutesByFullPath {
   '/app/admin/versandprotokoll': typeof AppAdminVersandprotokollRoute
   '/app/antraege/$id': typeof AppAntraegeIdRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
+  '/app/beitrag/erneut-einziehen': typeof AppBeitragErneutEinziehenRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
   '/app/berichte/bestandserhebung': typeof AppBerichteBestandserhebungRoute
@@ -524,6 +532,7 @@ export interface FileRoutesByTo {
   '/app/admin/versandprotokoll': typeof AppAdminVersandprotokollRoute
   '/app/antraege/$id': typeof AppAntraegeIdRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
+  '/app/beitrag/erneut-einziehen': typeof AppBeitragErneutEinziehenRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
   '/app/berichte/bestandserhebung': typeof AppBerichteBestandserhebungRoute
@@ -593,6 +602,7 @@ export interface FileRoutesById {
   '/app/admin/versandprotokoll': typeof AppAdminVersandprotokollRoute
   '/app/antraege/$id': typeof AppAntraegeIdRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
+  '/app/beitrag/erneut-einziehen': typeof AppBeitragErneutEinziehenRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
   '/app/berichte/bestandserhebung': typeof AppBerichteBestandserhebungRoute
@@ -663,6 +673,7 @@ export interface FileRouteTypes {
     | '/app/admin/versandprotokoll'
     | '/app/antraege/$id'
     | '/app/beitrag/$id'
+    | '/app/beitrag/erneut-einziehen'
     | '/app/beitrag/neu'
     | '/app/berichte/abteilungs-statistik'
     | '/app/berichte/bestandserhebung'
@@ -728,6 +739,7 @@ export interface FileRouteTypes {
     | '/app/admin/versandprotokoll'
     | '/app/antraege/$id'
     | '/app/beitrag/$id'
+    | '/app/beitrag/erneut-einziehen'
     | '/app/beitrag/neu'
     | '/app/berichte/abteilungs-statistik'
     | '/app/berichte/bestandserhebung'
@@ -796,6 +808,7 @@ export interface FileRouteTypes {
     | '/app/admin/versandprotokoll'
     | '/app/antraege/$id'
     | '/app/beitrag/$id'
+    | '/app/beitrag/erneut-einziehen'
     | '/app/beitrag/neu'
     | '/app/berichte/abteilungs-statistik'
     | '/app/berichte/bestandserhebung'
@@ -1175,6 +1188,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBeitragNeuRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/beitrag/erneut-einziehen': {
+      id: '/app/beitrag/erneut-einziehen'
+      path: '/beitrag/erneut-einziehen'
+      fullPath: '/app/beitrag/erneut-einziehen'
+      preLoaderRoute: typeof AppBeitragErneutEinziehenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/beitrag/$id': {
       id: '/app/beitrag/$id'
       path: '/beitrag/$id'
@@ -1346,6 +1366,7 @@ interface AppRouteRouteChildren {
   AppAdminVersandprotokollRoute: typeof AppAdminVersandprotokollRoute
   AppAntraegeIdRoute: typeof AppAntraegeIdRoute
   AppBeitragIdRoute: typeof AppBeitragIdRoute
+  AppBeitragErneutEinziehenRoute: typeof AppBeitragErneutEinziehenRoute
   AppBeitragNeuRoute: typeof AppBeitragNeuRoute
   AppBerichteAbteilungsStatistikRoute: typeof AppBerichteAbteilungsStatistikRoute
   AppBerichteBestandserhebungRoute: typeof AppBerichteBestandserhebungRoute
@@ -1392,6 +1413,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAdminVersandprotokollRoute: AppAdminVersandprotokollRoute,
   AppAntraegeIdRoute: AppAntraegeIdRoute,
   AppBeitragIdRoute: AppBeitragIdRoute,
+  AppBeitragErneutEinziehenRoute: AppBeitragErneutEinziehenRoute,
   AppBeitragNeuRoute: AppBeitragNeuRoute,
   AppBerichteAbteilungsStatistikRoute: AppBerichteAbteilungsStatistikRoute,
   AppBerichteBestandserhebungRoute: AppBerichteBestandserhebungRoute,

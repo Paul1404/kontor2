@@ -3,16 +3,20 @@ import { and, count, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import { getMailer } from "~/server/auth/send-invite";
+import { escapeLike } from "~/server/db/like";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { feeRunItemsTable, feeRunsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
-import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { type SepaMandate, sepaMandatesTable } from "~/server/db/schema/sepa";
 import { memberDisplayName } from "~/server/domain/member";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { amountStrToCents, buildFeeRunPreview, centsToAmount } from "~/server/sepa/build-fee-run";
+import { recollectionBlockReason } from "~/server/sepa/build-recollection";
 import { buildPain008, type Pain008Item } from "~/server/sepa/pain008";
 import { buildPrenotificationEmail } from "~/server/sepa/prenotification";
+import { selectMandate, sequenceTypeFor } from "~/server/sepa/select-mandate";
 
 const PreviewInput = v.object({
   billingYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
@@ -438,6 +442,391 @@ export const feeRunsRouter = {
     return result;
   }),
 
+  /**
+   * Returned postings (Rücklastschriften) that could be re-collected, with the
+   * reason blocking each one that cannot. Drives the Wiedereinzug picker: a row
+   * is selectable only when it carries an active mandate, an IBAN, an active
+   * direct-debit contract, and no Einzug-Sperre.
+   */
+  recollectCandidates: vorstandProc
+    .input(
+      v.optional(
+        v.object({
+          query: v.optional(v.nullable(v.string()), null),
+          limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 100),
+        }),
+        {},
+      ),
+    )
+    .handler(async ({ context, input }) => {
+      const q = (input.query ?? "").trim();
+      const like = `%${escapeLike(q)}%`;
+      const rows = await context.db
+        .select({
+          sollStellungId: sollStellungenTable.id,
+          memberId: sollStellungenTable.memberId,
+          contractId: sollStellungenTable.contractId,
+          billingYear: sollStellungenTable.billingYear,
+          amount: sollStellungenTable.amount,
+          openAmount: sollStellungenTable.openAmount,
+          artName: contractsTable.artName,
+          isDirectDebit: contractsTable.isDirectDebit,
+          directDebitBlocked: membersTable.directDebitBlocked,
+          hasIban: sql<boolean>`${membersTable.iban1} is not null`,
+          iban1Last4: membersTable.iban1Last4,
+          memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
+          memberNo: membersTable.memberNo,
+          kontaktNo: membersTable.kontaktNo,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
+          adrNr: membersTable.adrNr,
+        })
+        .from(sollStellungenTable)
+        .innerJoin(membersTable, eq(membersTable.id, sollStellungenTable.memberId))
+        .innerJoin(contractsTable, eq(contractsTable.id, sollStellungenTable.contractId))
+        .where(
+          and(
+            eq(sollStellungenTable.status, "returned"),
+            memberNotDeleted(),
+            q
+              ? sql`(
+                  ${membersTable.mitgliedsnummer} ilike ${like} or
+                  ${membersTable.nachname} ilike ${like} or
+                  ${membersTable.vorname} ilike ${like} or
+                  ${membersTable.firma1} ilike ${like}
+                )`
+              : sql`true`,
+          ),
+        )
+        .orderBy(desc(sollStellungenTable.billingYear), membersTable.nachname)
+        .limit(input.limit);
+
+      // Bulk-load mandates and decide which one each member would use, so the
+      // picker can show the mandate reference and flag the missing-mandate case.
+      const memberIds = Array.from(new Set(rows.map((r) => r.memberId)));
+      const mandates =
+        memberIds.length === 0
+          ? []
+          : await context.db
+              .select()
+              .from(sepaMandatesTable)
+              .where(inArray(sepaMandatesTable.memberId, memberIds));
+      const byMember = new Map<string, SepaMandate[]>();
+      for (const m of mandates) {
+        const list = byMember.get(m.memberId) ?? [];
+        list.push(m);
+        byMember.set(m.memberId, list);
+      }
+
+      return rows.map((r) => {
+        const chosen = selectMandate(byMember.get(r.memberId) ?? []).chosen;
+        const blockReason = recollectionBlockReason({
+          directDebitBlocked: r.directDebitBlocked,
+          isDirectDebit: r.isDirectDebit,
+          hasMandate: chosen != null,
+          hasIban: r.hasIban,
+        });
+        return {
+          sollStellungId: r.sollStellungId,
+          memberId: r.memberId,
+          memberName: r.memberName,
+          memberNo: r.memberNo,
+          kontaktNo: r.kontaktNo,
+          mitgliedsnummer: r.mitgliedsnummer,
+          adrNr: r.adrNr,
+          billingYear: r.billingYear,
+          artName: r.artName,
+          amount: centsToAmount(amountStrToCents(r.openAmount)),
+          mandateRef: chosen?.mandatsNr ?? null,
+          iban1Last4: r.iban1Last4,
+          eligible: blockReason === null,
+          blockReason,
+        };
+      });
+    }),
+
+  /**
+   * Wiedereinzug: re-debit selected returned postings in a fresh pain.008
+   * without ever deleting the original Sollstellung. Each selected posting
+   * flips back from `returned` to `eingezogen`, gets a new fee_run_item (so a
+   * second Rücklastschrift can be recorded against it), and the run is marked
+   * `kind = 'recollection'` so it reads apart from the yearly Beitragslauf.
+   */
+  recollect: vorstandProc
+    .input(
+      v.object({
+        sollStellungIds: v.pipe(v.array(v.string()), v.minLength(1)),
+        falligkeitsdatum: v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+      if (!org?.vereinsIban) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message:
+            "Vereinsdaten fehlen. Bitte unter Einstellungen > Vereinsdaten Gläubiger-ID, IBAN und BIC pflegen.",
+        });
+      }
+      if (!org.vereinsBic?.trim()) {
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Vereins-BIC ist nicht hinterlegt.",
+        });
+      }
+
+      const falligkeitsdatum = parseFalligkeit(input.falligkeitsdatum);
+      const ids = Array.from(new Set(input.sollStellungIds));
+
+      // Load the postings with their member (IBAN decrypts transparently) and
+      // contract. Only returned postings of non-deleted members qualify.
+      const postings = await context.db
+        .select({
+          sollStellungId: sollStellungenTable.id,
+          memberId: sollStellungenTable.memberId,
+          contractId: sollStellungenTable.contractId,
+          billingYear: sollStellungenTable.billingYear,
+          amount: sollStellungenTable.amount,
+          isDirectDebit: contractsTable.isDirectDebit,
+          abwKontoInh: contractsTable.abwKontoInh,
+          directDebitBlocked: membersTable.directDebitBlocked,
+          iban1: membersTable.iban1,
+          iban1Last4: membersTable.iban1Last4,
+          bic1: membersTable.bic1,
+          vorname: membersTable.vorname,
+          nachname: membersTable.nachname,
+          kurzname: membersTable.kurzname,
+          firma1: membersTable.firma1,
+          adrNr: membersTable.adrNr,
+        })
+        .from(sollStellungenTable)
+        .innerJoin(membersTable, eq(membersTable.id, sollStellungenTable.memberId))
+        .innerJoin(contractsTable, eq(contractsTable.id, sollStellungenTable.contractId))
+        .where(
+          and(
+            inArray(sollStellungenTable.id, ids),
+            eq(sollStellungenTable.status, "returned"),
+            memberNotDeleted(),
+          ),
+        );
+      if (postings.length === 0) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Keine einziehbaren Rückläufer ausgewählt.",
+        });
+      }
+
+      const memberIds = Array.from(new Set(postings.map((p) => p.memberId)));
+      const mandates = await context.db
+        .select()
+        .from(sepaMandatesTable)
+        .where(inArray(sepaMandatesTable.memberId, memberIds));
+      const mandatesByMember = new Map<string, SepaMandate[]>();
+      for (const m of mandates) {
+        const list = mandatesByMember.get(m.memberId) ?? [];
+        list.push(m);
+        mandatesByMember.set(m.memberId, list);
+      }
+
+      // Header billing year is just a label; items carry their own year in the
+      // purpose. Use the newest among the selection.
+      const runYear = Math.max(...postings.map((p) => p.billingYear));
+
+      const result = await context.db.transaction(async (tx) => {
+        // Serialize recollections against each other; the per-row status guard
+        // below blocks any concurrent run that already re-collected a posting.
+        await tx.execute(sql`select pg_advisory_xact_lock(4712)`);
+
+        // Re-read which of the selected postings are still `returned` inside the
+        // lock -- a concurrent recollection or a markPaid may have moved them.
+        const stillReturned = await tx
+          .select({ id: sollStellungenTable.id })
+          .from(sollStellungenTable)
+          .where(
+            and(inArray(sollStellungenTable.id, ids), eq(sollStellungenTable.status, "returned")),
+          );
+        const liveSet = new Set(stillReturned.map((r) => r.id));
+
+        const run = (
+          await tx
+            .insert(feeRunsTable)
+            .values({
+              billingYear: runYear,
+              falligkeitsdatum: input.falligkeitsdatum,
+              status: "committed",
+              kind: "recollection",
+              itemCount: 0,
+              totalAmount: "0",
+              createdBy: context.session!.user.id,
+              committedAt: new Date(),
+              committedBy: context.session!.user.id,
+            } as never)
+            .returning({ id: feeRunsTable.id })
+        )[0];
+        if (!run) throw new Error("fee_runs insert returned no row");
+
+        const pain008Items: Pain008Item[] = [];
+        const usedMandateIds = new Set<string>();
+        const skipped: string[] = [];
+        let runCents = 0n;
+
+        for (const p of postings) {
+          if (!liveSet.has(p.sollStellungId)) continue; // claimed elsewhere
+          const chosen = selectMandate(mandatesByMember.get(p.memberId) ?? []).chosen;
+          const iban = p.iban1;
+          const debtorName =
+            p.abwKontoInh?.trim() ||
+            memberDisplayName({
+              vorname: p.vorname,
+              nachname: p.nachname,
+              kurzname: p.kurzname,
+              firma1: p.firma1,
+              adrNr: p.adrNr,
+            });
+          const blockReason = recollectionBlockReason({
+            directDebitBlocked: p.directDebitBlocked,
+            isDirectDebit: p.isDirectDebit,
+            hasMandate: chosen != null,
+            hasIban: !!iban,
+          });
+          if (blockReason || !chosen || !iban) {
+            skipped.push(`${debtorName}: ${blockReason ?? "nicht einziehbar"}`);
+            continue;
+          }
+
+          const amount = centsToAmount(amountStrToCents(p.amount));
+          const endToEndId = crypto.randomUUID().replace(/-/g, "").slice(0, 35);
+          const sequenceType = sequenceTypeFor(chosen);
+          const signatureDate =
+            chosen.unterschriftDatum?.toISOString().slice(0, 10) ?? input.falligkeitsdatum;
+          const purpose = `Mitgliedsbeitrag ${p.billingYear} (Wiedereinzug)`;
+
+          const item = (
+            await tx
+              .insert(feeRunItemsTable)
+              .values({
+                feeRunId: run.id,
+                memberId: p.memberId,
+                contractId: p.contractId,
+                sepaMandateId: chosen.id,
+                sollStellungId: p.sollStellungId,
+                amount,
+                purpose,
+                includesAufnahmegebuhr: false,
+                endToEndId,
+                sequenceType,
+                mandateRef: chosen.mandatsNr,
+                mandateSignatureDate: signatureDate,
+                debtorName,
+                debtorIbanLast4: p.iban1Last4 ?? iban.slice(-4),
+                debtorBic: p.bic1 ?? null,
+              } as never)
+              .returning({ id: feeRunItemsTable.id })
+          )[0];
+
+          // Re-collected: presumed pulled again, so back to eingezogen / paid.
+          await tx
+            .update(sollStellungenTable)
+            .set({
+              status: "eingezogen",
+              paidAmount: sql`${sollStellungenTable.amount}`,
+              openAmount: "0",
+              lastFeeRunItemId: item?.id ?? null,
+              updatedAt: new Date(),
+            })
+            .where(eq(sollStellungenTable.id, p.sollStellungId));
+
+          pain008Items.push({
+            endToEndId,
+            amount,
+            mandateRef: chosen.mandatsNr,
+            mandateSignatureDate: signatureDate,
+            debtorName,
+            debtorIban: iban,
+            debtorBic: p.bic1 ?? null,
+            purpose: `Mitgliedsbeitrag ${p.billingYear} (Wiedereinzug)`,
+            sequenceType,
+          });
+          usedMandateIds.add(chosen.id);
+          runCents += amountStrToCents(amount);
+        }
+
+        if (pain008Items.length === 0) {
+          throw new ORPCError("CONFLICT", {
+            message:
+              skipped.length > 0
+                ? `Kein Posten einziehbar. ${skipped.join("; ")}`
+                : "Die ausgewählten Rückläufer wurden zwischenzeitlich bereits bearbeitet.",
+          });
+        }
+
+        if (usedMandateIds.size > 0) {
+          await tx
+            .update(sepaMandatesTable)
+            .set({
+              letzteVerwendung: falligkeitsdatum,
+              ersteVerwendung: sql`coalesce(${sepaMandatesTable.ersteVerwendung}, ${falligkeitsdatum})`,
+              updatedAt: new Date(),
+            })
+            .where(inArray(sepaMandatesTable.id, [...usedMandateIds]));
+        }
+
+        const runTotalAmount = centsToAmount(runCents);
+        const msgId = buildMsgId(runYear, run.id);
+        const now = new Date();
+        const filename = buildXmlFilename(now);
+        const xml = buildPain008({
+          creditor: {
+            name: org.vereinsname,
+            iban: org.vereinsIban,
+            bic: org.vereinsBic,
+            glaeubigerId: org.glaeubigerId,
+          },
+          falligkeitsdatum: input.falligkeitsdatum,
+          msgId,
+          pmtInfIdPrefix: msgId,
+          createdAtIso: now.toISOString(),
+          items: pain008Items,
+        });
+
+        await tx
+          .update(feeRunsTable)
+          .set({
+            itemCount: pain008Items.length,
+            totalAmount: runTotalAmount,
+            xmlMessageId: msgId,
+            xmlPaymentInfoIdFrst: `${msgId}-FRST`,
+            xmlPaymentInfoIdRcur: `${msgId}-RCUR`,
+            xmlGeneratedAt: now,
+            xmlFilename: filename,
+            xmlContent: xml,
+          })
+          .where(eq(feeRunsTable.id, run.id));
+
+        await appendAudit(tx, {
+          entityType: "fee_run",
+          entityId: run.id,
+          action: "create",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            kind: { before: null, after: "recollection" },
+            itemCount: { before: null, after: pain008Items.length },
+            totalAmount: { before: null, after: runTotalAmount },
+            status: { before: null, after: "committed" },
+          },
+          requestId: context.requestId ?? null,
+        });
+
+        return {
+          feeRunId: run.id,
+          itemCount: pain008Items.length,
+          totalAmount: runTotalAmount,
+          xmlFilename: filename,
+          skipped,
+        };
+      });
+
+      return result;
+    }),
+
   list: authedProc
     .input(
       v.optional(
@@ -455,6 +844,7 @@ export const feeRunsRouter = {
           billingYear: feeRunsTable.billingYear,
           falligkeitsdatum: feeRunsTable.falligkeitsdatum,
           status: feeRunsTable.status,
+          kind: feeRunsTable.kind,
           itemCount: feeRunsTable.itemCount,
           totalAmount: feeRunsTable.totalAmount,
           xmlFilename: feeRunsTable.xmlFilename,
