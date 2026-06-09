@@ -56,7 +56,7 @@ export function ReleaseNotesDialog({
         if (e.target === e.currentTarget) onOpenChange(false);
       }}
     >
-      <div className="motion-zoom-in flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-border bg-card shadow-card">
+      <div className="motion-zoom-in flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-border bg-card text-card-foreground shadow-card">
         <div className="flex items-start justify-between border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <Sparkles className="size-4 text-primary" />

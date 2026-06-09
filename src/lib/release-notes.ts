@@ -50,6 +50,11 @@ export const RELEASES: Release[] = [
         description:
           "Das öffentliche Beitrittsformular hat jetzt erklärende Hinweise an jedem Schritt: erkannter Tarif und Jahresbeitrag direkt bei den Mitgliedsdaten, der vollständige SEPA-Mandatstext mit Gläubiger-ID, eine ausführliche Zusammenfassung mit Bearbeiten-Sprüngen und beschriftete Optionen für die Unterschrift.",
       },
+      {
+        category: "fix",
+        description:
+          "Überschrift und Titel im Versionshinweise-Dialog werden wieder in voller Schriftfarbe dargestellt statt in blassem Grau.",
+      },
     ],
   },
   {
