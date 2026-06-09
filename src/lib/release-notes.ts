@@ -60,6 +60,21 @@ export const RELEASES: Release[] = [
         description:
           "Bei der IBAN-Eingabe wird die erkannte Bank direkt angezeigt, und die Abteilungsauswahl ist deutlicher als aktiv markiert.",
       },
+      {
+        category: "feature",
+        description:
+          "Eingaben im Beitrittsformular werden automatisch zwischengespeichert und beim erneuten Öffnen wiederhergestellt, solange der Browser-Tab offen bleibt.",
+      },
+      {
+        category: "feature",
+        description:
+          "Die Unterschrift lässt sich jetzt im Vollbild zeichnen, was besonders auf dem Smartphone angenehmer ist.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Vor dem Absenden weist das Formular dezent darauf hin, wenn zu Name und Geburtsdatum bereits ein Antrag oder eine Mitgliedschaft bestehen könnte.",
+      },
     ],
   },
   {

@@ -35,6 +35,42 @@ type KindRow = { vorname: string; nachname: string; geburtsdatum: string; abteil
 
 const STEPS = ["Mitgliedsdaten", "SEPA-Lastschrift", "Zusammenfassung"];
 
+// Draft persistence: keep an in-progress application across reloads. Uses
+// sessionStorage (cleared when the tab closes), matching svums and keeping the
+// applicant's data off the device long-term. The signature is intentionally
+// excluded; it is re-drawn on the summary step.
+const DRAFT_KEY = "svuwv-antrag-draft-v1";
+
+type Draft = {
+  step: number;
+  geschlecht: Anrede | null;
+  vorname: string;
+  nachname: string;
+  geburtsdatum: string;
+  strasse: string;
+  hausnummer: string;
+  plz: string;
+  ort: string;
+  telefon: string;
+  email: string;
+  selectedAbt: string[];
+  erzVorname: string;
+  erzNachname: string;
+  elternteilMitglied: boolean;
+  partnerVorname: string;
+  partnerNachname: string;
+  partnerGeburtsdatum: string;
+  partnerAbt: string[];
+  kinder: KindRow[];
+  kontoinhaber: string;
+  iban: string;
+  bic: string;
+  kreditinstitut: string;
+  signOnline: boolean;
+  datenschutz: boolean;
+  satzung: boolean;
+};
+
 function realAge(iso: string): number | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
   const [y, m, d] = iso.split("-").map(Number);
@@ -95,6 +131,110 @@ function AntragForm() {
   const [datenschutz, setDatenschutz] = useState(false);
   const [satzung, setSatzung] = useState(false);
 
+  // Draft + duplicate-check state.
+  const [hydrated, setHydrated] = useState(false);
+  const [draftState, setDraftState] = useState<"idle" | "restored" | "saved">("idle");
+  const [warning, setWarning] = useState<string | null>(null);
+  const [dupAck, setDupAck] = useState(false);
+
+  // Restore a saved draft once on mount.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as Partial<Draft>;
+        if (typeof d.step === "number") setStep(Math.min(Math.max(d.step, 0), STEPS.length - 1));
+        if (d.geschlecht !== undefined) setGeschlecht(d.geschlecht);
+        if (typeof d.vorname === "string") setVorname(d.vorname);
+        if (typeof d.nachname === "string") setNachname(d.nachname);
+        if (typeof d.geburtsdatum === "string") setGeburtsdatum(d.geburtsdatum);
+        if (typeof d.strasse === "string") setStrasse(d.strasse);
+        if (typeof d.hausnummer === "string") setHausnummer(d.hausnummer);
+        if (typeof d.plz === "string") setPlz(d.plz);
+        if (typeof d.ort === "string") setOrt(d.ort);
+        if (typeof d.telefon === "string") setTelefon(d.telefon);
+        if (typeof d.email === "string") setEmail(d.email);
+        if (Array.isArray(d.selectedAbt)) setSelectedAbt(d.selectedAbt);
+        if (typeof d.erzVorname === "string") setErzVorname(d.erzVorname);
+        if (typeof d.erzNachname === "string") setErzNachname(d.erzNachname);
+        if (typeof d.elternteilMitglied === "boolean") setElternteilMitglied(d.elternteilMitglied);
+        if (typeof d.partnerVorname === "string") setPartnerVorname(d.partnerVorname);
+        if (typeof d.partnerNachname === "string") setPartnerNachname(d.partnerNachname);
+        if (typeof d.partnerGeburtsdatum === "string")
+          setPartnerGeburtsdatum(d.partnerGeburtsdatum);
+        if (Array.isArray(d.partnerAbt)) setPartnerAbt(d.partnerAbt);
+        if (Array.isArray(d.kinder)) setKinder(d.kinder);
+        if (typeof d.kontoinhaber === "string") setKontoinhaber(d.kontoinhaber);
+        if (typeof d.iban === "string") setIban(d.iban);
+        if (typeof d.bic === "string") setBic(d.bic);
+        if (typeof d.kreditinstitut === "string") setKreditinstitut(d.kreditinstitut);
+        if (typeof d.signOnline === "boolean") setSignOnline(d.signOnline);
+        if (typeof d.datenschutz === "boolean") setDatenschutz(d.datenschutz);
+        if (typeof d.satzung === "boolean") setSatzung(d.satzung);
+        setDraftState("restored");
+        setTimeout(() => setDraftState("idle"), 4000);
+      }
+    } catch {
+      // A corrupt draft should never block a fresh application.
+    }
+    setHydrated(true);
+  }, []);
+
+  const draftJson = JSON.stringify({
+    step,
+    geschlecht,
+    vorname,
+    nachname,
+    geburtsdatum,
+    strasse,
+    hausnummer,
+    plz,
+    ort,
+    telefon,
+    email,
+    selectedAbt,
+    erzVorname,
+    erzNachname,
+    elternteilMitglied,
+    partnerVorname,
+    partnerNachname,
+    partnerGeburtsdatum,
+    partnerAbt,
+    kinder,
+    kontoinhaber,
+    iban,
+    bic,
+    kreditinstitut,
+    signOnline,
+    datenschutz,
+    satzung,
+  } satisfies Draft);
+
+  // Debounced persistence of the draft after any change.
+  useEffect(() => {
+    if (!hydrated) return;
+    const t = setTimeout(() => {
+      try {
+        sessionStorage.setItem(DRAFT_KEY, draftJson);
+        setDraftState("saved");
+        setTimeout(() => setDraftState((s) => (s === "saved" ? "idle" : s)), 2000);
+      } catch {
+        // sessionStorage can be unavailable (private mode); not fatal.
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [draftJson, hydrated]);
+
+  // A changed identity invalidates a previous duplicate acknowledgement.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: identity fields only
+  useEffect(() => {
+    setDupAck(false);
+  }, [vorname, nachname, geburtsdatum]);
+
+  const dup = useMutation({
+    mutationFn: () => orpc.applications.checkDuplicate({ vorname, nachname, geburtsdatum }),
+  });
+
   const age = geburtsdatum ? realAge(geburtsdatum) : null;
   const isMinor = age != null && age < 18;
   const hasPartner = partnerVorname.trim().length >= 2 && partnerNachname.trim().length >= 2;
@@ -154,10 +294,39 @@ function AntragForm() {
         datenschutzAccepted: datenschutz,
         satzungAccepted: satzung,
       }),
-    onSuccess: (res) => setResult({ antragsnummer: res.antragsnummer }),
+    onSuccess: (res) => {
+      try {
+        sessionStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // ignore
+      }
+      setResult({ antragsnummer: res.antragsnummer });
+    },
     onError: (e: unknown) =>
       setError(e instanceof Error ? e.message : "Der Antrag konnte nicht gesendet werden."),
   });
+
+  // Final submit: run a soft duplicate check first. A hit does not block; it
+  // warns once and a second click goes through (matching svums).
+  async function handleSubmit() {
+    setError(null);
+    setWarning(null);
+    if (!dupAck) {
+      try {
+        const r = await dup.mutateAsync();
+        if (r.duplicate) {
+          setDupAck(true);
+          setWarning(
+            "Es könnte bereits ein Antrag oder eine Mitgliedschaft mit diesem Namen und Geburtsdatum bestehen. Klicken Sie erneut auf „Beitritt erklären“, um trotzdem fortzufahren.",
+          );
+          return;
+        }
+      } catch {
+        // Never block submission because the duplicate check itself failed.
+      }
+    }
+    submit.mutate();
+  }
 
   function toggle(list: string[], set: (v: string[]) => void, id: string) {
     set(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -221,7 +390,15 @@ function AntragForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Stepper step={step} onJump={(i) => i < step && goTo(i)} />
+      <div className="flex flex-col gap-2">
+        <Stepper step={step} onJump={(i) => i < step && goTo(i)} />
+        {draftState !== "idle" ? (
+          <p className="motion-fade-in flex items-center gap-1.5 self-end text-xs text-muted-foreground">
+            <Check className="size-3.5 text-success" />
+            {draftState === "restored" ? "Entwurf wiederhergestellt" : "Entwurf gespeichert"}
+          </p>
+        ) : null}
+      </div>
 
       <div
         key={step}
@@ -724,6 +901,11 @@ function AntragForm() {
         ) : null}
       </div>
 
+      {warning ? (
+        <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
+          {warning}
+        </p>
+      ) : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <div className="flex justify-between gap-2">
@@ -742,13 +924,16 @@ function AntragForm() {
         ) : (
           <Button
             type="button"
-            disabled={submit.isPending || !datenschutz || !satzung || (signOnline && !signature)}
-            onClick={() => {
-              setError(null);
-              submit.mutate();
-            }}
+            disabled={
+              submit.isPending ||
+              dup.isPending ||
+              !datenschutz ||
+              !satzung ||
+              (signOnline && !signature)
+            }
+            onClick={handleSubmit}
           >
-            {submit.isPending ? (
+            {submit.isPending || dup.isPending ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
               <Send className="size-4" />
