@@ -18,6 +18,23 @@ export function redis(): Redis {
   return client;
 }
 
+/**
+ * Close the Redis connection if one was opened. No-op when the lazy `redis()`
+ * was never called. Prefers a graceful `QUIT`; falls back to a hard disconnect
+ * if the server is unreachable so shutdown never hangs. Resets the memoized
+ * client so a later `redis()` would reconnect.
+ */
+export async function closeRedis(): Promise<void> {
+  if (!client) return;
+  const instance = client;
+  client = undefined;
+  try {
+    await instance.quit();
+  } catch {
+    instance.disconnect();
+  }
+}
+
 export async function rateLimit(opts: {
   key: string;
   limit: number;

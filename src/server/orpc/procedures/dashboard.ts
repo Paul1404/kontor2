@@ -1,6 +1,6 @@
 import { and, count, eq, gte, isNotNull, isNull, sql } from "drizzle-orm";
 import * as v from "valibot";
-import { memberNotDeleted } from "~/server/db/member-filters";
+import { memberNotDeceased, memberNotDeleted, memberNotExited } from "~/server/db/member-filters";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
 import { authedProc } from "~/server/orpc/base";
@@ -59,7 +59,7 @@ export const dashboardRouter = {
         context.db
           .select({ c: count() })
           .from(membersTable)
-          .where(and(notDeleted, isNull(membersTable.austritt), isNull(membersTable.verstorbenAm))),
+          .where(and(notDeleted, memberNotExited(), memberNotDeceased())),
         context.db
           .select({ c: count() })
           .from(membersTable)
@@ -88,8 +88,8 @@ export const dashboardRouter = {
           end as bucket
           from ${membersTable}
           where ${memberNotDeleted()}
-            and ${membersTable.austritt} is null
-            and ${membersTable.verstorbenAm} is null
+            and ${memberNotExited()}
+            and ${memberNotDeceased()}
         ) t
         group by bucket
         order by bucket
@@ -109,8 +109,8 @@ export const dashboardRouter = {
             select ${effectiveGender} as g
             from ${membersTable}
             where ${memberNotDeleted()}
-              and ${membersTable.austritt} is null
-              and ${membersTable.verstorbenAm} is null
+              and ${memberNotExited()}
+              and ${memberNotDeceased()}
           ) s
         ) t
         group by gender
@@ -154,8 +154,8 @@ export const dashboardRouter = {
             end as next_birthday
           from ${membersTable}
           where ${memberNotDeleted()}
-            and ${membersTable.austritt} is null
-            and ${membersTable.verstorbenAm} is null
+            and ${memberNotExited()}
+            and ${memberNotDeceased()}
             and ${membersTable.geburtsdatum} is not null
         ) t
         where next_birthday <= current_date + interval '30 days'
@@ -176,8 +176,8 @@ export const dashboardRouter = {
           end as bucket
           from ${membersTable}
           where ${memberNotDeleted()}
-            and ${membersTable.austritt} is null
-            and ${membersTable.verstorbenAm} is null
+            and ${memberNotExited()}
+            and ${memberNotDeceased()}
         ) t
         group by bucket
         order by bucket
@@ -278,11 +278,11 @@ export const dashboardRouter = {
           context.db.execute<{ lastschrift: number; rechnung: number }>(sql`
         select
           (select count(*) from ${membersTable} m
-             where m.deleted_at is null and m.austritt is null and m.verstorben_am is null
+             where m.deleted_at is null and (m.austritt is null or m.austritt::date > current_date) and m.verstorben_am is null
                and exists (select 1 from contracts c where c.member_id = m.id and c.is_direct_debit = true
                             and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date)))::int as lastschrift,
           (select count(*) from ${membersTable} m
-             where m.deleted_at is null and m.austritt is null and m.verstorben_am is null
+             where m.deleted_at is null and (m.austritt is null or m.austritt::date > current_date) and m.verstorben_am is null
                and exists (select 1 from contracts c where c.member_id = m.id
                             and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date))
                and not exists (select 1 from contracts c where c.member_id = m.id and c.is_direct_debit = true
@@ -306,8 +306,8 @@ export const dashboardRouter = {
           ${effectiveGender} as g
           from ${membersTable}
           where ${memberNotDeleted()}
-            and ${membersTable.austritt} is null
-            and ${membersTable.verstorbenAm} is null
+            and ${memberNotExited()}
+            and ${memberNotDeceased()}
         ) t
         group by bucket
       `),

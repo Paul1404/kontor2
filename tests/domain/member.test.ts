@@ -7,6 +7,7 @@ import {
   isMinorAt,
   memberDisplayName,
   memberRef,
+  pendingAustrittDate,
   yesNoToBool,
 } from "~/server/domain/member";
 
@@ -112,5 +113,57 @@ describe("deriveStatus", () => {
     expect(isActiveStatus("passiv")).toBe(true);
     expect(isActiveStatus("ausgetreten")).toBe(false);
     expect(isActiveStatus("verstorben")).toBe(false);
+  });
+
+  it("treats a future exit date as still active until it arrives", () => {
+    const asOf = new Date("2026-06-09T12:00:00Z");
+    const future = new Date("2026-12-31T00:00:00Z");
+    const past = new Date("2026-01-01T00:00:00Z");
+
+    // Notice given for year-end: still a member today.
+    expect(deriveStatus({ austritt: future, verstorbenAm: null, aktivPasiv: "A" }, asOf)).toBe(
+      "aktiv",
+    );
+    expect(deriveStatus({ austritt: future, verstorbenAm: null, aktivPasiv: "P" }, asOf)).toBe(
+      "passiv",
+    );
+    // The exit has come due.
+    expect(deriveStatus({ austritt: past, verstorbenAm: null, aktivPasiv: "A" }, asOf)).toBe(
+      "ausgetreten",
+    );
+    // The leave date itself counts as effective (first non-member day).
+    expect(deriveStatus({ austritt: asOf, verstorbenAm: null, aktivPasiv: "A" }, asOf)).toBe(
+      "ausgetreten",
+    );
+  });
+
+  it("accepts YYYY-MM-DD strings for the exit date", () => {
+    const asOf = new Date("2026-06-09T12:00:00Z");
+    expect(
+      deriveStatus({ austritt: "2026-12-31", verstorbenAm: null, aktivPasiv: "A" }, asOf),
+    ).toBe("aktiv");
+    expect(
+      deriveStatus({ austritt: "2026-01-01", verstorbenAm: null, aktivPasiv: "A" }, asOf),
+    ).toBe("ausgetreten");
+  });
+});
+
+describe("pendingAustrittDate", () => {
+  const asOf = new Date("2026-06-09T12:00:00Z");
+
+  it("returns the leave date only when it is still in the future", () => {
+    const future = new Date("2026-12-31T00:00:00Z");
+    expect(pendingAustrittDate({ austritt: future, verstorbenAm: null }, asOf)).toEqual(future);
+    expect(
+      pendingAustrittDate({ austritt: new Date("2026-01-01T00:00:00Z"), verstorbenAm: null }, asOf),
+    ).toBeNull();
+    expect(pendingAustrittDate({ austritt: null, verstorbenAm: null }, asOf)).toBeNull();
+  });
+
+  it("clears the pending exit once a death is recorded", () => {
+    const future = new Date("2026-12-31T00:00:00Z");
+    expect(
+      pendingAustrittDate({ austritt: future, verstorbenAm: new Date("2026-05-01") }, asOf),
+    ).toBeNull();
   });
 });

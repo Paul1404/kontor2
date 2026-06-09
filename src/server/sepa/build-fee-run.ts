@@ -64,6 +64,24 @@ export type Preview = {
   issues: { level: "error" | "warning"; message: string }[];
 };
 
+/**
+ * Member-level reasons the Beitragslauf skips a member, independent of the
+ * contract, mandate, or amount. Checked in priority order: an explicit fee
+ * exemption first, then a paused (ruhend) membership, then a SEPA direct-debit
+ * hold. Returns the exclusion label, or null when none apply. Kept pure so the
+ * cascade rules are unit-testable without a database.
+ */
+export function memberFeeBlockReason(member: {
+  beitragsbefreit?: boolean | null;
+  ruhend?: boolean | null;
+  directDebitBlocked?: boolean | null;
+}): string | null {
+  if (member.beitragsbefreit) return "Beitragsbefreit";
+  if (member.ruhend) return "Ruhend";
+  if (member.directDebitBlocked) return "Einzug ausgesetzt";
+  return null;
+}
+
 export type PreviewParams = {
   billingYear: number;
   falligkeitsdatum: Date;
@@ -191,14 +209,15 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
       continue;
     }
 
-    if (member.directDebitBlocked) {
+    const memberBlock = memberFeeBlockReason(member);
+    if (memberBlock) {
       excluded.push({
         memberId: member.id,
         memberName,
         contractId: contract.id,
         vertragNr: contract.vertragNr,
         artName: contract.artName,
-        reason: "Einzug ausgesetzt",
+        reason: memberBlock,
       });
       continue;
     }

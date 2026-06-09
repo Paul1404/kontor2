@@ -1,7 +1,14 @@
 import { and, asc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { escapeLike } from "~/server/db/like";
-import { memberNotDeleted } from "~/server/db/member-filters";
+import {
+  memberHasDied,
+  memberHasExited,
+  memberHasPendingExit,
+  memberNotDeceased,
+  memberNotDeleted,
+  memberNotExited,
+} from "~/server/db/member-filters";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
@@ -15,7 +22,14 @@ import { isRoundBirthday } from "~/server/reports/birthday";
 import { isExcludedFromJubilee, jubileeDateFor, jubileeYearFor } from "~/server/reports/jubilee";
 import { CACHE_NS, cached } from "~/server/search/cache";
 
-const StatusSchema = v.picklist(["aktiv", "passiv", "ausgetreten", "verstorben", "alle"]);
+const StatusSchema = v.picklist([
+  "aktiv",
+  "passiv",
+  "gekuendigt",
+  "ausgetreten",
+  "verstorben",
+  "alle",
+]);
 
 const MemberExportInput = v.object({
   q: v.optional(v.string(), ""),
@@ -59,29 +73,34 @@ function formatDateDE(value: Date | string | null | undefined): string {
 
 function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>) {
   const conditions: ReturnType<typeof eq>[] = [];
+  // "Exited" means the Austritt date has arrived; a notice for a future date
+  // still counts as active (see `memberNotExited`), matching the members list.
   if (!input.includeAusgetretene && input.status !== "ausgetreten") {
-    conditions.push(isNull(membersTable.austritt) as never);
+    conditions.push(memberNotExited() as never);
   }
   if (input.status === "ausgetreten") {
-    conditions.push(isNotNull(membersTable.austritt) as never);
+    conditions.push(memberHasExited() as never);
   }
   if (input.status === "verstorben") {
-    conditions.push(isNotNull(membersTable.verstorbenAm) as never);
+    conditions.push(memberHasDied() as never);
+  }
+  if (input.status === "gekuendigt") {
+    conditions.push(memberHasPendingExit() as never);
   }
   if (input.status === "aktiv") {
-    // Mirror the members list: an explicit "aktiv" status means not exited and
-    // not deceased, enforced directly so it stays correct even when
+    // Mirror the members list: an explicit "aktiv" status means still a member
+    // today and not deceased, enforced directly so it stays correct even when
     // `includeAusgetretene` is set. Otherwise exited members leak into the
     // "aktiv" CSV and the export disagrees with the on-screen list.
-    conditions.push(isNull(membersTable.austritt) as never);
-    conditions.push(isNull(membersTable.verstorbenAm) as never);
+    conditions.push(memberNotExited() as never);
+    conditions.push(memberNotDeceased() as never);
   }
   if (input.status === "passiv") {
     // The normalized status already implies neither exited nor deceased; the
     // date guards keep the export correct even if status ever drifts.
     conditions.push(eq(membersTable.status, "passiv") as never);
-    conditions.push(isNull(membersTable.austritt) as never);
-    conditions.push(isNull(membersTable.verstorbenAm) as never);
+    conditions.push(memberNotExited() as never);
+    conditions.push(memberNotDeceased() as never);
   }
   conditions.push(memberNotDeleted() as never);
   if (input.q.trim()) {

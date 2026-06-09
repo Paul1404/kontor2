@@ -42,6 +42,7 @@ import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/
 import { formatLand } from "~/lib/country";
 import { triggerDownload } from "~/lib/download";
 import { EMPTY_VALUE, formatCurrency, formatDate, formatDateTime, formatPhone } from "~/lib/format";
+import { memberStatusView } from "~/lib/member-status";
 import { orpc } from "~/lib/orpc";
 import { usePageShortcut } from "~/lib/use-global-shortcuts";
 import { useRecentMembers } from "~/lib/use-recent-members";
@@ -204,6 +205,22 @@ function MemberDetailPage() {
             {member.directDebitBlocked ? (
               <Badge variant="warning" title="SEPA-Lastschrift ist für dieses Mitglied ausgesetzt">
                 Einzug ausgesetzt
+              </Badge>
+            ) : null}
+            {member.ruhend ? (
+              <Badge
+                variant="secondary"
+                title="Ruhende Mitgliedschaft: der Beitragslauf überspringt dieses Mitglied"
+              >
+                Ruhend
+              </Badge>
+            ) : null}
+            {member.beitragsbefreit ? (
+              <Badge
+                variant="secondary"
+                title="Beitragsbefreit: der Beitragslauf erstellt keine Sollstellung"
+              >
+                Beitragsbefreit
               </Badge>
             ) : null}
           </h1>
@@ -747,10 +764,13 @@ function MemberStatusBadge({
   // Kontakte (no Mitgliedsnummer) carry their own badge in the header; a
   // membership status would be misleading for them.
   if (!member.mitgliedsnummer) return null;
-  if (member.verstorbenAm) return <Badge variant="secondary">Verstorben</Badge>;
-  if (member.austritt) return <Badge variant="warning">Ausgetreten</Badge>;
-  if (member.aktivPasiv === "P") return <Badge variant="secondary">Passiv</Badge>;
-  return <Badge variant="success">Aktiv</Badge>;
+  // Date-aware: a future-dated Austritt reads "Kündigt zum …", not "Ausgetreten".
+  const view = memberStatusView({
+    austritt: member.austritt,
+    verstorbenAm: member.verstorbenAm,
+    status: member.aktivPasiv === "P" ? "passiv" : "aktiv",
+  });
+  return <Badge variant={view.variant}>{view.label}</Badge>;
 }
 
 function formatGeschlecht(value: string | null | undefined): string {

@@ -9,7 +9,7 @@
  * page (a bad entry is dropped, not thrown).
  */
 
-export type ViewStatus = "aktiv" | "passiv" | "ausgetreten" | "verstorben" | "alle";
+export type ViewStatus = "aktiv" | "passiv" | "gekuendigt" | "ausgetreten" | "verstorben" | "alle";
 export type ViewSortBy = "nachname" | "mitgliedsnummer" | "ort" | "email" | "eintritt";
 export type ViewSortDir = "asc" | "desc";
 
@@ -30,7 +30,14 @@ export type SavedView = {
   search: ViewSearch;
 };
 
-const STATUS_VALUES: ViewStatus[] = ["aktiv", "passiv", "ausgetreten", "verstorben", "alle"];
+const STATUS_VALUES: ViewStatus[] = [
+  "aktiv",
+  "passiv",
+  "gekuendigt",
+  "ausgetreten",
+  "verstorben",
+  "alle",
+];
 const SORT_VALUES: ViewSortBy[] = ["nachname", "mitgliedsnummer", "ort", "email", "eintritt"];
 
 export const SAVED_VIEWS_KEY = "members.savedViews.v1";

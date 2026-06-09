@@ -25,6 +25,20 @@ export function db() {
   return dbInstance;
 }
 
+/**
+ * Close the Postgres pool if one was opened. No-op when the lazy `sql()` was
+ * never called (e.g. SIGTERM before the first request). Resets the memoized
+ * handles so a later `db()` would reconnect. Called from the graceful-shutdown
+ * path so connections drain instead of being reset under the server.
+ */
+export async function closeDb(): Promise<void> {
+  if (!sqlInstance) return;
+  const instance = sqlInstance;
+  sqlInstance = undefined;
+  dbInstance = undefined;
+  await instance.end({ timeout: 5 });
+}
+
 export type DB = ReturnType<typeof db>;
 
 /**

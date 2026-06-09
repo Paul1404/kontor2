@@ -126,6 +126,20 @@ export const membersTable = pgTable(
      * a member who switched to Überweisung, or a temporary hold.
      */
     directDebitBlocked: boolean("direct_debit_blocked").notNull().default(false),
+    /**
+     * Ruhende Mitgliedschaft: temporarily paused. The member stays a member
+     * (still counts in the Bestandserhebung and the active total) but the
+     * Beitragslauf skips them (reason "Ruhend") until the pause is lifted. Use
+     * for a sabbatical, a long illness, or a season out.
+     */
+    ruhend: boolean("ruhend").notNull().default(false),
+    /**
+     * Beitragsbefreiung: exempt from membership fees. The member counts fully
+     * everywhere, but the Beitragslauf raises no Sollstellung for them (reason
+     * "Beitragsbefreit"). Distinct from a 0-Euro contract: a deliberate
+     * member-level status, independent of the contract amount.
+     */
+    beitragsbefreit: boolean("beitragsbefreit").notNull().default(false),
   },
   (t) => [
     uniqueIndex("members_adr_nr_uk").on(t.adrNr),

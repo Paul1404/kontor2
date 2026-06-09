@@ -41,6 +41,56 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.31.0",
+    date: "2026-06-09",
+    title: "Ruhend und Beitragsbefreiung",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Ein Mitglied lässt sich jetzt als „Ruhend“ oder „Beitragsbefreit“ kennzeichnen. Beide bleiben vollwertige Mitglieder und zählen im Bestand, werden im Beitragslauf aber übersprungen. Die Einstellung steht im Reiter Stammdaten unter „Beitrag“.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Im Beitragslauf erscheinen übersprungene Mitglieder mit dem Grund „Ruhend“ oder „Beitragsbefreit“ in der Ausschlussliste, sodass nachvollziehbar ist, warum keine Sollstellung erstellt wurde.",
+      },
+    ],
+  },
+  {
+    version: "0.30.0",
+    date: "2026-06-09",
+    title: "Geplante Austritte",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Ein Austritt mit Datum in der Zukunft zählt jetzt richtig: Das Mitglied bleibt bis zum Austrittstag aktiv und wird mit dem Hinweis „Kündigt zum …“ angezeigt. Erst am Stichtag wechselt der Status auf ausgetreten.",
+      },
+      {
+        category: "feature",
+        description:
+          "In der Mitgliederliste gibt es den neuen Status „Gekündigt“ als Filter und als Kachel. So sind alle Mitglieder mit anstehendem Austritt auf einen Blick sichtbar.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Gekündigte Mitglieder werden bis zum Austrittstag weiterhin in der Mitgliederzahl, in der Bestandserhebung und im Beitragslauf berücksichtigt. So stimmen Auswertungen und Abrechnung mit dem tatsächlichen Mitgliederbestand überein.",
+      },
+    ],
+  },
+  {
+    version: "0.29.2",
+    date: "2026-06-09",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Bei einem Update fährt die Anwendung jetzt sauber herunter. Laufende Anfragen werden noch zu Ende bearbeitet, bevor der Dienst neu startet. Dadurch kommt es während einer Aktualisierung seltener zu abgebrochenen Aktionen.",
+      },
+    ],
+  },
+  {
     version: "0.29.1",
     date: "2026-06-09",
     changes: [

@@ -47,7 +47,7 @@ import { headerCheckState, rangeIds } from "~/lib/selection";
 import { moveCursor } from "~/lib/table-nav";
 import { isTypingTarget, usePageShortcut } from "~/lib/use-global-shortcuts";
 
-type Status = "aktiv" | "passiv" | "ausgetreten" | "verstorben" | "alle";
+type Status = "aktiv" | "passiv" | "gekuendigt" | "ausgetreten" | "verstorben" | "alle";
 type SortBy = "nachname" | "mitgliedsnummer" | "ort" | "email" | "eintritt";
 type SortDir = "asc" | "desc";
 
@@ -81,7 +81,14 @@ type MembersSearch = {
   sortDir: SortDir;
 };
 
-const STATUS_VALUES: Status[] = ["aktiv", "passiv", "ausgetreten", "verstorben", "alle"];
+const STATUS_VALUES: Status[] = [
+  "aktiv",
+  "passiv",
+  "gekuendigt",
+  "ausgetreten",
+  "verstorben",
+  "alle",
+];
 const SORT_VALUES: SortBy[] = ["nachname", "mitgliedsnummer", "ort", "email", "eintritt"];
 
 const EMPTY_SEARCH: MembersSearch = {
@@ -580,6 +587,7 @@ function MembersListPage() {
             >
               <option value="aktiv">Aktiv</option>
               <option value="passiv">Passiv</option>
+              <option value="gekuendigt">Gekündigt</option>
               <option value="ausgetreten">Ausgetreten</option>
               <option value="verstorben">Verstorben</option>
               <option value="alle">Alle</option>
@@ -1111,6 +1119,7 @@ type MemberStats = {
   total: number;
   aktiv: number;
   passiv: number;
+  gekuendigt: number;
   ausgetreten: number;
   verstorben: number;
   kontakte: number;
@@ -1131,6 +1140,18 @@ function MemberStatsStrip({
     { key: "alle", label: "Gesamt", value: stats?.total ?? 0, dot: "bg-muted-foreground/40" },
     { key: "aktiv", label: "Aktiv", value: stats?.aktiv ?? 0, dot: "bg-success" },
     { key: "passiv", label: "Passiv", value: stats?.passiv ?? 0, dot: "bg-muted-foreground/60" },
+    // Only surface "Gekündigt" when there are pending exits (or the filter is
+    // active), so the strip stays calm when nobody is leaving.
+    ...(stats?.gekuendigt || activeStatus === "gekuendigt"
+      ? [
+          {
+            key: "gekuendigt" as Status,
+            label: "Gekündigt",
+            value: stats?.gekuendigt ?? 0,
+            dot: "bg-amber-400",
+          },
+        ]
+      : []),
     {
       key: "ausgetreten",
       label: "Ausgetreten",
@@ -1146,7 +1167,7 @@ function MemberStatsStrip({
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
       {tiles.map((t) => {
         const active = activeStatus === t.key;
         return (
