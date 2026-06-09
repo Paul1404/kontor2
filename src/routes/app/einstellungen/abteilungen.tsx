@@ -193,6 +193,8 @@ function AbteilungenSettingsPage() {
                             variant="ghost"
                             onClick={() => rename.mutate({ id: a.id, name: editDraft })}
                             disabled={!editDraft.trim() || rename.isPending}
+                            aria-label="Umbenennen speichern"
+                            title="Speichern"
                           >
                             {rename.isPending ? (
                               <Loader2 className="size-4 animate-spin" />
@@ -200,7 +202,13 @@ function AbteilungenSettingsPage() {
                               <Check className="size-4" />
                             )}
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEditingId(null)}
+                            aria-label="Bearbeitung abbrechen"
+                            title="Abbrechen"
+                          >
                             <X className="size-4" />
                           </Button>
                         </>

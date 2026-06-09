@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.39.1",
+    date: "2026-06-09",
+    title: "Korrekturen und Feinschliff",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Beim Erfassen von Rückläufern tauchen gelöschte Mitglieder nicht mehr in der Auswahl auf.",
+      },
+      {
+        category: "fix",
+        description:
+          "Die Finanzkennzahlen im Dashboard werden jetzt centgenau aus der Datenbank summiert, ohne Rundungsabweichung.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Symbol-Schaltflächen wie Bearbeiten, Löschen oder Speichern haben jetzt durchgängig eine Beschriftung für Screenreader. Ladehinweise nutzen das richtige Auslassungszeichen, und eine fehlende Mandatsreferenz wird einheitlich als Leerwert angezeigt.",
+      },
+    ],
+  },
+  {
     version: "0.39.0",
     date: "2026-06-09",
     title: "Zurückgelastete Beiträge erneut einziehen",

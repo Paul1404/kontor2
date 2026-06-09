@@ -271,7 +271,10 @@ export const feeRunsRouter = {
           committedBy: context.session!.user.id,
         } as never)
         .returning({ id: feeRunsTable.id });
-      if (!run) throw new Error("fee_runs insert returned no row");
+      if (!run)
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Beitragslauf konnte nicht angelegt werden.",
+        });
 
       // 2. Bulk-upsert soll_stellungen — one statement instead of one per
       //    candidate. .returning() gives us back the ids in input order,
@@ -659,7 +662,10 @@ export const feeRunsRouter = {
             } as never)
             .returning({ id: feeRunsTable.id })
         )[0];
-        if (!run) throw new Error("fee_runs insert returned no row");
+        if (!run)
+          throw new ORPCError("INTERNAL_SERVER_ERROR", {
+            message: "Beitragslauf konnte nicht angelegt werden.",
+          });
 
         const pain008Items: Pain008Item[] = [];
         const usedMandateIds = new Set<string>();

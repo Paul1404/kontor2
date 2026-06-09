@@ -149,6 +149,7 @@ export function WiedervorlagenCard({ memberId, canEdit }: { memberId: string; ca
                           type="button"
                           onClick={() => setStatus.mutate({ id: t.id, status: "open" })}
                           className="rounded p-1 text-muted-foreground hover:text-foreground"
+                          aria-label="Wiedervorlage wieder öffnen"
                           title="Wieder öffnen"
                         >
                           <RotateCcw className="size-4" />
@@ -158,6 +159,7 @@ export function WiedervorlagenCard({ memberId, canEdit }: { memberId: string; ca
                         type="button"
                         onClick={() => remove.mutate(t.id)}
                         className="rounded p-1 text-muted-foreground hover:text-destructive"
+                        aria-label="Wiedervorlage löschen"
                         title="Löschen"
                       >
                         <Trash2 className="size-4" />

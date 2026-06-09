@@ -303,6 +303,7 @@ function BeitragsartenSettingsPage() {
                             size="sm"
                             variant="ghost"
                             onClick={() => startEdit(row)}
+                            aria-label={`Beitragsart ${row.art} bearbeiten`}
                             title="Bearbeiten"
                           >
                             <Pencil className="size-4" />
@@ -320,6 +321,11 @@ function BeitragsartenSettingsPage() {
                               }
                             }}
                             disabled={!canDelete || remove.isPending}
+                            aria-label={
+                              canDelete
+                                ? `Beitragsart ${row.art} löschen`
+                                : "Wird von Verträgen referenziert"
+                            }
                             title={canDelete ? "Löschen" : "Wird von Verträgen referenziert"}
                           >
                             <Trash2
