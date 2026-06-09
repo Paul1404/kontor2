@@ -50,6 +50,11 @@ export const RELEASES: Release[] = [
         description:
           "Die Vereinsdaten haben einen neuen Abschnitt „Aufnahmeantrag“. Dort lassen sich die Jahresbeiträge je Alterskategorie, das Mandatsreferenz-Präfix und die Benachrichtigung über neue Anträge festlegen. Das ist die Grundlage für das kommende Online-Antragsformular.",
       },
+      {
+        category: "internal",
+        description:
+          "Verarbeitung für eingehende Aufnahmeanträge: Beitrag und Kategorie werden automatisch aus dem Geburtsdatum bestimmt, die Beitrittserklärung als PDF erzeugt und an Antragsteller und Verein versendet.",
+      },
     ],
   },
   {

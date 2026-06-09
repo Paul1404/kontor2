@@ -1,4 +1,5 @@
 import { abteilungenRouter } from "~/server/orpc/procedures/abteilungen";
+import { applicationsRouter } from "~/server/orpc/procedures/applications";
 import { attachmentsRouter } from "~/server/orpc/procedures/attachments";
 import { auditRouter } from "~/server/orpc/procedures/audit";
 import { authRouter } from "~/server/orpc/procedures/auth";
@@ -35,6 +36,7 @@ import { verbandsmeldungRouter } from "~/server/orpc/procedures/verbandsmeldung"
 export const appRouter = {
   auth: authRouter,
   members: membersRouter,
+  applications: applicationsRouter,
   abteilungen: abteilungenRouter,
   relationships: relationshipsRouter,
   contracts: contractsRouter,
