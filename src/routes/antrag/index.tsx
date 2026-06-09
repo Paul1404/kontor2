@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Pencil,
   Plus,
   Send,
   Trash2,
@@ -19,11 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { cn } from "~/lib/cn";
+import { EMPTY_VALUE, formatCurrency, formatDate, orEmpty } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
-
-export const Route = createFileRoute("/antrag/")({
-  component: AntragForm,
-});
 
 type Anrede = "Herr" | "Frau" | "keine Angabe";
 type KindRow = { vorname: string; nachname: string; geburtsdatum: string; abteilungen: string[] };
@@ -50,6 +48,7 @@ function AntragForm() {
     queryFn: () => orpc.applications.publicSettings(),
   });
   const abteilungen = settings.data?.abteilungen ?? [];
+  const vereinsname = settings.data?.vereinsname ?? "der Verein";
 
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -103,15 +102,18 @@ function AntragForm() {
     enabled: /^\d{4}-\d{2}-\d{2}$/.test(geburtsdatum),
   });
 
+  // The person who pays and signs: the guardian for a minor, otherwise the
+  // applicant. Used as the default account holder and on the SEPA mandate.
+  const payerName = isMinor
+    ? `${erzVorname} ${erzNachname}`.trim()
+    : `${vorname} ${nachname}`.trim();
+
   // Default the account holder to the contact person when reaching SEPA.
   useEffect(() => {
-    if (step === 1 && !kontoinhaber.trim()) {
-      const payer = isMinor
-        ? `${erzVorname} ${erzNachname}`.trim()
-        : `${vorname} ${nachname}`.trim();
-      if (payer) setKontoinhaber(payer);
+    if (step === 1 && !kontoinhaber.trim() && payerName) {
+      setKontoinhaber(payerName);
     }
-  }, [step, isMinor, erzVorname, erzNachname, vorname, nachname, kontoinhaber]);
+  }, [step, kontoinhaber, payerName]);
 
   const submit = useMutation({
     mutationFn: () =>
@@ -177,6 +179,8 @@ function AntragForm() {
     if (!err) setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
 
+  const selectedAbtNames = abteilungen.filter((a) => selectedAbt.includes(a.id)).map((a) => a.name);
+
   if (result) {
     return (
       <Card>
@@ -216,25 +220,32 @@ function AntragForm() {
           <Card>
             <CardHeader>
               <CardTitle>Mitgliedsdaten</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Geben Sie die Daten der Person ein, die Mitglied werden soll. Der passende Tarif
+                wird automatisch anhand des Alters ermittelt.
+              </p>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               {!isMinor ? (
-                <div className="flex flex-wrap gap-2">
-                  {(["Herr", "Frau", "keine Angabe"] as Anrede[]).map((a) => (
-                    <button
-                      key={a}
-                      type="button"
-                      onClick={() => setGeschlecht(a)}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-sm",
-                        geschlecht === a
-                          ? "border-primary bg-primary/10"
-                          : "border-border text-muted-foreground",
-                      )}
-                    >
-                      {a}
-                    </button>
-                  ))}
+                <div className="flex flex-col gap-1.5">
+                  <Label>Anrede *</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {(["Herr", "Frau", "keine Angabe"] as Anrede[]).map((a) => (
+                      <button
+                        key={a}
+                        type="button"
+                        onClick={() => setGeschlecht(a)}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-sm",
+                          geschlecht === a
+                            ? "border-primary bg-primary/10"
+                            : "border-border text-muted-foreground",
+                        )}
+                      >
+                        {a}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : null}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -267,10 +278,31 @@ function AntragForm() {
                 <Field label="Telefon">
                   <Input value={telefon} onChange={(e) => setTelefon(e.target.value)} />
                 </Field>
-                <Field label="E-Mail *">
+                <Field
+                  label="E-Mail *"
+                  hint="Wir benötigen Ihre E-Mail für die Bestätigung und die Kommunikation zum Antrag."
+                >
                   <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </Field>
               </div>
+
+              {age != null ? (
+                <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <p className="text-sm">
+                    Automatisch erkannt:{" "}
+                    <span className="font-semibold">
+                      {antragstyp === "familie"
+                        ? "Familienmitgliedschaft"
+                        : (fee.data?.label ?? "Tarif wird ermittelt…")}
+                    </span>
+                    {fee.data ? <> ({formatCurrency(fee.data.jahresbeitrag)} pro Jahr)</> : null}
+                    {isMinor
+                      ? ". Die Angaben einer gesetzlichen Vertretung sind erforderlich."
+                      : null}
+                  </p>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -278,6 +310,10 @@ function AntragForm() {
             <Card>
               <CardHeader>
                 <CardTitle>Gesetzliche Vertretung</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Diese Person unterschreibt die Beitrittserklärung, erteilt das SEPA-Mandat und ist
+                  Ansprechpartner für den Verein.
+                </p>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -288,14 +324,19 @@ function AntragForm() {
                     <Input value={erzNachname} onChange={(e) => setErzNachname(e.target.value)} />
                   </Field>
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={elternteilMitglied}
-                    onChange={(e) => setElternteilMitglied(e.target.checked)}
-                  />
-                  Ein Elternteil ist bereits Mitglied (reduzierter Beitrag)
-                </label>
+                <div className="flex flex-col gap-1">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={elternteilMitglied}
+                      onChange={(e) => setElternteilMitglied(e.target.checked)}
+                    />
+                    Ein Elternteil ist bereits Mitglied
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Falls ja, erhalten Kinder und Jugendliche einen vergünstigten Beitrag.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           ) : null}
@@ -303,6 +344,10 @@ function AntragForm() {
           <Card>
             <CardHeader>
               <CardTitle>Abteilungen *</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Mehrfachauswahl ist möglich. Wählen Sie keine Abteilung, wenn Sie den Verein nur
+                passiv unterstützen möchten.
+              </p>
             </CardHeader>
             <CardContent>
               <AbteilungPicker
@@ -317,12 +362,13 @@ function AntragForm() {
             <Card>
               <CardHeader>
                 <CardTitle>Familie (optional)</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Die Familienmitgliedschaft gilt für zwei Erwachsene und beliebig viele Kinder bis
+                  18 Jahre, unabhängig von der Kinderzahl. Tragen Sie dazu einen Partner oder ein
+                  zweites Elternteil und mindestens ein Kind ein.
+                </p>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
-                <p className="text-xs text-muted-foreground">
-                  Für die Familienmitgliedschaft tragen Sie einen Partner / ein zweites Elternteil
-                  und mindestens ein Kind ein.
-                </p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field label="Partner Vorname">
                     <Input
@@ -423,6 +469,12 @@ function AntragForm() {
                   >
                     <Plus className="size-4" /> Kind hinzufügen
                   </Button>
+                  {kinder.length > 0 && !hasPartner ? (
+                    <p className="text-xs text-muted-foreground">
+                      Für den Familientarif bitte oben einen Partner oder ein zweites Elternteil
+                      eintragen. Bis dahin gilt Ihr Einzelbeitrag.
+                    </p>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
@@ -433,27 +485,64 @@ function AntragForm() {
       {step === 1 ? (
         <Card>
           <CardHeader>
-            <CardTitle>SEPA-Lastschrift</CardTitle>
+            <CardTitle>SEPA-Lastschriftmandat</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Zahlungspflichtig:{" "}
+              <span className="font-medium text-foreground">{payerName || EMPTY_VALUE}</span>. Der
+              Jahresbeitrag wird einmal jährlich per SEPA-Lastschrift eingezogen. BIC und
+              Kreditinstitut werden nach IBAN-Eingabe automatisch ermittelt.
+            </p>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Kontoinhaber">
-              <Input value={kontoinhaber} onChange={(e) => setKontoinhaber(e.target.value)} />
-            </Field>
-            <div />
-            <IbanField
-              value={iban}
-              onChange={setIban}
-              onResolved={(info) => {
-                if (info.bic) setBic(info.bic);
-                if (info.name) setKreditinstitut(info.name);
-              }}
-            />
-            <Field label="BIC">
-              <Input value={bic} onChange={(e) => setBic(e.target.value.toUpperCase())} />
-            </Field>
-            <Field label="Kreditinstitut">
-              <Input value={kreditinstitut} onChange={(e) => setKreditinstitut(e.target.value)} />
-            </Field>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-3 text-sm">
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Gläubiger-ID</span>
+                <span className="text-right font-mono">{orEmpty(settings.data?.glaeubigerId)}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Mandatsreferenz</span>
+                <span className="text-right italic text-muted-foreground">
+                  wird automatisch vergeben
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Ich ermächtige {vereinsname} widerruflich, die von mir zu entrichtenden Zahlungen von
+              meinem Konto mittels Lastschrift einzuziehen. Zugleich weise ich mein Kreditinstitut
+              an, die von {vereinsname} auf mein Konto gezogenen Lastschriften einzulösen. Ich kann
+              innerhalb von acht Wochen, beginnend mit dem Belastungsdatum, die Erstattung des
+              belasteten Betrages verlangen. Es gelten dabei die mit meinem Kreditinstitut
+              vereinbarten Bedingungen.
+            </p>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field
+                label="Kontoinhaber"
+                hint="Nur ausfüllen, wenn das Konto auf einen anderen Namen läuft."
+              >
+                <Input
+                  value={kontoinhaber}
+                  placeholder={payerName}
+                  onChange={(e) => setKontoinhaber(e.target.value)}
+                />
+              </Field>
+              <div />
+              <IbanField
+                value={iban}
+                onChange={setIban}
+                onResolved={(info) => {
+                  if (info.bic) setBic(info.bic);
+                  if (info.name) setKreditinstitut(info.name);
+                }}
+              />
+              <Field label="BIC" hint="Wird nach IBAN-Eingabe automatisch ergänzt.">
+                <Input value={bic} onChange={(e) => setBic(e.target.value.toUpperCase())} />
+              </Field>
+              <Field label="Kreditinstitut" hint="Wird nach IBAN-Eingabe automatisch ergänzt.">
+                <Input value={kreditinstitut} onChange={(e) => setKreditinstitut(e.target.value)} />
+              </Field>
+            </div>
           </CardContent>
         </Card>
       ) : null}
@@ -463,52 +552,105 @@ function AntragForm() {
           <Card>
             <CardHeader>
               <CardTitle>Zusammenfassung</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Bitte prüfen Sie Ihre Angaben. Wählen Sie anschließend, wie Sie die
+                Beitrittserklärung unterzeichnen möchten.
+              </p>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3 text-sm">
-              <Row label="Antragsteller">{`${vorname} ${nachname}`.trim()}</Row>
-              <Row label="Mitgliedschaft">{fee.data?.label ?? "…"}</Row>
-              <Row label="Jahresbeitrag">{fee.data ? `${fee.data.jahresbeitrag} EUR` : "…"}</Row>
-              <Row label="Abteilungen">
-                {abteilungen
-                  .filter((a) => selectedAbt.includes(a.id))
-                  .map((a) => a.name)
-                  .join(", ") || "—"}
-              </Row>
+            <CardContent className="flex flex-col gap-5 text-sm">
+              <SummarySection title="Antragsteller" onEdit={() => setStep(0)}>
+                {!isMinor && geschlecht ? <Row label="Anrede">{geschlecht}</Row> : null}
+                <Row label="Name">{orEmpty(`${vorname} ${nachname}`.trim())}</Row>
+                <Row label="Geburtsdatum">{orEmpty(formatDate(geburtsdatum))}</Row>
+                <Row label="Adresse">
+                  {orEmpty(
+                    [`${strasse} ${hausnummer}`.trim(), `${plz} ${ort}`.trim()]
+                      .filter((s) => s.trim())
+                      .join(", "),
+                  )}
+                </Row>
+                {telefon ? <Row label="Telefon">{telefon}</Row> : null}
+                <Row label="E-Mail">{orEmpty(email)}</Row>
+                <Row label="Abteilungen">{orEmpty(selectedAbtNames.join(", "))}</Row>
+              </SummarySection>
+
+              {isMinor ? (
+                <SummarySection title="Gesetzliche Vertretung" onEdit={() => setStep(0)}>
+                  {geschlecht ? <Row label="Anrede">{geschlecht}</Row> : null}
+                  <Row label="Name">{orEmpty(`${erzVorname} ${erzNachname}`.trim())}</Row>
+                  <Row label="Elternteil Mitglied">{elternteilMitglied ? "Ja" : "Nein"}</Row>
+                </SummarySection>
+              ) : null}
+
+              {antragstyp === "familie" ? (
+                <SummarySection title={`Kinder (${kinder.length})`} onEdit={() => setStep(0)}>
+                  {kinder.map((k, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: positional summary rows.
+                    <Row key={`sk-${i}`} label={`Kind ${i + 1}`}>
+                      {orEmpty(
+                        `${k.vorname} ${k.nachname}`.trim() +
+                          (k.geburtsdatum ? `, ${formatDate(k.geburtsdatum)}` : ""),
+                      )}
+                    </Row>
+                  ))}
+                </SummarySection>
+              ) : null}
+
+              <SummarySection title="Mitgliedschaft" onEdit={() => setStep(0)}>
+                <Row label="Tarif">{orEmpty(fee.data?.label)}</Row>
+                <Row label="Jahresbeitrag">
+                  {fee.data ? formatCurrency(fee.data.jahresbeitrag) : EMPTY_VALUE}
+                </Row>
+              </SummarySection>
+
+              <SummarySection title="SEPA-Lastschrift" onEdit={() => setStep(1)}>
+                <Row label="Kontoinhaber">{orEmpty(kontoinhaber || payerName)}</Row>
+                <Row label="IBAN">{orEmpty(iban)}</Row>
+                {bic ? <Row label="BIC">{bic}</Row> : null}
+                {kreditinstitut ? <Row label="Kreditinstitut">{kreditinstitut}</Row> : null}
+              </SummarySection>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <CardTitle>Unterschrift</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Mit Ihrer Unterschrift erklären Sie Ihren Beitritt zu {vereinsname} und erteilen das
+                SEPA-Lastschriftmandat zur Einziehung des Mitgliedsbeitrags.
+              </p>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
+              <div className="overflow-hidden rounded-lg border border-border">
+                <SignChoice
+                  active={signOnline}
                   onClick={() => setSignOnline(true)}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-sm",
-                    signOnline
-                      ? "border-primary bg-primary/10"
-                      : "border-border text-muted-foreground",
-                  )}
-                >
-                  Jetzt unterschreiben
-                </button>
-                <button
-                  type="button"
+                  title="Jetzt direkt online unterschreiben"
+                  badge="Standard"
+                  description="Zeichnen Sie Ihre Unterschrift im Browser. Der Antrag wird sofort als unterzeichnet eingereicht, kein Upload nötig."
+                />
+                <SignChoice
+                  active={!signOnline}
                   onClick={() => setSignOnline(false)}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-sm",
-                    !signOnline
-                      ? "border-primary bg-primary/10"
-                      : "border-border text-muted-foreground",
-                  )}
-                >
-                  Per E-Mail erhalten und später unterschreiben
-                </button>
+                  title="PDF erhalten, drucken, unterschreiben und hochladen"
+                  description="Sie erhalten das Dokument per E-Mail, unterschreiben es handschriftlich und laden den Scan über den Link in der E-Mail wieder hoch."
+                />
               </div>
-              {signOnline ? <SignaturePad value={signature} onChange={setSignature} /> : null}
+              {signOnline ? (
+                <div className="flex flex-col gap-2">
+                  <SignaturePad value={signature} onChange={setSignature} />
+                  {signature ? (
+                    <p className="flex items-center gap-1 text-xs text-success">
+                      <CheckCircle2 className="size-3.5" /> Unterschrift gespeichert. Sie können den
+                      Antrag jetzt absenden.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Zeichnen Sie Ihre Unterschrift mit der Maus oder dem Finger.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -616,7 +758,6 @@ function Stepper({ step }: { step: number }) {
   return (
     <div className="flex items-center gap-3">
       {STEPS.map((label, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length static step list.
         <div key={label} className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span
@@ -638,11 +779,20 @@ function Stepper({ step }: { step: number }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <Label className="flex flex-col gap-1.5">
       <span>{label}</span>
       {children}
+      {hint ? <span className="text-xs font-normal text-muted-foreground">{hint}</span> : null}
     </Label>
   );
 }
@@ -655,3 +805,80 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     </div>
   );
 }
+
+function SummarySection({
+  title,
+  onEdit,
+  children,
+}: {
+  title: string;
+  onEdit: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </h3>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex items-center gap-1 text-xs text-primary hover:underline"
+        >
+          <Pencil className="size-3" /> Bearbeiten
+        </button>
+      </div>
+      <div className="flex flex-col gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function SignChoice({
+  active,
+  onClick,
+  title,
+  description,
+  badge,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  description: string;
+  badge?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-start gap-3 border-b border-border p-4 text-left transition-colors last:border-b-0",
+        active ? "bg-primary/5" : "hover:bg-muted/50",
+      )}
+    >
+      <span
+        className={cn(
+          "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2",
+          active ? "border-primary" : "border-muted-foreground/40",
+        )}
+      >
+        {active ? <span className="size-2.5 rounded-full bg-primary" /> : null}
+      </span>
+      <span className="flex flex-col gap-0.5">
+        <span className="flex items-center gap-2 text-sm font-medium">
+          {title}
+          {badge ? (
+            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-normal text-primary">
+              {badge}
+            </span>
+          ) : null}
+        </span>
+        <span className="text-xs text-muted-foreground">{description}</span>
+      </span>
+    </button>
+  );
+}
+
+export const Route = createFileRoute("/antrag/")({
+  component: AntragForm,
+});

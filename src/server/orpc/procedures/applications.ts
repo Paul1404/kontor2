@@ -278,6 +278,7 @@ export const applicationsRouter = {
       vereinsname: org?.vereinsname ?? "Verein",
       datenschutzUrl: org?.datenschutzUrl ?? null,
       satzungUrl: org?.satzungUrl ?? null,
+      glaeubigerId: org?.glaeubigerId ?? null,
       beitragsstaffel: org?.beitragsstaffel ?? null,
       abteilungen,
     };

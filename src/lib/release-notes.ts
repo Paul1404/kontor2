@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.36.0",
+    date: "2026-06-09",
+    title: "Klareres Online-Beitrittsformular",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Das öffentliche Beitrittsformular hat jetzt erklärende Hinweise an jedem Schritt: erkannter Tarif und Jahresbeitrag direkt bei den Mitgliedsdaten, der vollständige SEPA-Mandatstext mit Gläubiger-ID, eine ausführliche Zusammenfassung mit Bearbeiten-Sprüngen und beschriftete Optionen für die Unterschrift.",
+      },
+      {
+        category: "fix",
+        description:
+          "Überschrift und Titel im Versionshinweise-Dialog werden wieder in voller Schriftfarbe dargestellt statt in blassem Grau.",
+      },
+    ],
+  },
+  {
     version: "0.35.0",
     date: "2026-06-09",
     title: "Versandprotokoll, Gegenzeichnung und Antrags-Dokumente",
