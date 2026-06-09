@@ -1,7 +1,12 @@
 import { ORPCError } from "@orpc/server";
 import { type AnyColumn, and, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import * as v from "valibot";
-import { buildUploadUrl, issueUploadToken } from "~/server/application/upload-token";
+import {
+  buildUploadUrl,
+  consumeUploadToken,
+  issueUploadToken,
+  peekUploadToken,
+} from "~/server/application/upload-token";
 import { appendAudit } from "~/server/audit/log";
 import { getMailer } from "~/server/auth/send-invite";
 import { lastFour } from "~/server/crypto/encrypt";
@@ -502,6 +507,97 @@ export const applicationsRouter = {
       statusUrl: statusUrlFor(inserted.antragsnummer),
     };
   }),
+
+  /**
+   * Public: resolve an upload token to its application so the upload page can
+   * render. Does NOT consume the token (the actual upload does).
+   */
+  uploadInfo: publicProc
+    .input(v.object({ token: v.string() }))
+    .handler(async ({ context, input }) => {
+      const peek = await peekUploadToken(context.db, input.token);
+      if (!peek) {
+        throw new ORPCError("NOT_FOUND", {
+          message: "Der Upload-Link ist ungültig oder abgelaufen.",
+        });
+      }
+      const [app] = await context.db
+        .select({
+          antragsnummer: membershipApplicationsTable.antragsnummer,
+          vorname: membershipApplicationsTable.vorname,
+          nachname: membershipApplicationsTable.nachname,
+          status: membershipApplicationsTable.status,
+        })
+        .from(membershipApplicationsTable)
+        .where(eq(membershipApplicationsTable.id, peek.applicationId))
+        .limit(1);
+      if (!app) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+      return app;
+    }),
+
+  /**
+   * Public: accept the signed paper Beitrittserklärung scan. The token is
+   * single-use and consumed here; the file is stored in S3 and the application
+   * advances to `dokument_hochgeladen`. The scan is sent as a base64 data URI
+   * to stay on the existing JSON RPC surface; capped at 10 MB.
+   */
+  uploadSigned: publicProc
+    .input(
+      v.object({
+        token: v.string(),
+        filename: v.pipe(v.string(), v.minLength(1)),
+        mimeType: v.pipe(v.string(), v.minLength(1)),
+        contentBase64: v.pipe(v.string(), v.minLength(1)),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const limit = await rateLimit({
+        key: `antrag-upload:${clientIp(context.headers)}`,
+        limit: 10,
+        windowSeconds: 600,
+      });
+      if (!limit.allowed) {
+        throw new ORPCError("TOO_MANY_REQUESTS", { message: "Zu viele Anfragen." });
+      }
+      const allowed = ["application/pdf", "image/jpeg", "image/png", "image/heic"];
+      if (!allowed.includes(input.mimeType)) {
+        throw new ORPCError("VALIDATION_FAILED", { message: "Nicht erlaubtes Dateiformat." });
+      }
+      const body = Buffer.from(input.contentBase64, "base64");
+      if (body.byteLength === 0) {
+        throw new ORPCError("VALIDATION_FAILED", { message: "Leere Datei." });
+      }
+      if (body.byteLength > 10 * 1024 * 1024) {
+        throw new ORPCError("VALIDATION_FAILED", { message: "Datei zu groß (max. 10 MB)." });
+      }
+      const claim = await consumeUploadToken(context.db, input.token);
+      if (!claim) {
+        throw new ORPCError("NOT_FOUND", {
+          message: "Der Upload-Link ist ungültig, abgelaufen oder bereits benutzt.",
+        });
+      }
+      const ext = input.filename.split(".").pop()?.toLowerCase() ?? "bin";
+      const s3Key = `applications/${claim.applicationId}/signed-${Date.now()}.${ext}`;
+      await putObject({ key: s3Key, body, contentType: input.mimeType });
+      await context.db.insert(membershipApplicationFilesTable).values({
+        applicationId: claim.applicationId,
+        kind: "signed_scan",
+        s3Key,
+        filename: input.filename,
+        mimeType: input.mimeType,
+        sizeBytes: body.byteLength,
+      });
+      await context.db
+        .update(membershipApplicationsTable)
+        .set({ status: "dokument_hochgeladen", updatedAt: new Date() })
+        .where(
+          and(
+            eq(membershipApplicationsTable.id, claim.applicationId),
+            eq(membershipApplicationsTable.status, "neu"),
+          ),
+        );
+      return { ok: true };
+    }),
 
   // ---- Admin / Vorstand ----
 

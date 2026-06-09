@@ -55,6 +55,11 @@ export const RELEASES: Release[] = [
         description:
           "Ein Antrag kann genehmigt werden: Daraus entsteht ein Mitglied (bei Familienanträgen inklusive Partner und Kindern) mit Bankverbindung als SEPA-Mandat und optionalem Beitragsvertrag. Eine Ablehnung mit Begründung wird dem Antragsteller per E-Mail mitgeteilt.",
       },
+      {
+        category: "feature",
+        description:
+          "Wer die Beitrittserklärung lieber auf Papier unterschreibt, bekommt sie per E-Mail und kann den unterschriebenen Scan über einen Link (30 Tage gültig) wieder hochladen.",
+      },
     ],
   },
   {

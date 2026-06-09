@@ -66,6 +66,7 @@ import { Route as ApiIngestSvumsRouteImport } from './api/ingest.svums'
 import { Route as ApiFilesIdRouteImport } from './api/files.$id'
 import { Route as ApiCronSnapshotsRouteImport } from './api/cron.snapshots'
 import { Route as ApiAuthSplatRouteImport } from './api/auth.$'
+import { Route as AntragUploadTokenRouteImport } from './antrag/upload.$token'
 import { Route as AppForderungenMahnungenIndexRouteImport } from './app/forderungen/mahnungen/index'
 import { Route as AppForderungenKulanzIndexRouteImport } from './app/forderungen/kulanz/index'
 import { Route as AppMitgliederMitgliedsnummerBearbeitenRouteImport } from './app/mitglieder/$mitgliedsnummer_.bearbeiten'
@@ -365,6 +366,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AntragUploadTokenRoute = AntragUploadTokenRouteImport.update({
+  id: '/upload/$token',
+  path: '/upload/$token',
+  getParentRoute: () => AntragRouteRoute,
+} as any)
 const AppForderungenMahnungenIndexRoute =
   AppForderungenMahnungenIndexRouteImport.update({
     id: '/forderungen/mahnungen/',
@@ -426,6 +432,7 @@ export interface FileRoutesByFullPath {
   '/antrag/': typeof AntragIndexRoute
   '/app/': typeof AppIndexRoute
   '/portal/': typeof PortalIndexRoute
+  '/antrag/upload/$token': typeof AntragUploadTokenRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
@@ -488,6 +495,7 @@ export interface FileRoutesByTo {
   '/antrag': typeof AntragIndexRoute
   '/app': typeof AppIndexRoute
   '/portal': typeof PortalIndexRoute
+  '/antrag/upload/$token': typeof AntragUploadTokenRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
@@ -554,6 +562,7 @@ export interface FileRoutesById {
   '/antrag/': typeof AntragIndexRoute
   '/app/': typeof AppIndexRoute
   '/portal/': typeof PortalIndexRoute
+  '/antrag/upload/$token': typeof AntragUploadTokenRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
@@ -621,6 +630,7 @@ export interface FileRouteTypes {
     | '/antrag/'
     | '/app/'
     | '/portal/'
+    | '/antrag/upload/$token'
     | '/api/auth/$'
     | '/api/cron/snapshots'
     | '/api/files/$id'
@@ -683,6 +693,7 @@ export interface FileRouteTypes {
     | '/antrag'
     | '/app'
     | '/portal'
+    | '/antrag/upload/$token'
     | '/api/auth/$'
     | '/api/cron/snapshots'
     | '/api/files/$id'
@@ -748,6 +759,7 @@ export interface FileRouteTypes {
     | '/antrag/'
     | '/app/'
     | '/portal/'
+    | '/antrag/upload/$token'
     | '/api/auth/$'
     | '/api/cron/snapshots'
     | '/api/files/$id'
@@ -1208,6 +1220,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/antrag/upload/$token': {
+      id: '/antrag/upload/$token'
+      path: '/upload/$token'
+      fullPath: '/antrag/upload/$token'
+      preLoaderRoute: typeof AntragUploadTokenRouteImport
+      parentRoute: typeof AntragRouteRoute
+    }
     '/app/forderungen/mahnungen/': {
       id: '/app/forderungen/mahnungen/'
       path: '/forderungen/mahnungen'
@@ -1256,11 +1275,13 @@ declare module '@tanstack/react-router' {
 interface AntragRouteRouteChildren {
   AntragStatusRoute: typeof AntragStatusRoute
   AntragIndexRoute: typeof AntragIndexRoute
+  AntragUploadTokenRoute: typeof AntragUploadTokenRoute
 }
 
 const AntragRouteRouteChildren: AntragRouteRouteChildren = {
   AntragStatusRoute: AntragStatusRoute,
   AntragIndexRoute: AntragIndexRoute,
+  AntragUploadTokenRoute: AntragUploadTokenRoute,
 }
 
 const AntragRouteRouteWithChildren = AntragRouteRoute._addFileChildren(
