@@ -2,6 +2,7 @@ import { auth, type Session } from "~/server/auth/auth";
 import { ensureBootstrapAdmin } from "~/server/auth/bootstrap";
 import { ensureSessionConfigLoaded } from "~/server/auth/session-config";
 import { type DB, db } from "~/server/db/client";
+import { installShutdownBridge } from "~/server/lib/lifecycle";
 import { registerDbLogSink } from "~/server/lib/log-sink-db";
 import { logger } from "~/server/lib/logger";
 import { startSnapshotScheduler } from "~/server/snapshots/scheduler";
@@ -21,6 +22,9 @@ export async function createContext(request: Request): Promise<AppContext> {
   // from ever being installed.
   if (!schedulerStarted) {
     schedulerStarted = true;
+    // Hand the runtime entrypoint a way to release DB/Redis/log resources on
+    // shutdown (see src/server/lib/lifecycle.ts). Cheap and synchronous.
+    installShutdownBridge();
     // Attach the persistent log sink before the scheduler so any failure it
     // logs is captured in the DB feed too. Both are idempotent and lazy.
     try {

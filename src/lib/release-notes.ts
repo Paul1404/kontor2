@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.29.2",
+    date: "2026-06-09",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Bei einem Update fährt die Anwendung jetzt sauber herunter. Laufende Anfragen werden noch zu Ende bearbeitet, bevor der Dienst neu startet. Dadurch kommt es während einer Aktualisierung seltener zu abgebrochenen Aktionen.",
+      },
+    ],
+  },
+  {
     version: "0.29.1",
     date: "2026-06-09",
     changes: [

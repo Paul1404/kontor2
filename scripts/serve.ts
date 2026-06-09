@@ -10,6 +10,7 @@ import { join, normalize, resolve } from "node:path";
 import server from "../dist/server/server.js";
 import { log } from "./log";
 import { preflight } from "./preflight";
+import { createShutdownHandler } from "./shutdown";
 
 const port = Number(process.env.PORT ?? 3000);
 const CLIENT_DIR = resolve(import.meta.dir, "..", "dist", "client");
@@ -119,6 +120,36 @@ try {
 
 const s = Bun.serve({ port, fetch: handle });
 log.info("listening", { url: String(s.url) });
+
+// Graceful shutdown. Railway sends SIGTERM on redeploy; without this the
+// container is killed mid-request and DB/Redis connections are reset instead of
+// drained. Drain in-flight requests, then release app resources through the
+// bridge the server bundle installed on `globalThis` (it can't be imported here
+// — see scripts/shutdown.ts), then exit.
+const shutdown = createShutdownHandler({
+  stopServer: (force) => s.stop(force),
+  closeResources: () => globalThis.__svuwvCloseResources?.(),
+  log,
+  exit: (code) => process.exit(code),
+  drainTimeoutMs: Number(process.env.SHUTDOWN_TIMEOUT_MS ?? 15_000),
+});
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
+
+// A rejected promise or thrown error with no handler must not vanish silently.
+// An uncaught exception leaves the process in an undefined state, so we exit
+// non-zero and let Railway restart a clean container. An unhandled rejection is
+// usually a stray library promise; log it for visibility but keep serving
+// rather than risk a restart loop.
+process.on("unhandledRejection", (reason) => {
+  log.error("unhandledRejection", {
+    error: reason instanceof Error ? reason.message : String(reason),
+  });
+});
+process.on("uncaughtException", (err) => {
+  log.error("uncaughtException", { error: err instanceof Error ? err.message : String(err) });
+  process.exit(1);
+});
 
 // The snapshot scheduler initialises lazily inside `createContext` (oRPC).
 // On a freshly-deployed container with no oRPC traffic between deploy and

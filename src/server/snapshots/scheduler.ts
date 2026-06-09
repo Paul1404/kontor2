@@ -154,3 +154,15 @@ export function startSnapshotScheduler(): void {
   }
   schedule();
 }
+
+/**
+ * Cancel the pending nightly-snapshot timer, if any. Called on graceful
+ * shutdown so a run can't fire against a pool that's being torn down. Safe to
+ * call when the scheduler was never started.
+ */
+export function stopSnapshotScheduler(): void {
+  if (scheduledTimeout) {
+    clearTimeout(scheduledTimeout);
+    scheduledTimeout = null;
+  }
+}
