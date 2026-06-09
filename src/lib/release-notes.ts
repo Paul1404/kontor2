@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.34.1",
+    date: "2026-06-09",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Das Annehmen einer Einladung legt das Benutzerkonto wieder korrekt an. Die voreingestellte Rolle war nicht erlaubt und führte beim Speichern zu einem Fehler.",
+      },
+    ],
+  },
+  {
     version: "0.34.0",
     date: "2026-06-09",
     title: "Anträge bearbeiten",

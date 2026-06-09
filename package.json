@@ -1,6 +1,6 @@
 {
   "name": "svuwv",
-  "version": "0.34.0",
+  "version": "0.34.1",
   "private": true,
   "license": "UNLICENSED",
   "author": "Paul Dresch <paul.dresch@untereuerheim.com>",
@@ -15,6 +15,10 @@
     "check": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:int": "bun scripts/test-db.ts run vitest run --config vitest.integration.config.ts",
+    "test:db:up": "bun scripts/test-db.ts up",
+    "test:db:migrate": "bun scripts/test-db.ts migrate",
+    "test:db:down": "bun scripts/test-db.ts down",
     "verify": "bun run typecheck && biome ci . && bun run test && bun run build",
     "routes:regen": "bun scripts/regen-routes.ts",
     "db:generate": "drizzle-kit generate",

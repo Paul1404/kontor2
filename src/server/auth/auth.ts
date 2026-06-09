@@ -60,7 +60,11 @@ function buildAuth() {
       updateAge: sessionConfig.updateAgeHours * 60 * 60,
       cookieCache: { enabled: true, maxAge: 60 * 5 },
     },
-    plugins: [admin(), tanstackStartCookies()],
+    // `defaultRole` MUST be one of our `user_role` enum values: the admin
+    // plugin's built-in default is "user", which is not in the enum and makes
+    // every createUser insert fail with "invalid input value for enum
+    // user_role". New users start as readonly and are promoted explicitly.
+    plugins: [admin({ defaultRole: "readonly", adminRoles: ["admin"] }), tanstackStartCookies()],
   });
 }
 
