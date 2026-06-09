@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type BeitrittClub, buildBeitrittModel } from "./beitrittserklaerung-model";
+import { type BeitrittClub, buildBeitrittModel } from "~/server/pdf/beitrittserklaerung-model";
 
 const club: BeitrittClub = {
   vereinsname: "SV Untereuerheim",

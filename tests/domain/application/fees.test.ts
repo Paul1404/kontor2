@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateFee, DEFAULT_BEITRAGSSTAFFEL } from "./fees";
+import { calculateFee, DEFAULT_BEITRAGSSTAFFEL } from "~/server/domain/application/fees";
 
 describe("calculateFee (default schedule)", () => {
   it("familie is the flat tariff", () => {

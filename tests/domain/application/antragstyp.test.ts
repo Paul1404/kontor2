@@ -7,7 +7,7 @@ import {
   parseISODate,
   realAge,
   stichtag,
-} from "./antragstyp";
+} from "~/server/domain/application/antragstyp";
 
 describe("parseISODate", () => {
   it("parses a YYYY-MM-DD string as a UTC date", () => {

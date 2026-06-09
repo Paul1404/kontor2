@@ -1,0 +1,32 @@
+# Throwaway Postgres + Redis for local integration tests. Data lives in tmpfs
+# so a fresh, migrated database comes up in a couple of seconds and leaves
+# nothing behind. Ports are offset (5433 / 6380) so this never collides with a
+# real local dev database. Driven by `scripts/test-db.ts` (bun run test:int).
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: svuwv
+      POSTGRES_DB: svuwv_test
+      # Disposable, tmpfs-backed test DB reachable only on localhost: trust auth
+      # avoids hardcoding any password (and the secret-scanner false positive).
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U svuwv -d svuwv_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
