@@ -24,6 +24,20 @@ describe("jubileeDateFor", () => {
     expect(d.getUTCMonth()).toBe(1);
     expect(d.getUTCDate()).toBe(15);
   });
+
+  it("clamps a Feb 29 entry to Feb 28 in a non-leap jubilee year (no roll into March)", () => {
+    const d = jubileeDateFor(utc(2000, 2, 29), 25);
+    expect(d.getUTCFullYear()).toBe(2025);
+    expect(d.getUTCMonth()).toBe(1); // February, not March
+    expect(d.getUTCDate()).toBe(28);
+  });
+
+  it("keeps Feb 29 when the jubilee year is itself a leap year", () => {
+    const d = jubileeDateFor(utc(2000, 2, 29), 20);
+    expect(d.getUTCFullYear()).toBe(2020);
+    expect(d.getUTCMonth()).toBe(1);
+    expect(d.getUTCDate()).toBe(29);
+  });
 });
 
 describe("isExcludedFromJubilee", () => {

@@ -3,7 +3,38 @@
  * scales to its container with `w-full h-auto`, so there is no resize observer
  * and no chart library. Colors come from the shared PALETTE; axis text and grid
  * lines use `currentColor` so they follow the theme.
+ *
+ * Interactive charts show a styled HTML tooltip on hover instead of the native
+ * SVG `<title>` bubble (which is slow, unstyled and keyboard-invisible). The
+ * tooltip is positioned in CSS pixels relative to the chart container, so it
+ * follows the cursor regardless of how the viewBox is scaled.
  */
+import { type ReactNode, useRef, useState } from "react";
+
+type TipState = { x: number; y: number; node: ReactNode } | null;
+
+function useChartTooltip() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [tip, setTip] = useState<TipState>(null);
+  function show(e: { clientX: number; clientY: number }, node: ReactNode) {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTip({ x: e.clientX - rect.left, y: e.clientY - rect.top, node });
+  }
+  return { ref, tip, show, hide: () => setTip(null) };
+}
+
+function ChartTooltip({ tip }: { tip: TipState }) {
+  if (!tip) return null;
+  return (
+    <div
+      className="pointer-events-none absolute z-50 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
+      style={{ left: tip.x, top: tip.y - 10 }}
+    >
+      {tip.node}
+    </div>
+  );
+}
 
 export const PALETTE = {
   indigo: "#6366f1",
@@ -38,6 +69,8 @@ export function AreaChart({
   color?: string;
   valueFormat?: (n: number) => string;
 }) {
+  const { ref, tip, show, hide } = useChartTooltip();
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const W = 720;
   const H = 260;
   // Wider left/right padding so the first and last x-axis labels (and the
@@ -65,65 +98,126 @@ export function AreaChart({
   const gradId = `area-grad-${color.replace("#", "")}`;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Verlauf">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      {gridY.map((gy) => (
-        <line
-          key={gy}
-          x1={pad.l}
-          x2={pad.l + iw}
-          y1={gy}
-          y2={gy}
-          className="text-border"
-          stroke="currentColor"
-          strokeWidth={1}
-          strokeDasharray="3 4"
+    // biome-ignore lint/a11y/noStaticElementInteractions: decorative hover tooltip over a chart that is already exposed via role="img" and visible labels
+    <div
+      ref={ref}
+      className="relative"
+      onMouseLeave={() => {
+        hide();
+        setHoverIdx(null);
+      }}
+    >
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Verlauf">
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {gridY.map((gy) => (
+          <line
+            key={gy}
+            x1={pad.l}
+            x2={pad.l + iw}
+            y1={gy}
+            y2={gy}
+            className="text-border"
+            stroke="currentColor"
+            strokeWidth={1}
+            strokeDasharray="3 4"
+          />
+        ))}
+        <path d={area} fill={`url(#${gradId})`} />
+        <polyline
+          points={line}
+          fill="none"
+          stroke={color}
+          strokeWidth={2.5}
+          strokeLinejoin="round"
         />
-      ))}
-      <path d={area} fill={`url(#${gradId})`} />
-      <polyline points={line} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" />
-      {data.map((d, i) => (
-        <circle
-          key={d.label}
-          cx={x(i)}
-          cy={y(d.value)}
-          r={i === data.length - 1 ? 4 : 2.5}
-          fill={color}
-        />
-      ))}
-      {/* Value label on the last point. */}
-      <text
-        x={x(data.length - 1)}
-        y={y(data[data.length - 1]!.value) - 10}
-        textAnchor="end"
-        className="fill-foreground"
-        fill="currentColor"
-        fontSize="13"
-        fontWeight="600"
-      >
-        {valueFormat(data[data.length - 1]!.value)}
-      </text>
-      {data.map((d, i) => (
+        {hoverIdx != null ? (
+          <line
+            x1={x(hoverIdx)}
+            x2={x(hoverIdx)}
+            y1={pad.t}
+            y2={pad.t + ih}
+            stroke={color}
+            strokeOpacity={0.4}
+            strokeWidth={1}
+            strokeDasharray="3 3"
+          />
+        ) : null}
+        {data.map((d, i) => (
+          <circle
+            key={d.label}
+            cx={x(i)}
+            cy={y(d.value)}
+            r={i === hoverIdx ? 5 : i === data.length - 1 ? 4 : 2.5}
+            fill={color}
+          />
+        ))}
+        {/* Value label on the last point. */}
         <text
-          key={d.label}
-          x={x(i)}
-          y={H - 6}
-          // Anchor the outermost labels inward so they never spill past the
-          // viewBox edge and get clipped.
-          textAnchor={i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"}
-          className="fill-muted-foreground"
+          x={x(data.length - 1)}
+          y={y(data[data.length - 1]!.value) - 10}
+          textAnchor="end"
+          className="fill-foreground"
           fill="currentColor"
-          fontSize="11"
+          fontSize="13"
+          fontWeight="600"
         >
-          {d.label}
+          {valueFormat(data[data.length - 1]!.value)}
         </text>
-      ))}
-    </svg>
+        {data.map((d, i) => (
+          <text
+            key={d.label}
+            x={x(i)}
+            y={H - 6}
+            // Anchor the outermost labels inward so they never spill past the
+            // viewBox edge and get clipped.
+            textAnchor={i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"}
+            className="fill-muted-foreground"
+            fill="currentColor"
+            fontSize="11"
+          >
+            {d.label}
+          </text>
+        ))}
+        {/* Transparent hover bands, one per point, so the tooltip appears
+            anywhere along a point's vertical slice, not only on the dot. */}
+        {data.map((d, i) => {
+          const left = i === 0 ? pad.l : (x(i - 1) + x(i)) / 2;
+          const right = i === data.length - 1 ? pad.l + iw : (x(i) + x(i + 1)) / 2;
+          return (
+            // biome-ignore lint/a11y/noStaticElementInteractions: decorative hover band; values are also rendered as visible chart labels
+            <rect
+              key={`hit-${d.label}`}
+              x={left}
+              y={pad.t}
+              width={Math.max(0, right - left)}
+              height={ih}
+              fill="transparent"
+              onMouseMove={(e) => {
+                setHoverIdx(i);
+                show(e, <ChartTipRow label={d.label} value={valueFormat(d.value)} color={color} />);
+              }}
+            />
+          );
+        })}
+      </svg>
+      <ChartTooltip tip={tip} />
+    </div>
+  );
+}
+
+/** One label/value line in a chart tooltip, with the series swatch. */
+function ChartTipRow({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <span className="flex items-center gap-2">
+      <span className="size-2.5 rounded-[3px]" style={{ backgroundColor: color }} />
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium tabular-nums text-popover-foreground">{value}</span>
+    </span>
   );
 }
 
@@ -137,6 +231,8 @@ export function GroupedBarChart({
   series: { name: string; color: string; values: number[] }[];
   valueFormat?: (n: number) => string;
 }) {
+  const { ref, tip, show, hide } = useChartTooltip();
+  const [hoverCat, setHoverCat] = useState<number | null>(null);
   const W = 720;
   const H = 260;
   const pad = { l: 16, r: 16, t: 16, b: 26 };
@@ -151,61 +247,113 @@ export function GroupedBarChart({
   const y = (v: number) => pad.t + ih - (v / max) * ih;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Balkendiagramm">
-      {[0, 0.5, 1].map((f) => {
-        const gy = pad.t + ih - f * ih;
-        return (
-          <line
-            key={f}
-            x1={pad.l}
-            x2={pad.l + iw}
-            y1={gy}
-            y2={gy}
-            className="text-border"
-            stroke="currentColor"
-            strokeWidth={1}
-            strokeDasharray="3 4"
-          />
-        );
-      })}
-      {categories.map((cat, ci) => {
-        const groupX = pad.l + ci * groupW;
-        const clusterW = barW * series.length + barGap * (series.length - 1);
-        const startX = groupX + (groupW - clusterW) / 2;
-        return (
-          <g key={cat}>
-            {series.map((s, si) => {
-              const v = s.values[ci] ?? 0;
-              const bx = startX + si * (barW + barGap);
-              const by = y(v);
-              return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: decorative hover tooltip over a chart that is already exposed via role="img" and visible labels
+    <div
+      ref={ref}
+      className="relative"
+      onMouseLeave={() => {
+        hide();
+        setHoverCat(null);
+      }}
+    >
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="h-auto w-full"
+        role="img"
+        aria-label="Balkendiagramm"
+      >
+        {[0, 0.5, 1].map((f) => {
+          const gy = pad.t + ih - f * ih;
+          return (
+            <line
+              key={f}
+              x1={pad.l}
+              x2={pad.l + iw}
+              y1={gy}
+              y2={gy}
+              className="text-border"
+              stroke="currentColor"
+              strokeWidth={1}
+              strokeDasharray="3 4"
+            />
+          );
+        })}
+        {categories.map((cat, ci) => {
+          const groupX = pad.l + ci * groupW;
+          const clusterW = barW * series.length + barGap * (series.length - 1);
+          const startX = groupX + (groupW - clusterW) / 2;
+          const dim = hoverCat != null && hoverCat !== ci;
+          return (
+            <g key={cat} opacity={dim ? 0.4 : 1}>
+              {hoverCat === ci ? (
                 <rect
-                  key={s.name}
-                  x={bx}
-                  y={by}
-                  width={barW}
-                  height={Math.max(0, pad.t + ih - by)}
-                  rx={2}
-                  fill={s.color}
-                >
-                  <title>{`${cat} · ${s.name}: ${valueFormat(v)}`}</title>
-                </rect>
-              );
-            })}
-            <text
-              x={groupX + groupW / 2}
-              y={H - 6}
-              textAnchor="middle"
-              className="fill-muted-foreground"
-              fill="currentColor"
-              fontSize="11"
-            >
-              {cat}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+                  x={groupX + 1}
+                  y={pad.t}
+                  width={groupW - 2}
+                  height={ih}
+                  rx={4}
+                  className="fill-muted"
+                  opacity={0.5}
+                />
+              ) : null}
+              {series.map((s, si) => {
+                const v = s.values[ci] ?? 0;
+                const bx = startX + si * (barW + barGap);
+                const by = y(v);
+                return (
+                  <rect
+                    key={s.name}
+                    x={bx}
+                    y={by}
+                    width={barW}
+                    height={Math.max(0, pad.t + ih - by)}
+                    rx={2}
+                    fill={s.color}
+                  />
+                );
+              })}
+              <text
+                x={groupX + groupW / 2}
+                y={H - 6}
+                textAnchor="middle"
+                className="fill-muted-foreground"
+                fill="currentColor"
+                fontSize="11"
+              >
+                {cat}
+              </text>
+              {/* One transparent hit area per category group. */}
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: decorative hover band; values are also rendered as visible chart labels */}
+              <rect
+                x={groupX}
+                y={pad.t}
+                width={groupW}
+                height={ih}
+                fill="transparent"
+                onMouseMove={(e) => {
+                  setHoverCat(ci);
+                  show(
+                    e,
+                    <span className="flex flex-col gap-1">
+                      <span className="font-medium text-popover-foreground">{cat}</span>
+                      {series.map((s) => (
+                        <ChartTipRow
+                          key={s.name}
+                          label={s.name}
+                          value={valueFormat(s.values[ci] ?? 0)}
+                          color={s.color}
+                        />
+                      ))}
+                    </span>,
+                  );
+                }}
+              />
+            </g>
+          );
+        })}
+      </svg>
+      <ChartTooltip tip={tip} />
+    </div>
   );
 }
 

@@ -41,7 +41,7 @@ function DashboardPage() {
   if (isError) {
     return (
       <QueryError
-        title="Dashboard konnte nicht geladen werden"
+        title="Übersicht konnte nicht geladen werden"
         description="Die Kennzahlen konnten nicht abgerufen werden."
         error={error}
         onRetry={() => refetch()}
@@ -85,7 +85,7 @@ function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Dashboard</h1>
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Übersicht</h1>
         <p className="text-sm text-muted-foreground">
           Übersicht über Mitgliederstand und Aktivität.
         </p>

@@ -41,10 +41,30 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
-    version: "0.39.1",
+    version: "0.40.0",
     date: "2026-06-09",
-    title: "Korrekturen und Feinschliff",
+    title: "Klarere Auswertungen und deutsche Beschriftungen",
     changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Diagramme auf der Übersicht zeigen beim Überfahren mit der Maus jetzt eine saubere Sprechblase mit Jahr und Wert statt des grauen Browser-Hinweises. Der gerade betrachtete Balken oder Punkt wird hervorgehoben.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Englische Menüpunkte sind übersetzt: aus Dashboard wird Übersicht, aus Audit Log wird Änderungsprotokoll, aus Import wird Datenimport.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Der Kopfbereich einer Mitgliederseite ist aufgeräumt. Mitglieds-, Alt- und Adressnummer stehen als kompakte Felder nebeneinander, mit Erklärung beim Überfahren.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Nach dem Anlegen oder Speichern eines Mitglieds erscheint eine kurze Bestätigung.",
+      },
       {
         category: "fix",
         description:
@@ -53,7 +73,17 @@ export const RELEASES: Release[] = [
       {
         category: "fix",
         description:
-          "Die Finanzkennzahlen im Dashboard werden jetzt centgenau aus der Datenbank summiert, ohne Rundungsabweichung.",
+          "Die Finanzkennzahlen der Übersicht werden jetzt centgenau aus der Datenbank summiert, ohne Rundungsabweichung.",
+      },
+      {
+        category: "fix",
+        description:
+          "Ein am 29. Februar eingetretenes Mitglied bekommt sein Jubiläum in einem Nicht-Schaltjahr korrekt auf den 28. Februar gelegt, nicht mehr auf den 1. März.",
+      },
+      {
+        category: "fix",
+        description:
+          "Bei den Vereinsdaten wird die BIC auf das gültige Format geprüft, damit eine fehlerhafte Eingabe nicht erst beim Bankupload auffällt.",
       },
       {
         category: "improvement",

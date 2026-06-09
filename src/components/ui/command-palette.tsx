@@ -37,7 +37,7 @@ const NAV_COMMANDS: NavCommand[] = [
   {
     kind: "nav",
     id: "dashboard",
-    label: "Dashboard",
+    label: "Übersicht",
     icon: <LayoutDashboard className="size-4" />,
     path: "/app",
     needs: ["readonly", "vorstand", "admin"],
@@ -77,7 +77,7 @@ const NAV_COMMANDS: NavCommand[] = [
   {
     kind: "nav",
     id: "audit",
-    label: "Audit Log",
+    label: "Änderungsprotokoll",
     icon: <ScrollText className="size-4" />,
     path: "/app/audit",
     needs: ["readonly", "vorstand", "admin"],
@@ -425,7 +425,7 @@ export function CommandPalette({ role }: { role: Role }) {
                     return (
                       <CommandItem
                         icon={<ScrollText className="size-4" />}
-                        label={`Im Audit-Log nach „${trimmed}" suchen`}
+                        label={`Im Änderungsprotokoll nach „${trimmed}" suchen`}
                         active={i === highlight}
                         onMouseEnter={() => setHighlight(i)}
                         onClick={() => executeAt(i)}

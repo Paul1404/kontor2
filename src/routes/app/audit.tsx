@@ -109,7 +109,7 @@ function AuditPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Audit Log</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Änderungsprotokoll</h1>
         <p className="text-sm text-muted-foreground">
           Wer hat wann was geändert. Filter und Suche sind kombinierbar.
         </p>
