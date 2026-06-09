@@ -409,6 +409,13 @@ function AntragForm() {
           <div className="flex flex-col gap-6">
             <IntroPanel />
 
+            <p className="text-sm text-muted-foreground">
+              Sie haben die Beitrittserklärung schon auf Papier ausgefüllt?{" "}
+              <Link to="/antrag/papierformular" className="text-primary hover:underline">
+                Scan hochladen
+              </Link>
+            </p>
+
             <Card>
               <CardHeader>
                 <CardTitle>Mitgliedsdaten</CardTitle>

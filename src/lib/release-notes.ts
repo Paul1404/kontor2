@@ -80,6 +80,11 @@ export const RELEASES: Release[] = [
         description:
           "Die Adresseingabe im Beitrittsformular schlägt jetzt Straßen vor und ergänzt den Ort automatisch anhand der Postleitzahl (über OpenStreetMap).",
       },
+      {
+        category: "feature",
+        description:
+          "Wer die Beitrittserklärung schon auf Papier ausgefüllt hat, kann unter /antrag/papierformular einen Scan hochladen, ohne das Online-Formular auszufüllen. Der Antrag landet als Papier-Scan im Bereich Anträge zur Erfassung durch den Vorstand.",
+      },
     ],
   },
   {

@@ -793,6 +793,170 @@ export const applicationsRouter = {
       return { ok: true };
     }),
 
+  /**
+   * Public: accept a scan of an already-filled PAPER Beitrittserklärung without
+   * the applicant filling the online form. Creates a `scan_eingegangen`
+   * placeholder application whose person fields are filled in later by the
+   * Vorstand from the scan; stores the file and (best-effort) notifies the club
+   * and the applicant. Capped at 20 MB.
+   */
+  submitPaperScan: publicProc
+    .input(
+      v.object({
+        filename: v.pipe(v.string(), v.minLength(1)),
+        mimeType: v.pipe(v.string(), v.minLength(1)),
+        contentBase64: v.pipe(v.string(), v.minLength(1)),
+        email: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.email())), null),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const limit = await rateLimit({
+        key: `antrag-paper:${clientIp(context.headers)}`,
+        limit: 5,
+        windowSeconds: 600,
+      });
+      if (!limit.allowed) {
+        throw new ORPCError("TOO_MANY_REQUESTS", {
+          message: "Zu viele Uploads. Bitte versuchen Sie es in einigen Minuten erneut.",
+        });
+      }
+      const allowed = ["application/pdf", "image/jpeg", "image/png", "image/heic"];
+      if (!allowed.includes(input.mimeType)) {
+        throw new ORPCError("VALIDATION_FAILED", { message: "Nicht erlaubtes Dateiformat." });
+      }
+      const body = Buffer.from(input.contentBase64, "base64");
+      if (body.byteLength === 0) {
+        throw new ORPCError("VALIDATION_FAILED", { message: "Leere Datei." });
+      }
+      if (body.byteLength > 20 * 1024 * 1024) {
+        throw new ORPCError("VALIDATION_FAILED", { message: "Datei zu groß (max. 20 MB)." });
+      }
+      const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+      if (!org) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Der Verein hat das Antragsformular noch nicht eingerichtet.",
+        });
+      }
+
+      const year = new Date().getUTCFullYear();
+      // Placeholder person fields: the row carries no real applicant data until
+      // the Vorstand transcribes the scan. They are NOT NULL in the schema, so
+      // use clearly-marked sentinels that read as "needs entry" in the list.
+      const inserted = await context.db.transaction(async (tx) => {
+        const antragsnummer = await allocateDocRef(tx, "ANT", year);
+        const [row] = await tx
+          .insert(membershipApplicationsTable)
+          .values({
+            antragsnummer,
+            antragstyp: "einzel",
+            status: "scan_eingegangen",
+            source: "legacy",
+            mitgliedschaftTyp: "erwachsener",
+            vorname: "Papier-Antrag",
+            nachname: "(zu erfassen)",
+            geburtsdatum: new Date("1900-01-01"),
+            email: input.email,
+            consentIp: clientIp(context.headers),
+          })
+          .returning({
+            id: membershipApplicationsTable.id,
+            antragsnummer: membershipApplicationsTable.antragsnummer,
+          });
+        if (!row) {
+          throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
+        }
+        return row;
+      });
+
+      // Store the scan and notify, both best-effort so a storage/SMTP blip
+      // never loses the intake.
+      try {
+        const ext = input.filename.split(".").pop()?.toLowerCase() ?? "bin";
+        const s3Key = `applications/${inserted.id}/paper-${Date.now()}.${ext}`;
+        await putObject({ key: s3Key, body, contentType: input.mimeType });
+        await context.db.insert(membershipApplicationFilesTable).values({
+          applicationId: inserted.id,
+          kind: "signed_scan",
+          s3Key,
+          filename: input.filename,
+          mimeType: input.mimeType,
+          sizeBytes: body.byteLength,
+        });
+
+        const records: EmailLogEntry[] = [];
+        if (input.email) {
+          const subject = `Ihr Papier-Antrag bei ${org.vereinsname}`;
+          const res = await sendApplicationDocumentMail({
+            to: input.email,
+            subject,
+            text: [
+              "Hallo,",
+              "",
+              `vielen Dank. Ihr Papier-Antrag beim ${org.vereinsname} ist bei uns eingegangen.`,
+              `Ihre Vorgangsnummer lautet ${inserted.antragsnummer}.`,
+              "",
+              `Den aktuellen Stand sehen Sie hier: ${statusUrlFor(inserted.antragsnummer)}`,
+              "",
+              "Bitte achten Sie darauf, dass auf dem Scan Ihre Kontaktdaten gut lesbar sind.",
+            ].join("\n"),
+          });
+          records.push({
+            kind: EMAIL_KIND.antragConfirmation,
+            status: res.status,
+            recipient: input.email,
+            subject,
+            detail: res.detail,
+          });
+        }
+        const clubEmail = org.antragVorstandEmail ?? org.mitgliedschaftEmail ?? org.kontaktEmail;
+        if (org.antragBenachrichtigungAktiv && clubEmail) {
+          const subject = `Neuer Papier-Antrag: ${inserted.antragsnummer}`;
+          const res = await sendApplicationDocumentMail({
+            to: clubEmail,
+            subject,
+            text: [
+              "Ein neuer Papier-Antrag wurde über das Online-Formular hochgeladen.",
+              `Vorgangsnummer: ${inserted.antragsnummer}.`,
+              input.email ? `Kontakt: ${input.email}` : "Es wurde keine E-Mail angegeben.",
+              "",
+              "Bitte im Bereich Anträge prüfen und die Daten aus dem Scan erfassen.",
+            ].join("\n"),
+          });
+          records.push({
+            kind: EMAIL_KIND.antragClubNotification,
+            status: res.status,
+            recipient: clubEmail,
+            subject,
+            detail: res.detail,
+          });
+        }
+        if (records.length > 0) {
+          if (records.some((r) => r.status === "sent")) {
+            await context.db
+              .update(membershipApplicationsTable)
+              .set({ emailSent: true })
+              .where(eq(membershipApplicationsTable.id, inserted.id));
+          }
+          await recordEmail(
+            records.map((r) => ({
+              ...r,
+              entityType: "membership_application",
+              entityId: inserted.id,
+              requestId: context.requestId ?? null,
+            })),
+            context.db,
+          );
+        }
+      } catch (err) {
+        logger.error("application.paper.post_commit_failed", {
+          antragsnummer: inserted.antragsnummer,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      return { antragsnummer: inserted.antragsnummer };
+    }),
+
   // ---- Admin / Vorstand ----
 
   /** Paginated application list with search, status filter and test toggle. */
