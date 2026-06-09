@@ -29,7 +29,7 @@ export function AppShell({
     setMobileNavOpen(false);
   }, [pathname]);
   return (
-    <div className="flex h-screen bg-background print:h-auto print:block">
+    <div className="flex h-screen print:h-auto print:block print:bg-background">
       <Sidebar role={role} />
       <MobileSidebar role={role} open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
       <main className="flex flex-1 flex-col overflow-hidden print:overflow-visible">

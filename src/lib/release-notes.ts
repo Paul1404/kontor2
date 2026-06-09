@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.38.0",
+    date: "2026-06-09",
+    title: "Frischeres Erscheinungsbild und ruhigeres Formular",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die ganze Oberfläche bekommt einen dezenten, animierten Farbverlauf im Hintergrund, und das öffentliche Beitrittsformular hat jetzt einen Kopfbereich im Vereinsrot. Wer Animationen reduziert eingestellt hat, sieht den ruhenden Verlauf.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Familienangaben im Beitrittsformular sind eingeklappt und öffnen sich erst per Klick. Der häufige Fall einer Einzel- oder Kindmitgliedschaft bleibt dadurch übersichtlich. Vorhandene Angaben aus einem Entwurf bleiben sichtbar.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Korrekt ausgefüllte Pflichtfelder im Beitrittsformular zeigen jetzt ein grünes Häkchen, sodass auf einen Blick erkennbar ist, was passt.",
+      },
+    ],
+  },
+  {
     version: "0.37.0",
     date: "2026-06-09",
     title: "Beitrittsformular mit mehr Politur",

@@ -358,3 +358,130 @@
     }
   }
 }
+
+/*
+ * Aurora backdrop + brand gradients (ported from svums).
+ *
+ * Two independently animated radial-gradient layers sit fixed behind all
+ * content via body::before / ::after. They render above the body's base
+ * background but below in-flow content, so the effect shows through any
+ * container that does not paint an opaque background of its own. The shells
+ * (public Antrag, authed app) are kept transparent for this reason. Colors
+ * stay subtle in light mode and a touch stronger in dark. Animation is
+ * disabled under prefers-reduced-motion.
+ */
+:root {
+  --aurora-1: rgba(220, 38, 38, 0.1);
+  --aurora-2: rgba(251, 146, 60, 0.09);
+  --aurora-3: rgba(244, 114, 182, 0.08);
+}
+
+.dark {
+  --aurora-1: rgba(220, 38, 38, 0.2);
+  --aurora-2: rgba(168, 85, 247, 0.16);
+  --aurora-3: rgba(56, 189, 248, 0.14);
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: -18%;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+body::before {
+  background:
+    radial-gradient(48vmax 42vmax at 20% 25%, var(--aurora-1), transparent 60%),
+    radial-gradient(40vmax 36vmax at 82% 72%, var(--aurora-2), transparent 60%);
+  filter: blur(32px) saturate(1.2);
+  animation: svuwv-aurora-a 22s cubic-bezier(0.6, 0.05, 0.4, 0.95) infinite;
+}
+
+body::after {
+  background:
+    radial-gradient(52vmax 46vmax at 55% 110%, var(--aurora-3), transparent 60%),
+    radial-gradient(32vmax 28vmax at 72% 8%, var(--aurora-1), transparent 60%);
+  filter: blur(38px) saturate(1.25);
+  opacity: 0.85;
+  animation: svuwv-aurora-b 31s cubic-bezier(0.6, 0.05, 0.4, 0.95) infinite;
+}
+
+@keyframes svuwv-aurora-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate3d(6%, -4%, 0) scale(1.08) rotate(2deg);
+  }
+  66% {
+    transform: translate3d(-5%, 6%, 0) scale(1.05) rotate(-2deg);
+  }
+}
+
+@keyframes svuwv-aurora-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    opacity: 0.78;
+  }
+  40% {
+    transform: translate3d(-7%, 5%, 0) scale(1.12) rotate(-3deg);
+    opacity: 0.95;
+  }
+  75% {
+    transform: translate3d(5%, -6%, 0) scale(1.06) rotate(3deg);
+    opacity: 0.82;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after {
+    animation: none;
+  }
+}
+
+/* Brand gradient helpers: a warm red to orange wash for hero headers and a
+   clipped variant for headlines. Theme-aware so dark mode stays vivid. */
+.brand-gradient-bg {
+  background-image: linear-gradient(
+    135deg,
+    hsl(0 72% 42%) 0%,
+    hsl(0 78% 48%) 45%,
+    hsl(24 95% 53%) 100%
+  );
+}
+
+.dark .brand-gradient-bg {
+  background-image: linear-gradient(
+    135deg,
+    hsl(0 72% 46%) 0%,
+    hsl(0 78% 54%) 45%,
+    hsl(24 95% 56%) 100%
+  );
+}
+
+.brand-gradient-text {
+  background-image: linear-gradient(
+    135deg,
+    hsl(0 78% 48%) 0%,
+    hsl(24 95% 53%) 55%,
+    hsl(330 81% 60%) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.dark .brand-gradient-text {
+  background-image: linear-gradient(
+    135deg,
+    hsl(0 84% 67%) 0%,
+    hsl(24 95% 64%) 50%,
+    hsl(330 86% 70%) 100%
+  );
+}

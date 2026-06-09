@@ -17,6 +17,7 @@ import {
   Plus,
   Send,
   Trash2,
+  Users,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AbteilungPicker } from "~/components/antrag/abteilung-picker";
@@ -119,6 +120,10 @@ function AntragForm() {
   const [partnerGeburtsdatum, setPartnerGeburtsdatum] = useState("");
   const [partnerAbt, setPartnerAbt] = useState<string[]>([]);
   const [kinder, setKinder] = useState<KindRow[]>([]);
+  // The family section stays collapsed by default so the common Einzel/Kind
+  // path is not cluttered by partner and children editors. It opens on demand,
+  // or automatically once a restored draft already carries family data.
+  const [familieOpen, setFamilieOpen] = useState(false);
 
   // Step 1
   const [kontoinhaber, setKontoinhaber] = useState("");
@@ -239,6 +244,14 @@ function AntragForm() {
   const age = geburtsdatum ? realAge(geburtsdatum) : null;
   const isMinor = age != null && age < 18;
   const hasPartner = partnerVorname.trim().length >= 2 && partnerNachname.trim().length >= 2;
+  // Show the family editors when the user opened them or when there is already
+  // family data to edit (e.g. after a draft restore).
+  const hasFamilieData =
+    kinder.length > 0 ||
+    partnerVorname.trim().length > 0 ||
+    partnerNachname.trim().length > 0 ||
+    partnerGeburtsdatum.length > 0;
+  const familieExpanded = familieOpen || hasFamilieData;
   const antragstyp: "einzel" | "kind" | "familie" = isMinor
     ? "kind"
     : kinder.length > 0 && hasPartner
@@ -448,13 +461,13 @@ function AntragForm() {
                   </div>
                 ) : null}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Vorname *">
+                  <Field label="Vorname *" valid={vorname.trim().length >= 2}>
                     <Input value={vorname} onChange={(e) => setVorname(e.target.value)} />
                   </Field>
-                  <Field label="Nachname *">
+                  <Field label="Nachname *" valid={nachname.trim().length >= 2}>
                     <Input value={nachname} onChange={(e) => setNachname(e.target.value)} />
                   </Field>
-                  <Field label="Geburtsdatum *">
+                  <Field label="Geburtsdatum *" valid={age != null}>
                     <Input
                       type="date"
                       value={geburtsdatum}
@@ -481,6 +494,7 @@ function AntragForm() {
                   </Field>
                   <Field
                     label="E-Mail *"
+                    valid={/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())}
                     hint="Wir benötigen Ihre E-Mail für die Bestätigung und die Kommunikation zum Antrag."
                   >
                     <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -509,10 +523,10 @@ function AntragForm() {
                 </CardHeader>
                 <CardContent className="flex flex-col gap-4">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field label="Vorname *">
+                    <Field label="Vorname *" valid={erzVorname.trim().length >= 2}>
                       <Input value={erzVorname} onChange={(e) => setErzVorname(e.target.value)} />
                     </Field>
-                    <Field label="Nachname *">
+                    <Field label="Nachname *" valid={erzNachname.trim().length >= 2}>
                       <Input value={erzNachname} onChange={(e) => setErzNachname(e.target.value)} />
                     </Field>
                   </div>
@@ -560,115 +574,145 @@ function AntragForm() {
                     ein zweites Elternteil und mindestens ein Kind ein.
                   </p>
                 </CardHeader>
-                <CardContent className="flex flex-col gap-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field label="Partner Vorname">
-                      <Input
-                        value={partnerVorname}
-                        onChange={(e) => setPartnerVorname(e.target.value)}
-                      />
-                    </Field>
-                    <Field label="Partner Nachname">
-                      <Input
-                        value={partnerNachname}
-                        onChange={(e) => setPartnerNachname(e.target.value)}
-                      />
-                    </Field>
-                    <Field label="Partner Geburtsdatum">
-                      <Input
-                        type="date"
-                        value={partnerGeburtsdatum}
-                        onChange={(e) => setPartnerGeburtsdatum(e.target.value)}
-                      />
-                    </Field>
-                  </div>
-                  {hasPartner ? (
-                    <div>
-                      <Label className="mb-1.5 block">Abteilungen des Partners</Label>
-                      <AbteilungPicker
-                        abteilungen={abteilungen}
-                        selected={partnerAbt}
-                        onToggle={(id) => toggle(partnerAbt, setPartnerAbt, id)}
-                      />
-                    </div>
-                  ) : null}
-
-                  <div className="flex flex-col gap-3">
-                    {kinder.map((k, i) => (
-                      // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and short-lived.
-                      <div key={`kind-${i}`} className="rounded-lg border border-border p-3">
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="text-sm font-medium">Kind {i + 1}</span>
-                          <button
-                            type="button"
-                            aria-label="Kind entfernen"
-                            onClick={() => setKinder((prev) => prev.filter((_, j) => j !== i))}
-                            className="text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                          <Input
-                            placeholder="Vorname"
-                            value={k.vorname}
-                            onChange={(e) => updateKind(setKinder, i, { vorname: e.target.value })}
-                          />
-                          <Input
-                            placeholder="Nachname"
-                            value={k.nachname}
-                            onChange={(e) => updateKind(setKinder, i, { nachname: e.target.value })}
-                          />
-                          <Input
-                            type="date"
-                            value={k.geburtsdatum}
-                            onChange={(e) =>
-                              updateKind(setKinder, i, { geburtsdatum: e.target.value })
-                            }
-                          />
-                        </div>
-                        <div className="mt-2">
-                          <AbteilungPicker
-                            abteilungen={abteilungen}
-                            selected={k.abteilungen}
-                            onToggle={(id) =>
-                              updateKind(setKinder, i, {
-                                abteilungen: k.abteilungen.includes(id)
-                                  ? k.abteilungen.filter((x) => x !== id)
-                                  : [...k.abteilungen, id],
-                              })
-                            }
-                          />
-                        </div>
-                      </div>
-                    ))}
+                {!familieExpanded ? (
+                  <CardContent>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       className="self-start"
-                      onClick={() =>
-                        setKinder((prev) => [
-                          ...prev,
-                          {
-                            vorname: "",
-                            nachname: nachname.trim(),
-                            geburtsdatum: "",
-                            abteilungen: [],
-                          },
-                        ])
-                      }
+                      onClick={() => setFamilieOpen(true)}
                     >
-                      <Plus className="size-4" /> Kind hinzufügen
+                      <Users className="size-4" /> Familienmitglieder hinzufügen
                     </Button>
-                    {kinder.length > 0 && !hasPartner ? (
-                      <p className="text-xs text-muted-foreground">
-                        Für den Familientarif bitte oben einen Partner oder ein zweites Elternteil
-                        eintragen. Bis dahin gilt Ihr Einzelbeitrag.
-                      </p>
+                  </CardContent>
+                ) : (
+                  <CardContent className="motion-reveal-up flex flex-col gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <Field label="Partner Vorname">
+                        <Input
+                          value={partnerVorname}
+                          onChange={(e) => setPartnerVorname(e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Partner Nachname">
+                        <Input
+                          value={partnerNachname}
+                          onChange={(e) => setPartnerNachname(e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Partner Geburtsdatum">
+                        <Input
+                          type="date"
+                          value={partnerGeburtsdatum}
+                          onChange={(e) => setPartnerGeburtsdatum(e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                    {hasPartner ? (
+                      <div>
+                        <Label className="mb-1.5 block">Abteilungen des Partners</Label>
+                        <AbteilungPicker
+                          abteilungen={abteilungen}
+                          selected={partnerAbt}
+                          onToggle={(id) => toggle(partnerAbt, setPartnerAbt, id)}
+                        />
+                      </div>
                     ) : null}
-                  </div>
-                </CardContent>
+
+                    <div className="flex flex-col gap-3">
+                      {kinder.map((k, i) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and short-lived.
+                        <div key={`kind-${i}`} className="rounded-lg border border-border p-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="text-sm font-medium">Kind {i + 1}</span>
+                            <button
+                              type="button"
+                              aria-label="Kind entfernen"
+                              onClick={() => setKinder((prev) => prev.filter((_, j) => j !== i))}
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <Input
+                              placeholder="Vorname"
+                              value={k.vorname}
+                              onChange={(e) =>
+                                updateKind(setKinder, i, { vorname: e.target.value })
+                              }
+                            />
+                            <Input
+                              placeholder="Nachname"
+                              value={k.nachname}
+                              onChange={(e) =>
+                                updateKind(setKinder, i, { nachname: e.target.value })
+                              }
+                            />
+                            <Input
+                              type="date"
+                              value={k.geburtsdatum}
+                              onChange={(e) =>
+                                updateKind(setKinder, i, { geburtsdatum: e.target.value })
+                              }
+                            />
+                          </div>
+                          <div className="mt-2">
+                            <AbteilungPicker
+                              abteilungen={abteilungen}
+                              selected={k.abteilungen}
+                              onToggle={(id) =>
+                                updateKind(setKinder, i, {
+                                  abteilungen: k.abteilungen.includes(id)
+                                    ? k.abteilungen.filter((x) => x !== id)
+                                    : [...k.abteilungen, id],
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="self-start"
+                        onClick={() => {
+                          // Adding the first child implies a family, so pre-fill the
+                          // partner's last name from the applicant when still empty.
+                          if (!partnerNachname.trim()) setPartnerNachname(nachname.trim());
+                          setKinder((prev) => [
+                            ...prev,
+                            {
+                              vorname: "",
+                              nachname: nachname.trim(),
+                              geburtsdatum: "",
+                              abteilungen: [],
+                            },
+                          ]);
+                        }}
+                      >
+                        <Plus className="size-4" /> Kind hinzufügen
+                      </Button>
+                      {kinder.length > 0 && !hasPartner ? (
+                        <p className="text-xs text-muted-foreground">
+                          Für den Familientarif bitte oben einen Partner oder ein zweites Elternteil
+                          eintragen. Bis dahin gilt Ihr Einzelbeitrag.
+                        </p>
+                      ) : null}
+                    </div>
+                    {!hasFamilieData ? (
+                      <button
+                        type="button"
+                        onClick={() => setFamilieOpen(false)}
+                        className="self-start text-xs text-muted-foreground hover:text-foreground hover:underline"
+                      >
+                        Familienangaben ausblenden
+                      </button>
+                    ) : null}
+                  </CardContent>
+                )}
               </Card>
             ) : null}
           </div>
@@ -1093,15 +1137,22 @@ function Stepper({ step, onJump }: { step: number; onJump: (i: number) => void }
 function Field({
   label,
   hint,
+  valid,
   children,
 }: {
   label: string;
   hint?: string;
+  valid?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <Label className="flex flex-col gap-1.5">
-      <span>{label}</span>
+      <span className="flex items-center gap-1.5">
+        {label}
+        {valid ? (
+          <CheckCircle2 className="motion-pop-in size-3.5 text-success" aria-label="gültig" />
+        ) : null}
+      </span>
       {children}
       {hint ? <span className="text-xs font-normal text-muted-foreground">{hint}</span> : null}
     </Label>
