@@ -10,6 +10,7 @@ import {
 } from "~/server/auth/session-config";
 import { inspectEncryptedData, reencryptAllData } from "~/server/crypto/reencrypt";
 import { authSettingsTable, smtpConfigTable } from "~/server/db/schema/settings";
+import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { adminProc } from "~/server/orpc/base";
 
 const SessionSettingsInput = v.object({
@@ -174,8 +175,19 @@ export const settingsRouter = {
         ),
       }),
     )
-    .handler(async ({ input }) => {
+    .handler(async ({ context, input }) => {
       const result = await sendTestMail({ to: input.to, inline: input.inline ?? null });
+      await recordEmail(
+        {
+          kind: EMAIL_KIND.testMail,
+          ...statusFromSend(result),
+          recipient: input.to,
+          subject: "SVUWV: Test-E-Mail",
+          actorEmail: context.session!.user.email,
+          requestId: context.requestId ?? null,
+        },
+        context.db,
+      );
       if (!result.ok) {
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
           message: `Versand fehlgeschlagen: ${result.reason}`,

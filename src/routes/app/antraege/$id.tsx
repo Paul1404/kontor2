@@ -46,10 +46,10 @@ const FILE_KIND_LABEL: Record<string, string> = {
 };
 
 const EMAIL_KIND_LABEL: Record<string, string> = {
-  confirmation: "Bestätigung an Antragsteller",
-  club_notification: "Benachrichtigung an Verein",
-  approval: "Genehmigung",
-  decline: "Ablehnung",
+  antrag_confirmation: "Bestätigung an Antragsteller",
+  antrag_club_notification: "Benachrichtigung an Verein",
+  antrag_approval: "Genehmigung",
+  antrag_decline: "Ablehnung",
 };
 
 type EmailStatusMeta = { label: string; cls: string; icon: typeof Mail };

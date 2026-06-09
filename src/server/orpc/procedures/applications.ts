@@ -15,12 +15,12 @@ import { allocateDocRef } from "~/server/db/doc-ref";
 import { escapeLike } from "~/server/db/like";
 import { withUniqueRetry } from "~/server/db/retry";
 import { abteilungenTable } from "~/server/db/schema/abteilungen";
+import { emailLogTable } from "~/server/db/schema/email-log";
 import { membersTable } from "~/server/db/schema/members";
 import {
   type AntragKind,
   type AntragStatus,
   type MembershipApplication,
-  membershipApplicationEmailsTable,
   membershipApplicationFilesTable,
   membershipApplicationsTable,
 } from "~/server/db/schema/membership-applications";
@@ -41,10 +41,7 @@ import { env } from "~/server/env";
 import { lookupBankByIban } from "~/server/lib/blz";
 import { toCsv } from "~/server/lib/csv";
 import { logger } from "~/server/lib/logger";
-import {
-  type ApplicationEmailRecord,
-  recordApplicationEmails,
-} from "~/server/mail/application-email-log";
+import { EMAIL_KIND, type EmailLogEntry, recordEmail } from "~/server/mail/email-log";
 import {
   sendApplicationDocumentMail,
   sendApplicationMails,
@@ -646,7 +643,15 @@ export const applicationsRouter = {
           .set({ emailSent: true })
           .where(eq(membershipApplicationsTable.id, inserted.id));
       }
-      await recordApplicationEmails(context.db, inserted.id, mailRes.records);
+      await recordEmail(
+        mailRes.records.map((r) => ({
+          ...r,
+          entityType: "membership_application",
+          entityId: inserted.id,
+          requestId: context.requestId ?? null,
+        })),
+        context.db,
+      );
     } catch (err) {
       logger.error("application.submit.post_commit_failed", {
         antragsnummer: inserted.antragsnummer,
@@ -841,17 +846,22 @@ export const applicationsRouter = {
           .orderBy(desc(membershipApplicationFilesTable.uploadedAt)),
         context.db
           .select({
-            id: membershipApplicationEmailsTable.id,
-            kind: membershipApplicationEmailsTable.kind,
-            status: membershipApplicationEmailsTable.status,
-            recipient: membershipApplicationEmailsTable.recipient,
-            subject: membershipApplicationEmailsTable.subject,
-            detail: membershipApplicationEmailsTable.detail,
-            createdAt: membershipApplicationEmailsTable.createdAt,
+            id: emailLogTable.id,
+            kind: emailLogTable.kind,
+            status: emailLogTable.status,
+            recipient: emailLogTable.recipient,
+            subject: emailLogTable.subject,
+            detail: emailLogTable.detail,
+            createdAt: emailLogTable.createdAt,
           })
-          .from(membershipApplicationEmailsTable)
-          .where(eq(membershipApplicationEmailsTable.applicationId, input.id))
-          .orderBy(desc(membershipApplicationEmailsTable.createdAt)),
+          .from(emailLogTable)
+          .where(
+            and(
+              eq(emailLogTable.entityType, "membership_application"),
+              eq(emailLogTable.entityId, input.id),
+            ),
+          )
+          .orderBy(desc(emailLogTable.createdAt)),
       ]);
       const { iban, ...rest } = row;
       return {
@@ -941,16 +951,23 @@ export const applicationsRouter = {
         .where(eq(t.id, input.id));
 
       const subject = `Ihr Aufnahmeantrag (${app.antragsnummer})`;
-      let record: ApplicationEmailRecord;
+      const base = {
+        kind: EMAIL_KIND.antragDecline,
+        subject,
+        entityType: "membership_application",
+        entityId: app.id,
+        actorEmail: context.session!.user.email,
+        requestId: context.requestId ?? null,
+      } satisfies Partial<EmailLogEntry>;
+      let record: EmailLogEntry;
       if (app.email) {
         const mailer = await getMailer();
         const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
         if (!mailer) {
           record = {
-            kind: "decline",
+            ...base,
             status: "skipped",
             recipient: app.email,
-            subject,
             detail: "smtp_not_configured",
           };
         } else {
@@ -966,21 +983,20 @@ export const applicationsRouter = {
                 `Begründung: ${input.reason}`,
               ].join("\n"),
             });
-            record = { kind: "decline", status: "sent", recipient: app.email, subject };
+            record = { ...base, status: "sent", recipient: app.email };
           } catch (err) {
             record = {
-              kind: "decline",
+              ...base,
               status: "failed",
               recipient: app.email,
-              subject,
               detail: err instanceof Error ? err.message : String(err),
             };
           }
         }
       } else {
-        record = { kind: "decline", status: "skipped", subject, detail: "no_recipient" };
+        record = { ...base, status: "skipped", detail: "no_recipient" };
       }
-      await recordApplicationEmails(context.db, app.id, [record]);
+      await recordEmail(record, context.db);
       return { ok: true };
     }),
 
@@ -1195,19 +1211,33 @@ export const applicationsRouter = {
               }
             : null,
         });
-        await recordApplicationEmails(context.db, app.id, [
+        await recordEmail(
           {
-            kind: "approval",
+            kind: EMAIL_KIND.antragApproval,
             status: sent.status,
             recipient: app.email,
             subject: `Willkommen beim ${org?.vereinsname ?? "Verein"}`,
             detail: sent.detail,
+            entityType: "membership_application",
+            entityId: app.id,
+            actorEmail,
+            requestId: context.requestId ?? null,
           },
-        ]);
+          context.db,
+        );
       } else {
-        await recordApplicationEmails(context.db, app.id, [
-          { kind: "approval", status: "skipped", detail: "no_recipient" },
-        ]);
+        await recordEmail(
+          {
+            kind: EMAIL_KIND.antragApproval,
+            status: "skipped",
+            detail: "no_recipient",
+            entityType: "membership_application",
+            entityId: app.id,
+            actorEmail,
+            requestId: context.requestId ?? null,
+          },
+          context.db,
+        );
       }
 
       return { memberId: result.primaryId, mitgliedsnummer: result.refs.join(", ") };

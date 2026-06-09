@@ -9,7 +9,7 @@
 import nodemailer from "nodemailer";
 import { loadSmtpConfig } from "~/server/auth/send-invite";
 import { logger } from "~/server/lib/logger";
-import type { ApplicationEmailRecord } from "~/server/mail/application-email-log";
+import { EMAIL_KIND, type EmailLogEntry } from "~/server/mail/email-log";
 
 export type MailAttachment = { filename: string; content: Buffer; contentType?: string };
 
@@ -89,10 +89,10 @@ export async function sendApplicationMails(opts: {
   statusUrl: string;
   uploadUrl?: string | null;
   pdf: MailAttachment;
-}): Promise<{ applicantSent: boolean; clubSent: boolean; records: ApplicationEmailRecord[] }> {
+}): Promise<{ applicantSent: boolean; clubSent: boolean; records: EmailLogEntry[] }> {
   let applicantSent = false;
   let clubSent = false;
-  const records: ApplicationEmailRecord[] = [];
+  const records: EmailLogEntry[] = [];
 
   const applicantSubject = `Ihre Beitrittserklärung – ${opts.vereinsname}`;
   if (opts.applicantEmail) {
@@ -124,7 +124,7 @@ export async function sendApplicationMails(opts: {
       logger.warn("application.mail.applicant_failed", { reason: res.reason });
     }
     records.push({
-      kind: "confirmation",
+      kind: EMAIL_KIND.antragConfirmation,
       status: res.ok ? "sent" : res.reason === "smtp_not_configured" ? "skipped" : "failed",
       recipient: opts.applicantEmail,
       subject: applicantSubject,
@@ -132,7 +132,7 @@ export async function sendApplicationMails(opts: {
     });
   } else {
     records.push({
-      kind: "confirmation",
+      kind: EMAIL_KIND.antragConfirmation,
       status: "skipped",
       subject: applicantSubject,
       detail: "no_recipient",
@@ -160,7 +160,7 @@ export async function sendApplicationMails(opts: {
         logger.warn("application.mail.club_failed", { reason: res.reason });
       }
       records.push({
-        kind: "club_notification",
+        kind: EMAIL_KIND.antragClubNotification,
         status: res.ok ? "sent" : res.reason === "smtp_not_configured" ? "skipped" : "failed",
         recipient: opts.clubEmail,
         subject: clubSubject,
@@ -168,7 +168,7 @@ export async function sendApplicationMails(opts: {
       });
     } else {
       records.push({
-        kind: "club_notification",
+        kind: EMAIL_KIND.antragClubNotification,
         status: "skipped",
         subject: clubSubject,
         detail: "no_recipient",

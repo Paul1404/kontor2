@@ -10,6 +10,7 @@ export * from "./document-sequences";
 export * from "./dsgvo";
 export * from "./dunning";
 export * from "./ehrungen";
+export * from "./email-log";
 export * from "./fee-runs";
 export * from "./fee-type-history";
 export * from "./fee-types";

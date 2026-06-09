@@ -57,6 +57,7 @@ import { Route as AppBerichteAbteilungsStatistikRouteImport } from './app/berich
 import { Route as AppBeitragNeuRouteImport } from './app/beitrag/neu'
 import { Route as AppBeitragIdRouteImport } from './app/beitrag/$id'
 import { Route as AppAntraegeIdRouteImport } from './app/antraege/$id'
+import { Route as AppAdminVersandprotokollRouteImport } from './app/admin/versandprotokoll'
 import { Route as AppAdminSnapshotsRouteImport } from './app/admin/snapshots'
 import { Route as AppAdminProtokollRouteImport } from './app/admin/protokoll'
 import { Route as AppAdminErweitertRouteImport } from './app/admin/erweitert'
@@ -321,6 +322,12 @@ const AppAntraegeIdRoute = AppAntraegeIdRouteImport.update({
   path: '/antraege/$id',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppAdminVersandprotokollRoute =
+  AppAdminVersandprotokollRouteImport.update({
+    id: '/admin/versandprotokoll',
+    path: '/admin/versandprotokoll',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 const AppAdminSnapshotsRoute = AppAdminSnapshotsRouteImport.update({
   id: '/admin/snapshots',
   path: '/admin/snapshots',
@@ -442,6 +449,7 @@ export interface FileRoutesByFullPath {
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/protokoll': typeof AppAdminProtokollRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
+  '/app/admin/versandprotokoll': typeof AppAdminVersandprotokollRoute
   '/app/antraege/$id': typeof AppAntraegeIdRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
@@ -505,6 +513,7 @@ export interface FileRoutesByTo {
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/protokoll': typeof AppAdminProtokollRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
+  '/app/admin/versandprotokoll': typeof AppAdminVersandprotokollRoute
   '/app/antraege/$id': typeof AppAntraegeIdRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
@@ -572,6 +581,7 @@ export interface FileRoutesById {
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/protokoll': typeof AppAdminProtokollRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
+  '/app/admin/versandprotokoll': typeof AppAdminVersandprotokollRoute
   '/app/antraege/$id': typeof AppAntraegeIdRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
@@ -640,6 +650,7 @@ export interface FileRouteTypes {
     | '/app/admin/erweitert'
     | '/app/admin/protokoll'
     | '/app/admin/snapshots'
+    | '/app/admin/versandprotokoll'
     | '/app/antraege/$id'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
@@ -703,6 +714,7 @@ export interface FileRouteTypes {
     | '/app/admin/erweitert'
     | '/app/admin/protokoll'
     | '/app/admin/snapshots'
+    | '/app/admin/versandprotokoll'
     | '/app/antraege/$id'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
@@ -769,6 +781,7 @@ export interface FileRouteTypes {
     | '/app/admin/erweitert'
     | '/app/admin/protokoll'
     | '/app/admin/snapshots'
+    | '/app/admin/versandprotokoll'
     | '/app/antraege/$id'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
@@ -1157,6 +1170,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAntraegeIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/admin/versandprotokoll': {
+      id: '/app/admin/versandprotokoll'
+      path: '/admin/versandprotokoll'
+      fullPath: '/app/admin/versandprotokoll'
+      preLoaderRoute: typeof AppAdminVersandprotokollRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/admin/snapshots': {
       id: '/app/admin/snapshots'
       path: '/admin/snapshots'
@@ -1302,6 +1322,7 @@ interface AppRouteRouteChildren {
   AppAdminErweitertRoute: typeof AppAdminErweitertRoute
   AppAdminProtokollRoute: typeof AppAdminProtokollRoute
   AppAdminSnapshotsRoute: typeof AppAdminSnapshotsRoute
+  AppAdminVersandprotokollRoute: typeof AppAdminVersandprotokollRoute
   AppAntraegeIdRoute: typeof AppAntraegeIdRoute
   AppBeitragIdRoute: typeof AppBeitragIdRoute
   AppBeitragNeuRoute: typeof AppBeitragNeuRoute
@@ -1347,6 +1368,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAdminErweitertRoute: AppAdminErweitertRoute,
   AppAdminProtokollRoute: AppAdminProtokollRoute,
   AppAdminSnapshotsRoute: AppAdminSnapshotsRoute,
+  AppAdminVersandprotokollRoute: AppAdminVersandprotokollRoute,
   AppAntraegeIdRoute: AppAntraegeIdRoute,
   AppBeitragIdRoute: AppBeitragIdRoute,
   AppBeitragNeuRoute: AppBeitragNeuRoute,

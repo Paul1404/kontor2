@@ -8,6 +8,7 @@ import { sendInviteEmail } from "~/server/auth/send-invite";
 import { completeSetup, isInSetupMode } from "~/server/auth/setup";
 import { invitations, roleEnum, users } from "~/server/db/schema/auth";
 import { env } from "~/server/env";
+import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { adminProc, authedProc, publicProc } from "~/server/orpc/base";
 
 /** SHA-256 hex of the raw invite token; only the hash is persisted. */
@@ -159,6 +160,19 @@ export const authRouter = {
         invitedByName: context.session!.user.name ?? context.session!.user.email,
         role: input.role,
       });
+      await recordEmail(
+        {
+          kind: EMAIL_KIND.invite,
+          ...statusFromSend(result),
+          recipient: input.email,
+          subject: "Einladung zur SVUWV Vereinsverwaltung",
+          entityType: "invitation",
+          entityId: inv!.id,
+          actorEmail: context.session!.user.email,
+          requestId: context.requestId ?? null,
+        },
+        context.db,
+      );
 
       await appendAudit(context.db, {
         entityType: "invitation",

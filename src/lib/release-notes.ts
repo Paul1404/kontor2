@@ -43,8 +43,13 @@ export const RELEASES: Release[] = [
   {
     version: "0.35.0",
     date: "2026-06-09",
-    title: "Anträge: Gegenzeichnung, E-Mail-Verlauf, Dokumente",
+    title: "Versandprotokoll, Gegenzeichnung und Antrags-Dokumente",
     changes: [
+      {
+        category: "feature",
+        description:
+          "Neues Versandprotokoll unter Verwaltung: alle von der App versendeten E-Mails an einer Stelle, mit Status (versendet, übersprungen, fehlgeschlagen). Erfasst werden Antragsbestätigungen, Vereinsbenachrichtigungen, Genehmigungen und Ablehnungen, Mahnungen, Benutzereinladungen, Portalzugänge und Test-E-Mails.",
+      },
       {
         category: "feature",
         description:
@@ -53,7 +58,7 @@ export const RELEASES: Release[] = [
       {
         category: "feature",
         description:
-          "Die Antrags-Detailseite zeigt jetzt alle erzeugten Dokumente zum Öffnen sowie einen E-Mail-Verlauf: ob Bestätigung, Benachrichtigung, Genehmigung und Ablehnung versendet, übersprungen oder fehlgeschlagen sind.",
+          "Die Antrags-Detailseite zeigt jetzt alle erzeugten Dokumente zum Öffnen sowie den E-Mail-Verlauf des Antrags aus dem Versandprotokoll.",
       },
       {
         category: "internal",
