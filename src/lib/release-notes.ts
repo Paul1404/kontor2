@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.35.0",
+    date: "2026-06-09",
+    title: "Anträge: Gegenzeichnung, E-Mail-Verlauf, Dokumente",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Der Vorstand kann eine Gegenzeichnung als Bild hinterlegen. Sie wird beim Genehmigen in die Beitrittserklärung eingebettet, zusammen mit der Unterschrift des Antragstellers, und dem Antragsteller als genehmigtes PDF zugeschickt.",
+      },
+      {
+        category: "feature",
+        description:
+          "Die Antrags-Detailseite zeigt jetzt alle erzeugten Dokumente zum Öffnen sowie einen E-Mail-Verlauf: ob Bestätigung, Benachrichtigung, Genehmigung und Ablehnung versendet, übersprungen oder fehlgeschlagen sind.",
+      },
+      {
+        category: "internal",
+        description:
+          "Neuer Generator für Testanträge und ein Hinweis, dass die alte svums-Schnittstelle abgelöst ist.",
+      },
+    ],
+  },
+  {
     version: "0.34.1",
     date: "2026-06-09",
     changes: [

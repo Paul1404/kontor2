@@ -1,8 +1,24 @@
+/**
+ * DEPRECATED -- svums push ingest pipeline (sunset).
+ *
+ * This endpoint accepted a signed batch push from the standalone "svums" app,
+ * back when svums owned the public membership application and fed new members
+ * into svuwv. svuwv now hosts the Beitrittserklärung natively at `/antrag`:
+ * an applicant submits, the Vorstand reviews under `/app/antraege`, and
+ * approval onboards the member directly. The svums round-trip is no longer the
+ * intended path for new members.
+ *
+ * The endpoint stays live only so an already-deployed svums sender does not
+ * start erroring mid-migration; it logs a deprecation warning on every call.
+ * Once no svums instance is pushing anymore, remove this route together with
+ * the `svums_push` ingest source and the `SVUMS_PUSH_SECRET` env var.
+ */
 import { createFileRoute } from "@tanstack/react-router";
 import { verifySignature } from "~/server/crypto/hmac";
 import { db } from "~/server/db/client";
 import { env } from "~/server/env";
 import { runIngest } from "~/server/importer/ingest-pipeline";
+import { logger } from "~/server/lib/logger";
 import { acquireNonce, rateLimit } from "~/server/redis/client";
 
 // Mirror the 50 MB cap the interactive SQL-dump import enforces, so a
@@ -58,6 +74,13 @@ async function handle({ request }: { request: Request }): Promise<Response> {
       headers: { "content-type": "application/json" },
     });
   }
+
+  // Sunset: a verified push still works, but the native /antrag flow has
+  // replaced this path. Warn so we can tell when no svums sender is left.
+  logger.warn("ingest.svums.deprecated", {
+    requestId: request.headers.get("x-request-id"),
+    note: "svums push pipeline is deprecated; new members come via /antrag",
+  });
 
   let payload: {
     batch?: { svumsBatchId?: string; at?: string };
