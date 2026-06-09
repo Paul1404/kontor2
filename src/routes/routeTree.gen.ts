@@ -13,9 +13,11 @@ import { Route as SetupRouteImport } from './setup'
 import { Route as LoginRouteImport } from './login'
 import { Route as PortalRouteRouteImport } from './portal/route'
 import { Route as AppRouteRouteImport } from './app/route'
+import { Route as AntragRouteRouteImport } from './antrag/route'
 import { Route as IndexRouteImport } from './index'
 import { Route as PortalIndexRouteImport } from './portal/index'
 import { Route as AppIndexRouteImport } from './app/index'
+import { Route as AntragIndexRouteImport } from './antrag/index'
 import { Route as PortalProfilRouteImport } from './portal/profil'
 import { Route as PortalAbgemeldetRouteImport } from './portal/abgemeldet'
 import { Route as PortalAbgelaufenRouteImport } from './portal/abgelaufen'
@@ -30,6 +32,7 @@ import { Route as AppImportRouteImport } from './app/import'
 import { Route as AppDatenqualitaetRouteImport } from './app/datenqualitaet'
 import { Route as AppAuditRouteImport } from './app/audit'
 import { Route as ApiHealthRouteImport } from './api/health'
+import { Route as AntragStatusRouteImport } from './antrag/status'
 import { Route as AppMitgliederIndexRouteImport } from './app/mitglieder/index'
 import { Route as AppForderungenIndexRouteImport } from './app/forderungen/index'
 import { Route as AppDsgvoIndexRouteImport } from './app/dsgvo/index'
@@ -88,6 +91,11 @@ const AppRouteRoute = AppRouteRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AntragRouteRoute = AntragRouteRouteImport.update({
+  id: '/antrag',
+  path: '/antrag',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -102,6 +110,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRouteRoute,
+} as any)
+const AntragIndexRoute = AntragIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AntragRouteRoute,
 } as any)
 const PortalProfilRoute = PortalProfilRouteImport.update({
   id: '/profil',
@@ -172,6 +185,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AntragStatusRoute = AntragStatusRouteImport.update({
+  id: '/status',
+  path: '/status',
+  getParentRoute: () => AntragRouteRoute,
 } as any)
 const AppMitgliederIndexRoute = AppMitgliederIndexRouteImport.update({
   id: '/mitglieder/',
@@ -373,10 +391,12 @@ const ApiPortalZugangTokenRoute = ApiPortalZugangTokenRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/antrag': typeof AntragRouteRouteWithChildren
   '/app': typeof AppRouteRouteWithChildren
   '/portal': typeof PortalRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
@@ -391,6 +411,7 @@ export interface FileRoutesByFullPath {
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
   '/portal/profil': typeof PortalProfilRoute
+  '/antrag/': typeof AntragIndexRoute
   '/app/': typeof AppIndexRoute
   '/portal/': typeof PortalIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -435,6 +456,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
@@ -449,6 +471,7 @@ export interface FileRoutesByTo {
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
   '/portal/profil': typeof PortalProfilRoute
+  '/antrag': typeof AntragIndexRoute
   '/app': typeof AppIndexRoute
   '/portal': typeof PortalIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -492,10 +515,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/antrag': typeof AntragRouteRouteWithChildren
   '/app': typeof AppRouteRouteWithChildren
   '/portal': typeof PortalRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
@@ -510,6 +535,7 @@ export interface FileRoutesById {
   '/portal/abgelaufen': typeof PortalAbgelaufenRoute
   '/portal/abgemeldet': typeof PortalAbgemeldetRoute
   '/portal/profil': typeof PortalProfilRoute
+  '/antrag/': typeof AntragIndexRoute
   '/app/': typeof AppIndexRoute
   '/portal/': typeof PortalIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -554,10 +580,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/antrag'
     | '/app'
     | '/portal'
     | '/login'
     | '/setup'
+    | '/antrag/status'
     | '/api/health'
     | '/app/audit'
     | '/app/datenqualitaet'
@@ -572,6 +600,7 @@ export interface FileRouteTypes {
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
     | '/portal/profil'
+    | '/antrag/'
     | '/app/'
     | '/portal/'
     | '/api/auth/$'
@@ -616,6 +645,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/setup'
+    | '/antrag/status'
     | '/api/health'
     | '/app/audit'
     | '/app/datenqualitaet'
@@ -630,6 +660,7 @@ export interface FileRouteTypes {
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
     | '/portal/profil'
+    | '/antrag'
     | '/app'
     | '/portal'
     | '/api/auth/$'
@@ -672,10 +703,12 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/antrag'
     | '/app'
     | '/portal'
     | '/login'
     | '/setup'
+    | '/antrag/status'
     | '/api/health'
     | '/app/audit'
     | '/app/datenqualitaet'
@@ -690,6 +723,7 @@ export interface FileRouteTypes {
     | '/portal/abgelaufen'
     | '/portal/abgemeldet'
     | '/portal/profil'
+    | '/antrag/'
     | '/app/'
     | '/portal/'
     | '/api/auth/$'
@@ -733,6 +767,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AntragRouteRoute: typeof AntragRouteRouteWithChildren
   AppRouteRoute: typeof AppRouteRouteWithChildren
   PortalRouteRoute: typeof PortalRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
@@ -778,6 +813,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/antrag': {
+      id: '/antrag'
+      path: '/antrag'
+      fullPath: '/antrag'
+      preLoaderRoute: typeof AntragRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -798,6 +840,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/'
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRouteRoute
+    }
+    '/antrag/': {
+      id: '/antrag/'
+      path: '/'
+      fullPath: '/antrag/'
+      preLoaderRoute: typeof AntragIndexRouteImport
+      parentRoute: typeof AntragRouteRoute
     }
     '/portal/profil': {
       id: '/portal/profil'
@@ -896,6 +945,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/antrag/status': {
+      id: '/antrag/status'
+      path: '/status'
+      fullPath: '/antrag/status'
+      preLoaderRoute: typeof AntragStatusRouteImport
+      parentRoute: typeof AntragRouteRoute
     }
     '/app/mitglieder/': {
       id: '/app/mitglieder/'
@@ -1159,6 +1215,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AntragRouteRouteChildren {
+  AntragStatusRoute: typeof AntragStatusRoute
+  AntragIndexRoute: typeof AntragIndexRoute
+}
+
+const AntragRouteRouteChildren: AntragRouteRouteChildren = {
+  AntragStatusRoute: AntragStatusRoute,
+  AntragIndexRoute: AntragIndexRoute,
+}
+
+const AntragRouteRouteWithChildren = AntragRouteRoute._addFileChildren(
+  AntragRouteRouteChildren,
+)
+
 interface AppRouteRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppDatenqualitaetRoute: typeof AppDatenqualitaetRoute
@@ -1270,6 +1340,7 @@ const PortalRouteRouteWithChildren = PortalRouteRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AntragRouteRoute: AntragRouteRouteWithChildren,
   AppRouteRoute: AppRouteRouteWithChildren,
   PortalRouteRoute: PortalRouteRouteWithChildren,
   LoginRoute: LoginRoute,

@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.33.0",
+    date: "2026-06-09",
+    title: "Online-Aufnahmeantrag",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neue Beitrittserklärungen können online unter /antrag gestellt werden. Das Formular führt in drei Schritten durch Mitgliedsdaten, SEPA-Lastschrift und Zusammenfassung, erkennt Einzel-, Kind- und Familienanträge automatisch, berechnet den Jahresbeitrag und nimmt die Unterschrift direkt entgegen oder schickt die Erklärung per E-Mail zum Unterschreiben.",
+      },
+      {
+        category: "feature",
+        description:
+          "Unter /antrag/status können Antragsteller mit ihrer Antragsnummer jederzeit den Bearbeitungsstand einsehen.",
+      },
+    ],
+  },
+  {
     version: "0.32.0",
     date: "2026-06-09",
     title: "Aufnahmeantrag: Grundlagen",
