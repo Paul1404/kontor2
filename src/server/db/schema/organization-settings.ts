@@ -1,6 +1,32 @@
-import { boolean, integer, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
 import { encryptedText } from "~/server/db/types";
+
+/**
+ * Age-bucket annual fees for the online membership application
+ * (Beitragsstaffel). Amounts are euro decimal strings. `kind` and `jugendlich`
+ * have two rates depending on whether a parent is already a member; the other
+ * categories have a single rate. Defaults mirror the legacy svums schedule.
+ */
+export type Beitragsstaffel = {
+  familie: string;
+  kind: string;
+  kindElternMitglied: string;
+  jugendlich: string;
+  jugendlichElternMitglied: string;
+  jungerErwachsener: string;
+  erwachsener: string;
+};
+
+export const DEFAULT_BEITRAGSSTAFFEL: Beitragsstaffel = {
+  familie: "96.00",
+  kind: "24.00",
+  kindElternMitglied: "12.00",
+  jugendlich: "36.00",
+  jugendlichElternMitglied: "24.00",
+  jungerErwachsener: "42.00",
+  erwachsener: "54.00",
+};
 
 /**
  * Vereins-Stammdaten (singleton row, id = 1). Holds the data required to
@@ -67,6 +93,20 @@ export const organizationSettingsTable = pgTable("organization_settings", {
   kontaktTelefon: text("kontakt_telefon"),
   datenschutzUrl: text("datenschutz_url"),
   satzungUrl: text("satzung_url"),
+  /**
+   * Präfix der SEPA-Mandatsreferenz, die beim Genehmigen eines Online-Antrags
+   * vergeben wird (z. B. "SVU1945-"). Daraus wird `<prefix><jahr>-<nr>` gebaut.
+   */
+  mandatsreferenzPrefix: text("mandatsreferenz_prefix").notNull().default("SVUWV-"),
+  /** Altersabhängige Jahresbeiträge für den Online-Aufnahmeantrag. */
+  beitragsstaffel: jsonb("beitragsstaffel").$type<Beitragsstaffel>(),
+  /** Bei neuem Online-Antrag eine Benachrichtigung an den Verein senden? */
+  antragBenachrichtigungAktiv: boolean("antrag_benachrichtigung_aktiv").notNull().default(true),
+  /**
+   * Empfänger der Vereins-Benachrichtigung über neue Anträge. Leer: es wird auf
+   * `mitgliedschaftEmail`, dann `kontaktEmail` zurückgegriffen.
+   */
+  antragVorstandEmail: text("antrag_vorstand_email"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
 });

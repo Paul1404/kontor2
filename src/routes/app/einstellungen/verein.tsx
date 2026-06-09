@@ -15,6 +15,28 @@ export const Route = createFileRoute("/app/einstellungen/verein")({
 
 type Msg = { kind: "ok" | "error"; text: string };
 
+type Staffel = {
+  familie: string;
+  kind: string;
+  kindElternMitglied: string;
+  jugendlich: string;
+  jugendlichElternMitglied: string;
+  jungerErwachsener: string;
+  erwachsener: string;
+};
+
+// Local copy of the default schedule. The server schema also defines this, but
+// importing it here would pull server-only Drizzle code into the client bundle.
+const DEFAULT_STAFFEL: Staffel = {
+  familie: "96.00",
+  kind: "24.00",
+  kindElternMitglied: "12.00",
+  jugendlich: "36.00",
+  jugendlichElternMitglied: "24.00",
+  jungerErwachsener: "42.00",
+  erwachsener: "54.00",
+};
+
 function VereinsdatenPage() {
   const qc = useQueryClient();
   const cfg = useQuery({
@@ -48,6 +70,10 @@ function VereinsdatenPage() {
     kontaktTelefon: "",
     datenschutzUrl: "",
     satzungUrl: "",
+    mandatsreferenzPrefix: "SVUWV-",
+    beitragsstaffel: DEFAULT_STAFFEL,
+    antragBenachrichtigungAktiv: true,
+    antragVorstandEmail: "",
   });
   const [msg, setMsg] = useState<Msg | null>(null);
 
@@ -79,6 +105,10 @@ function VereinsdatenPage() {
         kontaktTelefon: cfg.data.kontaktTelefon ?? "",
         datenschutzUrl: cfg.data.datenschutzUrl ?? "",
         satzungUrl: cfg.data.satzungUrl ?? "",
+        mandatsreferenzPrefix: cfg.data.mandatsreferenzPrefix ?? "SVUWV-",
+        beitragsstaffel: cfg.data.beitragsstaffel ?? DEFAULT_STAFFEL,
+        antragBenachrichtigungAktiv: cfg.data.antragBenachrichtigungAktiv ?? true,
+        antragVorstandEmail: cfg.data.antragVorstandEmail ?? "",
       });
     }
   }, [cfg.data]);
@@ -111,6 +141,18 @@ function VereinsdatenPage() {
         kontaktTelefon: form.kontaktTelefon || null,
         datenschutzUrl: form.datenschutzUrl || null,
         satzungUrl: form.satzungUrl || null,
+        mandatsreferenzPrefix: form.mandatsreferenzPrefix || "SVUWV-",
+        beitragsstaffel: {
+          familie: normalizeMoney(form.beitragsstaffel.familie),
+          kind: normalizeMoney(form.beitragsstaffel.kind),
+          kindElternMitglied: normalizeMoney(form.beitragsstaffel.kindElternMitglied),
+          jugendlich: normalizeMoney(form.beitragsstaffel.jugendlich),
+          jugendlichElternMitglied: normalizeMoney(form.beitragsstaffel.jugendlichElternMitglied),
+          jungerErwachsener: normalizeMoney(form.beitragsstaffel.jungerErwachsener),
+          erwachsener: normalizeMoney(form.beitragsstaffel.erwachsener),
+        },
+        antragBenachrichtigungAktiv: form.antragBenachrichtigungAktiv,
+        antragVorstandEmail: form.antragVorstandEmail || null,
       }),
     onSuccess: () => {
       setMsg({ kind: "ok", text: "Vereinsdaten gespeichert." });
@@ -456,6 +498,126 @@ function VereinsdatenPage() {
               </div>
             </div>
 
+            <div className="md:col-span-2">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Aufnahmeantrag (Online)
+              </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Steuert das öffentliche Antragsformular unter /antrag: Mandatsreferenz,
+                Jahresbeiträge je Alterskategorie und die Benachrichtigung über neue Anträge.
+              </p>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <Field
+                  label="Mandatsreferenz-Präfix"
+                  hint="Daraus wird die Mandatsreferenz gebaut, z. B. SVU1945-"
+                >
+                  <Input
+                    value={form.mandatsreferenzPrefix}
+                    onChange={(e) => setForm({ ...form, mandatsreferenzPrefix: e.target.value })}
+                    placeholder="SVU1945-"
+                  />
+                </Field>
+                <Field
+                  label="Benachrichtigung an den Verein"
+                  hint="Bei jedem neuen Online-Antrag eine E-Mail an den Verein senden."
+                >
+                  <Select
+                    value={form.antragBenachrichtigungAktiv ? "ja" : "nein"}
+                    onChange={(e) =>
+                      setForm({ ...form, antragBenachrichtigungAktiv: e.target.value === "ja" })
+                    }
+                  >
+                    <option value="ja">An</option>
+                    <option value="nein">Aus</option>
+                  </Select>
+                </Field>
+                <Field
+                  label="Vereins-E-Mail für Anträge"
+                  hint="Empfänger der Antrags-Benachrichtigung. Leer: es wird die Mitgliedschaft-E-Mail verwendet."
+                >
+                  <Input
+                    type="email"
+                    value={form.antragVorstandEmail}
+                    onChange={(e) => setForm({ ...form, antragVorstandEmail: e.target.value })}
+                    placeholder="mitgliedschaft@verein.de"
+                  />
+                </Field>
+              </div>
+              <h4 className="mb-3 mt-5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Jahresbeiträge je Kategorie in €
+              </h4>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <StaffelField
+                  label="Familie"
+                  value={form.beitragsstaffel.familie}
+                  onChange={(val) =>
+                    setForm({ ...form, beitragsstaffel: { ...form.beitragsstaffel, familie: val } })
+                  }
+                />
+                <StaffelField
+                  label="Erwachsene"
+                  value={form.beitragsstaffel.erwachsener}
+                  onChange={(val) =>
+                    setForm({
+                      ...form,
+                      beitragsstaffel: { ...form.beitragsstaffel, erwachsener: val },
+                    })
+                  }
+                />
+                <StaffelField
+                  label="Junge Erwachsene (bis 25)"
+                  value={form.beitragsstaffel.jungerErwachsener}
+                  onChange={(val) =>
+                    setForm({
+                      ...form,
+                      beitragsstaffel: { ...form.beitragsstaffel, jungerErwachsener: val },
+                    })
+                  }
+                />
+                <div />
+                <StaffelField
+                  label="Jugendliche (bis 18), kein Elternteil Mitglied"
+                  value={form.beitragsstaffel.jugendlich}
+                  onChange={(val) =>
+                    setForm({
+                      ...form,
+                      beitragsstaffel: { ...form.beitragsstaffel, jugendlich: val },
+                    })
+                  }
+                />
+                <StaffelField
+                  label="Jugendliche (bis 18), 1 Elternteil Mitglied"
+                  value={form.beitragsstaffel.jugendlichElternMitglied}
+                  onChange={(val) =>
+                    setForm({
+                      ...form,
+                      beitragsstaffel: {
+                        ...form.beitragsstaffel,
+                        jugendlichElternMitglied: val,
+                      },
+                    })
+                  }
+                />
+                <StaffelField
+                  label="Kinder (bis 14), kein Elternteil Mitglied"
+                  value={form.beitragsstaffel.kind}
+                  onChange={(val) =>
+                    setForm({ ...form, beitragsstaffel: { ...form.beitragsstaffel, kind: val } })
+                  }
+                />
+                <StaffelField
+                  label="Kinder (bis 14), 1 Elternteil Mitglied"
+                  value={form.beitragsstaffel.kindElternMitglied}
+                  onChange={(val) =>
+                    setForm({
+                      ...form,
+                      beitragsstaffel: { ...form.beitragsstaffel, kindElternMitglied: val },
+                    })
+                  }
+                />
+              </div>
+            </div>
+
             <div className="md:col-span-2 flex flex-wrap items-center justify-end gap-3 border-t border-border pt-5">
               <Button type="submit" disabled={save.isPending}>
                 {save.isPending ? (
@@ -481,6 +643,27 @@ function Select({ className, children, ...props }: React.SelectHTMLAttributes<HT
     >
       {children}
     </select>
+  );
+}
+
+function StaffelField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+}) {
+  return (
+    <Field label={label}>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(",", "."))}
+        inputMode="decimal"
+        placeholder="0,00"
+      />
+    </Field>
   );
 }
 

@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.32.0",
+    date: "2026-06-09",
+    title: "Aufnahmeantrag: Grundlagen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Vereinsdaten haben einen neuen Abschnitt „Aufnahmeantrag“. Dort lassen sich die Jahresbeiträge je Alterskategorie, das Mandatsreferenz-Präfix und die Benachrichtigung über neue Anträge festlegen. Das ist die Grundlage für das kommende Online-Antragsformular.",
+      },
+    ],
+  },
+  {
     version: "0.31.0",
     date: "2026-06-09",
     title: "Ruhend und Beitragsbefreiung",

@@ -19,6 +19,7 @@ export * from "./legacy-sepa";
 export * from "./linear-lookups";
 export * from "./member-source-records";
 export * from "./members";
+export * from "./membership-applications";
 export * from "./organization-settings";
 export * from "./portal";
 export * from "./relationships";
