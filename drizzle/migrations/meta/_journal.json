@@ -302,6 +302,13 @@
       "when": 1780993682499,
       "tag": "0042_outgoing_jetstream",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1780995881842,
+      "tag": "0043_left_scalphunter",
+      "breakpoints": true
     }
   ]
 }

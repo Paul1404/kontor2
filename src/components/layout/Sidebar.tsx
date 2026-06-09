@@ -52,6 +52,12 @@ const SECTIONS: NavSection[] = [
       { to: "/app", label: "Dashboard", icon: <LayoutDashboard className="size-[18px]" /> },
       { to: "/app/mitglieder", label: "Mitglieder", icon: <Users className="size-[18px]" /> },
       {
+        to: "/app/antraege",
+        label: "Anträge",
+        icon: <Inbox className="size-[18px]" />,
+        vorstandOnly: true,
+      },
+      {
         to: "/app/netzwerk",
         label: "Netzwerk",
         icon: <Share2 className="size-[18px]" />,

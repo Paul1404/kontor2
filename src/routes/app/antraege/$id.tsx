@@ -1,0 +1,255 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { ArrowLeft, Ban, CheckCircle2, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { QueryError } from "~/components/ui/query-error";
+import { Textarea } from "~/components/ui/textarea";
+import { orpc } from "~/lib/orpc";
+
+export const Route = createFileRoute("/app/antraege/$id")({
+  component: AntragDetailPage,
+});
+
+function fmtDate(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("de-DE");
+}
+
+function AntragDetailPage() {
+  const { id } = Route.useParams();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+
+  const detail = useQuery({
+    queryKey: ["applications.get", id],
+    queryFn: () => orpc.applications.get({ id }),
+  });
+  const feeTypes = useQuery({
+    queryKey: ["feeTypes.list"],
+    queryFn: () => orpc.feeTypes.list(),
+  });
+
+  const [art, setArt] = useState<number | "">("");
+  const [betrag, setBetrag] = useState("");
+  const [declineReason, setDeclineReason] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["applications.get", id] });
+    qc.invalidateQueries({ queryKey: ["applications.list"] });
+  };
+
+  const approve = useMutation({
+    mutationFn: () =>
+      orpc.applications.approve({
+        id,
+        art: art === "" ? null : Number(art),
+        betrag: betrag.trim() || null,
+      }),
+    onSuccess: (res) => {
+      setMsg(`Genehmigt. Mitgliedsnummer: ${res.mitgliedsnummer}`);
+      invalidate();
+    },
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Genehmigung fehlgeschlagen."),
+  });
+
+  const decline = useMutation({
+    mutationFn: () => orpc.applications.decline({ id, reason: declineReason.trim() }),
+    onSuccess: () => {
+      setMsg("Antrag abgelehnt.");
+      invalidate();
+    },
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Ablehnung fehlgeschlagen."),
+  });
+
+  if (detail.isError) {
+    return (
+      <QueryError
+        title="Antrag konnte nicht geladen werden"
+        error={detail.error}
+        onRetry={() => detail.refetch()}
+      />
+    );
+  }
+  if (detail.isLoading || !detail.data) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
+        <Loader2 className="size-5 animate-spin" />
+      </div>
+    );
+  }
+
+  const a = detail.data;
+  const terminal = a.status === "genehmigt" || a.status === "abgelehnt";
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Link
+          to="/app/antraege"
+          className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" /> Zurück zur Liste
+        </Link>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {a.vorname} {a.nachname}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {a.antragsnummer} · {a.antragstyp} · Status: {a.status}
+        </p>
+      </div>
+
+      {msg ? (
+        <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">{msg}</div>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Antragsdaten</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+          <Row label="Geburtsdatum">{fmtDate(a.geburtsdatum)}</Row>
+          <Row label="E-Mail">{a.email ?? "—"}</Row>
+          <Row label="Telefon">{a.telefon ?? "—"}</Row>
+          <Row label="Anschrift">
+            {[a.strasse, a.hausnummer].filter(Boolean).join(" ")} {a.plz} {a.ort}
+          </Row>
+          <Row label="Mitgliedschaft">{a.mitgliedschaftTyp}</Row>
+          <Row label="Jahresbeitrag">{a.jahresbeitrag ? `${a.jahresbeitrag} €` : "—"}</Row>
+          <Row label="IBAN">{a.ibanMasked ?? "—"}</Row>
+          <Row label="Mandatsreferenz">{a.mandatsreferenz ?? "—"}</Row>
+          {a.erziehungsberechtigterVorname ? (
+            <Row label="Gesetzliche Vertretung">
+              {a.erziehungsberechtigterVorname} {a.erziehungsberechtigterNachname}
+            </Row>
+          ) : null}
+          {a.mitgliedsnummer ? <Row label="Mitgliedsnummer">{a.mitgliedsnummer}</Row> : null}
+        </CardContent>
+      </Card>
+
+      {!terminal ? (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle2 className="size-5 text-success" /> Genehmigen
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                Legt ein Mitglied an (bei Familie inklusive Partner und Kindern) und übernimmt die
+                Bankverbindung als SEPA-Mandat. Optional wird ein Beitragsvertrag erstellt.
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Label className="flex flex-col gap-1.5">
+                  <span>Beitragsart (optional)</span>
+                  <select
+                    value={art}
+                    onChange={(e) => setArt(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="">Kein Vertrag</option>
+                    {feeTypes.data?.map((f) => (
+                      <option key={f.art} value={f.art}>
+                        {f.bezeichnung ?? `Art ${f.art}`}
+                      </option>
+                    ))}
+                  </select>
+                </Label>
+                <Label className="flex flex-col gap-1.5">
+                  <span>Betrag (EUR)</span>
+                  <Input
+                    inputMode="decimal"
+                    placeholder={a.jahresbeitrag ?? "z. B. 54,00"}
+                    value={betrag}
+                    onChange={(e) => setBetrag(e.target.value)}
+                  />
+                </Label>
+              </div>
+              <Button
+                type="button"
+                className="self-start"
+                disabled={approve.isPending}
+                onClick={() => {
+                  setMsg(null);
+                  approve.mutate();
+                }}
+              >
+                {approve.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-4" />
+                )}
+                Genehmigen und Mitglied anlegen
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Ban className="size-5 text-destructive" /> Ablehnen
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <Label className="flex flex-col gap-1.5">
+                <span>Begründung (wird dem Antragsteller per E-Mail mitgeteilt)</span>
+                <Textarea
+                  value={declineReason}
+                  onChange={(e) => setDeclineReason(e.target.value)}
+                  rows={3}
+                />
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                className="self-start"
+                disabled={decline.isPending || declineReason.trim().length === 0}
+                onClick={() => {
+                  setMsg(null);
+                  decline.mutate();
+                }}
+              >
+                {decline.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Ban className="size-4" />
+                )}
+                Ablehnen
+              </Button>
+            </CardContent>
+          </Card>
+        </>
+      ) : a.status === "genehmigt" && a.memberId ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="self-start"
+          onClick={() =>
+            navigate({
+              to: "/app/mitglieder/$mitgliedsnummer",
+              params: { mitgliedsnummer: a.mitgliedsnummer?.split(",")[0]?.trim() ?? "" },
+            })
+          }
+        >
+          Zum Mitglied
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-4 border-b border-border/60 py-1.5 last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-right font-medium">{children}</span>
+    </div>
+  );
+}

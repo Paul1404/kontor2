@@ -47,7 +47,17 @@ on Railway via Dockerfile.
 ## Commands
 
 - `bun run verify` -- typecheck + biome ci + tests + build. Run before pushing.
-- `bun test`, `bun run typecheck`, `bun run check` (biome autofix).
+- `bun run test` runs Vitest. Unit tests live in `tests/` (mirroring `src/`);
+  the config only globs `tests/**`, so a test placed next to its source under
+  `src/` will NOT run in CI. Put unit tests in `tests/`.
+- `bun run test:int` -- integration tests against a real Postgres + Redis.
+  Needs Docker: brings up `docker-compose.test.yml` (tmpfs, ports 5433/6380),
+  applies migrations, runs `tests/integration/**` with the test env wired in
+  (`scripts/test-db.ts`). `test:db:up` / `test:db:down` manage the stack by
+  hand. Integration tests are excluded from the fast suite and self-skip unless
+  `DATABASE_URL` points at `svuwv_test`; CI runs them as a separate job with
+  service containers.
+- `bun run typecheck`, `bun run check` (biome autofix).
 - `bun run db:generate` -- generate a migration from schema changes. Commit the
   SQL file; never hand-edit generated migrations. `db:migrate` applies them.
 - `bun run routes:regen` -- regenerate the route tree after adding routes.

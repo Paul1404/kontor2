@@ -41,6 +41,73 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.34.1",
+    date: "2026-06-09",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Das Annehmen einer Einladung legt das Benutzerkonto wieder korrekt an. Die voreingestellte Rolle war nicht erlaubt und führte beim Speichern zu einem Fehler.",
+      },
+    ],
+  },
+  {
+    version: "0.34.0",
+    date: "2026-06-09",
+    title: "Anträge bearbeiten",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neuer Bereich „Anträge“ in der Seitenleiste. Eingegangene Online-Aufnahmeanträge lassen sich dort suchen, filtern und im Detail ansehen.",
+      },
+      {
+        category: "feature",
+        description:
+          "Ein Antrag kann genehmigt werden: Daraus entsteht ein Mitglied (bei Familienanträgen inklusive Partner und Kindern) mit Bankverbindung als SEPA-Mandat und optionalem Beitragsvertrag. Eine Ablehnung mit Begründung wird dem Antragsteller per E-Mail mitgeteilt.",
+      },
+      {
+        category: "feature",
+        description:
+          "Wer die Beitrittserklärung lieber auf Papier unterschreibt, bekommt sie per E-Mail und kann den unterschriebenen Scan über einen Link (30 Tage gültig) wieder hochladen.",
+      },
+    ],
+  },
+  {
+    version: "0.33.0",
+    date: "2026-06-09",
+    title: "Online-Aufnahmeantrag",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neue Beitrittserklärungen können online unter /antrag gestellt werden. Das Formular führt in drei Schritten durch Mitgliedsdaten, SEPA-Lastschrift und Zusammenfassung, erkennt Einzel-, Kind- und Familienanträge automatisch, berechnet den Jahresbeitrag und nimmt die Unterschrift direkt entgegen oder schickt die Erklärung per E-Mail zum Unterschreiben.",
+      },
+      {
+        category: "feature",
+        description:
+          "Unter /antrag/status können Antragsteller mit ihrer Antragsnummer jederzeit den Bearbeitungsstand einsehen.",
+      },
+    ],
+  },
+  {
+    version: "0.32.0",
+    date: "2026-06-09",
+    title: "Aufnahmeantrag: Grundlagen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Vereinsdaten haben einen neuen Abschnitt „Aufnahmeantrag“. Dort lassen sich die Jahresbeiträge je Alterskategorie, das Mandatsreferenz-Präfix und die Benachrichtigung über neue Anträge festlegen. Das ist die Grundlage für das kommende Online-Antragsformular.",
+      },
+      {
+        category: "internal",
+        description:
+          "Verarbeitung für eingehende Aufnahmeanträge: Beitrag und Kategorie werden automatisch aus dem Geburtsdatum bestimmt, die Beitrittserklärung als PDF erzeugt und an Antragsteller und Verein versendet.",
+      },
+    ],
+  },
+  {
     version: "0.31.0",
     date: "2026-06-09",
     title: "Ruhend und Beitragsbefreiung",

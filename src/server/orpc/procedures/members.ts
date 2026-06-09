@@ -24,6 +24,7 @@ import { organizationSettingsTable } from "~/server/db/schema/organization-setti
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { deriveGeschlecht, deriveStatus, type MemberStatus } from "~/server/domain/member";
+import { onboardMember } from "~/server/domain/member/onboard";
 import { generateMemberNumber } from "~/server/domain/member-number";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
 import {
@@ -1662,142 +1663,50 @@ export const membersRouter = {
       const eintrittIso = patch.eintritt instanceof Date ? toIsoDay(patch.eintritt) : null;
       const fallbackEintritt = eintrittIso ?? new Date().toISOString().slice(0, 10);
       const isKontakt = input.kind === "kontakt";
+      const status = memberStatusFromForm(
+        input.patch.aktivPasiv,
+        (patch.austritt as Date | null) ?? null,
+        (patch.verstorbenAm as Date | null) ?? null,
+      );
+
+      // Validate Betrag and dates up front (before the transaction) so a bad
+      // value fails fast and is not re-checked on each unique-collision retry.
+      const contract = input.contract
+        ? {
+            art: input.contract.art,
+            artName: input.contract.artName ?? null,
+            vertragNr: input.contract.vertragNr ?? null,
+            betrag: validateBetragString(input.contract.betrag, "Betrag"),
+            sollstellung: input.contract.sollstellung ?? null,
+            vertragBegin: toDateOrNull(
+              input.contract.vertragBegin ?? eintrittIso,
+              "Vertragsbeginn",
+            ),
+          }
+        : null;
+      const sepa = input.sepa
+        ? {
+            mandatsNr: input.sepa.mandatsNr ?? null,
+            unterschriftDatum: toDateOrNull(input.sepa.unterschriftDatum, "Unterschriftsdatum"),
+            gueltigAb: toDateOrNull(input.sepa.gueltigAb ?? eintrittIso, "Gültig ab"),
+          }
+        : null;
 
       const result = await withUniqueRetry(() =>
-        context.db.transaction(async (tx) => {
-          const [maxRow] = await tx
-            .select({
-              maxAdrNr: sql<number>`coalesce(max(${membersTable.adrNr}), 0)::int`,
-            })
-            .from(membersTable);
-          const nextAdrNr = (maxRow?.maxAdrNr ?? 0) + 1;
-          // Mint the opaque app-owned number for the chosen namespace. The
-          // partial unique index + withUniqueRetry handle the rare collision.
-          const memberNo = isKontakt ? null : generateMemberNumber("member");
-          const kontaktNo = isKontakt ? generateMemberNumber("kontakt") : null;
-          const ref = (memberNo ?? kontaktNo) as string;
-
-          const now = new Date();
-          const cleanCols = {
-            memberNo,
-            kontaktNo,
-            status: memberStatusFromForm(
-              input.patch.aktivPasiv,
-              (patch.austritt as Date | null) ?? null,
-              (patch.verstorbenAm as Date | null) ?? null,
-            ),
-            dunningBlocked: false,
-            directDebitBlocked: false,
-          };
-          const [inserted] = await tx
-            .insert(membersTable)
-            .values({
-              ...(patch as Record<string, unknown>),
-              adrNr: nextAdrNr,
-              ...cleanCols,
-              createdAt: now,
-              updatedAt: now,
-            } as never)
-            .returning({
-              id: membersTable.id,
-              memberNo: membersTable.memberNo,
-              kontaktNo: membersTable.kontaktNo,
-            });
-          if (!inserted) {
-            throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
-          }
-
-          // Departments. Validate the ids up front so a bad one fails clean
-          // instead of as an opaque FK error.
-          const abteilungIds = [...new Set(input.abteilungen.map((a) => a.abteilungId))];
-          if (abteilungIds.length > 0) {
-            const found = await tx
-              .select({ id: abteilungenTable.id })
-              .from(abteilungenTable)
-              .where(inArray(abteilungenTable.id, abteilungIds));
-            if (found.length !== abteilungIds.length) {
-              throw new ORPCError("NOT_FOUND", { message: "Abteilung nicht gefunden." });
-            }
-            for (const a of input.abteilungen) {
-              await tx
-                .insert(memberAbteilungenTable)
-                .values({
-                  memberId: inserted.id,
-                  abteilungId: a.abteilungId,
-                  eintrittsdatum: a.eintrittsdatum ?? fallbackEintritt,
-                })
-                .onConflictDoNothing();
-            }
-          }
-
-          // Optional first contract.
-          if (input.contract) {
-            await tx.insert(contractsTable).values({
-              memberId: inserted.id,
-              adrNr: nextAdrNr,
-              mitglNr: ref,
-              vertragNr:
-                input.contract.vertragNr && input.contract.vertragNr.trim().length > 0
-                  ? input.contract.vertragNr.trim()
-                  : "1",
-              art: input.contract.art,
-              artName: input.contract.artName ?? null,
-              betrag: validateBetragString(input.contract.betrag, "Betrag"),
-              sollstellung: input.contract.sollstellung ?? null,
-              vertragBegin: toDateOrNull(
-                input.contract.vertragBegin ?? eintrittIso,
-                "Vertragsbeginn",
-              ),
-            } as never);
-          }
-
-          // Optional first SEPA mandate.
-          if (input.sepa) {
-            await tx.insert(sepaMandatesTable).values({
-              memberId: inserted.id,
-              adrNr: nextAdrNr,
-              mandatsNr:
-                input.sepa.mandatsNr && input.sepa.mandatsNr.trim().length > 0
-                  ? input.sepa.mandatsNr.trim()
-                  : "M1",
-              angelegtAm: now,
-              unterschriftDatum: toDateOrNull(input.sepa.unterschriftDatum, "Unterschriftsdatum"),
-              gueltigAb: toDateOrNull(input.sepa.gueltigAb ?? eintrittIso, "Gültig ab"),
-            } as never);
-          }
-
-          const auditId = await appendAudit(tx, {
-            entityType: "member",
-            entityId: inserted.id,
-            action: "create",
-            source: "ui",
+        context.db.transaction((tx) =>
+          onboardMember(tx, {
+            patch,
+            isKontakt,
+            status,
+            abteilungen: input.abteilungen,
+            fallbackEintritt,
+            contract,
+            sepa,
             actorId,
             actorEmail,
-            changes: diff(null, {
-              ...patch,
-              adrNr: nextAdrNr,
-              ...cleanCols,
-              abteilungen: input.abteilungen.length,
-              vertrag: input.contract ? 1 : 0,
-              sepaMandat: input.sepa ? 1 : 0,
-            }),
             requestId: context.requestId ?? null,
-          });
-          await takeMemberSnapshot(tx, inserted.id, {
-            trigger: "mutation",
-            actorId,
-            actorEmail,
-            auditId,
-          });
-
-          return {
-            id: inserted.id,
-            memberNo: inserted.memberNo ?? memberNo,
-            kontaktNo: inserted.kontaktNo ?? kontaktNo,
-            ref,
-            adrNr: nextAdrNr,
-          };
-        }),
+          }),
+        ),
       );
 
       await invalidateMemberCaches();

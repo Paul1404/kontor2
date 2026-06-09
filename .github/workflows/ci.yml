@@ -39,6 +39,65 @@ jobs:
       - name: Build
         run: bun run build
 
+  integration:
+    name: integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: svuwv
+          POSTGRES_DB: svuwv_test
+          # Ephemeral CI service on localhost only; trust auth keeps any
+          # password out of the workflow file.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U svuwv -d svuwv_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://svuwv@localhost:5432/svuwv_test
+      REDIS_URL: redis://localhost:6379
+      BETTER_AUTH_URL: http://localhost:3000
+      # 64 hex zeros: valid APP_SECRET shape, no real secret.
+      APP_SECRET: "0000000000000000000000000000000000000000000000000000000000000000"
+      AWS_ENDPOINT_URL: http://localhost:9000
+      AWS_S3_BUCKET_NAME: svuwv-test
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      SNAPSHOT_CRON_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Apply migrations
+        run: bun scripts/migrate.prod.ts
+
+      - name: Integration tests
+        run: bunx vitest run --config vitest.integration.config.ts
+
   docker:
     name: docker build
     runs-on: ubuntu-latest

@@ -283,10 +283,10 @@ export const authRouter = {
         // honours `disableSignUp: true` in the auth config. Same reason
         // here: invited users must be created via the admin API.
         //
-        // The admin plugin's `createUser.body.role` enum is only the
-        // built-in `"user" | "admin"`, so we always pass "user" here and
-        // overwrite to our real Verein role (`readonly` / `vorstand` /
-        // `admin`) in the follow-up update below.
+        // Role is intentionally omitted: the admin plugin is configured with
+        // `defaultRole: "readonly"` (a valid `user_role` enum value), so the
+        // insert succeeds. We then overwrite to the real Verein role
+        // (`readonly` / `vorstand` / `admin`) in the follow-up update below.
         let userId: string;
         try {
           const created = await auth().api.createUser({
@@ -294,7 +294,6 @@ export const authRouter = {
               email: inv.email,
               password: input.password,
               name: input.name,
-              role: "user",
             },
           });
           if (!created?.user?.id) {

@@ -8,6 +8,16 @@ import { normalizeIban, validateIban } from "~/server/sepa/iban";
 
 const MoneyString = v.pipe(v.string(), v.regex(/^-?\d+(\.\d{1,2})?$/));
 
+const BeitragsstaffelInput = v.object({
+  familie: MoneyString,
+  kind: MoneyString,
+  kindElternMitglied: MoneyString,
+  jugendlich: MoneyString,
+  jugendlichElternMitglied: MoneyString,
+  jungerErwachsener: MoneyString,
+  erwachsener: MoneyString,
+});
+
 const UpdateInput = v.object({
   vereinsname: v.pipe(v.string(), v.minLength(1)),
   anschriftStrasse: v.optional(v.nullable(v.string()), null),
@@ -37,6 +47,10 @@ const UpdateInput = v.object({
   kontaktTelefon: v.optional(v.nullable(v.string()), null),
   datenschutzUrl: v.optional(v.nullable(v.string()), null),
   satzungUrl: v.optional(v.nullable(v.string()), null),
+  mandatsreferenzPrefix: v.optional(v.pipe(v.string(), v.minLength(1)), "SVUWV-"),
+  beitragsstaffel: v.optional(v.nullable(BeitragsstaffelInput), null),
+  antragBenachrichtigungAktiv: v.optional(v.boolean(), true),
+  antragVorstandEmail: v.optional(v.nullable(v.string()), null),
 });
 
 export const organizationSettingsRouter = {
@@ -92,6 +106,10 @@ export const organizationSettingsRouter = {
       kontaktTelefon: input.kontaktTelefon,
       datenschutzUrl: input.datenschutzUrl,
       satzungUrl: input.satzungUrl,
+      mandatsreferenzPrefix: input.mandatsreferenzPrefix,
+      beitragsstaffel: input.beitragsstaffel,
+      antragBenachrichtigungAktiv: input.antragBenachrichtigungAktiv,
+      antragVorstandEmail: input.antragVorstandEmail,
       updatedAt: new Date(),
       updatedBy: context.session!.user.id,
     };
