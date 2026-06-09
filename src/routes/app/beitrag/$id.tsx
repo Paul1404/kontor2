@@ -65,7 +65,8 @@ function FeeRunDetailPage() {
             ← Übersicht
           </button>
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <Coins className="size-6 text-brand" /> Beitragslauf {r.billingYear}
+            <Coins className="size-6 text-brand" />
+            {r.kind === "recollection" ? "Wiedereinzug" : "Beitragslauf"} {r.billingYear}
           </h1>
           <div className="text-sm text-muted-foreground">
             Fällig am {formatDate(r.falligkeitsdatum)} · {r.itemCount} Posten ·{" "}

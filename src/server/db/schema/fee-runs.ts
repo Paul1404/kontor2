@@ -30,6 +30,15 @@ export const feeRunStatusEnum = pgEnum("fee_run_status", [
  */
 export const feeRunSourceEnum = pgEnum("fee_run_source", ["app", "linear_import"]);
 
+/**
+ * What a run is for. `regular` is the yearly Beitragslauf (and its catch-up
+ * re-runs). `recollection` is a Wiedereinzug: a fresh pain.008 for postings
+ * that already exist but came back as a Rücklastschrift, now with a corrected
+ * IBAN / valid mandate. A recollection never creates Sollstellungen -- it
+ * re-debits existing `returned` ones and flips them back to `eingezogen`.
+ */
+export const feeRunKindEnum = pgEnum("fee_run_kind", ["regular", "recollection"]);
+
 export const sepaSequenceTypeEnum = pgEnum("sepa_sequence_type", ["FRST", "RCUR", "OOFF", "FNAL"]);
 
 export const sollStellungStatusEnum = pgEnum("soll_stellung_status", [
@@ -59,6 +68,7 @@ export const feeRunsTable = pgTable(
     billingYear: integer("billing_year").notNull(),
     falligkeitsdatum: date("falligkeitsdatum").notNull(),
     status: feeRunStatusEnum("status").notNull().default("draft"),
+    kind: feeRunKindEnum("kind").notNull().default("regular"),
     itemCount: integer("item_count").notNull().default(0),
     totalAmount: numeric("total_amount", { precision: 19, scale: 8 }).notNull().default("0"),
     xmlMessageId: text("xml_message_id"),
