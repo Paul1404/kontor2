@@ -38,6 +38,7 @@ import { Route as AppForderungenIndexRouteImport } from './app/forderungen/index
 import { Route as AppDsgvoIndexRouteImport } from './app/dsgvo/index'
 import { Route as AppBerichteIndexRouteImport } from './app/berichte/index'
 import { Route as AppBeitragIndexRouteImport } from './app/beitrag/index'
+import { Route as AppAntraegeIndexRouteImport } from './app/antraege/index'
 import { Route as AppMitgliederNeuRouteImport } from './app/mitglieder/neu'
 import { Route as AppMitgliederMitgliedsnummerRouteImport } from './app/mitglieder/$mitgliedsnummer'
 import { Route as AppForderungenRuecklaeuferRouteImport } from './app/forderungen/ruecklaeufer'
@@ -55,6 +56,7 @@ import { Route as AppBerichteBestandserhebungRouteImport } from './app/berichte/
 import { Route as AppBerichteAbteilungsStatistikRouteImport } from './app/berichte/abteilungs-statistik'
 import { Route as AppBeitragNeuRouteImport } from './app/beitrag/neu'
 import { Route as AppBeitragIdRouteImport } from './app/beitrag/$id'
+import { Route as AppAntraegeIdRouteImport } from './app/antraege/$id'
 import { Route as AppAdminSnapshotsRouteImport } from './app/admin/snapshots'
 import { Route as AppAdminProtokollRouteImport } from './app/admin/protokoll'
 import { Route as AppAdminErweitertRouteImport } from './app/admin/erweitert'
@@ -216,6 +218,11 @@ const AppBeitragIndexRoute = AppBeitragIndexRouteImport.update({
   path: '/beitrag/',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppAntraegeIndexRoute = AppAntraegeIndexRouteImport.update({
+  id: '/antraege/',
+  path: '/antraege/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppMitgliederNeuRoute = AppMitgliederNeuRouteImport.update({
   id: '/mitglieder/neu',
   path: '/mitglieder/neu',
@@ -306,6 +313,11 @@ const AppBeitragNeuRoute = AppBeitragNeuRouteImport.update({
 const AppBeitragIdRoute = AppBeitragIdRouteImport.update({
   id: '/beitrag/$id',
   path: '/beitrag/$id',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppAntraegeIdRoute = AppAntraegeIdRouteImport.update({
+  id: '/antraege/$id',
+  path: '/antraege/$id',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppAdminSnapshotsRoute = AppAdminSnapshotsRouteImport.update({
@@ -423,6 +435,7 @@ export interface FileRoutesByFullPath {
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/protokoll': typeof AppAdminProtokollRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
+  '/app/antraege/$id': typeof AppAntraegeIdRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
@@ -440,6 +453,7 @@ export interface FileRoutesByFullPath {
   '/app/forderungen/ruecklaeufer': typeof AppForderungenRuecklaeuferRoute
   '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRoute
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
+  '/app/antraege/': typeof AppAntraegeIndexRoute
   '/app/beitrag/': typeof AppBeitragIndexRoute
   '/app/berichte/': typeof AppBerichteIndexRoute
   '/app/dsgvo/': typeof AppDsgvoIndexRoute
@@ -483,6 +497,7 @@ export interface FileRoutesByTo {
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/protokoll': typeof AppAdminProtokollRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
+  '/app/antraege/$id': typeof AppAntraegeIdRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
@@ -500,6 +515,7 @@ export interface FileRoutesByTo {
   '/app/forderungen/ruecklaeufer': typeof AppForderungenRuecklaeuferRoute
   '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRoute
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
+  '/app/antraege': typeof AppAntraegeIndexRoute
   '/app/beitrag': typeof AppBeitragIndexRoute
   '/app/berichte': typeof AppBerichteIndexRoute
   '/app/dsgvo': typeof AppDsgvoIndexRoute
@@ -547,6 +563,7 @@ export interface FileRoutesById {
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/protokoll': typeof AppAdminProtokollRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
+  '/app/antraege/$id': typeof AppAntraegeIdRoute
   '/app/beitrag/$id': typeof AppBeitragIdRoute
   '/app/beitrag/neu': typeof AppBeitragNeuRoute
   '/app/berichte/abteilungs-statistik': typeof AppBerichteAbteilungsStatistikRoute
@@ -564,6 +581,7 @@ export interface FileRoutesById {
   '/app/forderungen/ruecklaeufer': typeof AppForderungenRuecklaeuferRoute
   '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRoute
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
+  '/app/antraege/': typeof AppAntraegeIndexRoute
   '/app/beitrag/': typeof AppBeitragIndexRoute
   '/app/berichte/': typeof AppBerichteIndexRoute
   '/app/dsgvo/': typeof AppDsgvoIndexRoute
@@ -612,6 +630,7 @@ export interface FileRouteTypes {
     | '/app/admin/erweitert'
     | '/app/admin/protokoll'
     | '/app/admin/snapshots'
+    | '/app/antraege/$id'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
     | '/app/berichte/abteilungs-statistik'
@@ -629,6 +648,7 @@ export interface FileRouteTypes {
     | '/app/forderungen/ruecklaeufer'
     | '/app/mitglieder/$mitgliedsnummer'
     | '/app/mitglieder/neu'
+    | '/app/antraege/'
     | '/app/beitrag/'
     | '/app/berichte/'
     | '/app/dsgvo/'
@@ -672,6 +692,7 @@ export interface FileRouteTypes {
     | '/app/admin/erweitert'
     | '/app/admin/protokoll'
     | '/app/admin/snapshots'
+    | '/app/antraege/$id'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
     | '/app/berichte/abteilungs-statistik'
@@ -689,6 +710,7 @@ export interface FileRouteTypes {
     | '/app/forderungen/ruecklaeufer'
     | '/app/mitglieder/$mitgliedsnummer'
     | '/app/mitglieder/neu'
+    | '/app/antraege'
     | '/app/beitrag'
     | '/app/berichte'
     | '/app/dsgvo'
@@ -735,6 +757,7 @@ export interface FileRouteTypes {
     | '/app/admin/erweitert'
     | '/app/admin/protokoll'
     | '/app/admin/snapshots'
+    | '/app/antraege/$id'
     | '/app/beitrag/$id'
     | '/app/beitrag/neu'
     | '/app/berichte/abteilungs-statistik'
@@ -752,6 +775,7 @@ export interface FileRouteTypes {
     | '/app/forderungen/ruecklaeufer'
     | '/app/mitglieder/$mitgliedsnummer'
     | '/app/mitglieder/neu'
+    | '/app/antraege/'
     | '/app/beitrag/'
     | '/app/berichte/'
     | '/app/dsgvo/'
@@ -988,6 +1012,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBeitragIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/antraege/': {
+      id: '/app/antraege/'
+      path: '/antraege'
+      fullPath: '/app/antraege/'
+      preLoaderRoute: typeof AppAntraegeIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/mitglieder/neu': {
       id: '/app/mitglieder/neu'
       path: '/mitglieder/neu'
@@ -1105,6 +1136,13 @@ declare module '@tanstack/react-router' {
       path: '/beitrag/$id'
       fullPath: '/app/beitrag/$id'
       preLoaderRoute: typeof AppBeitragIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/antraege/$id': {
+      id: '/app/antraege/$id'
+      path: '/antraege/$id'
+      fullPath: '/app/antraege/$id'
+      preLoaderRoute: typeof AppAntraegeIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/admin/snapshots': {
@@ -1243,6 +1281,7 @@ interface AppRouteRouteChildren {
   AppAdminErweitertRoute: typeof AppAdminErweitertRoute
   AppAdminProtokollRoute: typeof AppAdminProtokollRoute
   AppAdminSnapshotsRoute: typeof AppAdminSnapshotsRoute
+  AppAntraegeIdRoute: typeof AppAntraegeIdRoute
   AppBeitragIdRoute: typeof AppBeitragIdRoute
   AppBeitragNeuRoute: typeof AppBeitragNeuRoute
   AppBerichteAbteilungsStatistikRoute: typeof AppBerichteAbteilungsStatistikRoute
@@ -1260,6 +1299,7 @@ interface AppRouteRouteChildren {
   AppForderungenRuecklaeuferRoute: typeof AppForderungenRuecklaeuferRoute
   AppMitgliederMitgliedsnummerRoute: typeof AppMitgliederMitgliedsnummerRoute
   AppMitgliederNeuRoute: typeof AppMitgliederNeuRoute
+  AppAntraegeIndexRoute: typeof AppAntraegeIndexRoute
   AppBeitragIndexRoute: typeof AppBeitragIndexRoute
   AppBerichteIndexRoute: typeof AppBerichteIndexRoute
   AppDsgvoIndexRoute: typeof AppDsgvoIndexRoute
@@ -1286,6 +1326,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAdminErweitertRoute: AppAdminErweitertRoute,
   AppAdminProtokollRoute: AppAdminProtokollRoute,
   AppAdminSnapshotsRoute: AppAdminSnapshotsRoute,
+  AppAntraegeIdRoute: AppAntraegeIdRoute,
   AppBeitragIdRoute: AppBeitragIdRoute,
   AppBeitragNeuRoute: AppBeitragNeuRoute,
   AppBerichteAbteilungsStatistikRoute: AppBerichteAbteilungsStatistikRoute,
@@ -1303,6 +1344,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppForderungenRuecklaeuferRoute: AppForderungenRuecklaeuferRoute,
   AppMitgliederMitgliedsnummerRoute: AppMitgliederMitgliedsnummerRoute,
   AppMitgliederNeuRoute: AppMitgliederNeuRoute,
+  AppAntraegeIndexRoute: AppAntraegeIndexRoute,
   AppBeitragIndexRoute: AppBeitragIndexRoute,
   AppBerichteIndexRoute: AppBerichteIndexRoute,
   AppDsgvoIndexRoute: AppDsgvoIndexRoute,

@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.34.0",
+    date: "2026-06-09",
+    title: "Anträge bearbeiten",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neuer Bereich „Anträge“ in der Seitenleiste. Eingegangene Online-Aufnahmeanträge lassen sich dort suchen, filtern und im Detail ansehen.",
+      },
+      {
+        category: "feature",
+        description:
+          "Ein Antrag kann genehmigt werden: Daraus entsteht ein Mitglied (bei Familienanträgen inklusive Partner und Kindern) mit Bankverbindung als SEPA-Mandat und optionalem Beitragsvertrag. Eine Ablehnung mit Begründung wird dem Antragsteller per E-Mail mitgeteilt.",
+      },
+    ],
+  },
+  {
     version: "0.33.0",
     date: "2026-06-09",
     title: "Online-Aufnahmeantrag",

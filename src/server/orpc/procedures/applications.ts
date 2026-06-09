@@ -1,14 +1,19 @@
 import { ORPCError } from "@orpc/server";
-import { type AnyColumn, and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { type AnyColumn, and, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { buildUploadUrl, issueUploadToken } from "~/server/application/upload-token";
+import { appendAudit } from "~/server/audit/log";
+import { getMailer } from "~/server/auth/send-invite";
 import { lastFour } from "~/server/crypto/encrypt";
 import type { DBOrTx } from "~/server/db/client";
 import { allocateDocRef } from "~/server/db/doc-ref";
+import { escapeLike } from "~/server/db/like";
+import { withUniqueRetry } from "~/server/db/retry";
 import { abteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
 import {
   type AntragKind,
+  type AntragStatus,
   membershipApplicationFilesTable,
   membershipApplicationsTable,
 } from "~/server/db/schema/membership-applications";
@@ -21,17 +26,20 @@ import {
   realAge,
 } from "~/server/domain/application/antragstyp";
 import { calculateFee } from "~/server/domain/application/fees";
+import { onboardMember } from "~/server/domain/member/onboard";
 import { env } from "~/server/env";
 import { lookupBankByIban } from "~/server/lib/blz";
+import { toCsv } from "~/server/lib/csv";
 import { logger } from "~/server/lib/logger";
 import { sendApplicationMails } from "~/server/mail/send-application-mail";
-import { publicProc } from "~/server/orpc/base";
+import { publicProc, vorstandProc } from "~/server/orpc/base";
 import { buildBeitrittModel } from "~/server/pdf/beitrittserklaerung-model";
 import { clubLogoDataUri } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { BeitrittserklaerungDocument } from "~/server/pdf/templates/beitrittserklaerung";
 import { rateLimit } from "~/server/redis/client";
 import { putObject } from "~/server/s3/client";
+import { invalidateMemberCaches } from "~/server/search/cache";
 import { formatIbanGrouped, normalizeIban, validateIban } from "~/server/sepa/iban";
 
 const ANRede = v.picklist(["Herr", "Frau", "keine Angabe"]);
@@ -98,6 +106,12 @@ function statusUrlFor(antragsnummer: string): string {
 function refSuffix(antragsnummer: string): string {
   const m = /-(\d+)$/.exec(antragsnummer);
   return m ? m[1]! : antragsnummer;
+}
+
+function anredeFromGeschlecht(g: "m" | "w" | "d" | "unbekannt" | null): string | null {
+  if (g === "m") return "Herr";
+  if (g === "w") return "Frau";
+  return null;
 }
 
 async function loadActiveAbteilungen(db: DBOrTx, ids: string[]): Promise<Map<string, string>> {
@@ -488,4 +502,420 @@ export const applicationsRouter = {
       statusUrl: statusUrlFor(inserted.antragsnummer),
     };
   }),
+
+  // ---- Admin / Vorstand ----
+
+  /** Paginated application list with search, status filter and test toggle. */
+  list: vorstandProc
+    .input(
+      v.object({
+        q: v.optional(v.string(), ""),
+        status: v.optional(
+          v.nullable(
+            v.picklist([
+              "neu",
+              "scan_eingegangen",
+              "dokument_hochgeladen",
+              "in_bearbeitung",
+              "genehmigt",
+              "abgelehnt",
+            ]),
+          ),
+          null,
+        ),
+        includeTest: v.optional(v.boolean(), false),
+        page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
+        pageSize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const t = membershipApplicationsTable;
+      const conds = [];
+      if (!input.includeTest) conds.push(eq(t.isTest, false));
+      if (input.status) conds.push(eq(t.status, input.status));
+      const q = input.q.trim();
+      if (q) {
+        const like = `%${escapeLike(q)}%`;
+        conds.push(
+          or(
+            ilike(t.nachname, like),
+            ilike(t.vorname, like),
+            ilike(t.antragsnummer, like),
+            ilike(t.email, like),
+          ),
+        );
+      }
+      const where = conds.length > 0 ? and(...conds) : undefined;
+      const totalRow = (await context.db.select({ total: count() }).from(t).where(where))[0];
+      const total = totalRow?.total ?? 0;
+      const rows = await context.db
+        .select({
+          id: t.id,
+          antragsnummer: t.antragsnummer,
+          antragstyp: t.antragstyp,
+          status: t.status,
+          source: t.source,
+          vorname: t.vorname,
+          nachname: t.nachname,
+          email: t.email,
+          mitgliedschaftTyp: t.mitgliedschaftTyp,
+          jahresbeitrag: t.jahresbeitrag,
+          isTest: t.isTest,
+          createdAt: t.createdAt,
+        })
+        .from(t)
+        .where(where)
+        .orderBy(desc(t.createdAt))
+        .limit(input.pageSize)
+        .offset((input.page - 1) * input.pageSize);
+      return { rows, total, page: input.page, pageSize: input.pageSize };
+    }),
+
+  /** Full application detail. IBAN is masked to the last four digits. */
+  get: vorstandProc
+    .input(v.object({ id: v.pipe(v.string(), v.uuid()) }))
+    .handler(async ({ context, input }) => {
+      const t = membershipApplicationsTable;
+      const [row] = await context.db.select().from(t).where(eq(t.id, input.id)).limit(1);
+      if (!row) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+      const { iban, ...rest } = row;
+      return {
+        ...rest,
+        ibanMasked: row.ibanLast4 ? `**** **** **** **** ${row.ibanLast4}` : null,
+      };
+    }),
+
+  /** Edit notes and move the application through the non-terminal statuses. */
+  update: vorstandProc
+    .input(
+      v.object({
+        id: v.pipe(v.string(), v.uuid()),
+        status: v.optional(
+          v.nullable(
+            v.picklist(["neu", "scan_eingegangen", "dokument_hochgeladen", "in_bearbeitung"]),
+          ),
+          null,
+        ),
+        notes: v.optional(v.nullable(v.string()), null),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const t = membershipApplicationsTable;
+      const patch: Record<string, unknown> = { updatedAt: new Date() };
+      if (input.status) patch.status = input.status;
+      if (input.notes !== null) patch.notes = input.notes;
+      const res = await context.db
+        .update(t)
+        .set(patch)
+        .where(eq(t.id, input.id))
+        .returning({ id: t.id });
+      if (res.length === 0) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+      return { ok: true };
+    }),
+
+  /** Decline an application with a reason that is emailed to the applicant. */
+  decline: vorstandProc
+    .input(
+      v.object({
+        id: v.pipe(v.string(), v.uuid()),
+        reason: v.pipe(v.string(), v.trim(), v.minLength(1)),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const t = membershipApplicationsTable;
+      const [app] = await context.db.select().from(t).where(eq(t.id, input.id)).limit(1);
+      if (!app) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+      if (app.status === "genehmigt") {
+        throw new ORPCError("CONFLICT", {
+          message: "Ein genehmigter Antrag kann nicht abgelehnt werden.",
+        });
+      }
+      await context.db
+        .update(t)
+        .set({ status: "abgelehnt", adminDeclineReason: input.reason, updatedAt: new Date() })
+        .where(eq(t.id, input.id));
+
+      if (app.email) {
+        const mailer = await getMailer();
+        const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+        await mailer
+          ?.send({
+            to: app.email,
+            subject: `Ihr Aufnahmeantrag (${app.antragsnummer})`,
+            text: [
+              `Hallo ${app.vorname} ${app.nachname},`,
+              "",
+              `Ihr Aufnahmeantrag beim ${org?.vereinsname ?? "Verein"} konnte leider nicht angenommen werden.`,
+              "",
+              `Begründung: ${input.reason}`,
+            ].join("\n"),
+          })
+          .catch(() => undefined);
+      }
+      return { ok: true };
+    }),
+
+  /**
+   * Approve an application: create the member (and, for a family, the partner
+   * and children) via the shared `onboardMember`, link the created member back
+   * to the application, and email the applicant. A contract is created when a
+   * fee art is supplied; the SEPA mandate uses the application's Mandatsreferenz.
+   */
+  approve: vorstandProc
+    .input(
+      v.object({
+        id: v.pipe(v.string(), v.uuid()),
+        art: v.optional(v.nullable(v.pipe(v.number(), v.integer())), null),
+        betrag: v.optional(v.nullable(v.string()), null),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const t = membershipApplicationsTable;
+      const [app] = await context.db.select().from(t).where(eq(t.id, input.id)).limit(1);
+      if (!app) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+      if (app.status === "genehmigt" || app.memberId) {
+        throw new ORPCError("CONFLICT", { message: "Antrag ist bereits genehmigt." });
+      }
+
+      const actorId = context.session!.user.id;
+      const actorEmail = context.session!.user.email;
+      const fallbackEintritt = new Date().toISOString().slice(0, 10);
+      const isMinor = app.antragstyp === "kind";
+      const ibanPlain = app.iban?.trim() ? app.iban.trim() : null;
+
+      const primaryPatch: Record<string, unknown> = {
+        anrede: anredeFromGeschlecht(app.geschlecht),
+        geschlecht: app.geschlecht,
+        vorname: app.vorname,
+        nachname: app.nachname,
+        geburtsdatum: app.geburtsdatum,
+        strasse: app.strasse,
+        hausnummer: app.hausnummer,
+        plz: app.plz,
+        ort: app.ort,
+        telefon1: app.telefon,
+        email: app.email,
+        eintritt: new Date(),
+      };
+      if (isMinor) {
+        const guardian =
+          `${app.erziehungsberechtigterVorname ?? ""} ${app.erziehungsberechtigterNachname ?? ""}`.trim();
+        primaryPatch.vertreterName = guardian || null;
+        primaryPatch.vertreterStrasse =
+          [app.strasse, app.hausnummer].filter(Boolean).join(" ") || null;
+        primaryPatch.vertreterPlz = app.plz;
+        primaryPatch.vertreterOrt = app.ort;
+      }
+      if (ibanPlain) {
+        primaryPatch.iban1 = ibanPlain;
+        primaryPatch.iban1Last4 = app.ibanLast4 ?? lastFour(ibanPlain);
+        primaryPatch.bic1 = app.bic;
+      }
+
+      const contract =
+        input.art != null
+          ? {
+              art: input.art,
+              artName: null,
+              vertragNr: null,
+              betrag: input.betrag ?? app.jahresbeitrag ?? null,
+              sollstellung: null,
+              vertragBegin: new Date(),
+            }
+          : null;
+      const sepa = ibanPlain
+        ? {
+            mandatsNr: app.mandatsreferenz,
+            unterschriftDatum: app.consentAt,
+            gueltigAb: new Date(),
+          }
+        : null;
+
+      const result = await withUniqueRetry(() =>
+        context.db.transaction(async (tx) => {
+          const primary = await onboardMember(tx, {
+            patch: primaryPatch,
+            isKontakt: false,
+            status: "aktiv",
+            abteilungen: (app.abteilungen ?? []).map((id) => ({ abteilungId: id })),
+            fallbackEintritt,
+            contract,
+            sepa,
+            actorId,
+            actorEmail,
+            requestId: context.requestId ?? null,
+          });
+          const refs = [primary.ref];
+
+          if (app.antragstyp === "familie") {
+            if (app.partnerVorname && app.partnerNachname) {
+              const p = await onboardMember(tx, {
+                patch: {
+                  vorname: app.partnerVorname,
+                  nachname: app.partnerNachname,
+                  geburtsdatum: app.partnerGeburtsdatum,
+                  strasse: app.strasse,
+                  hausnummer: app.hausnummer,
+                  plz: app.plz,
+                  ort: app.ort,
+                  eintritt: new Date(),
+                },
+                isKontakt: false,
+                status: "aktiv",
+                abteilungen: (app.partnerAbteilungen ?? []).map((id) => ({ abteilungId: id })),
+                fallbackEintritt,
+                contract: null,
+                sepa: null,
+                actorId,
+                actorEmail,
+                requestId: context.requestId ?? null,
+              });
+              refs.push(p.ref);
+            }
+            for (const k of app.kinder ?? []) {
+              const c = await onboardMember(tx, {
+                patch: {
+                  vorname: k.vorname,
+                  nachname: k.nachname,
+                  geburtsdatum: k.geburtsdatum ? parseISODate(k.geburtsdatum) : null,
+                  strasse: app.strasse,
+                  hausnummer: app.hausnummer,
+                  plz: app.plz,
+                  ort: app.ort,
+                  eintritt: new Date(),
+                },
+                isKontakt: false,
+                status: "aktiv",
+                abteilungen: (k.abteilungen ?? []).map((id) => ({ abteilungId: id })),
+                fallbackEintritt,
+                contract: null,
+                sepa: null,
+                actorId,
+                actorEmail,
+                requestId: context.requestId ?? null,
+              });
+              refs.push(c.ref);
+            }
+          }
+
+          await tx
+            .update(t)
+            .set({
+              status: "genehmigt",
+              memberId: primary.id,
+              mitgliedsnummer: refs.join(", "),
+              updatedAt: new Date(),
+            })
+            .where(eq(t.id, app.id));
+
+          await appendAudit(tx, {
+            entityType: "membership_application",
+            entityId: app.id,
+            action: "update",
+            source: "ui",
+            actorId,
+            actorEmail,
+            changes: {
+              status: { before: app.status, after: "genehmigt" },
+              mitgliedsnummer: { before: null, after: refs.join(", ") },
+            },
+            requestId: context.requestId ?? null,
+          });
+
+          return { primaryId: primary.id, refs };
+        }),
+      );
+
+      await invalidateMemberCaches();
+
+      if (app.email) {
+        const mailer = await getMailer();
+        const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+        await mailer
+          ?.send({
+            to: app.email,
+            subject: `Willkommen beim ${org?.vereinsname ?? "Verein"}`,
+            text: [
+              `Hallo ${app.vorname} ${app.nachname},`,
+              "",
+              `Ihr Aufnahmeantrag wurde angenommen. Ihre Mitgliedsnummer: ${result.refs.join(", ")}.`,
+              "",
+              "Herzlich willkommen.",
+            ].join("\n"),
+          })
+          .catch(() => undefined);
+      }
+
+      return { memberId: result.primaryId, mitgliedsnummer: result.refs.join(", ") };
+    }),
+
+  /** Dashboard counters for the application queue. */
+  stats: vorstandProc.handler(async ({ context }) => {
+    const t = membershipApplicationsTable;
+    const rows = await context.db
+      .select({ status: t.status, n: count() })
+      .from(t)
+      .where(eq(t.isTest, false))
+      .groupBy(t.status);
+    const byStatus: Record<string, number> = {};
+    let total = 0;
+    for (const r of rows) {
+      byStatus[r.status] = r.n;
+      total += r.n;
+    }
+    const revenueRow = (
+      await context.db
+        .select({ revenue: sql<string>`coalesce(sum(${t.jahresbeitrag}), 0)::text` })
+        .from(t)
+        .where(and(eq(t.isTest, false), eq(t.status, "genehmigt")))
+    )[0];
+    return { total, byStatus, revenueApproved: revenueRow?.revenue ?? "0" };
+  }),
+
+  /** Export applications as a German CSV (semicolon, BOM). */
+  exportCsv: vorstandProc
+    .input(v.object({ includeTest: v.optional(v.boolean(), false) }))
+    .handler(async ({ context, input }) => {
+      const t = membershipApplicationsTable;
+      const rows = await context.db
+        .select({
+          antragsnummer: t.antragsnummer,
+          status: t.status,
+          antragstyp: t.antragstyp,
+          vorname: t.vorname,
+          nachname: t.nachname,
+          email: t.email,
+          plz: t.plz,
+          ort: t.ort,
+          mitgliedschaftTyp: t.mitgliedschaftTyp,
+          jahresbeitrag: t.jahresbeitrag,
+          mitgliedsnummer: t.mitgliedsnummer,
+          createdAt: t.createdAt,
+        })
+        .from(t)
+        .where(input.includeTest ? undefined : eq(t.isTest, false))
+        .orderBy(desc(t.createdAt));
+      const content = toCsv(rows, [
+        { key: "antragsnummer", label: "Antragsnummer" },
+        { key: "status", label: "Status" },
+        { key: "antragstyp", label: "Antragstyp" },
+        { key: "vorname", label: "Vorname" },
+        { key: "nachname", label: "Nachname" },
+        { key: "email", label: "E-Mail" },
+        { key: "plz", label: "PLZ" },
+        { key: "ort", label: "Ort" },
+        { key: "mitgliedschaftTyp", label: "Mitgliedschaft" },
+        { key: "jahresbeitrag", label: "Jahresbeitrag" },
+        { key: "mitgliedsnummer", label: "Mitgliedsnummer" },
+        {
+          key: "createdAt",
+          label: "Eingegangen",
+          format: (val) => (val instanceof Date ? val.toISOString().slice(0, 10) : ""),
+        },
+      ]);
+      return { filename: "antraege.csv", content };
+    }),
 };
+
+// Re-exported for callers that need the status union without importing schema.
+export type { AntragStatus };
