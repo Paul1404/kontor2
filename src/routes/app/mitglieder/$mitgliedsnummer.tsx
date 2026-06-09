@@ -207,6 +207,22 @@ function MemberDetailPage() {
                 Einzug ausgesetzt
               </Badge>
             ) : null}
+            {member.ruhend ? (
+              <Badge
+                variant="secondary"
+                title="Ruhende Mitgliedschaft: der Beitragslauf überspringt dieses Mitglied"
+              >
+                Ruhend
+              </Badge>
+            ) : null}
+            {member.beitragsbefreit ? (
+              <Badge
+                variant="secondary"
+                title="Beitragsbefreit: der Beitragslauf erstellt keine Sollstellung"
+              >
+                Beitragsbefreit
+              </Badge>
+            ) : null}
           </h1>
           <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
             {member.memberNo ? (

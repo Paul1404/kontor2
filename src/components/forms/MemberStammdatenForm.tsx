@@ -42,6 +42,8 @@ export type StammdatenValues = {
   vertreterOrt: string;
   notes: string;
   directDebitBlocked: boolean;
+  ruhend: boolean;
+  beitragsbefreit: boolean;
 };
 
 export const EMPTY_STAMM: StammdatenValues = {
@@ -77,6 +79,8 @@ export const EMPTY_STAMM: StammdatenValues = {
   vertreterOrt: "",
   notes: "",
   directDebitBlocked: false,
+  ruhend: false,
+  beitragsbefreit: false,
 };
 
 function calcAge(yyyymmdd: string): string {
@@ -142,6 +146,8 @@ export function buildInitialValues(
     vertreterOrt: (member.vertreterOrt as string) ?? "",
     notes: (member.notes as string) ?? "",
     directDebitBlocked: (member.directDebitBlocked as boolean | null | undefined) ?? false,
+    ruhend: (member.ruhend as boolean | null | undefined) ?? false,
+    beitragsbefreit: (member.beitragsbefreit as boolean | null | undefined) ?? false,
   };
 }
 
@@ -191,6 +197,8 @@ export function buildPatch(
   out.vertreterOrt = nullable(values.vertreterOrt);
   out.notes = nullable(values.notes);
   out.directDebitBlocked = values.directDebitBlocked;
+  out.ruhend = values.ruhend;
+  out.beitragsbefreit = values.beitragsbefreit;
   const normIban = values.iban1.replace(/\s+/g, "").toUpperCase();
   if (normIban !== initialIban) {
     out.iban1 = normIban.length > 0 ? normIban : null;
@@ -403,6 +411,28 @@ export function MemberStammdatenForm({
                 onChange={(e) => update("austritt", e.target.value)}
               />
             </FormField>
+            <FormField label="Beitrag">
+              <select
+                value={values.beitragsbefreit ? "befreit" : values.ruhend ? "ruhend" : "normal"}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  update("ruhend", val === "ruhend");
+                  update("beitragsbefreit", val === "befreit");
+                }}
+                className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              >
+                <option value="normal">Beitragspflichtig</option>
+                <option value="ruhend">Ruhend</option>
+                <option value="befreit">Beitragsbefreit</option>
+              </select>
+            </FormField>
+            {values.ruhend || values.beitragsbefreit ? (
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                Der Beitragslauf überspringt dieses Mitglied
+                {values.beitragsbefreit ? " (beitragsbefreit)" : " (ruhend)"}. Die Mitgliedschaft
+                bleibt bestehen und zählt weiterhin im Bestand.
+              </p>
+            ) : null}
             <FormField label="Notizen" full>
               <Textarea
                 value={values.notes}

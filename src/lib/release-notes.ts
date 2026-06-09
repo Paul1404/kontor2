@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.31.0",
+    date: "2026-06-09",
+    title: "Ruhend und Beitragsbefreiung",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Ein Mitglied lässt sich jetzt als „Ruhend“ oder „Beitragsbefreit“ kennzeichnen. Beide bleiben vollwertige Mitglieder und zählen im Bestand, werden im Beitragslauf aber übersprungen. Die Einstellung steht im Reiter Stammdaten unter „Beitrag“.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Im Beitragslauf erscheinen übersprungene Mitglieder mit dem Grund „Ruhend“ oder „Beitragsbefreit“ in der Ausschlussliste, sodass nachvollziehbar ist, warum keine Sollstellung erstellt wurde.",
+      },
+    ],
+  },
+  {
     version: "0.30.0",
     date: "2026-06-09",
     title: "Geplante Austritte",

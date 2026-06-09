@@ -115,6 +115,10 @@ const StammdatenInput = v.object({
   notes: v.optional(v.nullable(v.string())),
   /** Suspends SEPA direct debit: the Beitragslauf skips this member. */
   directDebitBlocked: v.optional(v.nullable(v.boolean())),
+  /** Ruhende Mitgliedschaft: still a member, but the Beitragslauf skips them. */
+  ruhend: v.optional(v.nullable(v.boolean())),
+  /** Beitragsbefreiung: exempt from fees; the Beitragslauf raises no posting. */
+  beitragsbefreit: v.optional(v.nullable(v.boolean())),
 });
 
 /**
@@ -234,6 +238,8 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   setIfPresent("vertreterOrt");
   setIfPresent("notes");
   setIfPresent("directDebitBlocked");
+  setIfPresent("ruhend");
+  setIfPresent("beitragsbefreit");
 
   if ("geburtsdatum" in input)
     patch.geburtsdatum = toDateOrNull(input.geburtsdatum, "Geburtsdatum");
