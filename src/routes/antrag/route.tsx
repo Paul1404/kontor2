@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
-import { ShieldCheck } from "lucide-react";
+import { Mail, Phone, ShieldCheck } from "lucide-react";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/antrag")({
@@ -13,7 +13,14 @@ function AntragLayout() {
     queryFn: () => orpc.applications.publicSettings(),
     retry: false,
   });
-  const vereinsname = settings.data?.vereinsname ?? "Verein";
+  const s = settings.data;
+  const vereinsname = s?.vereinsname ?? "Verein";
+  const anschrift = [
+    s?.anschriftStrasse,
+    [s?.anschriftPlz, s?.anschriftOrt].filter(Boolean).join(" "),
+  ]
+    .filter((p) => p?.trim())
+    .join(", ");
 
   return (
     <div className="min-h-screen text-foreground">
@@ -39,8 +46,53 @@ function AntragLayout() {
       <main className="mx-auto max-w-3xl px-4 py-6">
         <Outlet />
       </main>
-      <footer className="mt-12 border-t py-6">
-        <div className="mx-auto max-w-3xl px-4 text-xs text-muted-foreground">{vereinsname}</div>
+      <footer className="mt-12 border-t py-8">
+        <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 text-xs text-muted-foreground sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-0.5">
+            <span className="font-medium text-foreground">{vereinsname}</span>
+            {anschrift ? <span>{anschrift}</span> : null}
+          </div>
+          <div className="flex flex-col gap-1 sm:items-end">
+            {s?.kontaktEmail ? (
+              <a
+                href={`mailto:${s.kontaktEmail}`}
+                className="inline-flex items-center gap-1.5 hover:text-foreground"
+              >
+                <Mail className="size-3.5" /> {s.kontaktEmail}
+              </a>
+            ) : null}
+            {s?.kontaktTelefon ? (
+              <a
+                href={`tel:${s.kontaktTelefon.replace(/\s/g, "")}`}
+                className="inline-flex items-center gap-1.5 hover:text-foreground"
+              >
+                <Phone className="size-3.5" /> {s.kontaktTelefon}
+              </a>
+            ) : null}
+            <div className="flex gap-3">
+              {s?.datenschutzUrl ? (
+                <a
+                  href={s.datenschutzUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-foreground hover:underline"
+                >
+                  Datenschutz
+                </a>
+              ) : null}
+              {s?.satzungUrl ? (
+                <a
+                  href={s.satzungUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-foreground hover:underline"
+                >
+                  Satzung
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
   );

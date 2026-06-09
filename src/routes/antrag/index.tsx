@@ -1,15 +1,18 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   ArrowRight,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   Clock,
   Copy,
   CreditCard,
+  HelpCircle,
   Loader2,
   Mail,
   Pencil,
@@ -19,7 +22,15 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  type ReactElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AbteilungPicker } from "~/components/antrag/abteilung-picker";
 import { AddressFields } from "~/components/antrag/address-fields";
 import { IbanField } from "~/components/antrag/iban-field";
@@ -36,6 +47,40 @@ type Anrede = "Herr" | "Frau" | "keine Angabe";
 type KindRow = { vorname: string; nachname: string; geburtsdatum: string; abteilungen: string[] };
 
 const STEPS = ["Mitgliedsdaten", "SEPA-Lastschrift", "Zusammenfassung"];
+
+// Order in which invalid fields are surfaced (drives scroll-to-first-error).
+const ERROR_ORDER = [
+  "geschlecht",
+  "vorname",
+  "nachname",
+  "geburtsdatum",
+  "abteilung",
+  "email",
+  "erzVorname",
+  "erzNachname",
+  "iban",
+] as const;
+
+// Subtle magnetic pull of an element toward the pointer. Offsets are written to
+// CSS custom properties consumed by `.btn-magnetic`; reduced-motion neutralizes
+// the transform in CSS, so the written values simply have no visible effect.
+function useMagnetic() {
+  const ref = useRef<HTMLButtonElement>(null);
+  function onPointerMove(e: React.PointerEvent) {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${(e.clientX - (r.left + r.width / 2)) * 0.18}px`);
+    el.style.setProperty("--my", `${(e.clientY - (r.top + r.height / 2)) * 0.3}px`);
+  }
+  function onPointerLeave() {
+    const el = ref.current;
+    if (!el) return;
+    el.style.setProperty("--mx", "0px");
+    el.style.setProperty("--my", "0px");
+  }
+  return { ref, onPointerMove, onPointerLeave };
+}
 
 // Draft persistence: keep an in-progress application across reloads. Uses
 // sessionStorage (cleared when the tab closes), matching svums and keeping the
@@ -54,6 +99,7 @@ type Draft = {
   plz: string;
   ort: string;
   telefon: string;
+  telefonOptOut: boolean;
   email: string;
   selectedAbt: string[];
   erzVorname: string;
@@ -110,6 +156,7 @@ function AntragForm() {
   const [plz, setPlz] = useState("");
   const [ort, setOrt] = useState("");
   const [telefon, setTelefon] = useState("");
+  const [telefonOptOut, setTelefonOptOut] = useState(false);
   const [email, setEmail] = useState("");
   const [selectedAbt, setSelectedAbt] = useState<string[]>([]);
   const [erzVorname, setErzVorname] = useState("");
@@ -142,6 +189,27 @@ function AntragForm() {
   const [draftState, setDraftState] = useState<"idle" | "restored" | "saved">("idle");
   const [warning, setWarning] = useState<string | null>(null);
   const [dupAck, setDupAck] = useState(false);
+  // Live (debounced) duplicate hint shown while typing the identity.
+  const [dupHint, setDupHint] = useState<string | null>(null);
+
+  // Per-field validation: error messages keyed by field, plus a nonce that
+  // re-triggers the attention pulse on every failed step.
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [pulseNonce, setPulseNonce] = useState(0);
+  function clearError(key: string) {
+    setErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
+
+  // Which child card is expanded; collapse the rest once there is more than one.
+  const [expandedChild, setExpandedChild] = useState<number | null>(null);
+
+  // Magnetic pull on the primary action button.
+  const magnet = useMagnetic();
 
   // Restore a saved draft once on mount.
   useEffect(() => {
@@ -159,6 +227,7 @@ function AntragForm() {
         if (typeof d.plz === "string") setPlz(d.plz);
         if (typeof d.ort === "string") setOrt(d.ort);
         if (typeof d.telefon === "string") setTelefon(d.telefon);
+        if (typeof d.telefonOptOut === "boolean") setTelefonOptOut(d.telefonOptOut);
         if (typeof d.email === "string") setEmail(d.email);
         if (Array.isArray(d.selectedAbt)) setSelectedAbt(d.selectedAbt);
         if (typeof d.erzVorname === "string") setErzVorname(d.erzVorname);
@@ -197,6 +266,7 @@ function AntragForm() {
     plz,
     ort,
     telefon,
+    telefonOptOut,
     email,
     selectedAbt,
     erzVorname,
@@ -240,6 +310,39 @@ function AntragForm() {
   const dup = useMutation({
     mutationFn: () => orpc.applications.checkDuplicate({ vorname, nachname, geburtsdatum }),
   });
+
+  // Live duplicate hint: once name and birth date are present, check in the
+  // background (debounced) and warn softly. It never blocks; submission has its
+  // own confirm step.
+  useEffect(() => {
+    const ready =
+      vorname.trim().length >= 2 &&
+      nachname.trim().length >= 2 &&
+      /^\d{4}-\d{2}-\d{2}$/.test(geburtsdatum);
+    if (!ready) {
+      setDupHint(null);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const r = await orpc.applications.checkDuplicate({ vorname, nachname, geburtsdatum });
+        if (!cancelled) {
+          setDupHint(
+            r.duplicate
+              ? "Zu diesem Namen und Geburtsdatum gibt es vielleicht schon einen Antrag oder eine Mitgliedschaft. Sie können trotzdem fortfahren."
+              : null,
+          );
+        }
+      } catch {
+        // A failed background check should never surface as an error.
+      }
+    }, 800);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [vorname, nachname, geburtsdatum]);
 
   const age = geburtsdatum ? realAge(geburtsdatum) : null;
   const isMinor = age != null && age < 18;
@@ -346,22 +449,25 @@ function AntragForm() {
     set(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
   }
 
-  function validateStep(s: number): string | null {
+  // Per-field validation for a step. Keys match the `f-<key>` anchor ids so the
+  // first invalid field can be scrolled into view.
+  function computeErrors(s: number): Record<string, string> {
+    const e: Record<string, string> = {};
     if (s === 0) {
-      if (!geschlecht && !isMinor) return "Bitte eine Anrede wählen.";
-      if (vorname.trim().length < 2 || nachname.trim().length < 2)
-        return "Bitte Vor- und Nachname angeben.";
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(geburtsdatum))
-        return "Bitte ein gültiges Geburtsdatum angeben.";
-      if (selectedAbt.length === 0) return "Bitte mindestens eine Abteilung wählen.";
-      if (!email.trim()) return "Bitte eine E-Mail-Adresse angeben.";
-      if (isMinor && (erzVorname.trim().length < 2 || erzNachname.trim().length < 2))
-        return "Bitte die gesetzliche Vertretung angeben.";
+      if (!isMinor && !geschlecht) e.geschlecht = "Bitte eine Anrede wählen.";
+      if (vorname.trim().length < 2) e.vorname = "Mindestens zwei Zeichen.";
+      if (nachname.trim().length < 2) e.nachname = "Mindestens zwei Zeichen.";
+      if (age == null) e.geburtsdatum = "Bitte ein gültiges Geburtsdatum angeben.";
+      if (selectedAbt.length === 0) e.abteilung = "Bitte mindestens eine Abteilung wählen.";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+        e.email = "Bitte eine gültige E-Mail-Adresse angeben.";
+      if (isMinor && erzVorname.trim().length < 2) e.erzVorname = "Mindestens zwei Zeichen.";
+      if (isMinor && erzNachname.trim().length < 2) e.erzNachname = "Mindestens zwei Zeichen.";
     }
     if (s === 1) {
-      if (iban.replace(/\s/g, "").length < 15) return "Bitte eine gültige IBAN angeben.";
+      if (iban.replace(/\s/g, "").length < 15) e.iban = "Bitte eine gültige IBAN angeben.";
     }
-    return null;
+    return e;
   }
 
   function goTo(target: number) {
@@ -370,16 +476,33 @@ function AntragForm() {
   }
 
   function next() {
-    const err = validateStep(step);
-    setError(err);
-    if (!err) {
-      setDir("forward");
-      setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    const errs = computeErrors(step);
+    setErrors(errs);
+    const keys = ERROR_ORDER.filter((k) => errs[k]);
+    if (keys.length > 0) {
+      setError(
+        keys.length === 1
+          ? "Bitte prüfen Sie das markierte Feld."
+          : `Bitte prüfen Sie ${keys.length} markierte Felder.`,
+      );
+      setPulseNonce((n) => n + 1);
+      const firstKey = keys[0];
+      setTimeout(() => {
+        const el = document.getElementById(`f-${firstKey}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        el?.querySelector<HTMLElement>("input, button, [tabindex]")?.focus();
+      }, 0);
+      return;
     }
+    setError(null);
+    setErrors({});
+    setDir("forward");
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
 
   function back() {
     setError(null);
+    setErrors({});
     setDir("backward");
     setStep((s) => Math.max(s - 1, 0));
   }
@@ -429,7 +552,7 @@ function AntragForm() {
               </Link>
             </p>
 
-            <Card>
+            <Card className="glass-card">
               <CardHeader>
                 <CardTitle>Mitgliedsdaten</CardTitle>
                 <p className="text-sm text-muted-foreground">
@@ -439,14 +562,17 @@ function AntragForm() {
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 {!isMinor ? (
-                  <div className="flex flex-col gap-1.5">
+                  <div id="f-geschlecht" className="flex scroll-mt-24 flex-col gap-1.5">
                     <Label>Anrede *</Label>
                     <div className="flex flex-wrap gap-2">
                       {(["Herr", "Frau", "keine Angabe"] as Anrede[]).map((a) => (
                         <button
                           key={a}
                           type="button"
-                          onClick={() => setGeschlecht(a)}
+                          onClick={() => {
+                            setGeschlecht(a);
+                            clearError("geschlecht");
+                          }}
                           className={cn(
                             "rounded-full border px-3 py-1.5 text-sm transition-all active:scale-95",
                             geschlecht === a
@@ -458,24 +584,66 @@ function AntragForm() {
                         </button>
                       ))}
                     </div>
+                    {errors.geschlecht ? (
+                      <span className="text-xs text-destructive">{errors.geschlecht}</span>
+                    ) : null}
                   </div>
                 ) : null}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Vorname *" valid={vorname.trim().length >= 2}>
-                    <Input value={vorname} onChange={(e) => setVorname(e.target.value)} />
+                  <Field
+                    label="Vorname *"
+                    anchorId="f-vorname"
+                    valid={vorname.trim().length >= 2}
+                    error={errors.vorname}
+                    pulseNonce={pulseNonce}
+                  >
+                    <Input
+                      value={vorname}
+                      onChange={(e) => {
+                        setVorname(e.target.value);
+                        clearError("vorname");
+                      }}
+                    />
                   </Field>
-                  <Field label="Nachname *" valid={nachname.trim().length >= 2}>
-                    <Input value={nachname} onChange={(e) => setNachname(e.target.value)} />
+                  <Field
+                    label="Nachname *"
+                    anchorId="f-nachname"
+                    valid={nachname.trim().length >= 2}
+                    error={errors.nachname}
+                    pulseNonce={pulseNonce}
+                  >
+                    <Input
+                      value={nachname}
+                      onChange={(e) => {
+                        setNachname(e.target.value);
+                        clearError("nachname");
+                      }}
+                    />
                   </Field>
-                  <Field label="Geburtsdatum *" valid={age != null}>
+                  <Field
+                    label="Geburtsdatum *"
+                    anchorId="f-geburtsdatum"
+                    valid={age != null}
+                    error={errors.geburtsdatum}
+                    pulseNonce={pulseNonce}
+                  >
                     <Input
                       type="date"
                       value={geburtsdatum}
-                      onChange={(e) => setGeburtsdatum(e.target.value)}
+                      onChange={(e) => {
+                        setGeburtsdatum(e.target.value);
+                        clearError("geburtsdatum");
+                      }}
                     />
                   </Field>
                   <div />
                 </div>
+                {dupHint ? (
+                  <p className="motion-fade-in flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                    {dupHint}
+                  </p>
+                ) : null}
 
                 <AddressFields
                   strasse={strasse}
@@ -489,15 +657,42 @@ function AntragForm() {
                 />
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Telefon">
-                    <Input value={telefon} onChange={(e) => setTelefon(e.target.value)} />
-                  </Field>
+                  <div className="flex flex-col gap-1.5">
+                    <Field label="Telefon">
+                      <Input
+                        value={telefon}
+                        disabled={telefonOptOut}
+                        onChange={(e) => setTelefon(e.target.value)}
+                      />
+                    </Field>
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={telefonOptOut}
+                        onChange={(e) => {
+                          setTelefonOptOut(e.target.checked);
+                          if (e.target.checked) setTelefon("");
+                        }}
+                      />
+                      Ich möchte keine Telefonnummer angeben
+                    </label>
+                  </div>
                   <Field
                     label="E-Mail *"
+                    anchorId="f-email"
                     valid={/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())}
+                    error={errors.email}
+                    pulseNonce={pulseNonce}
                     hint="Wir benötigen Ihre E-Mail für die Bestätigung und die Kommunikation zum Antrag."
                   >
-                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                    <Input
+                      type="email"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        clearError("email");
+                      }}
+                    />
                   </Field>
                 </div>
 
@@ -513,7 +708,7 @@ function AntragForm() {
             </Card>
 
             {isMinor ? (
-              <Card>
+              <Card className="glass-card">
                 <CardHeader>
                   <CardTitle>Gesetzliche Vertretung</CardTitle>
                   <p className="text-sm text-muted-foreground">
@@ -523,11 +718,35 @@ function AntragForm() {
                 </CardHeader>
                 <CardContent className="flex flex-col gap-4">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field label="Vorname *" valid={erzVorname.trim().length >= 2}>
-                      <Input value={erzVorname} onChange={(e) => setErzVorname(e.target.value)} />
+                    <Field
+                      label="Vorname *"
+                      anchorId="f-erzVorname"
+                      valid={erzVorname.trim().length >= 2}
+                      error={errors.erzVorname}
+                      pulseNonce={pulseNonce}
+                    >
+                      <Input
+                        value={erzVorname}
+                        onChange={(e) => {
+                          setErzVorname(e.target.value);
+                          clearError("erzVorname");
+                        }}
+                      />
                     </Field>
-                    <Field label="Nachname *" valid={erzNachname.trim().length >= 2}>
-                      <Input value={erzNachname} onChange={(e) => setErzNachname(e.target.value)} />
+                    <Field
+                      label="Nachname *"
+                      anchorId="f-erzNachname"
+                      valid={erzNachname.trim().length >= 2}
+                      error={errors.erzNachname}
+                      pulseNonce={pulseNonce}
+                    >
+                      <Input
+                        value={erzNachname}
+                        onChange={(e) => {
+                          setErzNachname(e.target.value);
+                          clearError("erzNachname");
+                        }}
+                      />
                     </Field>
                   </div>
                   <div className="flex flex-col gap-1">
@@ -547,7 +766,7 @@ function AntragForm() {
               </Card>
             ) : null}
 
-            <Card>
+            <Card id="f-abteilung" className="glass-card scroll-mt-24">
               <CardHeader>
                 <CardTitle>Abteilungen *</CardTitle>
                 <p className="text-sm text-muted-foreground">
@@ -559,13 +778,19 @@ function AntragForm() {
                 <AbteilungPicker
                   abteilungen={abteilungen}
                   selected={selectedAbt}
-                  onToggle={(id) => toggle(selectedAbt, setSelectedAbt, id)}
+                  onToggle={(id) => {
+                    toggle(selectedAbt, setSelectedAbt, id);
+                    clearError("abteilung");
+                  }}
                 />
+                {errors.abteilung ? (
+                  <p className="mt-2 text-xs text-destructive">{errors.abteilung}</p>
+                ) : null}
               </CardContent>
             </Card>
 
             {!isMinor ? (
-              <Card>
+              <Card className="glass-card">
                 <CardHeader>
                   <CardTitle>Familie (optional)</CardTitle>
                   <p className="text-sm text-muted-foreground">
@@ -621,58 +846,97 @@ function AntragForm() {
                     ) : null}
 
                     <div className="flex flex-col gap-3">
-                      {kinder.map((k, i) => (
-                        // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and short-lived.
-                        <div key={`kind-${i}`} className="rounded-lg border border-border p-3">
-                          <div className="mb-2 flex items-center justify-between">
-                            <span className="text-sm font-medium">Kind {i + 1}</span>
-                            <button
-                              type="button"
-                              aria-label="Kind entfernen"
-                              onClick={() => setKinder((prev) => prev.filter((_, j) => j !== i))}
-                              className="text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
+                      {kinder.map((k, i) => {
+                        // Collapse other cards once there is more than one child;
+                        // a single child always stays open.
+                        const collapsible = kinder.length > 1;
+                        const open = !collapsible || expandedChild === i;
+                        const childName = `${k.vorname} ${k.nachname}`.trim();
+                        return (
+                          // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and short-lived.
+                          <div key={`kind-${i}`} className="rounded-lg border border-border p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <button
+                                type="button"
+                                aria-expanded={open}
+                                disabled={!collapsible}
+                                onClick={() => setExpandedChild(open ? null : i)}
+                                className={cn(
+                                  "flex min-w-0 items-center gap-1.5 text-sm font-medium",
+                                  collapsible ? "cursor-pointer" : "cursor-default",
+                                )}
+                              >
+                                {collapsible ? (
+                                  <ChevronDown
+                                    className={cn(
+                                      "size-4 shrink-0 text-muted-foreground transition-transform",
+                                      open ? "" : "-rotate-90",
+                                    )}
+                                  />
+                                ) : null}
+                                <span className="truncate">
+                                  Kind {i + 1}
+                                  {!open && childName ? (
+                                    <span className="font-normal text-muted-foreground">
+                                      {" "}
+                                      · {childName}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                aria-label="Kind entfernen"
+                                onClick={() => {
+                                  setKinder((prev) => prev.filter((_, j) => j !== i));
+                                  setExpandedChild(null);
+                                }}
+                                className="shrink-0 text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            </div>
+                            {open ? (
+                              <div className="motion-reveal-up mt-3 flex flex-col gap-2">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                  <Input
+                                    placeholder="Vorname"
+                                    value={k.vorname}
+                                    onChange={(e) =>
+                                      updateKind(setKinder, i, { vorname: e.target.value })
+                                    }
+                                  />
+                                  <Input
+                                    placeholder="Nachname"
+                                    value={k.nachname}
+                                    onChange={(e) =>
+                                      updateKind(setKinder, i, { nachname: e.target.value })
+                                    }
+                                  />
+                                  <Input
+                                    type="date"
+                                    value={k.geburtsdatum}
+                                    onChange={(e) =>
+                                      updateKind(setKinder, i, { geburtsdatum: e.target.value })
+                                    }
+                                  />
+                                </div>
+                                <AbteilungPicker
+                                  abteilungen={abteilungen}
+                                  selected={k.abteilungen}
+                                  onToggle={(id) =>
+                                    updateKind(setKinder, i, {
+                                      abteilungen: k.abteilungen.includes(id)
+                                        ? k.abteilungen.filter((x) => x !== id)
+                                        : [...k.abteilungen, id],
+                                    })
+                                  }
+                                />
+                              </div>
+                            ) : null}
                           </div>
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <Input
-                              placeholder="Vorname"
-                              value={k.vorname}
-                              onChange={(e) =>
-                                updateKind(setKinder, i, { vorname: e.target.value })
-                              }
-                            />
-                            <Input
-                              placeholder="Nachname"
-                              value={k.nachname}
-                              onChange={(e) =>
-                                updateKind(setKinder, i, { nachname: e.target.value })
-                              }
-                            />
-                            <Input
-                              type="date"
-                              value={k.geburtsdatum}
-                              onChange={(e) =>
-                                updateKind(setKinder, i, { geburtsdatum: e.target.value })
-                              }
-                            />
-                          </div>
-                          <div className="mt-2">
-                            <AbteilungPicker
-                              abteilungen={abteilungen}
-                              selected={k.abteilungen}
-                              onToggle={(id) =>
-                                updateKind(setKinder, i, {
-                                  abteilungen: k.abteilungen.includes(id)
-                                    ? k.abteilungen.filter((x) => x !== id)
-                                    : [...k.abteilungen, id],
-                                })
-                              }
-                            />
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                       <Button
                         type="button"
                         variant="outline"
@@ -682,15 +946,18 @@ function AntragForm() {
                           // Adding the first child implies a family, so pre-fill the
                           // partner's last name from the applicant when still empty.
                           if (!partnerNachname.trim()) setPartnerNachname(nachname.trim());
-                          setKinder((prev) => [
-                            ...prev,
-                            {
-                              vorname: "",
-                              nachname: nachname.trim(),
-                              geburtsdatum: "",
-                              abteilungen: [],
-                            },
-                          ]);
+                          setKinder((prev) => {
+                            setExpandedChild(prev.length);
+                            return [
+                              ...prev,
+                              {
+                                vorname: "",
+                                nachname: nachname.trim(),
+                                geburtsdatum: "",
+                                abteilungen: [],
+                              },
+                            ];
+                          });
                         }}
                       >
                         <Plus className="size-4" /> Kind hinzufügen
@@ -719,9 +986,12 @@ function AntragForm() {
         ) : null}
 
         {step === 1 ? (
-          <Card>
+          <Card className="glass-card">
             <CardHeader>
-              <CardTitle>SEPA-Lastschriftmandat</CardTitle>
+              <CardTitle className="flex items-center gap-1.5">
+                SEPA-Lastschriftmandat
+                <HelpTip text="Mit dem Mandat erlauben Sie dem Verein, den Jahresbeitrag von Ihrem Konto einzuziehen. Sie können einer Abbuchung innerhalb von acht Wochen widersprechen." />
+              </CardTitle>
               <p className="text-sm text-muted-foreground">
                 Zahlungspflichtig:{" "}
                 <span className="font-medium text-foreground">{payerName || EMPTY_VALUE}</span>. Der
@@ -766,14 +1036,20 @@ function AntragForm() {
                   />
                 </Field>
                 <div />
-                <IbanField
-                  value={iban}
-                  onChange={setIban}
-                  onResolved={(info) => {
-                    if (info.bic) setBic(info.bic);
-                    if (info.name) setKreditinstitut(info.name);
-                  }}
-                />
+                <div id="f-iban" className="scroll-mt-24">
+                  <IbanField
+                    value={iban}
+                    onChange={(v) => {
+                      setIban(v);
+                      clearError("iban");
+                    }}
+                    error={errors.iban}
+                    onResolved={(info) => {
+                      if (info.bic) setBic(info.bic);
+                      if (info.name) setKreditinstitut(info.name);
+                    }}
+                  />
+                </div>
                 <Field label="BIC" hint="Wird nach IBAN-Eingabe automatisch ergänzt.">
                   <Input value={bic} onChange={(e) => setBic(e.target.value.toUpperCase())} />
                 </Field>
@@ -790,7 +1066,7 @@ function AntragForm() {
 
         {step === 2 ? (
           <div className="flex flex-col gap-6">
-            <Card>
+            <Card className="glass-card">
               <CardHeader>
                 <CardTitle>Zusammenfassung</CardTitle>
                 <p className="text-sm text-muted-foreground">
@@ -853,7 +1129,7 @@ function AntragForm() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="glass-card">
               <CardHeader>
                 <CardTitle>Unterschrift</CardTitle>
                 <p className="text-sm text-muted-foreground">
@@ -895,7 +1171,7 @@ function AntragForm() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="glass-card">
               <CardContent className="flex flex-col gap-3 pt-6 text-sm">
                 <label className="flex items-start gap-2">
                   <input
@@ -960,24 +1236,41 @@ function AntragForm() {
           {warning}
         </p>
       ) : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p className="flex items-center gap-2 text-sm text-destructive">
+          <AlertTriangle className="size-4 shrink-0" />
+          {error}
+        </p>
+      ) : null}
 
       <div className="flex justify-between gap-2">
         <Button
           type="button"
           variant="outline"
+          className="btn-spring"
           onClick={back}
           disabled={step === 0 || submit.isPending}
         >
           <ChevronLeft className="size-4" /> Zurück
         </Button>
         {step < STEPS.length - 1 ? (
-          <Button type="button" onClick={next}>
+          <Button
+            ref={magnet.ref}
+            type="button"
+            className="btn-spring btn-magnetic"
+            onPointerMove={magnet.onPointerMove}
+            onPointerLeave={magnet.onPointerLeave}
+            onClick={next}
+          >
             Weiter <ChevronRight className="size-4" />
           </Button>
         ) : (
           <Button
+            ref={magnet.ref}
             type="button"
+            className="btn-spring btn-magnetic"
+            onPointerMove={magnet.onPointerMove}
+            onPointerLeave={magnet.onPointerLeave}
             disabled={
               submit.isPending ||
               dup.isPending ||
@@ -1138,24 +1431,76 @@ function Field({
   label,
   hint,
   valid,
+  error,
+  anchorId,
+  pulseNonce,
+  help,
   children,
 }: {
   label: string;
   hint?: string;
   valid?: boolean;
+  error?: string;
+  /** DOM id used as the scroll-to-error anchor (e.g. "f-vorname"). */
+  anchorId?: string;
+  pulseNonce?: number;
+  help?: string;
   children: React.ReactNode;
 }) {
+  // Flag the underlying control as invalid so it picks up the red focus ring.
+  const control =
+    error && isValidElement(children)
+      ? cloneElement(children as ReactElement<{ "aria-invalid"?: boolean }>, {
+          "aria-invalid": true,
+        })
+      : children;
   return (
-    <Label className="flex flex-col gap-1.5">
-      <span className="flex items-center gap-1.5">
-        {label}
-        {valid ? (
-          <CheckCircle2 className="motion-pop-in size-3.5 text-success" aria-label="gültig" />
+    <div id={anchorId} className="scroll-mt-24">
+      <Label className="flex flex-col gap-1.5">
+        <span className="flex items-center gap-1.5">
+          {label}
+          {valid && !error ? (
+            <CheckCircle2 className="motion-pop-in size-3.5 text-success" aria-label="gültig" />
+          ) : null}
+          {help ? <HelpTip text={help} /> : null}
+        </span>
+        {error ? (
+          <span key={pulseNonce} className="field-pulse block">
+            {control}
+          </span>
+        ) : (
+          control
+        )}
+        {error ? (
+          <span className="text-xs font-normal text-destructive">{error}</span>
+        ) : hint ? (
+          <span className="text-xs font-normal text-muted-foreground">{hint}</span>
         ) : null}
-      </span>
-      {children}
-      {hint ? <span className="text-xs font-normal text-muted-foreground">{hint}</span> : null}
-    </Label>
+      </Label>
+    </div>
+  );
+}
+
+// Small inline help: a question-mark button that toggles a short tooltip.
+function HelpTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-label="Hilfe anzeigen"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="text-muted-foreground hover:text-foreground"
+      >
+        <HelpCircle className="size-3.5" />
+      </button>
+      {open ? (
+        <span className="motion-pop-in absolute left-5 top-0 z-10 w-56 rounded-lg border border-border bg-popover p-2.5 text-xs font-normal leading-relaxed text-popover-foreground shadow-elevated">
+          {text}
+        </span>
+      ) : null}
+    </span>
   );
 }
 

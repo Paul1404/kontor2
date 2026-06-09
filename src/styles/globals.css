@@ -485,3 +485,62 @@ body::after {
     hsl(330 86% 70%) 100%
   );
 }
+
+/*
+ * Translucent card surface so the aurora backdrop reads through. Unlayered so
+ * the background wins over Tailwind's layered `bg-card` utility on the Card.
+ */
+.glass-card {
+  background-color: color-mix(in oklab, var(--color-card) 78%, transparent);
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+}
+
+/* Red ring that pulses twice to pull the eye to an invalid field after a
+   failed step validation. */
+@keyframes svuwv-error-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(0 72% 51% / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px hsl(0 72% 51% / 0.28);
+  }
+}
+
+.field-pulse {
+  border-radius: var(--radius-sm);
+  animation: svuwv-error-pulse 0.9s ease-in-out 2;
+}
+
+/* Spring on the primary actions, plus an optional magnetic pull toward the
+   cursor (offsets set in JS via --mx / --my). */
+.btn-spring {
+  transition:
+    transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 220ms ease;
+}
+.btn-spring:hover {
+  transform: translateY(-1px);
+}
+.btn-spring:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn-magnetic {
+  transform: translate(var(--mx, 0px), var(--my, 0px));
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-pulse {
+    animation: none;
+  }
+  .btn-spring,
+  .btn-spring:hover,
+  .btn-spring:active,
+  .btn-magnetic {
+    transform: none;
+    transition: none;
+  }
+}
