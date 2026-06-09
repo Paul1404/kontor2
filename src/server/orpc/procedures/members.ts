@@ -5,7 +5,14 @@ import { ABTEILUNG_NONE_FILTER } from "~/lib/abteilung-filter";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
 import { escapeLike } from "~/server/db/like";
-import { memberNotDeleted } from "~/server/db/member-filters";
+import {
+  memberHasDied,
+  memberHasExited,
+  memberHasPendingExit,
+  memberNotDeceased,
+  memberNotDeleted,
+  memberNotExited,
+} from "~/server/db/member-filters";
 import { withUniqueRetry } from "~/server/db/retry";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { attachmentsTable } from "~/server/db/schema/attachments";
@@ -36,7 +43,14 @@ import {
 import { validateIban } from "~/server/sepa/iban";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
-const StatusSchema = v.picklist(["aktiv", "passiv", "ausgetreten", "verstorben", "alle"]);
+const StatusSchema = v.picklist([
+  "aktiv",
+  "passiv",
+  "gekuendigt",
+  "ausgetreten",
+  "verstorben",
+  "alle",
+]);
 
 const SortBySchema = v.picklist(["nachname", "mitgliedsnummer", "ort", "email", "eintritt"]);
 const SortDirSchema = v.picklist(["asc", "desc"]);
@@ -296,24 +310,30 @@ export const membersRouter = {
       conditions.push(memberNotDeleted() as never);
     }
 
+    // "Exited" means the Austritt date has actually arrived. A member who has
+    // only given notice for a future date is still active and must stay in the
+    // default and "aktiv"/"passiv" views (see `memberNotExited`).
     if (!input.deletedOnly && !input.includeAusgetretene && input.status !== "ausgetreten") {
-      conditions.push(isNull(membersTable.austritt) as never);
+      conditions.push(memberNotExited() as never);
     }
     if (!input.deletedOnly && input.status === "ausgetreten") {
-      conditions.push(isNotNull(membersTable.austritt) as never);
+      conditions.push(memberHasExited() as never);
     }
     if (!input.deletedOnly && input.status === "verstorben") {
-      conditions.push(isNotNull(membersTable.verstorbenAm) as never);
+      conditions.push(memberHasDied() as never);
+    }
+    if (!input.deletedOnly && input.status === "gekuendigt") {
+      // Notice given, leave date still in the future.
+      conditions.push(memberHasPendingExit() as never);
     }
     if (!input.deletedOnly && input.status === "aktiv") {
-      // Match the dashboard's "Aktive Mitglieder" definition: not exited
-      // and not deceased. Enforce `isNull(austritt)` here directly so the
-      // result is correct even when `includeAusgetretene` is set (the
-      // explicit status wins over that broad toggle — otherwise exited
-      // members would leak into the "aktiv" list). The Linear `Aktiv`
-      // column is a free-form string and not reliable here.
-      conditions.push(isNull(membersTable.austritt) as never);
-      conditions.push(isNull(membersTable.verstorbenAm) as never);
+      // The dashboard's "Aktive Mitglieder" definition: still a member today,
+      // not deceased. Enforced directly so the result is correct even when
+      // `includeAusgetretene` is set (the explicit status wins over that broad
+      // toggle — otherwise exited members would leak into the "aktiv" list).
+      // The Linear `Aktiv` column is a free-form string and not reliable here.
+      conditions.push(memberNotExited() as never);
+      conditions.push(memberNotDeceased() as never);
     }
     if (!input.deletedOnly && input.status === "passiv") {
       // The normalized status already means "passive and neither exited nor
@@ -321,8 +341,8 @@ export const membersRouter = {
       // in case status ever drifts from the exit/death dates (e.g. a raw field
       // restore that wrote `austritt` without re-deriving status).
       conditions.push(eq(membersTable.status, "passiv") as never);
-      conditions.push(isNull(membersTable.austritt) as never);
-      conditions.push(isNull(membersTable.verstorbenAm) as never);
+      conditions.push(memberNotExited() as never);
+      conditions.push(memberNotDeceased() as never);
     }
 
     // "Verwaiste Kontakte" filter: Kontakt (no mitgliedsnummer) AND no relationship
@@ -669,12 +689,9 @@ export const membersRouter = {
   stats: authedProc.input(v.void()).handler(async ({ context }) =>
     cached(CACHE_NS.dashboard, "members-stats", 120, async () => {
       const notDeleted = memberNotDeleted();
-      const lebt = and(
-        notDeleted,
-        isNull(membersTable.austritt),
-        isNull(membersTable.verstorbenAm),
-      );
-      const [[total], [aktiv], [passiv], [ausgetreten], [verstorben], [kontakte]] =
+      // "Lebt": still a member today (a future-dated Austritt still counts).
+      const lebt = and(notDeleted, memberNotExited(), memberNotDeceased());
+      const [[total], [aktiv], [passiv], [gekuendigt], [ausgetreten], [verstorben], [kontakte]] =
         await Promise.all([
           context.db.select({ c: count() }).from(membersTable).where(notDeleted),
           context.db.select({ c: count() }).from(membersTable).where(lebt),
@@ -685,11 +702,15 @@ export const membersRouter = {
           context.db
             .select({ c: count() })
             .from(membersTable)
-            .where(and(notDeleted, isNotNull(membersTable.austritt))),
+            .where(and(notDeleted, memberHasPendingExit())),
           context.db
             .select({ c: count() })
             .from(membersTable)
-            .where(and(notDeleted, isNotNull(membersTable.verstorbenAm))),
+            .where(and(notDeleted, memberHasExited())),
+          context.db
+            .select({ c: count() })
+            .from(membersTable)
+            .where(and(notDeleted, memberHasDied())),
           context.db
             .select({ c: count() })
             .from(membersTable)
@@ -699,6 +720,7 @@ export const membersRouter = {
         total: total?.c ?? 0,
         aktiv: aktiv?.c ?? 0,
         passiv: passiv?.c ?? 0,
+        gekuendigt: gekuendigt?.c ?? 0,
         ausgetreten: ausgetreten?.c ?? 0,
         verstorben: verstorben?.c ?? 0,
         kontakte: kontakte?.c ?? 0,
@@ -1361,15 +1383,17 @@ export const membersRouter = {
         abteilungIds: input.abteilungIds,
       });
 
-      // Member row: stamp the leave date and flip to passive.
+      // Member row: stamp the leave/death date.
       const memberSet: Record<string, unknown> = { updatedAt: today };
       if (input.reason === "verstorben") {
         memberSet.verstorbenAm = austrittTs;
       } else {
         memberSet.austritt = austrittTs;
       }
-      // Normalized status: the exit/death dates win in deriveStatus, so a
-      // leaving member becomes ausgetreten/verstorben regardless of the A/P flag.
+      // Normalized status as of today: a leave date that has arrived flips the
+      // member to ausgetreten/verstorben, but a *future* leave date leaves them
+      // aktiv/passiv (notice given, still a member until then). The nightly
+      // reconcile flips them once the date passes.
       memberSet.status = deriveStatus({
         austritt: (memberSet.austritt as Date | null) ?? member.austritt,
         verstorbenAm: (memberSet.verstorbenAm as Date | null) ?? member.verstorbenAm,

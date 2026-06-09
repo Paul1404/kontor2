@@ -2,6 +2,7 @@ import { eq, isNull } from "drizzle-orm";
 import { db, sql } from "~/server/db/client";
 import { membersTable } from "~/server/db/schema/members";
 import { memberSnapshotsTable, snapshotRunsTable } from "~/server/db/schema/snapshots";
+import { reconcileMemberStatuses } from "~/server/domain/member-status-reconcile";
 import { logger } from "~/server/lib/logger";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
@@ -113,12 +114,34 @@ export async function runNightlySnapshot(
   }
 }
 
+/**
+ * Reconcile member status to the calendar (flip scheduled exits/deaths that
+ * have come due). Logged once, swallowing errors so a hiccup never blocks the
+ * snapshot run that follows it.
+ */
+async function runStatusReconcile(): Promise<void> {
+  try {
+    const { exited, deceased } = await reconcileMemberStatuses(db());
+    if (exited > 0 || deceased > 0) {
+      logger.info("member status reconciled", { exited, deceased });
+    }
+  } catch (err) {
+    logger.error("member status reconcile failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 export function startSnapshotScheduler(): void {
   if (process.env.SNAPSHOT_CRON_DISABLED === "1") {
     logger.info("snapshot scheduler disabled", { reason: "SNAPSHOT_CRON_DISABLED=1" });
     return;
   }
   if (scheduledTimeout) return; // already started
+
+  // Catch any exits/deaths whose date passed while the process was down, so the
+  // stored status is correct without waiting for the 02:30 run.
+  void runStatusReconcile();
 
   function schedule() {
     const next = nextRunAt();
@@ -130,6 +153,7 @@ export function startSnapshotScheduler(): void {
     scheduledTimeout = setTimeout(async () => {
       scheduledTimeout = null;
       try {
+        await runStatusReconcile();
         const result = await runNightlySnapshot({ actorEmail: "system:scheduler" });
         if (result.acquiredLock) {
           logger.info("nightly snapshot run", {

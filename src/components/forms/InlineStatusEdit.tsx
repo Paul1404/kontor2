@@ -5,12 +5,15 @@ import { createPortal } from "react-dom";
 import { Badge } from "~/components/ui/badge";
 import { toast } from "~/components/ui/toaster";
 import { cn } from "~/lib/cn";
+import { memberStatusView } from "~/lib/member-status";
 import { orpc } from "~/lib/orpc";
 
 type Member = {
   id: string;
   status: string | null;
   deletedAt: string | Date | null;
+  austritt: string | Date | null;
+  verstorbenAm: string | Date | null;
 };
 
 /**
@@ -184,9 +187,6 @@ function MenuItem({
 }
 
 function StaticBadge({ member }: { member: Member }) {
-  if (member.deletedAt) return <Badge variant="destructive">Gelöscht</Badge>;
-  if (member.status === "verstorben") return <Badge variant="secondary">Verstorben</Badge>;
-  if (member.status === "ausgetreten") return <Badge variant="warning">Ausgetreten</Badge>;
-  if (member.status === "passiv") return <Badge variant="secondary">Passiv</Badge>;
-  return <Badge variant="success">Aktiv</Badge>;
+  const view = memberStatusView(member);
+  return <Badge variant={view.variant}>{view.label}</Badge>;
 }

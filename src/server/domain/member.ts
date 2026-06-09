@@ -116,18 +116,49 @@ export function memberDisplayName(m: MemberNameParts): string {
   return m.kurzname ?? m.firma1 ?? `Mitglied ${memberRef(m)}`.trim();
 }
 
+/** A date value (timestamp or YYYY-MM-DD) that has taken effect by `asOf`. */
+function takesEffectBy(value: Date | string | null | undefined, asOf: Date): boolean {
+  if (value === null || value === undefined) return false;
+  const d = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(d.getTime())) return false;
+  return d.getTime() <= asOf.getTime();
+}
+
 /**
- * Collapse the legacy status signals into one canonical status. Precedence
- * mirrors the list/stats filters: a recorded death wins, then an exit date,
- * then the active/passive flag. Presence of `austritt`/`verstorbenAm` decides
- * exit/death regardless of whether the date is in the future, matching the
- * existing `isNull(austritt)` filters in the members procedures.
+ * Collapse the legacy status signals into one canonical status as of `asOf`
+ * (default: now). Precedence: a death that has occurred wins, then an exit that
+ * has taken effect, then the active/passive flag.
+ *
+ * Crucially, a *future* exit date does not flip the member yet: someone who has
+ * given notice effective at year-end is still aktiv/passiv until that day, so
+ * they keep counting in fee runs, dunning, and the Bestandserhebung. The stored
+ * status is reconciled to `ausgetreten` once the date arrives (see
+ * `reconcileMemberStatuses` in the nightly scheduler). Death dates are facts,
+ * never scheduled ahead, but are gated the same way for symmetry.
  */
-export function deriveStatus(m: MemberStatusParts): MemberStatus {
-  if (m.verstorbenAm !== null && m.verstorbenAm !== undefined) return "verstorben";
-  if (m.austritt !== null && m.austritt !== undefined) return "ausgetreten";
+export function deriveStatus(m: MemberStatusParts, asOf: Date = new Date()): MemberStatus {
+  if (takesEffectBy(m.verstorbenAm, asOf)) return "verstorben";
+  if (takesEffectBy(m.austritt, asOf)) return "ausgetreten";
   if ((m.aktivPasiv ?? "").trim().toUpperCase() === "P") return "passiv";
   return "aktiv";
+}
+
+/**
+ * The leave date a member has been given notice for but that has not yet taken
+ * effect (`austritt` in the future relative to `asOf`), or null when the member
+ * has no pending exit. Such a member is still aktiv/passiv until the date; this
+ * is what the UI surfaces as "Kündigt zum …". A death already recorded takes
+ * precedence and clears any pending exit.
+ */
+export function pendingAustrittDate(
+  m: Pick<MemberStatusParts, "austritt" | "verstorbenAm">,
+  asOf: Date = new Date(),
+): Date | null {
+  if (takesEffectBy(m.verstorbenAm, asOf)) return null;
+  if (m.austritt === null || m.austritt === undefined) return null;
+  const d = m.austritt instanceof Date ? m.austritt : new Date(m.austritt);
+  if (!Number.isFinite(d.getTime())) return null;
+  return d.getTime() > asOf.getTime() ? d : null;
 }
 
 /** A "live" member for counts/lists: still a member, neither exited nor deceased. */
