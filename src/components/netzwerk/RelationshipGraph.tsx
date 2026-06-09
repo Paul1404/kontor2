@@ -3,9 +3,11 @@
  * nodes + undirected edges in an SVG that pans (drag) and zooms (wheel /
  * buttons). Layout is component-based: each connected "family" is laid out on
  * its own little ring (or a star when one person is the clear hub), then the
- * clusters are packed into a rough grid. That keeps families readable as
- * separate islands instead of one hairball, and it is fast and deterministic
- * (no physics simulation, no resize observer).
+ * clusters are circle-packed from the center outward so the biggest families
+ * sit in the middle and the whole thing reads as one organic cloud instead of a
+ * rigid grid. Each family gets a soft tinted bubble behind it so groups read as
+ * units at a glance. It is fast and deterministic (no physics simulation, no
+ * resize observer).
  *
  * Interaction: clicking a person selects them (it does not navigate) and opens
  * a details panel listing their connections. Clicking a connection hops to that
@@ -38,9 +40,19 @@ export type GraphEdge = {
 
 type Point = { x: number; y: number };
 type View = { x: number; y: number; w: number; h: number };
+type Cluster = { x: number; y: number; r: number; color: string };
 
 const SPACING = 96;
 const GUTTER = 64;
+/** Soft tint cycled across families so neighbouring bubbles stay distinct. */
+const FAMILY_COLORS = [
+  PALETTE.indigo,
+  PALETTE.sky,
+  PALETTE.violet,
+  PALETTE.emerald,
+  PALETTE.amber,
+  PALETTE.rose,
+];
 
 /** Lay out one connected component centered on the origin. */
 function layoutComponent(
@@ -74,7 +86,34 @@ function layoutComponent(
   return out;
 }
 
-/** Full layout: positions per node id + the overall bounding box. */
+/**
+ * Find a center for a circle of radius `r` that does not overlap any already
+ * placed circle, walking a phyllotaxis (sunflower) spiral outward from the
+ * origin. The spiral keeps packing density even, so families settle into a
+ * round cloud instead of long rows.
+ */
+function findSpot(placed: Cluster[], r: number, gap: number): Point {
+  if (placed.length === 0) return { x: 0, y: 0 };
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const step = SPACING * 0.32;
+  for (let i = 1; i < 8000; i++) {
+    const dist = step * Math.sqrt(i);
+    const ang = i * golden;
+    const x = Math.cos(ang) * dist;
+    const y = Math.sin(ang) * dist;
+    let ok = true;
+    for (const p of placed) {
+      if (Math.hypot(p.x - x, p.y - y) < p.r + r + gap) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return { x, y };
+  }
+  return { x: 0, y: 0 };
+}
+
+/** Full layout: positions per node id, family bubbles, and the bounding box. */
 function computeLayout(nodes: GraphNode[], edges: GraphEdge[]) {
   const idToIdx = new Map(nodes.map((node, i) => [node.id, i]));
   const parent = nodes.map((_, i) => i);
@@ -116,60 +155,61 @@ function computeLayout(nodes: GraphNode[], edges: GraphEdge[]) {
     else comps.set(r, [i]);
   });
 
-  type Block = { indices: number[]; local: Map<number, Point>; w: number; h: number };
+  type Block = { indices: number[]; local: Map<number, Point>; radius: number };
   const blocks: Block[] = [];
   for (const idxs of comps.values()) {
     const local = layoutComponent(idxs, degree, adjacency);
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const p of local.values()) {
-      minX = Math.min(minX, p.x);
-      minY = Math.min(minY, p.y);
-      maxX = Math.max(maxX, p.x);
-      maxY = Math.max(maxY, p.y);
-    }
-    // Normalize so the block starts at (0,0) with a little internal margin.
-    const m = SPACING * 0.5;
-    for (const [i, p] of local) local.set(i, { x: p.x - minX + m, y: p.y - minY + m });
-    blocks.push({
-      indices: idxs,
-      local,
-      w: maxX - minX + m * 2,
-      h: maxY - minY + m * 2,
-    });
+    // Radius of the family = farthest node from its centre, plus room for the
+    // node dot and the label that hangs below it.
+    let reach = 0;
+    for (const p of local.values()) reach = Math.max(reach, Math.hypot(p.x, p.y));
+    blocks.push({ indices: idxs, local, radius: reach + SPACING * 0.6 });
   }
 
-  // Largest families first, packed left-to-right into a roughly square area.
-  blocks.sort((a, b) => b.indices.length - a.indices.length);
-  const totalArea = blocks.reduce((s, b) => s + (b.w + GUTTER) * (b.h + GUTTER), 0);
-  const rowWidth = Math.max(SPACING * 4, Math.sqrt(totalArea) * 1.3);
+  // Largest families first so they claim the centre of the cloud.
+  blocks.sort((a, b) => b.indices.length - a.indices.length || b.radius - a.radius);
 
   const positions = new Array<Point>(nodes.length);
-  let cursorX = 0;
-  let cursorY = 0;
-  let rowHeight = 0;
-  let boundW = 0;
-  for (const block of blocks) {
-    if (cursorX > 0 && cursorX + block.w > rowWidth) {
-      cursorX = 0;
-      cursorY += rowHeight + GUTTER;
-      rowHeight = 0;
-    }
+  const clusters: Cluster[] = [];
+  const placed: Cluster[] = [];
+  const gap = GUTTER * 0.5;
+  blocks.forEach((block, bi) => {
+    const center = findSpot(placed, block.radius, gap);
+    const cluster: Cluster = {
+      x: center.x,
+      y: center.y,
+      r: block.radius,
+      color: FAMILY_COLORS[bi % FAMILY_COLORS.length]!,
+    };
+    placed.push(cluster);
+    clusters.push(cluster);
     for (const [i, p] of block.local) {
-      positions[i] = { x: cursorX + p.x, y: cursorY + p.y };
+      positions[i] = { x: center.x + p.x, y: center.y + p.y };
     }
-    cursorX += block.w + GUTTER;
-    rowHeight = Math.max(rowHeight, block.h);
-    boundW = Math.max(boundW, cursorX - GUTTER);
+  });
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const c of clusters) {
+    minX = Math.min(minX, c.x - c.r);
+    minY = Math.min(minY, c.y - c.r);
+    maxX = Math.max(maxX, c.x + c.r);
+    maxY = Math.max(maxY, c.y + c.r);
   }
-  const boundH = cursorY + rowHeight;
+  if (!Number.isFinite(minX)) {
+    minX = 0;
+    minY = 0;
+    maxX = SPACING;
+    maxY = SPACING;
+  }
 
   return {
     positions,
-    bbox: { w: Math.max(boundW, SPACING), h: Math.max(boundH, SPACING) },
-    families: blocks.length,
+    clusters,
+    bbox: { w: Math.max(maxX - minX, SPACING), h: Math.max(maxY - minY, SPACING) },
+    families: clusters.length,
   };
 }
 
@@ -193,8 +233,22 @@ function fitView(points: Point[], pad: number): View {
   };
 }
 
+/** Quadratic bezier with a gentle, consistent bow so links look organic. */
+function edgePath(a: Point, b: Point): string {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const off = Math.min(len * 0.12, 20);
+  const cx = (a.x + b.x) / 2 + (-dy / len) * off;
+  const cy = (a.y + b.y) / 2 + (dx / len) * off;
+  return `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`;
+}
+
 export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges: GraphEdge[] }) {
-  const { positions, bbox, families } = useMemo(() => computeLayout(nodes, edges), [nodes, edges]);
+  const { positions, clusters, bbox, families } = useMemo(
+    () => computeLayout(nodes, edges),
+    [nodes, edges],
+  );
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const posById = useMemo(() => {
     const m = new Map<string, Point>();
@@ -405,6 +459,21 @@ export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges:
           }}
         >
           <g>
+            {clusters.map((c) => (
+              <circle
+                key={`cluster-${Math.round(c.x)}-${Math.round(c.y)}`}
+                cx={c.x}
+                cy={c.y}
+                r={c.r - SPACING * 0.25}
+                fill={c.color}
+                stroke={c.color}
+                strokeWidth={1.5}
+                fillOpacity={focusId ? 0.03 : 0.06}
+                strokeOpacity={focusId ? 0.08 : 0.16}
+              />
+            ))}
+          </g>
+          <g>
             {edges.map((e) => {
               const a = posById.get(e.source);
               const b = posById.get(e.target);
@@ -412,20 +481,19 @@ export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges:
               const dim = isDimmed(e.source) && isDimmed(e.target);
               const active = focusId != null && (e.source === focusId || e.target === focusId);
               return (
-                <line
+                <path
                   key={`${e.source}|${e.target}`}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
+                  d={edgePath(a, b)}
+                  fill="none"
                   stroke={e.istVertreter ? PALETTE.amber : "currentColor"}
                   className={e.istVertreter ? "" : "text-border"}
                   strokeWidth={active ? 3 : e.istVertreter ? 2.5 : 1.5}
+                  strokeLinecap="round"
                   strokeDasharray={e.istVertreter ? "6 4" : undefined}
-                  opacity={dim ? 0.12 : active ? 1 : 0.55}
+                  opacity={dim ? 0.1 : active ? 1 : 0.5}
                 >
                   {e.label ? <title>{e.label}</title> : null}
-                </line>
+                </path>
               );
             })}
           </g>
@@ -446,7 +514,7 @@ export function RelationshipGraph({ nodes, edges }: { nodes: GraphNode[]; edges:
                     e.stopPropagation();
                     if (!dragged.current) selectNode(node.id);
                   }}
-                  style={{ opacity: dim ? 0.25 : 1, cursor: "pointer" }}
+                  style={{ opacity: dim ? 0.22 : 1, cursor: "pointer" }}
                 >
                   {isSelected ? (
                     <circle

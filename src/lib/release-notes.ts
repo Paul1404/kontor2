@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.41.0",
+    date: "2026-06-09",
+    title: "Übersichtlicheres Beziehungsnetzwerk",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Das Beziehungsnetzwerk ist neu angeordnet. Jede Familie sitzt jetzt als eigene farbige Blase in einer runden Karte, die größten Familien in der Mitte, statt als gleichförmiges Raster aus Punkten. Verbindungen sind leicht geschwungen und Gruppen sind auf einen Blick zu erkennen.",
+      },
+    ],
+  },
+  {
     version: "0.40.0",
     date: "2026-06-09",
     title: "Klarere Auswertungen und deutsche Beschriftungen",
