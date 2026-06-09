@@ -410,7 +410,10 @@ export const dunningRouter = {
             createdBy: context.session!.user.id,
           } satisfies NewDunningRun as never)
           .returning({ id: dunningRunsTable.id });
-        if (!runRow) throw new Error("dunning_runs insert returned no row");
+        if (!runRow)
+          throw new ORPCError("INTERNAL_SERVER_ERROR", {
+            message: "Mahnlauf konnte nicht angelegt werden.",
+          });
 
         // Render PDFs + collect item values.
         const itemValues: NewDunningItem[] = [];

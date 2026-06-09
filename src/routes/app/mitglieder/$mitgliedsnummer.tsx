@@ -38,6 +38,7 @@ import { CopyButton } from "~/components/ui/copy-button";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Tabs } from "~/components/ui/tabs";
 import { toast } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/audit-labels";
 import { formatLand } from "~/lib/country";
 import { triggerDownload } from "~/lib/download";
@@ -198,57 +199,55 @@ function MemberDetailPage() {
             {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")}
             <MemberStatusBadge member={member} />
             {!member.memberNo ? (
-              <Badge variant="outline" title="Zahlt für ein Mitglied, ist aber selbst keines">
-                Kontakt
-              </Badge>
+              <Tooltip content="Zahlt für ein Mitglied, ist aber selbst keines">
+                <Badge variant="outline">Kontakt</Badge>
+              </Tooltip>
             ) : null}
             {member.directDebitBlocked ? (
-              <Badge variant="warning" title="SEPA-Lastschrift ist für dieses Mitglied ausgesetzt">
-                Einzug ausgesetzt
-              </Badge>
+              <Tooltip content="SEPA-Lastschrift ist für dieses Mitglied ausgesetzt">
+                <Badge variant="warning">Einzug ausgesetzt</Badge>
+              </Tooltip>
             ) : null}
             {member.ruhend ? (
-              <Badge
-                variant="secondary"
-                title="Ruhende Mitgliedschaft: der Beitragslauf überspringt dieses Mitglied"
-              >
-                Ruhend
-              </Badge>
+              <Tooltip content="Ruhende Mitgliedschaft: der Beitragslauf überspringt dieses Mitglied">
+                <Badge variant="secondary">Ruhend</Badge>
+              </Tooltip>
             ) : null}
             {member.beitragsbefreit ? (
-              <Badge
-                variant="secondary"
-                title="Beitragsbefreit: der Beitragslauf erstellt keine Sollstellung"
-              >
-                Beitragsbefreit
-              </Badge>
+              <Tooltip content="Beitragsbefreit: der Beitragslauf erstellt keine Sollstellung">
+                <Badge variant="secondary">Beitragsbefreit</Badge>
+              </Tooltip>
             ) : null}
           </h1>
-          <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-            {member.memberNo ? (
-              <>
-                Mitgliedsnummer: <span className="tabular-nums">{member.memberNo}</span>
-                <CopyButton value={member.memberNo} label="Mitgliedsnummer" />
-              </>
-            ) : (
-              <>
-                Kontaktnummer: <span className="tabular-nums">{member.kontaktNo}</span>
-                <CopyButton value={member.kontaktNo ?? ""} label="Kontaktnummer" />
-              </>
-            )}
-            {member.mitgliedsnummer ? (
-              <>
-                <span className="text-muted-foreground/50">·</span>
-                <span title="Frühere Linear-Mitgliedsnummer">
-                  Alt-Nr. <span className="tabular-nums">{member.mitgliedsnummer}</span>
-                </span>
-              </>
-            ) : null}
-            <span className="text-muted-foreground/50">·</span>
-            <span title="Interne Adressnummer">
-              AdrNr <span className="tabular-nums">{member.adrNr}</span>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-sm">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {member.memberNo ? "Mitgliedsnr." : "Kontaktnr."}
+              </span>
+              <span className="font-medium tabular-nums text-foreground">
+                {member.memberNo ?? member.kontaktNo ?? EMPTY_VALUE}
+              </span>
+              <CopyButton
+                value={member.memberNo ?? member.kontaktNo ?? ""}
+                label={member.memberNo ? "Mitgliedsnummer" : "Kontaktnummer"}
+                className="-mr-1 size-5"
+              />
             </span>
-          </p>
+            {member.mitgliedsnummer ? (
+              <Tooltip content="Frühere Mitgliedsnummer aus der Linear-Verwaltung">
+                <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
+                  Alt-Nr.
+                  <span className="tabular-nums text-foreground/80">{member.mitgliedsnummer}</span>
+                </span>
+              </Tooltip>
+            ) : null}
+            <Tooltip content="Interne Adressnummer aus der Stammdatenverwaltung">
+              <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
+                AdrNr
+                <span className="tabular-nums text-foreground/80">{member.adrNr}</span>
+              </span>
+            </Tooltip>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button

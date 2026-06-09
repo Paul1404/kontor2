@@ -10,6 +10,7 @@ import {
 } from "~/components/forms/MemberStammdatenForm";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
+import { toast } from "~/components/ui/toaster";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/mitglieder/$mitgliedsnummer_/bearbeiten")({
@@ -47,6 +48,7 @@ function EditMemberPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
       await qc.invalidateQueries({ queryKey: ["members.list"] });
+      toast.success("Änderungen gespeichert.");
       navigate({
         to: "/app/mitglieder/$mitgliedsnummer",
         params: { mitgliedsnummer },

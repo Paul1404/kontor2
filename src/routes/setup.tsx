@@ -68,7 +68,7 @@ function SetupPage() {
           {status.isLoading ? (
             <div className="flex flex-col items-center gap-2 py-6 text-sm text-muted-foreground">
               <Loader2 className="size-5 animate-spin" />
-              Wird geprüft...
+              Wird geprüft…
             </div>
           ) : status.isError ? (
             <div className="flex flex-col items-center gap-2 py-4 text-sm text-destructive">

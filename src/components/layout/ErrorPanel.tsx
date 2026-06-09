@@ -55,7 +55,7 @@ export function ErrorPanel({
         {showHome ? (
           <Link to="/app">
             <Button variant="outline">
-              <ArrowLeft className="size-4" /> Zum Dashboard
+              <ArrowLeft className="size-4" /> Zur Übersicht
             </Button>
           </Link>
         ) : null}
@@ -94,7 +94,7 @@ export function NotFoundPanel({ children }: { children?: ReactNode }) {
       </div>
       <Link to="/app">
         <Button>
-          <ArrowLeft className="size-4" /> Zum Dashboard
+          <ArrowLeft className="size-4" /> Zur Übersicht
         </Button>
       </Link>
     </div>

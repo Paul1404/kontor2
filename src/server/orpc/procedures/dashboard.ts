@@ -259,9 +259,9 @@ export const dashboardRouter = {
       `),
           context.db.execute<{ year: number; soll: number; bezahlt: number; offen: number }>(sql`
         select billing_year as year,
-               sum(amount)::float8 as soll,
-               sum(paid_amount)::float8 as bezahlt,
-               sum(open_amount)::float8 as offen
+               sum(amount)::numeric as soll,
+               sum(paid_amount)::numeric as bezahlt,
+               sum(open_amount)::numeric as offen
         from soll_stellungen
         where status <> 'cancelled'
         group by billing_year
@@ -269,7 +269,7 @@ export const dashboardRouter = {
         limit 8
       `),
           context.db.execute<{ mahnstufe: number; anzahl: number; offen: number }>(sql`
-        select mahnstufe, count(*)::int as anzahl, coalesce(sum(open_amount), 0)::float8 as offen
+        select mahnstufe, count(*)::int as anzahl, coalesce(sum(open_amount), 0)::numeric as offen
         from soll_stellungen
         where status in ('open', 'returned') and open_amount > 0
         group by mahnstufe

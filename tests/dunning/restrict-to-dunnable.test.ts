@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { restrictToDunnable } from "./build-dunning";
+import { restrictToDunnable } from "~/server/dunning/build-dunning";
 
 type M = {
   memberId: string;

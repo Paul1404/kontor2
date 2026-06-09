@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { altMitgliedsnummer, memberRef } from "./member-ref";
+import { altMitgliedsnummer, memberRef } from "~/lib/member-ref";
 
 describe("memberRef", () => {
   it("prefers the app-owned member number", () => {

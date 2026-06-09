@@ -49,7 +49,7 @@ const SECTIONS: NavSection[] = [
   {
     label: null,
     items: [
-      { to: "/app", label: "Dashboard", icon: <LayoutDashboard className="size-[18px]" /> },
+      { to: "/app", label: "Übersicht", icon: <LayoutDashboard className="size-[18px]" /> },
       { to: "/app/mitglieder", label: "Mitglieder", icon: <Users className="size-[18px]" /> },
       {
         to: "/app/antraege",
@@ -105,7 +105,11 @@ const SECTIONS: NavSection[] = [
         icon: <ListChecks className="size-[18px]" />,
         vorstandOnly: true,
       },
-      { to: "/app/audit", label: "Audit Log", icon: <ScrollText className="size-[18px]" /> },
+      {
+        to: "/app/audit",
+        label: "Änderungsprotokoll",
+        icon: <ScrollText className="size-[18px]" />,
+      },
       {
         to: "/app/dsgvo",
         label: "Datenschutz",
@@ -125,7 +129,7 @@ const SECTIONS: NavSection[] = [
     items: [
       {
         to: "/app/import",
-        label: "Import",
+        label: "Datenimport",
         icon: <FileSpreadsheet className="size-[18px]" />,
         adminOnly: true,
       },

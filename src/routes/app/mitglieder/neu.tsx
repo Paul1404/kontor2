@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
+import { toast } from "~/components/ui/toaster";
 import { cn } from "~/lib/cn";
 import { orpc } from "~/lib/orpc";
 
@@ -70,6 +71,7 @@ function NewMemberPage() {
     },
     onSuccess: async (result) => {
       await qc.invalidateQueries({ queryKey: ["members.list"] });
+      toast.success("Mitglied angelegt.");
       navigate({
         to: "/app/mitglieder/$mitgliedsnummer",
         params: { mitgliedsnummer: result.ref },

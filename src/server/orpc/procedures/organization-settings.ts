@@ -89,6 +89,14 @@ export const organizationSettingsRouter = {
       throw new ORPCError("BAD_REQUEST", { message: "IBAN ungültig (Prüfsumme fehlerhaft)." });
     }
 
+    const bic = input.vereinsBic.toUpperCase().replace(/\s+/g, "");
+    // 8 or 11 chars: 6 letters (bank + country) + 2 alphanumeric (location) +
+    // optional 3 alphanumeric (branch). A malformed BIC would otherwise land in
+    // the pain.008 and be rejected by the bank on upload.
+    if (!/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(bic)) {
+      throw new ORPCError("BAD_REQUEST", { message: "BIC ungültig (8 oder 11 Zeichen erwartet)." });
+    }
+
     const existing = (await context.db.select().from(organizationSettingsTable).limit(1))[0];
 
     const next = {
@@ -100,7 +108,7 @@ export const organizationSettingsRouter = {
       glaeubigerId: input.glaeubigerId,
       vereinsIban: iban,
       vereinsIbanLast4: lastFour(iban)!,
-      vereinsBic: input.vereinsBic.toUpperCase().replace(/\s+/g, ""),
+      vereinsBic: bic,
       vereinsBankname: input.vereinsBankname,
       defaultFalligkeitTag: input.defaultFalligkeitTag,
       mahngebuhr1: input.mahngebuhr1,

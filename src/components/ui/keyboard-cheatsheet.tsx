@@ -16,9 +16,9 @@ const SECTIONS: Array<{ title: string; items: Shortcut[] }> = [
   {
     title: "Navigation",
     items: [
-      { keys: ["g", "d"], label: "Dashboard" },
+      { keys: ["g", "d"], label: "Übersicht" },
       { keys: ["g", "m"], label: "Mitglieder" },
-      { keys: ["g", "a"], label: "Audit Log" },
+      { keys: ["g", "a"], label: "Änderungsprotokoll" },
       { keys: ["g", "b"], label: "Beitragsläufe", needsRole: ["vorstand", "admin"] },
       { keys: ["g", "s"], label: "Snapshots", needsRole: ["admin"] },
     ],

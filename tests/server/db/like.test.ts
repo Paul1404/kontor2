@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeLike } from "./like";
+import { escapeLike } from "~/server/db/like";
 
 describe("escapeLike", () => {
   it("escapes LIKE wildcards so they match literally", () => {

@@ -626,7 +626,9 @@ function IncludedTable(props: { candidates: PreviewData["candidates"] }) {
                         <div className="text-xs text-muted-foreground">inkl. Aufnahmegebühr</div>
                       ) : null}
                     </td>
-                    <td className="px-4 py-2 font-mono text-xs">{chosen?.mandatsNr ?? "?"}</td>
+                    <td className="px-4 py-2 font-mono text-xs">
+                      {chosen?.mandatsNr ?? EMPTY_VALUE}
+                    </td>
                     <td className="px-4 py-2">
                       <Badge variant="secondary">{c.sequenceType}</Badge>
                     </td>

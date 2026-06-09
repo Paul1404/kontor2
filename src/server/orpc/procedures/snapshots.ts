@@ -576,7 +576,8 @@ export const snapshotsRouter = {
               .from(membersTable)
               .where(eq(membersTable.id, snap.memberId))
               .limit(1);
-            if (!current) throw new Error("Mitglied existiert nicht mehr.");
+            if (!current)
+              throw new ORPCError("NOT_FOUND", { message: "Mitglied existiert nicht mehr." });
             const currentDeps = await loadCurrentDependents(tx, snap.memberId);
             const diffPayload = diffSnapshotVsCurrent(
               {

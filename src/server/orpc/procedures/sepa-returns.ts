@@ -5,6 +5,7 @@ import { appendAudit } from "~/server/audit/log";
 import { matchCamtReturns, parseCamt054, type ReturnableItem } from "~/server/bank/camt054";
 import type { DB } from "~/server/db/client";
 import { escapeLike } from "~/server/db/like";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { sepaReturnsTable } from "~/server/db/schema/dunning";
 import { feeRunItemsTable, feeRunsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
@@ -192,6 +193,7 @@ export const sepaReturnsRouter = {
       const where = and(
         eq(feeRunsTable.status, "committed"),
         sql`${feeRunItemsTable.returnedAt} is null`,
+        memberNotDeleted(),
         q
           ? sql`(
               ${membersTable.mitgliedsnummer} ilike ${like} or
