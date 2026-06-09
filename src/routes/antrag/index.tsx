@@ -1,17 +1,24 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  ArrowRight,
   Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
+  Clock,
+  Copy,
+  CreditCard,
   Loader2,
+  Mail,
   Pencil,
+  PenLine,
   Plus,
   Send,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AbteilungPicker } from "~/components/antrag/abteilung-picker";
 import { IbanField } from "~/components/antrag/iban-field";
 import { SignaturePad } from "~/components/antrag/signature-pad";
@@ -51,6 +58,7 @@ function AntragForm() {
   const vereinsname = settings.data?.vereinsname ?? "der Verein";
 
   const [step, setStep] = useState(0);
+  const [dir, setDir] = useState<"forward" | "backward">("forward");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ antragsnummer: string } | null>(null);
 
@@ -173,541 +181,548 @@ function AntragForm() {
     return null;
   }
 
+  function goTo(target: number) {
+    setDir(target > step ? "forward" : "backward");
+    setStep(target);
+  }
+
   function next() {
     const err = validateStep(step);
     setError(err);
-    if (!err) setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    if (!err) {
+      setDir("forward");
+      setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    }
+  }
+
+  function back() {
+    setError(null);
+    setDir("backward");
+    setStep((s) => Math.max(s - 1, 0));
   }
 
   const selectedAbtNames = abteilungen.filter((a) => selectedAbt.includes(a.id)).map((a) => a.name);
+  const tarifLabel =
+    antragstyp === "familie" ? "Familienmitgliedschaft" : (fee.data?.label ?? null);
 
   if (result) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CheckCircle2 className="size-5 text-success" /> Antrag eingegangen
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 text-sm">
-          <p>
-            Vielen Dank. Ihre Antragsnummer lautet{" "}
-            <span className="font-semibold">{result.antragsnummer}</span>.
-          </p>
-          <p className="text-muted-foreground">
-            {signOnline
-              ? "Sie erhalten eine Bestätigung per E-Mail mit der Beitrittserklärung im Anhang."
-              : "Sie erhalten die Beitrittserklärung per E-Mail. Bitte unterschreiben Sie sie und laden Sie den Scan über den Link in der E-Mail wieder hoch."}
-          </p>
-          <Link
-            to="/antrag/status"
-            search={{ nr: result.antragsnummer }}
-            className="text-sm text-primary hover:underline"
-          >
-            Status verfolgen
-          </Link>
-        </CardContent>
-      </Card>
+      <SuccessScreen
+        antragsnummer={result.antragsnummer}
+        signOnline={signOnline}
+        email={email}
+        name={`${vorname} ${nachname}`.trim()}
+        tarif={tarifLabel}
+        jahresbeitrag={fee.data ? formatCurrency(fee.data.jahresbeitrag) : null}
+        abteilungen={selectedAbtNames}
+      />
     );
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <Stepper step={step} />
+      <Stepper step={step} onJump={(i) => i < step && goTo(i)} />
 
-      {step === 0 ? (
-        <div className="flex flex-col gap-6">
+      <div
+        key={step}
+        className={dir === "forward" ? "motion-step-forward" : "motion-step-backward"}
+      >
+        {step === 0 ? (
+          <div className="flex flex-col gap-6">
+            <IntroPanel />
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Mitgliedsdaten</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Geben Sie die Daten der Person ein, die Mitglied werden soll. Der passende Tarif
+                  wird automatisch anhand des Alters ermittelt.
+                </p>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {!isMinor ? (
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Anrede *</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {(["Herr", "Frau", "keine Angabe"] as Anrede[]).map((a) => (
+                        <button
+                          key={a}
+                          type="button"
+                          onClick={() => setGeschlecht(a)}
+                          className={cn(
+                            "rounded-full border px-3 py-1.5 text-sm transition-all active:scale-95",
+                            geschlecht === a
+                              ? "border-primary bg-primary/10 shadow-soft"
+                              : "border-border text-muted-foreground hover:border-ring/40",
+                          )}
+                        >
+                          {a}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Vorname *">
+                    <Input value={vorname} onChange={(e) => setVorname(e.target.value)} />
+                  </Field>
+                  <Field label="Nachname *">
+                    <Input value={nachname} onChange={(e) => setNachname(e.target.value)} />
+                  </Field>
+                  <Field label="Geburtsdatum *">
+                    <Input
+                      type="date"
+                      value={geburtsdatum}
+                      onChange={(e) => setGeburtsdatum(e.target.value)}
+                    />
+                  </Field>
+                  <div />
+                  <Field label="Straße">
+                    <Input value={strasse} onChange={(e) => setStrasse(e.target.value)} />
+                  </Field>
+                  <Field label="Hausnummer">
+                    <Input value={hausnummer} onChange={(e) => setHausnummer(e.target.value)} />
+                  </Field>
+                  <Field label="PLZ">
+                    <Input value={plz} onChange={(e) => setPlz(e.target.value)} />
+                  </Field>
+                  <Field label="Ort">
+                    <Input value={ort} onChange={(e) => setOrt(e.target.value)} />
+                  </Field>
+                  <Field label="Telefon">
+                    <Input value={telefon} onChange={(e) => setTelefon(e.target.value)} />
+                  </Field>
+                  <Field
+                    label="E-Mail *"
+                    hint="Wir benötigen Ihre E-Mail für die Bestätigung und die Kommunikation zum Antrag."
+                  >
+                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  </Field>
+                </div>
+
+                {age != null ? (
+                  <FeeCard
+                    tarif={tarifLabel}
+                    betrag={fee.data ? formatCurrency(fee.data.jahresbeitrag) : null}
+                    isMinor={isMinor}
+                    loading={fee.isLoading}
+                  />
+                ) : null}
+              </CardContent>
+            </Card>
+
+            {isMinor ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Gesetzliche Vertretung</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Diese Person unterschreibt die Beitrittserklärung, erteilt das SEPA-Mandat und
+                    ist Ansprechpartner für den Verein.
+                  </p>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Field label="Vorname *">
+                      <Input value={erzVorname} onChange={(e) => setErzVorname(e.target.value)} />
+                    </Field>
+                    <Field label="Nachname *">
+                      <Input value={erzNachname} onChange={(e) => setErzNachname(e.target.value)} />
+                    </Field>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={elternteilMitglied}
+                        onChange={(e) => setElternteilMitglied(e.target.checked)}
+                      />
+                      Ein Elternteil ist bereits Mitglied
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Falls ja, erhalten Kinder und Jugendliche einen vergünstigten Beitrag.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Abteilungen *</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Mehrfachauswahl ist möglich. Wählen Sie keine Abteilung, wenn Sie den Verein nur
+                  passiv unterstützen möchten.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <AbteilungPicker
+                  abteilungen={abteilungen}
+                  selected={selectedAbt}
+                  onToggle={(id) => toggle(selectedAbt, setSelectedAbt, id)}
+                />
+              </CardContent>
+            </Card>
+
+            {!isMinor ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Familie (optional)</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Die Familienmitgliedschaft gilt für zwei Erwachsene und beliebig viele Kinder
+                    bis 18 Jahre, unabhängig von der Kinderzahl. Tragen Sie dazu einen Partner oder
+                    ein zweites Elternteil und mindestens ein Kind ein.
+                  </p>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Field label="Partner Vorname">
+                      <Input
+                        value={partnerVorname}
+                        onChange={(e) => setPartnerVorname(e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Partner Nachname">
+                      <Input
+                        value={partnerNachname}
+                        onChange={(e) => setPartnerNachname(e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Partner Geburtsdatum">
+                      <Input
+                        type="date"
+                        value={partnerGeburtsdatum}
+                        onChange={(e) => setPartnerGeburtsdatum(e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                  {hasPartner ? (
+                    <div>
+                      <Label className="mb-1.5 block">Abteilungen des Partners</Label>
+                      <AbteilungPicker
+                        abteilungen={abteilungen}
+                        selected={partnerAbt}
+                        onToggle={(id) => toggle(partnerAbt, setPartnerAbt, id)}
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-col gap-3">
+                    {kinder.map((k, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and short-lived.
+                      <div key={`kind-${i}`} className="rounded-lg border border-border p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-sm font-medium">Kind {i + 1}</span>
+                          <button
+                            type="button"
+                            aria-label="Kind entfernen"
+                            onClick={() => setKinder((prev) => prev.filter((_, j) => j !== i))}
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <Input
+                            placeholder="Vorname"
+                            value={k.vorname}
+                            onChange={(e) => updateKind(setKinder, i, { vorname: e.target.value })}
+                          />
+                          <Input
+                            placeholder="Nachname"
+                            value={k.nachname}
+                            onChange={(e) => updateKind(setKinder, i, { nachname: e.target.value })}
+                          />
+                          <Input
+                            type="date"
+                            value={k.geburtsdatum}
+                            onChange={(e) =>
+                              updateKind(setKinder, i, { geburtsdatum: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div className="mt-2">
+                          <AbteilungPicker
+                            abteilungen={abteilungen}
+                            selected={k.abteilungen}
+                            onToggle={(id) =>
+                              updateKind(setKinder, i, {
+                                abteilungen: k.abteilungen.includes(id)
+                                  ? k.abteilungen.filter((x) => x !== id)
+                                  : [...k.abteilungen, id],
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="self-start"
+                      onClick={() =>
+                        setKinder((prev) => [
+                          ...prev,
+                          {
+                            vorname: "",
+                            nachname: nachname.trim(),
+                            geburtsdatum: "",
+                            abteilungen: [],
+                          },
+                        ])
+                      }
+                    >
+                      <Plus className="size-4" /> Kind hinzufügen
+                    </Button>
+                    {kinder.length > 0 && !hasPartner ? (
+                      <p className="text-xs text-muted-foreground">
+                        Für den Familientarif bitte oben einen Partner oder ein zweites Elternteil
+                        eintragen. Bis dahin gilt Ihr Einzelbeitrag.
+                      </p>
+                    ) : null}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
+        ) : null}
+
+        {step === 1 ? (
           <Card>
             <CardHeader>
-              <CardTitle>Mitgliedsdaten</CardTitle>
+              <CardTitle>SEPA-Lastschriftmandat</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Geben Sie die Daten der Person ein, die Mitglied werden soll. Der passende Tarif
-                wird automatisch anhand des Alters ermittelt.
+                Zahlungspflichtig:{" "}
+                <span className="font-medium text-foreground">{payerName || EMPTY_VALUE}</span>. Der
+                Jahresbeitrag wird einmal jährlich per SEPA-Lastschrift eingezogen. BIC und
+                Kreditinstitut werden nach IBAN-Eingabe automatisch ermittelt.
               </p>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              {!isMinor ? (
-                <div className="flex flex-col gap-1.5">
-                  <Label>Anrede *</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {(["Herr", "Frau", "keine Angabe"] as Anrede[]).map((a) => (
-                      <button
-                        key={a}
-                        type="button"
-                        onClick={() => setGeschlecht(a)}
-                        className={cn(
-                          "rounded-full border px-3 py-1.5 text-sm",
-                          geschlecht === a
-                            ? "border-primary bg-primary/10"
-                            : "border-border text-muted-foreground",
-                        )}
-                      >
-                        {a}
-                      </button>
-                    ))}
-                  </div>
+              <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-3 text-sm">
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Gläubiger-ID</span>
+                  <span className="text-right font-mono">
+                    {orEmpty(settings.data?.glaeubigerId)}
+                  </span>
                 </div>
-              ) : null}
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Mandatsreferenz</span>
+                  <span className="text-right italic text-muted-foreground">
+                    wird automatisch vergeben
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Ich ermächtige {vereinsname} widerruflich, die von mir zu entrichtenden Zahlungen
+                von meinem Konto mittels Lastschrift einzuziehen. Zugleich weise ich mein
+                Kreditinstitut an, die von {vereinsname} auf mein Konto gezogenen Lastschriften
+                einzulösen. Ich kann innerhalb von acht Wochen, beginnend mit dem Belastungsdatum,
+                die Erstattung des belasteten Betrages verlangen. Es gelten dabei die mit meinem
+                Kreditinstitut vereinbarten Bedingungen.
+              </p>
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Vorname *">
-                  <Input value={vorname} onChange={(e) => setVorname(e.target.value)} />
-                </Field>
-                <Field label="Nachname *">
-                  <Input value={nachname} onChange={(e) => setNachname(e.target.value)} />
-                </Field>
-                <Field label="Geburtsdatum *">
+                <Field
+                  label="Kontoinhaber"
+                  hint="Nur ausfüllen, wenn das Konto auf einen anderen Namen läuft."
+                >
                   <Input
-                    type="date"
-                    value={geburtsdatum}
-                    onChange={(e) => setGeburtsdatum(e.target.value)}
+                    value={kontoinhaber}
+                    placeholder={payerName}
+                    onChange={(e) => setKontoinhaber(e.target.value)}
                   />
                 </Field>
                 <div />
-                <Field label="Straße">
-                  <Input value={strasse} onChange={(e) => setStrasse(e.target.value)} />
+                <IbanField
+                  value={iban}
+                  onChange={setIban}
+                  onResolved={(info) => {
+                    if (info.bic) setBic(info.bic);
+                    if (info.name) setKreditinstitut(info.name);
+                  }}
+                />
+                <Field label="BIC" hint="Wird nach IBAN-Eingabe automatisch ergänzt.">
+                  <Input value={bic} onChange={(e) => setBic(e.target.value.toUpperCase())} />
                 </Field>
-                <Field label="Hausnummer">
-                  <Input value={hausnummer} onChange={(e) => setHausnummer(e.target.value)} />
-                </Field>
-                <Field label="PLZ">
-                  <Input value={plz} onChange={(e) => setPlz(e.target.value)} />
-                </Field>
-                <Field label="Ort">
-                  <Input value={ort} onChange={(e) => setOrt(e.target.value)} />
-                </Field>
-                <Field label="Telefon">
-                  <Input value={telefon} onChange={(e) => setTelefon(e.target.value)} />
-                </Field>
-                <Field
-                  label="E-Mail *"
-                  hint="Wir benötigen Ihre E-Mail für die Bestätigung und die Kommunikation zum Antrag."
-                >
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Field label="Kreditinstitut" hint="Wird nach IBAN-Eingabe automatisch ergänzt.">
+                  <Input
+                    value={kreditinstitut}
+                    onChange={(e) => setKreditinstitut(e.target.value)}
+                  />
                 </Field>
               </div>
-
-              {age != null ? (
-                <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-                  <p className="text-sm">
-                    Automatisch erkannt:{" "}
-                    <span className="font-semibold">
-                      {antragstyp === "familie"
-                        ? "Familienmitgliedschaft"
-                        : (fee.data?.label ?? "Tarif wird ermittelt…")}
-                    </span>
-                    {fee.data ? <> ({formatCurrency(fee.data.jahresbeitrag)} pro Jahr)</> : null}
-                    {isMinor
-                      ? ". Die Angaben einer gesetzlichen Vertretung sind erforderlich."
-                      : null}
-                  </p>
-                </div>
-              ) : null}
             </CardContent>
           </Card>
+        ) : null}
 
-          {isMinor ? (
+        {step === 2 ? (
+          <div className="flex flex-col gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Gesetzliche Vertretung</CardTitle>
+                <CardTitle>Zusammenfassung</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Diese Person unterschreibt die Beitrittserklärung, erteilt das SEPA-Mandat und ist
-                  Ansprechpartner für den Verein.
+                  Bitte prüfen Sie Ihre Angaben. Wählen Sie anschließend, wie Sie die
+                  Beitrittserklärung unterzeichnen möchten.
                 </p>
               </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Vorname *">
-                    <Input value={erzVorname} onChange={(e) => setErzVorname(e.target.value)} />
-                  </Field>
-                  <Field label="Nachname *">
-                    <Input value={erzNachname} onChange={(e) => setErzNachname(e.target.value)} />
-                  </Field>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={elternteilMitglied}
-                      onChange={(e) => setElternteilMitglied(e.target.checked)}
-                    />
-                    Ein Elternteil ist bereits Mitglied
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    Falls ja, erhalten Kinder und Jugendliche einen vergünstigten Beitrag.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : null}
+              <CardContent className="flex flex-col gap-5 text-sm">
+                <SummarySection title="Antragsteller" onEdit={() => goTo(0)}>
+                  {!isMinor && geschlecht ? <Row label="Anrede">{geschlecht}</Row> : null}
+                  <Row label="Name">{orEmpty(`${vorname} ${nachname}`.trim())}</Row>
+                  <Row label="Geburtsdatum">{orEmpty(formatDate(geburtsdatum))}</Row>
+                  <Row label="Adresse">
+                    {orEmpty(
+                      [`${strasse} ${hausnummer}`.trim(), `${plz} ${ort}`.trim()]
+                        .filter((s) => s.trim())
+                        .join(", "),
+                    )}
+                  </Row>
+                  {telefon ? <Row label="Telefon">{telefon}</Row> : null}
+                  <Row label="E-Mail">{orEmpty(email)}</Row>
+                  <Row label="Abteilungen">{orEmpty(selectedAbtNames.join(", "))}</Row>
+                </SummarySection>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Abteilungen *</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Mehrfachauswahl ist möglich. Wählen Sie keine Abteilung, wenn Sie den Verein nur
-                passiv unterstützen möchten.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <AbteilungPicker
-                abteilungen={abteilungen}
-                selected={selectedAbt}
-                onToggle={(id) => toggle(selectedAbt, setSelectedAbt, id)}
-              />
-            </CardContent>
-          </Card>
-
-          {!isMinor ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Familie (optional)</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Die Familienmitgliedschaft gilt für zwei Erwachsene und beliebig viele Kinder bis
-                  18 Jahre, unabhängig von der Kinderzahl. Tragen Sie dazu einen Partner oder ein
-                  zweites Elternteil und mindestens ein Kind ein.
-                </p>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Partner Vorname">
-                    <Input
-                      value={partnerVorname}
-                      onChange={(e) => setPartnerVorname(e.target.value)}
-                    />
-                  </Field>
-                  <Field label="Partner Nachname">
-                    <Input
-                      value={partnerNachname}
-                      onChange={(e) => setPartnerNachname(e.target.value)}
-                    />
-                  </Field>
-                  <Field label="Partner Geburtsdatum">
-                    <Input
-                      type="date"
-                      value={partnerGeburtsdatum}
-                      onChange={(e) => setPartnerGeburtsdatum(e.target.value)}
-                    />
-                  </Field>
-                </div>
-                {hasPartner ? (
-                  <div>
-                    <Label className="mb-1.5 block">Abteilungen des Partners</Label>
-                    <AbteilungPicker
-                      abteilungen={abteilungen}
-                      selected={partnerAbt}
-                      onToggle={(id) => toggle(partnerAbt, setPartnerAbt, id)}
-                    />
-                  </div>
+                {isMinor ? (
+                  <SummarySection title="Gesetzliche Vertretung" onEdit={() => goTo(0)}>
+                    {geschlecht ? <Row label="Anrede">{geschlecht}</Row> : null}
+                    <Row label="Name">{orEmpty(`${erzVorname} ${erzNachname}`.trim())}</Row>
+                    <Row label="Elternteil Mitglied">{elternteilMitglied ? "Ja" : "Nein"}</Row>
+                  </SummarySection>
                 ) : null}
 
-                <div className="flex flex-col gap-3">
-                  {kinder.map((k, i) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and short-lived.
-                    <div key={`kind-${i}`} className="rounded-lg border border-border p-3">
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="text-sm font-medium">Kind {i + 1}</span>
-                        <button
-                          type="button"
-                          aria-label="Kind entfernen"
-                          onClick={() => setKinder((prev) => prev.filter((_, j) => j !== i))}
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <Input
-                          placeholder="Vorname"
-                          value={k.vorname}
-                          onChange={(e) => updateKind(setKinder, i, { vorname: e.target.value })}
-                        />
-                        <Input
-                          placeholder="Nachname"
-                          value={k.nachname}
-                          onChange={(e) => updateKind(setKinder, i, { nachname: e.target.value })}
-                        />
-                        <Input
-                          type="date"
-                          value={k.geburtsdatum}
-                          onChange={(e) =>
-                            updateKind(setKinder, i, { geburtsdatum: e.target.value })
-                          }
-                        />
-                      </div>
-                      <div className="mt-2">
-                        <AbteilungPicker
-                          abteilungen={abteilungen}
-                          selected={k.abteilungen}
-                          onToggle={(id) =>
-                            updateKind(setKinder, i, {
-                              abteilungen: k.abteilungen.includes(id)
-                                ? k.abteilungen.filter((x) => x !== id)
-                                : [...k.abteilungen, id],
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="self-start"
-                    onClick={() =>
-                      setKinder((prev) => [
-                        ...prev,
-                        {
-                          vorname: "",
-                          nachname: nachname.trim(),
-                          geburtsdatum: "",
-                          abteilungen: [],
-                        },
-                      ])
-                    }
-                  >
-                    <Plus className="size-4" /> Kind hinzufügen
-                  </Button>
-                  {kinder.length > 0 && !hasPartner ? (
-                    <p className="text-xs text-muted-foreground">
-                      Für den Familientarif bitte oben einen Partner oder ein zweites Elternteil
-                      eintragen. Bis dahin gilt Ihr Einzelbeitrag.
-                    </p>
-                  ) : null}
-                </div>
+                {antragstyp === "familie" ? (
+                  <SummarySection title={`Kinder (${kinder.length})`} onEdit={() => goTo(0)}>
+                    {kinder.map((k, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: positional summary rows.
+                      <Row key={`sk-${i}`} label={`Kind ${i + 1}`}>
+                        {orEmpty(
+                          `${k.vorname} ${k.nachname}`.trim() +
+                            (k.geburtsdatum ? `, ${formatDate(k.geburtsdatum)}` : ""),
+                        )}
+                      </Row>
+                    ))}
+                  </SummarySection>
+                ) : null}
+
+                <SummarySection title="Mitgliedschaft" onEdit={() => goTo(0)}>
+                  <Row label="Tarif">{orEmpty(fee.data?.label)}</Row>
+                  <Row label="Jahresbeitrag">
+                    {fee.data ? formatCurrency(fee.data.jahresbeitrag) : EMPTY_VALUE}
+                  </Row>
+                </SummarySection>
+
+                <SummarySection title="SEPA-Lastschrift" onEdit={() => goTo(1)}>
+                  <Row label="Kontoinhaber">{orEmpty(kontoinhaber || payerName)}</Row>
+                  <Row label="IBAN">{orEmpty(iban)}</Row>
+                  {bic ? <Row label="BIC">{bic}</Row> : null}
+                  {kreditinstitut ? <Row label="Kreditinstitut">{kreditinstitut}</Row> : null}
+                </SummarySection>
               </CardContent>
             </Card>
-          ) : null}
-        </div>
-      ) : null}
 
-      {step === 1 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>SEPA-Lastschriftmandat</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Zahlungspflichtig:{" "}
-              <span className="font-medium text-foreground">{payerName || EMPTY_VALUE}</span>. Der
-              Jahresbeitrag wird einmal jährlich per SEPA-Lastschrift eingezogen. BIC und
-              Kreditinstitut werden nach IBAN-Eingabe automatisch ermittelt.
-            </p>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-3 text-sm">
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Gläubiger-ID</span>
-                <span className="text-right font-mono">{orEmpty(settings.data?.glaeubigerId)}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Mandatsreferenz</span>
-                <span className="text-right italic text-muted-foreground">
-                  wird automatisch vergeben
-                </span>
-              </div>
-            </div>
-
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Ich ermächtige {vereinsname} widerruflich, die von mir zu entrichtenden Zahlungen von
-              meinem Konto mittels Lastschrift einzuziehen. Zugleich weise ich mein Kreditinstitut
-              an, die von {vereinsname} auf mein Konto gezogenen Lastschriften einzulösen. Ich kann
-              innerhalb von acht Wochen, beginnend mit dem Belastungsdatum, die Erstattung des
-              belasteten Betrages verlangen. Es gelten dabei die mit meinem Kreditinstitut
-              vereinbarten Bedingungen.
-            </p>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field
-                label="Kontoinhaber"
-                hint="Nur ausfüllen, wenn das Konto auf einen anderen Namen läuft."
-              >
-                <Input
-                  value={kontoinhaber}
-                  placeholder={payerName}
-                  onChange={(e) => setKontoinhaber(e.target.value)}
-                />
-              </Field>
-              <div />
-              <IbanField
-                value={iban}
-                onChange={setIban}
-                onResolved={(info) => {
-                  if (info.bic) setBic(info.bic);
-                  if (info.name) setKreditinstitut(info.name);
-                }}
-              />
-              <Field label="BIC" hint="Wird nach IBAN-Eingabe automatisch ergänzt.">
-                <Input value={bic} onChange={(e) => setBic(e.target.value.toUpperCase())} />
-              </Field>
-              <Field label="Kreditinstitut" hint="Wird nach IBAN-Eingabe automatisch ergänzt.">
-                <Input value={kreditinstitut} onChange={(e) => setKreditinstitut(e.target.value)} />
-              </Field>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {step === 2 ? (
-        <div className="flex flex-col gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Zusammenfassung</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Bitte prüfen Sie Ihre Angaben. Wählen Sie anschließend, wie Sie die
-                Beitrittserklärung unterzeichnen möchten.
-              </p>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-5 text-sm">
-              <SummarySection title="Antragsteller" onEdit={() => setStep(0)}>
-                {!isMinor && geschlecht ? <Row label="Anrede">{geschlecht}</Row> : null}
-                <Row label="Name">{orEmpty(`${vorname} ${nachname}`.trim())}</Row>
-                <Row label="Geburtsdatum">{orEmpty(formatDate(geburtsdatum))}</Row>
-                <Row label="Adresse">
-                  {orEmpty(
-                    [`${strasse} ${hausnummer}`.trim(), `${plz} ${ort}`.trim()]
-                      .filter((s) => s.trim())
-                      .join(", "),
-                  )}
-                </Row>
-                {telefon ? <Row label="Telefon">{telefon}</Row> : null}
-                <Row label="E-Mail">{orEmpty(email)}</Row>
-                <Row label="Abteilungen">{orEmpty(selectedAbtNames.join(", "))}</Row>
-              </SummarySection>
-
-              {isMinor ? (
-                <SummarySection title="Gesetzliche Vertretung" onEdit={() => setStep(0)}>
-                  {geschlecht ? <Row label="Anrede">{geschlecht}</Row> : null}
-                  <Row label="Name">{orEmpty(`${erzVorname} ${erzNachname}`.trim())}</Row>
-                  <Row label="Elternteil Mitglied">{elternteilMitglied ? "Ja" : "Nein"}</Row>
-                </SummarySection>
-              ) : null}
-
-              {antragstyp === "familie" ? (
-                <SummarySection title={`Kinder (${kinder.length})`} onEdit={() => setStep(0)}>
-                  {kinder.map((k, i) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: positional summary rows.
-                    <Row key={`sk-${i}`} label={`Kind ${i + 1}`}>
-                      {orEmpty(
-                        `${k.vorname} ${k.nachname}`.trim() +
-                          (k.geburtsdatum ? `, ${formatDate(k.geburtsdatum)}` : ""),
-                      )}
-                    </Row>
-                  ))}
-                </SummarySection>
-              ) : null}
-
-              <SummarySection title="Mitgliedschaft" onEdit={() => setStep(0)}>
-                <Row label="Tarif">{orEmpty(fee.data?.label)}</Row>
-                <Row label="Jahresbeitrag">
-                  {fee.data ? formatCurrency(fee.data.jahresbeitrag) : EMPTY_VALUE}
-                </Row>
-              </SummarySection>
-
-              <SummarySection title="SEPA-Lastschrift" onEdit={() => setStep(1)}>
-                <Row label="Kontoinhaber">{orEmpty(kontoinhaber || payerName)}</Row>
-                <Row label="IBAN">{orEmpty(iban)}</Row>
-                {bic ? <Row label="BIC">{bic}</Row> : null}
-                {kreditinstitut ? <Row label="Kreditinstitut">{kreditinstitut}</Row> : null}
-              </SummarySection>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Unterschrift</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Mit Ihrer Unterschrift erklären Sie Ihren Beitritt zu {vereinsname} und erteilen das
-                SEPA-Lastschriftmandat zur Einziehung des Mitgliedsbeitrags.
-              </p>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <div className="overflow-hidden rounded-lg border border-border">
-                <SignChoice
-                  active={signOnline}
-                  onClick={() => setSignOnline(true)}
-                  title="Jetzt direkt online unterschreiben"
-                  badge="Standard"
-                  description="Zeichnen Sie Ihre Unterschrift im Browser. Der Antrag wird sofort als unterzeichnet eingereicht, kein Upload nötig."
-                />
-                <SignChoice
-                  active={!signOnline}
-                  onClick={() => setSignOnline(false)}
-                  title="PDF erhalten, drucken, unterschreiben und hochladen"
-                  description="Sie erhalten das Dokument per E-Mail, unterschreiben es handschriftlich und laden den Scan über den Link in der E-Mail wieder hoch."
-                />
-              </div>
-              {signOnline ? (
-                <div className="flex flex-col gap-2">
-                  <SignaturePad value={signature} onChange={setSignature} />
-                  {signature ? (
-                    <p className="flex items-center gap-1 text-xs text-success">
-                      <CheckCircle2 className="size-3.5" /> Unterschrift gespeichert. Sie können den
-                      Antrag jetzt absenden.
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Zeichnen Sie Ihre Unterschrift mit der Maus oder dem Finger.
-                    </p>
-                  )}
+            <Card>
+              <CardHeader>
+                <CardTitle>Unterschrift</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Mit Ihrer Unterschrift erklären Sie Ihren Beitritt zu {vereinsname} und erteilen
+                  das SEPA-Lastschriftmandat zur Einziehung des Mitgliedsbeitrags.
+                </p>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <div className="overflow-hidden rounded-lg border border-border">
+                  <SignChoice
+                    active={signOnline}
+                    onClick={() => setSignOnline(true)}
+                    title="Jetzt direkt online unterschreiben"
+                    badge="Standard"
+                    description="Zeichnen Sie Ihre Unterschrift im Browser. Der Antrag wird sofort als unterzeichnet eingereicht, kein Upload nötig."
+                  />
+                  <SignChoice
+                    active={!signOnline}
+                    onClick={() => setSignOnline(false)}
+                    title="PDF erhalten, drucken, unterschreiben und hochladen"
+                    description="Sie erhalten das Dokument per E-Mail, unterschreiben es handschriftlich und laden den Scan über den Link in der E-Mail wieder hoch."
+                  />
                 </div>
-              ) : null}
-            </CardContent>
-          </Card>
+                {signOnline ? (
+                  <div className="flex flex-col gap-2">
+                    <SignaturePad value={signature} onChange={setSignature} />
+                    {signature ? (
+                      <p className="motion-fade-in flex items-center gap-1 text-xs text-success">
+                        <CheckCircle2 className="motion-pop-in size-3.5" /> Unterschrift
+                        gespeichert. Sie können den Antrag jetzt absenden.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Zeichnen Sie Ihre Unterschrift mit der Maus oder dem Finger.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="flex flex-col gap-3 pt-6 text-sm">
-              <label className="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  checked={datenschutz}
-                  onChange={(e) => setDatenschutz(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <span>
-                  Ich habe die{" "}
-                  {settings.data?.datenschutzUrl ? (
-                    <a
-                      href={settings.data.datenschutzUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      Datenschutzerklärung
-                    </a>
-                  ) : (
-                    "Datenschutzerklärung"
-                  )}{" "}
-                  gelesen und akzeptiere sie.
-                </span>
-              </label>
-              <label className="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  checked={satzung}
-                  onChange={(e) => setSatzung(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <span>
-                  Ich erkenne die{" "}
-                  {settings.data?.satzungUrl ? (
-                    <a
-                      href={settings.data.satzungUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      Satzung
-                    </a>
-                  ) : (
-                    "Satzung"
-                  )}{" "}
-                  des Vereins an.
-                </span>
-              </label>
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
+            <Card>
+              <CardContent className="flex flex-col gap-3 pt-6 text-sm">
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={datenschutz}
+                    onChange={(e) => setDatenschutz(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    Ich habe die{" "}
+                    {settings.data?.datenschutzUrl ? (
+                      <a
+                        href={settings.data.datenschutzUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        Datenschutzerklärung
+                      </a>
+                    ) : (
+                      "Datenschutzerklärung"
+                    )}{" "}
+                    gelesen und akzeptiere sie.
+                  </span>
+                </label>
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={satzung}
+                    onChange={(e) => setSatzung(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    Ich erkenne die{" "}
+                    {settings.data?.satzungUrl ? (
+                      <a
+                        href={settings.data.satzungUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        Satzung
+                      </a>
+                    ) : (
+                      "Satzung"
+                    )}{" "}
+                    des Vereins an.
+                  </span>
+                </label>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Ein Austritt ist nur zum Ende eines Kalenderjahres unter Einhaltung einer Frist
+                  von sechs Wochen in Textform möglich.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
+      </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
@@ -715,7 +730,7 @@ function AntragForm() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => setStep((s) => Math.max(s - 1, 0))}
+          onClick={back}
           disabled={step === 0 || submit.isPending}
         >
           <ChevronLeft className="size-4" /> Zurück
@@ -754,27 +769,128 @@ function updateKind(
   set((prev) => prev.map((k, i) => (i === index ? { ...k, ...patch } : k)));
 }
 
-function Stepper({ step }: { step: number }) {
+const INTRO_STEPS = [
+  { icon: ClipboardList, title: "Daten eingeben", note: "Mitglied, Adresse und Abteilungen" },
+  { icon: CreditCard, title: "Bankdaten", note: "SEPA-Lastschrift für den Beitrag" },
+  { icon: PenLine, title: "Prüfen & absenden", note: "Unterschreiben, fertig" },
+];
+
+function IntroPanel() {
   return (
-    <div className="flex items-center gap-3">
-      {STEPS.map((label, i) => (
-        <div key={label} className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span
+    <div className="rounded-xl border border-border bg-muted/40 p-4">
+      <p className="mb-3 text-sm font-medium">So funktioniert's: drei einfache Schritte</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {INTRO_STEPS.map((s, i) => {
+          const Icon = s.icon;
+          return (
+            <div
+              key={s.title}
+              className="motion-reveal-up flex items-start gap-2.5"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Icon className="size-4" />
+              </span>
+              <div>
+                <div className="text-sm font-medium leading-tight">{s.title}</div>
+                <div className="text-xs text-muted-foreground">{s.note}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function FeeCard({
+  tarif,
+  betrag,
+  isMinor,
+  loading,
+}: {
+  tarif: string | null;
+  betrag: string | null;
+  isMinor: boolean;
+  loading: boolean;
+}) {
+  return (
+    <div
+      key={`${tarif}-${betrag}`}
+      className="motion-fee-pop flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+        <CheckCircle2 className="size-5" />
+      </span>
+      <div className="min-w-0">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+          Automatisch erkannter Tarif
+        </div>
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-base font-semibold">
+            {tarif ?? (loading ? "wird ermittelt…" : EMPTY_VALUE)}
+          </span>
+          {betrag ? (
+            <span className="text-lg font-bold text-primary">{betrag} pro Jahr</span>
+          ) : null}
+        </div>
+        {isMinor ? (
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Die Angaben einer gesetzlichen Vertretung sind erforderlich.
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function Stepper({ step, onJump }: { step: number; onJump: (i: number) => void }) {
+  return (
+    <div className="flex items-center">
+      {STEPS.map((label, i) => {
+        const done = i < step;
+        const current = i === step;
+        return (
+          <div key={label} className="flex flex-1 items-center last:flex-none">
+            <button
+              type="button"
+              onClick={() => onJump(i)}
+              disabled={!done}
               className={cn(
-                "flex size-6 items-center justify-center rounded-full text-xs font-semibold",
-                i <= step ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                "flex items-center gap-2 text-left",
+                done ? "cursor-pointer" : "cursor-default",
               )}
             >
-              {i < step ? <Check className="size-3.5" /> : i + 1}
-            </span>
-            <span className={cn("text-sm", i === step ? "font-medium" : "text-muted-foreground")}>
-              {label}
-            </span>
+              <span
+                className={cn(
+                  "flex size-7 items-center justify-center rounded-full text-xs font-semibold transition-colors",
+                  done || current
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground",
+                )}
+              >
+                {done ? <Check className="motion-pop-in size-3.5" /> : i + 1}
+              </span>
+              <span
+                className={cn(
+                  "hidden text-sm sm:inline",
+                  current ? "font-medium" : "text-muted-foreground",
+                )}
+              >
+                {label}
+              </span>
+            </button>
+            {i < STEPS.length - 1 ? (
+              <span className="mx-2 h-px flex-1 overflow-hidden rounded-full bg-border">
+                <span
+                  className="block h-full bg-primary transition-all duration-300"
+                  style={{ width: done ? "100%" : "0%" }}
+                />
+              </span>
+            ) : null}
           </div>
-          {i < STEPS.length - 1 ? <div className="h-px w-6 bg-border" /> : null}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -862,7 +978,7 @@ function SignChoice({
           active ? "border-primary" : "border-muted-foreground/40",
         )}
       >
-        {active ? <span className="size-2.5 rounded-full bg-primary" /> : null}
+        {active ? <span className="motion-pop-in size-2.5 rounded-full bg-primary" /> : null}
       </span>
       <span className="flex flex-col gap-0.5">
         <span className="flex items-center gap-2 text-sm font-medium">
@@ -876,6 +992,215 @@ function SignChoice({
         <span className="text-xs text-muted-foreground">{description}</span>
       </span>
     </button>
+  );
+}
+
+const CONFETTI_COLORS = [
+  "hsl(0 78% 48%)",
+  "hsl(38 92% 50%)",
+  "hsl(152 60% 36%)",
+  "hsl(220 60% 55%)",
+];
+
+function Confetti() {
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: 70 }, (_, i) => ({
+        id: i,
+        left: Math.random() * 100,
+        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+        delay: Math.random() * 0.6,
+        duration: 2.4 + Math.random() * 1.6,
+        rot: 360 + Math.random() * 540,
+      })),
+    [],
+  );
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+      {pieces.map((p) => (
+        <span
+          key={p.id}
+          className="confetti-piece"
+          style={
+            {
+              left: `${p.left}%`,
+              backgroundColor: p.color,
+              "--confetti-delay": `${p.delay}s`,
+              "--confetti-dur": `${p.duration}s`,
+              "--confetti-rot": `${p.rot}deg`,
+            } as React.CSSProperties
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
+function SuccessCheck() {
+  return (
+    <svg
+      className="success-check size-20"
+      viewBox="0 0 64 64"
+      fill="none"
+      role="img"
+      aria-label="Erfolgreich eingereicht"
+    >
+      <circle
+        className="success-ring"
+        cx="32"
+        cy="32"
+        r="28"
+        stroke="var(--color-success)"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      <path
+        className="success-tick"
+        d="M20 33l8 8 16-17"
+        stroke="var(--color-success)"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function SuccessScreen({
+  antragsnummer,
+  signOnline,
+  email,
+  name,
+  tarif,
+  jahresbeitrag,
+  abteilungen,
+}: {
+  antragsnummer: string;
+  signOnline: boolean;
+  email: string;
+  name: string;
+  tarif: string | null;
+  jahresbeitrag: string | null;
+  abteilungen: string[];
+}) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(antragsnummer);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard can be blocked; the number is shown anyway.
+    }
+  }
+
+  const timeline = [
+    {
+      icon: Mail,
+      title: "Bestätigung per E-Mail",
+      note: email ? `An ${email}, in wenigen Minuten.` : "In wenigen Minuten.",
+      done: true,
+    },
+    {
+      icon: PenLine,
+      title: signOnline ? "Digital unterschrieben" : "PDF drucken, unterschreiben und hochladen",
+      note: signOnline
+        ? "Erledigt. Kein weiterer Schritt nötig."
+        : "Den Scan über den Link in der E-Mail hochladen.",
+      done: signOnline,
+    },
+    {
+      icon: Clock,
+      title: "Prüfung durch den Verein",
+      note: "Ihr Antrag wird geprüft und bestätigt. Das dauert wenige Werktage.",
+      done: false,
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Confetti />
+      <Card className="motion-reveal-up overflow-hidden">
+        <CardContent className="flex flex-col items-center gap-4 px-6 pt-8 pb-6 text-center">
+          <SuccessCheck />
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">
+              Vielen Dank für Ihre Beitrittserklärung
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Ihr Antrag wurde erfolgreich eingereicht.
+            </p>
+          </div>
+
+          <div className="flex w-full max-w-sm items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-left">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Antragsnummer
+              </div>
+              <div className="font-mono text-base font-semibold">{antragsnummer}</div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={copy}
+              aria-label="Antragsnummer kopieren"
+            >
+              {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+              {copied ? "Kopiert" : "Kopieren"}
+            </Button>
+          </div>
+
+          <div className="flex w-full max-w-sm flex-col gap-1.5 text-left text-sm">
+            {name ? <Row label="Name">{name}</Row> : null}
+            {abteilungen.length ? <Row label="Abteilungen">{abteilungen.join(", ")}</Row> : null}
+            {tarif ? <Row label="Tarif">{tarif}</Row> : null}
+            {jahresbeitrag ? <Row label="Jahresbeitrag">{jahresbeitrag}</Row> : null}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="motion-reveal-up" style={{ animationDelay: "120ms" } as React.CSSProperties}>
+        <CardHeader>
+          <CardTitle className="text-base">So geht es weiter</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {timeline.map((t, i) => {
+            const Icon = t.icon;
+            return (
+              <div key={t.title} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <span
+                    className={cn(
+                      "flex size-8 shrink-0 items-center justify-center rounded-full",
+                      t.done ? "bg-success/15 text-success" : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {t.done ? <Check className="size-4" /> : <Icon className="size-4" />}
+                  </span>
+                  {i < timeline.length - 1 ? <span className="my-1 w-px flex-1 bg-border" /> : null}
+                </div>
+                <div className="pb-1">
+                  <div className="text-sm font-medium">{t.title}</div>
+                  <div className="text-xs text-muted-foreground">{t.note}</div>
+                </div>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      <div className="flex flex-wrap gap-3">
+        <Link
+          to="/antrag/status"
+          search={{ nr: antragsnummer }}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 text-sm font-medium text-foreground shadow-soft transition-all hover:bg-accent"
+        >
+          <ArrowRight className="size-4" /> Status verfolgen
+        </Link>
+      </div>
+    </div>
   );
 }
 

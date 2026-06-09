@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.37.0",
+    date: "2026-06-09",
+    title: "Beitrittsformular mit mehr Politur",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Das öffentliche Beitrittsformular führt jetzt klarer durch: ein kurzer Überblick „So funktioniert's“ am Anfang, eine hervorgehobene Tarifkarte mit Jahresbeitrag, ein Fortschrittsbalken über die drei Schritte und sanfte Übergänge zwischen ihnen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Nach dem Absenden gibt es eine eigene Bestätigungsseite mit Antragsnummer zum Kopieren und einer Übersicht der nächsten Schritte. Die Statusseite zeigt den Fortschritt als Zeitleiste.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Bei der IBAN-Eingabe wird die erkannte Bank direkt angezeigt, und die Abteilungsauswahl ist deutlicher als aktiv markiert.",
+      },
+    ],
+  },
+  {
     version: "0.36.0",
     date: "2026-06-09",
     title: "Klareres Online-Beitrittsformular",
