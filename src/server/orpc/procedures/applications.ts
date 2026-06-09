@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { type AnyColumn, and, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { lookupPlz, searchStreets } from "~/server/address/nominatim";
 import {
   buildUploadUrl,
   consumeUploadToken,
@@ -324,6 +325,41 @@ export const applicationsRouter = {
       if (!validateIban(iban)) return { valid: false as const };
       const hit = lookupBankByIban(iban);
       return { valid: true as const, bic: hit?.bic ?? null, name: hit?.name ?? null };
+    }),
+
+  /** PLZ -> Ort resolution for the public form (OpenStreetMap Nominatim). */
+  lookupPlz: publicProc
+    .input(v.object({ plz: v.pipe(v.string(), v.regex(/^\d{5}$/)) }))
+    .handler(async ({ context, input }) => {
+      const limit = await rateLimit({
+        key: `antrag-plz:${clientIp(context.headers)}`,
+        limit: 60,
+        windowSeconds: 60,
+      });
+      if (!limit.allowed) {
+        throw new ORPCError("TOO_MANY_REQUESTS", { message: "Zu viele Anfragen." });
+      }
+      return { orte: await lookupPlz(input.plz) };
+    }),
+
+  /** Street autocomplete for the public form, optionally scoped by PLZ. */
+  searchStreets: publicProc
+    .input(
+      v.object({
+        query: v.pipe(v.string(), v.trim(), v.maxLength(120)),
+        plz: v.optional(v.nullable(v.string()), null),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const limit = await rateLimit({
+        key: `antrag-street:${clientIp(context.headers)}`,
+        limit: 60,
+        windowSeconds: 60,
+      });
+      if (!limit.allowed) {
+        throw new ORPCError("TOO_MANY_REQUESTS", { message: "Zu viele Anfragen." });
+      }
+      return { results: await searchStreets(input.query, input.plz ?? undefined) };
     }),
 
   /** Duplicate guard on name + DOB against members and open applications. */

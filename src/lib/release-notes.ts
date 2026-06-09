@@ -75,6 +75,11 @@ export const RELEASES: Release[] = [
         description:
           "Vor dem Absenden weist das Formular dezent darauf hin, wenn zu Name und Geburtsdatum bereits ein Antrag oder eine Mitgliedschaft bestehen könnte.",
       },
+      {
+        category: "feature",
+        description:
+          "Die Adresseingabe im Beitrittsformular schlägt jetzt Straßen vor und ergänzt den Ort automatisch anhand der Postleitzahl (über OpenStreetMap).",
+      },
     ],
   },
   {

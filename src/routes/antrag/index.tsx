@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AbteilungPicker } from "~/components/antrag/abteilung-picker";
+import { AddressFields } from "~/components/antrag/address-fields";
 import { IbanField } from "~/components/antrag/iban-field";
 import { SignaturePad } from "~/components/antrag/signature-pad";
 import { Button } from "~/components/ui/button";
@@ -454,18 +455,20 @@ function AntragForm() {
                     />
                   </Field>
                   <div />
-                  <Field label="Straße">
-                    <Input value={strasse} onChange={(e) => setStrasse(e.target.value)} />
-                  </Field>
-                  <Field label="Hausnummer">
-                    <Input value={hausnummer} onChange={(e) => setHausnummer(e.target.value)} />
-                  </Field>
-                  <Field label="PLZ">
-                    <Input value={plz} onChange={(e) => setPlz(e.target.value)} />
-                  </Field>
-                  <Field label="Ort">
-                    <Input value={ort} onChange={(e) => setOrt(e.target.value)} />
-                  </Field>
+                </div>
+
+                <AddressFields
+                  strasse={strasse}
+                  hausnummer={hausnummer}
+                  plz={plz}
+                  ort={ort}
+                  onStrasse={setStrasse}
+                  onHausnummer={setHausnummer}
+                  onPlz={setPlz}
+                  onOrt={setOrt}
+                />
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field label="Telefon">
                     <Input value={telefon} onChange={(e) => setTelefon(e.target.value)} />
                   </Field>
