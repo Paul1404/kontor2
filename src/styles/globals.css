@@ -358,3 +358,189 @@
     }
   }
 }
+
+/*
+ * Aurora backdrop + brand gradients (ported from svums).
+ *
+ * Two independently animated radial-gradient layers sit fixed behind all
+ * content via body::before / ::after. They render above the body's base
+ * background but below in-flow content, so the effect shows through any
+ * container that does not paint an opaque background of its own. The shells
+ * (public Antrag, authed app) are kept transparent for this reason. Colors
+ * stay subtle in light mode and a touch stronger in dark. Animation is
+ * disabled under prefers-reduced-motion.
+ */
+:root {
+  --aurora-1: rgba(220, 38, 38, 0.1);
+  --aurora-2: rgba(251, 146, 60, 0.09);
+  --aurora-3: rgba(244, 114, 182, 0.08);
+}
+
+.dark {
+  --aurora-1: rgba(220, 38, 38, 0.2);
+  --aurora-2: rgba(168, 85, 247, 0.16);
+  --aurora-3: rgba(56, 189, 248, 0.14);
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: -18%;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+body::before {
+  background:
+    radial-gradient(48vmax 42vmax at 20% 25%, var(--aurora-1), transparent 60%),
+    radial-gradient(40vmax 36vmax at 82% 72%, var(--aurora-2), transparent 60%);
+  filter: blur(32px) saturate(1.2);
+  animation: svuwv-aurora-a 22s cubic-bezier(0.6, 0.05, 0.4, 0.95) infinite;
+}
+
+body::after {
+  background:
+    radial-gradient(52vmax 46vmax at 55% 110%, var(--aurora-3), transparent 60%),
+    radial-gradient(32vmax 28vmax at 72% 8%, var(--aurora-1), transparent 60%);
+  filter: blur(38px) saturate(1.25);
+  opacity: 0.85;
+  animation: svuwv-aurora-b 31s cubic-bezier(0.6, 0.05, 0.4, 0.95) infinite;
+}
+
+@keyframes svuwv-aurora-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate3d(6%, -4%, 0) scale(1.08) rotate(2deg);
+  }
+  66% {
+    transform: translate3d(-5%, 6%, 0) scale(1.05) rotate(-2deg);
+  }
+}
+
+@keyframes svuwv-aurora-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    opacity: 0.78;
+  }
+  40% {
+    transform: translate3d(-7%, 5%, 0) scale(1.12) rotate(-3deg);
+    opacity: 0.95;
+  }
+  75% {
+    transform: translate3d(5%, -6%, 0) scale(1.06) rotate(3deg);
+    opacity: 0.82;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after {
+    animation: none;
+  }
+}
+
+/* Brand gradient helpers: a warm red to orange wash for hero headers and a
+   clipped variant for headlines. Theme-aware so dark mode stays vivid. */
+.brand-gradient-bg {
+  background-image: linear-gradient(
+    135deg,
+    hsl(0 72% 42%) 0%,
+    hsl(0 78% 48%) 45%,
+    hsl(24 95% 53%) 100%
+  );
+}
+
+.dark .brand-gradient-bg {
+  background-image: linear-gradient(
+    135deg,
+    hsl(0 72% 46%) 0%,
+    hsl(0 78% 54%) 45%,
+    hsl(24 95% 56%) 100%
+  );
+}
+
+.brand-gradient-text {
+  background-image: linear-gradient(
+    135deg,
+    hsl(0 78% 48%) 0%,
+    hsl(24 95% 53%) 55%,
+    hsl(330 81% 60%) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.dark .brand-gradient-text {
+  background-image: linear-gradient(
+    135deg,
+    hsl(0 84% 67%) 0%,
+    hsl(24 95% 64%) 50%,
+    hsl(330 86% 70%) 100%
+  );
+}
+
+/*
+ * Translucent card surface so the aurora backdrop reads through. Unlayered so
+ * the background wins over Tailwind's layered `bg-card` utility on the Card.
+ */
+.glass-card {
+  background-color: color-mix(in oklab, var(--color-card) 78%, transparent);
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+}
+
+/* Red ring that pulses twice to pull the eye to an invalid field after a
+   failed step validation. */
+@keyframes svuwv-error-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(0 72% 51% / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px hsl(0 72% 51% / 0.28);
+  }
+}
+
+.field-pulse {
+  border-radius: var(--radius-sm);
+  animation: svuwv-error-pulse 0.9s ease-in-out 2;
+}
+
+/* Spring on the primary actions, plus an optional magnetic pull toward the
+   cursor (offsets set in JS via --mx / --my). */
+.btn-spring {
+  transition:
+    transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 220ms ease;
+}
+.btn-spring:hover {
+  transform: translateY(-1px);
+}
+.btn-spring:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn-magnetic {
+  transform: translate(var(--mx, 0px), var(--my, 0px));
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-pulse {
+    animation: none;
+  }
+  .btn-spring,
+  .btn-spring:hover,
+  .btn-spring:active,
+  .btn-magnetic {
+    transform: none;
+    transition: none;
+  }
+}

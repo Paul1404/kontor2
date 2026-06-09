@@ -41,6 +41,48 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.38.0",
+    date: "2026-06-09",
+    title: "Frischeres Erscheinungsbild und ruhigeres Formular",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die ganze Oberfläche bekommt einen dezenten, animierten Farbverlauf im Hintergrund, und das öffentliche Beitrittsformular hat jetzt einen Kopfbereich im Vereinsrot. Wer Animationen reduziert eingestellt hat, sieht den ruhenden Verlauf.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Familienangaben im Beitrittsformular sind eingeklappt und öffnen sich erst per Klick. Der häufige Fall einer Einzel- oder Kindmitgliedschaft bleibt dadurch übersichtlich. Vorhandene Angaben aus einem Entwurf bleiben sichtbar.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Korrekt ausgefüllte Pflichtfelder im Beitrittsformular zeigen jetzt ein grünes Häkchen, sodass auf einen Blick erkennbar ist, was passt.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Fehlt beim Weiterklicken eine Angabe, springt das Formular zum ersten markierten Feld und zeigt an, wie viele Felder noch zu prüfen sind.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Schon während der Eingabe weist ein dezenter Hinweis darauf hin, falls zu Name und Geburtsdatum bereits ein Antrag bestehen könnte. Abschicken bleibt jederzeit möglich.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Mehrere Kinder lassen sich jetzt einzeln ein- und ausklappen, eine Telefonnummer kann bewusst weggelassen werden, und kurze Hilfetexte erklären das SEPA-Mandat.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Der Fußbereich des Beitrittsformulars zeigt jetzt Anschrift, Kontakt und Links zu Datenschutz und Satzung des Vereins.",
+      },
+    ],
+  },
+  {
     version: "0.37.0",
     date: "2026-06-09",
     title: "Beitrittsformular mit mehr Politur",

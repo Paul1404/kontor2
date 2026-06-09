@@ -277,6 +277,11 @@ export const applicationsRouter = {
       .orderBy(abteilungenTable.name);
     return {
       vereinsname: org?.vereinsname ?? "Verein",
+      anschriftStrasse: org?.anschriftStrasse ?? null,
+      anschriftPlz: org?.anschriftPlz ?? null,
+      anschriftOrt: org?.anschriftOrt ?? null,
+      kontaktEmail: org?.kontaktEmail ?? null,
+      kontaktTelefon: org?.kontaktTelefon ?? null,
       datenschutzUrl: org?.datenschutzUrl ?? null,
       satzungUrl: org?.satzungUrl ?? null,
       glaeubigerId: org?.glaeubigerId ?? null,
