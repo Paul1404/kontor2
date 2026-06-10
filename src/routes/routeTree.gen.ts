@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './__root'
 import { Route as SetupRouteImport } from './setup'
+import { Route as PasswortZuruecksetzenRouteImport } from './passwort-zuruecksetzen'
+import { Route as PasswortVergessenRouteImport } from './passwort-vergessen'
 import { Route as LoginRouteImport } from './login'
 import { Route as PortalRouteRouteImport } from './portal/route'
 import { Route as AppRouteRouteImport } from './app/route'
@@ -82,6 +84,16 @@ import { Route as ApiPortalZugangTokenRouteImport } from './api/portal.zugang.$t
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PasswortZuruecksetzenRoute = PasswortZuruecksetzenRouteImport.update({
+  id: '/passwort-zuruecksetzen',
+  path: '/passwort-zuruecksetzen',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PasswortVergessenRoute = PasswortVergessenRouteImport.update({
+  id: '/passwort-vergessen',
+  path: '/passwort-vergessen',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -446,6 +458,8 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteRouteWithChildren
   '/portal': typeof PortalRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/passwort-vergessen': typeof PasswortVergessenRoute
+  '/passwort-zuruecksetzen': typeof PasswortZuruecksetzenRoute
   '/setup': typeof SetupRoute
   '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
@@ -514,6 +528,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/passwort-vergessen': typeof PasswortVergessenRoute
+  '/passwort-zuruecksetzen': typeof PasswortZuruecksetzenRoute
   '/setup': typeof SetupRoute
   '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
@@ -586,6 +602,8 @@ export interface FileRoutesById {
   '/app': typeof AppRouteRouteWithChildren
   '/portal': typeof PortalRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/passwort-vergessen': typeof PasswortVergessenRoute
+  '/passwort-zuruecksetzen': typeof PasswortZuruecksetzenRoute
   '/setup': typeof SetupRoute
   '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
@@ -659,6 +677,8 @@ export interface FileRouteTypes {
     | '/app'
     | '/portal'
     | '/login'
+    | '/passwort-vergessen'
+    | '/passwort-zuruecksetzen'
     | '/setup'
     | '/antrag/papierformular'
     | '/antrag/status'
@@ -727,6 +747,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/passwort-vergessen'
+    | '/passwort-zuruecksetzen'
     | '/setup'
     | '/antrag/papierformular'
     | '/antrag/status'
@@ -798,6 +820,8 @@ export interface FileRouteTypes {
     | '/app'
     | '/portal'
     | '/login'
+    | '/passwort-vergessen'
+    | '/passwort-zuruecksetzen'
     | '/setup'
     | '/antrag/papierformular'
     | '/antrag/status'
@@ -870,6 +894,8 @@ export interface RootRouteChildren {
   AppRouteRoute: typeof AppRouteRouteWithChildren
   PortalRouteRoute: typeof PortalRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  PasswortVergessenRoute: typeof PasswortVergessenRoute
+  PasswortZuruecksetzenRoute: typeof PasswortZuruecksetzenRoute
   SetupRoute: typeof SetupRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiMcpRoute: typeof ApiMcpRoute
@@ -890,6 +916,20 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/passwort-zuruecksetzen': {
+      id: '/passwort-zuruecksetzen'
+      path: '/passwort-zuruecksetzen'
+      fullPath: '/passwort-zuruecksetzen'
+      preLoaderRoute: typeof PasswortZuruecksetzenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/passwort-vergessen': {
+      id: '/passwort-vergessen'
+      path: '/passwort-vergessen'
+      fullPath: '/passwort-vergessen'
+      preLoaderRoute: typeof PasswortVergessenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -1514,6 +1554,8 @@ const rootRouteChildren: RootRouteChildren = {
   AppRouteRoute: AppRouteRouteWithChildren,
   PortalRouteRoute: PortalRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  PasswortVergessenRoute: PasswortVergessenRoute,
+  PasswortZuruecksetzenRoute: PasswortZuruecksetzenRoute,
   SetupRoute: SetupRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiMcpRoute: ApiMcpRoute,

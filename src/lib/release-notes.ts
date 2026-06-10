@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.49.0",
+    date: "2026-06-10",
+    title: "Passwörter und Sitzungen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Passwort vergessen: Auf der Anmeldeseite gibt es jetzt einen Link, über den man sich einen Link zum Zurücksetzen per E-Mail schicken lassen kann. Der Link ist eine Stunde gültig. Funktioniert nur, wenn SMTP eingerichtet ist.",
+      },
+      {
+        category: "feature",
+        description:
+          "Eigenes Passwort ändern: In der Benutzer-Verwaltung lässt sich das Passwort des eigenen Kontos ändern. Andere offene Sitzungen werden dabei beendet.",
+      },
+      {
+        category: "feature",
+        description:
+          "Admin-Werkzeuge je Benutzer: Passwort zurücksetzen (erzeugt ein temporäres Passwort, das einmalig angezeigt wird) und alle Sitzungen beenden (erzwingt eine erneute Anmeldung). Beides wird im Audit-Protokoll vermerkt.",
+      },
+    ],
+  },
+  {
     version: "0.48.0",
     date: "2026-06-10",
     title: "Benutzer verwalten: sperren und löschen",

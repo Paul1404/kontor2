@@ -333,6 +333,106 @@ export const authRouter = {
       return { ok: true };
     }),
 
+  /**
+   * Force-logout: revokes all of a user's sessions (DB rows and the Redis
+   * secondary-storage copies) so the next request from any of their devices
+   * requires a fresh login. The user keeps their account and role. Allowed on
+   * yourself too — a deliberate "sign out everywhere".
+   */
+  revokeUserSessions: adminProc
+    .input(v.object({ userId: v.string() }))
+    .handler(async ({ context, input }) => {
+      const [target] = await context.db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!target) {
+        throw new ORPCError("NOT_FOUND", { message: "Benutzer nicht gefunden." });
+      }
+
+      try {
+        await auth().api.revokeUserSessions({
+          body: { userId: input.userId },
+          headers: context.headers,
+        });
+      } catch (err) {
+        logger.error("auth.revokeUserSessions.failed", {
+          userId: input.userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Sitzungen konnten nicht beendet werden.",
+        });
+      }
+
+      await appendAudit(context.db, {
+        entityType: "user",
+        entityId: input.userId,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: { sessionsRevoked: { before: null, after: true } },
+        requestId: context.requestId ?? null,
+      });
+      return { ok: true };
+    }),
+
+  /**
+   * Admin password reset: sets a freshly generated temporary password and
+   * returns it ONCE so the admin can hand it to a locked-out colleague. The
+   * password itself is never persisted in the audit log (only the fact that a
+   * reset happened). Sessions are revoked so any old, possibly compromised
+   * login is cut off and the user must sign in with the new password.
+   */
+  resetUserPassword: adminProc
+    .input(v.object({ userId: v.string() }))
+    .handler(async ({ context, input }) => {
+      const [target] = await context.db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!target) {
+        throw new ORPCError("NOT_FOUND", { message: "Benutzer nicht gefunden." });
+      }
+
+      // base64url of 18 random bytes -> 24 url-safe chars, comfortably above
+      // the 12-char minimum and high entropy.
+      const tempPassword = randomBytes(18).toString("base64url");
+      try {
+        await auth().api.setUserPassword({
+          body: { userId: input.userId, newPassword: tempPassword },
+          headers: context.headers,
+        });
+        await auth().api.revokeUserSessions({
+          body: { userId: input.userId },
+          headers: context.headers,
+        });
+      } catch (err) {
+        logger.error("auth.resetUserPassword.failed", {
+          userId: input.userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Passwort konnte nicht zurückgesetzt werden.",
+        });
+      }
+
+      await appendAudit(context.db, {
+        entityType: "user",
+        entityId: input.userId,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: { passwordReset: { before: null, after: true } },
+        requestId: context.requestId ?? null,
+      });
+      return { email: target.email, tempPassword };
+    }),
+
   invite: adminProc
     .input(v.object({ email: v.pipe(v.string(), v.email()), role: RoleSchema }))
     .handler(async ({ context, input }) => {

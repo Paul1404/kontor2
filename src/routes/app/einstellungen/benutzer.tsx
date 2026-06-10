@@ -5,7 +5,9 @@ import {
   CheckCircle2,
   Clock,
   Eye,
+  KeyRound,
   Loader2,
+  LogOut,
   Mail,
   Save,
   ShieldCheck,
@@ -20,12 +22,14 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog, TypeToConfirmDialog } from "~/components/ui/confirm-dialog";
+import { CopyButton } from "~/components/ui/copy-button";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { QueryError, QueryErrorRow } from "~/components/ui/query-error";
 import { Textarea } from "~/components/ui/textarea";
 import { toast } from "~/components/ui/toaster";
+import { authClient } from "~/lib/auth-client";
 import { EMPTY_VALUE, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -126,6 +130,54 @@ function UsersPage() {
     },
     onError: (err) => toast.error((err as Error).message),
   });
+
+  const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(
+    null,
+  );
+
+  const revokeSessions = useMutation({
+    mutationFn: (userId: string) => orpc.auth.revokeUserSessions({ userId }),
+    onSuccess: () => toast.success("Sitzungen beendet. Der Benutzer muss sich neu anmelden."),
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  const resetPassword = useMutation({
+    mutationFn: (userId: string) => orpc.auth.resetUserPassword({ userId }),
+    onSuccess: (data) => setTempPassword({ email: data.email, password: data.tempPassword }),
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  // Change own password (better-auth client, not an oRPC procedure).
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNext, setPwNext] = useState("");
+  const [pwMsg, setPwMsg] = useState<Msg | null>(null);
+  const [pwBusy, setPwBusy] = useState(false);
+
+  async function onChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwMsg(null);
+    if (pwNext.length < 12) {
+      setPwMsg({ kind: "error", text: "Das neue Passwort muss mindestens 12 Zeichen haben." });
+      return;
+    }
+    setPwBusy(true);
+    const res = await authClient.changePassword({
+      currentPassword: pwCurrent,
+      newPassword: pwNext,
+      revokeOtherSessions: true,
+    });
+    setPwBusy(false);
+    if (res.error) {
+      setPwMsg({
+        kind: "error",
+        text: res.error.message ?? "Passwort konnte nicht geändert werden.",
+      });
+      return;
+    }
+    setPwCurrent("");
+    setPwNext("");
+    setPwMsg({ kind: "ok", text: "Passwort geändert. Andere Sitzungen wurden beendet." });
+  }
 
   const sessionSettings = useQuery({
     queryKey: ["sessionSettings"],
@@ -370,6 +422,38 @@ function UsersPage() {
                                   type="button"
                                   variant="ghost"
                                   size="icon"
+                                  className="size-8"
+                                  aria-label={`Passwort von ${u.email} zurücksetzen`}
+                                  title="Passwort zurücksetzen"
+                                  disabled={resetPassword.isPending}
+                                  onClick={() => resetPassword.mutate(u.id)}
+                                >
+                                  {resetPassword.isPending && resetPassword.variables === u.id ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                  ) : (
+                                    <KeyRound className="size-4" />
+                                  )}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-8"
+                                  aria-label={`Alle Sitzungen von ${u.email} beenden`}
+                                  title="Abmelden (alle Sitzungen beenden)"
+                                  disabled={revokeSessions.isPending}
+                                  onClick={() => revokeSessions.mutate(u.id)}
+                                >
+                                  {revokeSessions.isPending && revokeSessions.variables === u.id ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                  ) : (
+                                    <LogOut className="size-4" />
+                                  )}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
                                   className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                                   aria-label={`Benutzer ${u.email} löschen`}
                                   disabled={busy}
@@ -577,6 +661,68 @@ function UsersPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="size-5 text-muted-foreground" />
+            Mein Passwort
+          </CardTitle>
+          <CardDescription>
+            Ändert das Passwort Ihres eigenen Kontos. Andere offene Sitzungen werden dabei beendet.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="flex flex-wrap items-end gap-3" onSubmit={onChangePassword}>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="pw-current">Aktuelles Passwort</Label>
+              <Input
+                id="pw-current"
+                type="password"
+                required
+                autoComplete="current-password"
+                value={pwCurrent}
+                onChange={(e) => setPwCurrent(e.target.value)}
+                className="w-56"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="pw-next">Neues Passwort</Label>
+              <Input
+                id="pw-next"
+                type="password"
+                required
+                minLength={12}
+                autoComplete="new-password"
+                value={pwNext}
+                onChange={(e) => setPwNext(e.target.value)}
+                className="w-56"
+              />
+            </div>
+            <Button type="submit" disabled={pwBusy}>
+              {pwBusy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              Passwort ändern
+            </Button>
+          </form>
+          <p className="mt-3 text-xs text-muted-foreground">Mindestens 12 Zeichen.</p>
+          {pwMsg ? (
+            <div
+              className={`mt-4 flex items-start gap-2 rounded-lg border p-3 text-sm shadow-soft ${
+                pwMsg.kind === "ok"
+                  ? "border-success/30 bg-success/10"
+                  : "border-destructive/30 bg-destructive/10"
+              }`}
+            >
+              {pwMsg.kind === "ok" ? (
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+              ) : (
+                <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+              )}
+              <span className="break-words">{pwMsg.text}</span>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
       <ConfirmDialog
         open={pendingDowngrade !== null}
         onOpenChange={(o) => {
@@ -656,6 +802,31 @@ function UsersPage() {
           deleteUser.mutate(pendingDelete.userId);
         }}
       />
+
+      <ConfirmDialog
+        open={tempPassword !== null}
+        onOpenChange={(o) => {
+          if (!o) setTempPassword(null);
+        }}
+        title="Temporäres Passwort"
+        description={
+          tempPassword
+            ? `Geben Sie ${tempPassword.email} dieses Passwort. Es wird nur jetzt angezeigt. Alle bisherigen Sitzungen wurden beendet; beim nächsten Login sollte ein eigenes Passwort vergeben werden.`
+            : undefined
+        }
+        confirmLabel="Fertig"
+        cancelLabel="Schließen"
+        onConfirm={() => setTempPassword(null)}
+      >
+        {tempPassword ? (
+          <div className="flex items-center justify-between gap-3">
+            <code className="break-all font-mono text-sm text-foreground">
+              {tempPassword.password}
+            </code>
+            <CopyButton value={tempPassword.password} label="Passwort" />
+          </div>
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }
