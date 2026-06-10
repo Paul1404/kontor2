@@ -11,6 +11,7 @@ const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
   get_member: "readonly",
   member_stats: "readonly",
   list_departments: "readonly",
+  list_fee_types: "readonly",
   member_timeline: "readonly",
   search_entities: "readonly",
   dashboard_stats: "readonly",
@@ -25,11 +26,16 @@ const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
   report_finance: "vorstand",
   report_department_stats: "vorstand",
   data_quality_summary: "vorstand",
+  data_quality_members: "vorstand",
   create_member: "vorstand",
   update_member: "vorstand",
   create_task: "vorstand",
   set_task_status: "vorstand",
   dunning_mark_paid: "vorstand",
+  create_contract: "vorstand",
+  update_contract: "vorstand",
+  create_sepa_mandate: "vorstand",
+  merge_members: "admin",
 };
 
 const MUTATION_TOOLS = [
@@ -38,6 +44,10 @@ const MUTATION_TOOLS = [
   "create_task",
   "set_task_status",
   "dunning_mark_paid",
+  "create_contract",
+  "update_contract",
+  "create_sepa_mandate",
+  "merge_members",
 ];
 
 describe("mcp tool registry", () => {

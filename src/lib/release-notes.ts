@@ -41,6 +41,42 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.47.0",
+    date: "2026-06-10",
+    title: "Mitglieder zusammenführen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Doppelt erfasste Mitglieder lassen sich jetzt zusammenführen. Alle Verträge, SEPA-Mandate, Sollstellungen, Beziehungen, Ehrungen, Abteilungen, Aufgaben und Dokumente wandern auf den behaltenen Datensatz, der andere wird gelöscht. Einträge, die sonst eine Dublette erzeugen würden, bleiben am gelöschten Datensatz und werden im Ergebnis ausgewiesen. Nichts wird unwiderruflich entfernt. Die Funktion ist nur für Administratoren und steht auch KI-Assistenten mit Admin-Schlüssel zur Verfügung.",
+      },
+    ],
+  },
+  {
+    version: "0.46.0",
+    date: "2026-06-10",
+    title: "KI-Zugriff: Datenqualität beheben",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "KI-Assistenten (MCP) können erkannte Datenqualitätsprobleme jetzt auch direkt beheben, nicht nur anzeigen. Am Mitglied lassen sich IBAN, BIC und die gesetzliche Vertretung pflegen, Verträge anlegen und ändern sowie SEPA-Mandate anlegen. Die Beitragsarten sind dafür über die Schnittstelle abrufbar. Alle Änderungen brauchen Vorstand-Rechte und landen im Audit-Protokoll. Mitglieder zusammenführen, Beitragsläufe, Import und Einstellungen bleiben gesperrt.",
+      },
+    ],
+  },
+  {
+    version: "0.45.0",
+    date: "2026-06-10",
+    title: "KI-Zugriff: Datenqualität im Detail",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "KI-Assistenten (MCP) können jetzt nicht nur die Datenqualität zählen, sondern auch die betroffenen Mitglieder einer Kategorie auflisten. So lässt sich direkt nachfragen, welche Mitglieder etwa eine Lastschrift ohne Mandat oder keinen laufenden Vertrag haben. Lesend, nur mit Vorstand-Rechten, höchstens 500 Treffer.",
+      },
+    ],
+  },
+  {
     version: "0.44.0",
     date: "2026-06-10",
     title: "KI-Zugriff (MCP)",
