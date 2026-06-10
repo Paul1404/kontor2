@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.50.0",
+    date: "2026-06-10",
+    title: "Anträge bearbeiten, Portal-Zugänge widerrufen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Anträge: In der Detailansicht lassen sich jetzt der Bearbeitungsstatus (Eingegangen, Scan eingegangen, Dokument hochgeladen, In Bearbeitung) setzen und interne Notizen pflegen, ohne den Antrag schon genehmigen oder ablehnen zu müssen.",
+      },
+      {
+        category: "feature",
+        description:
+          "Anträge: CSV-Export der Liste und eine kurze Übersicht (gesamt, genehmigt, offen) oben auf der Seite.",
+      },
+      {
+        category: "feature",
+        description:
+          "Portal-Zugang: Beim Mitglied werden die ausgegebenen Zugangslinks mit Status angezeigt und lassen sich einzeln widerrufen. Ein widerrufener Link beendet auch eine bereits laufende Portal-Sitzung.",
+      },
+    ],
+  },
+  {
     version: "0.49.0",
     date: "2026-06-10",
     title: "Passwörter und Sitzungen",
