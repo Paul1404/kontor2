@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.56.2",
+    date: "2026-06-11",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Der Health-Check prüft jetzt die PDF-Erzeugung mit. Ein fehlerhaftes Deployment fällt dadurch beim Start auf und geht nicht mehr live, die laufende Version bleibt aktiv.",
+      },
+    ],
+  },
+  {
     version: "0.56.1",
     date: "2026-06-10",
     changes: [
