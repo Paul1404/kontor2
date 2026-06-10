@@ -10,6 +10,7 @@ import { lastFour } from "~/server/crypto/encrypt";
 import { type CleanMemberInput, deriveStatus, isDunningBlocked } from "~/server/domain/member";
 import type { LinearRow } from "~/server/importer/linear-mapper";
 import { coerceBool, coerceDate, coerceInt, coerceStr } from "~/server/importer/sql-tokenizer";
+import { normalizePhone, titleCaseName } from "~/server/validation/member-fields";
 
 /**
  * Translate one Linear `adresse` row into the clean member row. Returns null
@@ -28,8 +29,11 @@ export function translateLinearMember(d: LinearRow): CleanMemberInput | null {
     mitgliedsnummer: coerceStr(d.MITGLNR ?? null, 15),
     anrede: coerceStr(d.Anrede ?? null, 20),
     titel1: coerceStr(d.Titel1 ?? null, 60),
-    vorname: coerceStr(d.Vorname ?? null, 30),
-    nachname: coerceStr(d.Nachname ?? null, 40),
+    // Normalize names on write (issue #80): title-case only re-cases
+    // all-upper/all-lower tokens, so Linear's frequent ALL-CAPS surnames become
+    // "Müller" while a deliberate "McDonald" is left as-is.
+    vorname: titleCaseName(coerceStr(d.Vorname ?? null, 30)),
+    nachname: titleCaseName(coerceStr(d.Nachname ?? null, 40)),
     geburtsdatum: coerceDate(d.Geburtsdatum ?? null),
     geburtsort: coerceStr(d.Geburtsort ?? null, 60),
     kurzname: coerceStr(d.Kurzname ?? null, 40),
@@ -44,8 +48,9 @@ export function translateLinearMember(d: LinearRow): CleanMemberInput | null {
     land: coerceStr(d.Land ?? null, 100),
     // Linear sometimes stored the email in Telefon3; keep that fallback.
     email: coerceStr(d.EMailName ?? null, 250) ?? coerceStr(d.Telefon3 ?? null, 250),
-    telefon1: coerceStr(d.Telefon1 ?? null, 40),
-    telefon2: coerceStr(d.Telefon2 ?? null, 40),
+    // Coerce an area-code-only phone (no subscriber part) to null on import.
+    telefon1: normalizePhone(coerceStr(d.Telefon1 ?? null, 40)),
+    telefon2: normalizePhone(coerceStr(d.Telefon2 ?? null, 40)),
     www: coerceStr(d.www ?? null, 256),
     iban1,
     iban1Last4: lastFour(iban1),

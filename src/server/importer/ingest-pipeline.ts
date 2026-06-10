@@ -36,6 +36,11 @@ import {
 } from "~/server/importer/linear-mapper";
 import { translateLinearMember } from "~/server/importer/translate-member";
 import { invalidateMemberCaches } from "~/server/search/cache";
+import {
+  type BatchReport,
+  type MemberFieldInput,
+  summarizeBatch,
+} from "~/server/validation/member-fields";
 
 export type IngestInput = {
   source: "sql_upload" | "svums_push";
@@ -107,6 +112,13 @@ export type IngestResult = {
   legacySepaRunsImported: number;
   legacySepaItemsImported: number;
   errors: Array<{ table: string; message: string }>;
+  /**
+   * Pre-commit data-quality report over the translated batch (issue #80):
+   * per-field error/warning counts plus duplicate Mitgliedsnummern, so a bad
+   * import is visible. Phones are auto-normalized on write, so the report
+   * reflects what still needs attention after normalization.
+   */
+  validationReport: BatchReport;
 };
 
 export async function runIngest(db: DB, input: IngestInput): Promise<IngestResult> {
@@ -244,12 +256,14 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
 
   const membersBase = processed;
   let memberRowIndex = 0;
+  const cleanForReport: MemberFieldInput[] = [];
   for (const raw of input.members ?? []) {
     try {
       // Translate Linear -> clean at the boundary. The importer writes only the
       // clean schema columns; the verbatim row is kept as provenance below.
       const clean = translateLinearMember(raw);
       if (!clean) continue;
+      cleanForReport.push(clean);
       const adrNr = clean.adrNr;
       const { isDeleted, ...cleanCols } = clean;
       const row: Record<string, unknown> = { ...cleanCols, lastImportedAt: new Date() };
@@ -971,5 +985,6 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
     legacySepaRunsImported,
     legacySepaItemsImported,
     errors,
+    validationReport: summarizeBatch(cleanForReport),
   };
 }

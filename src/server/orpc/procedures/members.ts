@@ -50,6 +50,14 @@ import {
 } from "~/server/search/cache";
 import { validateIban } from "~/server/sepa/iban";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
+import {
+  type FieldResult,
+  validateBic,
+  validateEmail,
+  validateGeburtsdatum,
+  validatePhone,
+  validatePlz,
+} from "~/server/validation/member-fields";
 
 const StatusSchema = v.picklist([
   "aktiv",
@@ -254,6 +262,28 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
     patch.iban1 = norm;
     patch.iban1Last4 = lastFour(norm);
   }
+
+  // Reject the same bad inputs the import gate flags, using the shared field
+  // validators (issue #80) so the two surfaces cannot drift. Only fields
+  // actually present in the patch are checked; an error-level result is a hard
+  // reject (warnings are left to the Datenqualitaet view).
+  const reject = (result: FieldResult): void => {
+    if (result.level === "error") {
+      throw new ORPCError("VALIDATION_FAILED", { message: result.message ?? "Eingabe ungültig." });
+    }
+  };
+  if ("email" in input) reject(validateEmail(patch.email as string | null));
+  if ("bic1" in input) reject(validateBic(patch.bic1 as string | null));
+  if ("telefon1" in input) reject(validatePhone(patch.telefon1 as string | null));
+  if ("telefon2" in input) reject(validatePhone(patch.telefon2 as string | null));
+  if ("plz" in input) {
+    reject(
+      validatePlz(patch.plz as string | null, {
+        land: ("land" in input ? (patch.land as string | null) : null) ?? undefined,
+      }),
+    );
+  }
+  if ("geburtsdatum" in input) reject(validateGeburtsdatum(patch.geburtsdatum as Date | null));
 
   return patch;
 }
