@@ -31,6 +31,7 @@ import { Route as AppMuseumRouteImport } from './app/museum'
 import { Route as AppImportRouteImport } from './app/import'
 import { Route as AppDatenqualitaetRouteImport } from './app/datenqualitaet'
 import { Route as AppAuditRouteImport } from './app/audit'
+import { Route as ApiMcpRouteImport } from './api/mcp'
 import { Route as ApiHealthRouteImport } from './api/health'
 import { Route as AntragStatusRouteImport } from './antrag/status'
 import { Route as AntragPapierformularRouteImport } from './antrag/papierformular'
@@ -45,6 +46,7 @@ import { Route as AppMitgliederMitgliedsnummerRouteImport } from './app/mitglied
 import { Route as AppForderungenRuecklaeuferRouteImport } from './app/forderungen/ruecklaeufer'
 import { Route as AppEinstellungenVereinRouteImport } from './app/einstellungen/verein'
 import { Route as AppEinstellungenSmtpRouteImport } from './app/einstellungen/smtp'
+import { Route as AppEinstellungenKiZugriffRouteImport } from './app/einstellungen/ki-zugriff'
 import { Route as AppEinstellungenBenutzerRouteImport } from './app/einstellungen/benutzer'
 import { Route as AppEinstellungenBeitragsartenRouteImport } from './app/einstellungen/beitragsarten'
 import { Route as AppEinstellungenAbteilungenRouteImport } from './app/einstellungen/abteilungen'
@@ -187,6 +189,11 @@ const AppAuditRoute = AppAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const ApiMcpRoute = ApiMcpRouteImport.update({
+  id: '/api/mcp',
+  path: '/api/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -259,6 +266,12 @@ const AppEinstellungenSmtpRoute = AppEinstellungenSmtpRouteImport.update({
   path: '/einstellungen/smtp',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppEinstellungenKiZugriffRoute =
+  AppEinstellungenKiZugriffRouteImport.update({
+    id: '/einstellungen/ki-zugriff',
+    path: '/einstellungen/ki-zugriff',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 const AppEinstellungenBenutzerRoute =
   AppEinstellungenBenutzerRouteImport.update({
     id: '/einstellungen/benutzer',
@@ -437,6 +450,7 @@ export interface FileRoutesByFullPath {
   '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
@@ -478,6 +492,7 @@ export interface FileRoutesByFullPath {
   '/app/einstellungen/abteilungen': typeof AppEinstellungenAbteilungenRoute
   '/app/einstellungen/beitragsarten': typeof AppEinstellungenBeitragsartenRoute
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
+  '/app/einstellungen/ki-zugriff': typeof AppEinstellungenKiZugriffRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
   '/app/forderungen/ruecklaeufer': typeof AppForderungenRuecklaeuferRoute
@@ -503,6 +518,7 @@ export interface FileRoutesByTo {
   '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
@@ -544,6 +560,7 @@ export interface FileRoutesByTo {
   '/app/einstellungen/abteilungen': typeof AppEinstellungenAbteilungenRoute
   '/app/einstellungen/beitragsarten': typeof AppEinstellungenBeitragsartenRoute
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
+  '/app/einstellungen/ki-zugriff': typeof AppEinstellungenKiZugriffRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
   '/app/forderungen/ruecklaeufer': typeof AppForderungenRuecklaeuferRoute
@@ -573,6 +590,7 @@ export interface FileRoutesById {
   '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/import': typeof AppImportRoute
@@ -614,6 +632,7 @@ export interface FileRoutesById {
   '/app/einstellungen/abteilungen': typeof AppEinstellungenAbteilungenRoute
   '/app/einstellungen/beitragsarten': typeof AppEinstellungenBeitragsartenRoute
   '/app/einstellungen/benutzer': typeof AppEinstellungenBenutzerRoute
+  '/app/einstellungen/ki-zugriff': typeof AppEinstellungenKiZugriffRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
   '/app/forderungen/ruecklaeufer': typeof AppForderungenRuecklaeuferRoute
@@ -644,6 +663,7 @@ export interface FileRouteTypes {
     | '/antrag/papierformular'
     | '/antrag/status'
     | '/api/health'
+    | '/api/mcp'
     | '/app/audit'
     | '/app/datenqualitaet'
     | '/app/import'
@@ -685,6 +705,7 @@ export interface FileRouteTypes {
     | '/app/einstellungen/abteilungen'
     | '/app/einstellungen/beitragsarten'
     | '/app/einstellungen/benutzer'
+    | '/app/einstellungen/ki-zugriff'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
     | '/app/forderungen/ruecklaeufer'
@@ -710,6 +731,7 @@ export interface FileRouteTypes {
     | '/antrag/papierformular'
     | '/antrag/status'
     | '/api/health'
+    | '/api/mcp'
     | '/app/audit'
     | '/app/datenqualitaet'
     | '/app/import'
@@ -751,6 +773,7 @@ export interface FileRouteTypes {
     | '/app/einstellungen/abteilungen'
     | '/app/einstellungen/beitragsarten'
     | '/app/einstellungen/benutzer'
+    | '/app/einstellungen/ki-zugriff'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
     | '/app/forderungen/ruecklaeufer'
@@ -779,6 +802,7 @@ export interface FileRouteTypes {
     | '/antrag/papierformular'
     | '/antrag/status'
     | '/api/health'
+    | '/api/mcp'
     | '/app/audit'
     | '/app/datenqualitaet'
     | '/app/import'
@@ -820,6 +844,7 @@ export interface FileRouteTypes {
     | '/app/einstellungen/abteilungen'
     | '/app/einstellungen/beitragsarten'
     | '/app/einstellungen/benutzer'
+    | '/app/einstellungen/ki-zugriff'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
     | '/app/forderungen/ruecklaeufer'
@@ -847,6 +872,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   SetupRoute: typeof SetupRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiMcpRoute: typeof ApiMcpRoute
   InviteTokenRoute: typeof InviteTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiCronSnapshotsRoute: typeof ApiCronSnapshotsRoute
@@ -1013,6 +1039,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAuditRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/api/mcp': {
+      id: '/api/mcp'
+      path: '/api/mcp'
+      fullPath: '/api/mcp'
+      preLoaderRoute: typeof ApiMcpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -1109,6 +1142,13 @@ declare module '@tanstack/react-router' {
       path: '/einstellungen/smtp'
       fullPath: '/app/einstellungen/smtp'
       preLoaderRoute: typeof AppEinstellungenSmtpRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/ki-zugriff': {
+      id: '/app/einstellungen/ki-zugriff'
+      path: '/einstellungen/ki-zugriff'
+      fullPath: '/app/einstellungen/ki-zugriff'
+      preLoaderRoute: typeof AppEinstellungenKiZugriffRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/einstellungen/benutzer': {
@@ -1378,6 +1418,7 @@ interface AppRouteRouteChildren {
   AppEinstellungenAbteilungenRoute: typeof AppEinstellungenAbteilungenRoute
   AppEinstellungenBeitragsartenRoute: typeof AppEinstellungenBeitragsartenRoute
   AppEinstellungenBenutzerRoute: typeof AppEinstellungenBenutzerRoute
+  AppEinstellungenKiZugriffRoute: typeof AppEinstellungenKiZugriffRoute
   AppEinstellungenSmtpRoute: typeof AppEinstellungenSmtpRoute
   AppEinstellungenVereinRoute: typeof AppEinstellungenVereinRoute
   AppForderungenRuecklaeuferRoute: typeof AppForderungenRuecklaeuferRoute
@@ -1425,6 +1466,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppEinstellungenAbteilungenRoute: AppEinstellungenAbteilungenRoute,
   AppEinstellungenBeitragsartenRoute: AppEinstellungenBeitragsartenRoute,
   AppEinstellungenBenutzerRoute: AppEinstellungenBenutzerRoute,
+  AppEinstellungenKiZugriffRoute: AppEinstellungenKiZugriffRoute,
   AppEinstellungenSmtpRoute: AppEinstellungenSmtpRoute,
   AppEinstellungenVereinRoute: AppEinstellungenVereinRoute,
   AppForderungenRuecklaeuferRoute: AppForderungenRuecklaeuferRoute,
@@ -1474,6 +1516,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   SetupRoute: SetupRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiMcpRoute: ApiMcpRoute,
   InviteTokenRoute: InviteTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiCronSnapshotsRoute: ApiCronSnapshotsRoute,

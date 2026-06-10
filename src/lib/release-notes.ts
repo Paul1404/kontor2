@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.44.0",
+    date: "2026-06-10",
+    title: "KI-Zugriff (MCP)",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neue Schnittstelle für KI-Assistenten wie Claude (MCP). Unter Einstellungen, KI-Zugriff können Administratoren Zugriffsschlüssel erstellen und widerrufen. Ein Schlüssel handelt mit der Rolle des verknüpften Benutzers: Readonly-Schlüssel können nur lesen, Vorstand-Schlüssel zusätzlich Mitglieder und Aufgaben bearbeiten. Beitrags- und Mahnläufe, SEPA und Einstellungen bleiben gesperrt, jede Änderung landet im Audit-Protokoll.",
+      },
+    ],
+  },
+  {
     version: "0.43.0",
     date: "2026-06-10",
     title: "Sicherheits-Update",

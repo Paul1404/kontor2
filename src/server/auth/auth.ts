@@ -1,3 +1,4 @@
+import { apiKey } from "@better-auth/api-key";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins";
@@ -21,6 +22,7 @@ function buildAuth() {
         sessions: schema.sessions,
         accounts: schema.accounts,
         verifications: schema.verifications,
+        apikeys: schema.apikeys,
       },
     }),
     emailAndPassword: {
@@ -93,7 +95,23 @@ function buildAuth() {
     // plugin's built-in default is "user", which is not in the enum and makes
     // every createUser insert fail with "invalid input value for enum
     // user_role". New users start as readonly and are promoted explicitly.
-    plugins: [admin({ defaultRole: "readonly", adminRoles: ["admin"] }), tanstackStartCookies()],
+    plugins: [
+      admin({ defaultRole: "readonly", adminRoles: ["admin"] }),
+      // API keys for the MCP endpoint (/api/mcp). `enableSessionForAPIKeys`
+      // stays at its false default on purpose: keys are only honored where we
+      // verify them explicitly (the MCP route), never as a session for the
+      // whole app or better-auth's own endpoints. Per-key rate limits are set
+      // here because the plugin default is 10 requests per day, far too low
+      // for an AI assistant session.
+      apiKey({
+        apiKeyHeaders: "x-api-key",
+        defaultPrefix: "svuwv_",
+        enableMetadata: true,
+        rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 120 },
+      }),
+      // MUST remain the last plugin (cookie handling in TanStack Start).
+      tanstackStartCookies(),
+    ],
   });
 }
 

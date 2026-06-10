@@ -1,6 +1,6 @@
 {
   "name": "svuwv",
-  "version": "0.43.0",
+  "version": "0.44.0",
   "private": true,
   "license": "UNLICENSED",
   "author": "Paul Dresch <paul.dresch@untereuerheim.com>",
@@ -32,6 +32,8 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1065.0",
     "@aws-sdk/s3-request-presigner": "^3.1065.0",
+    "@better-auth/api-key": "1.6.16",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@orpc/client": "^1.14.5",
     "@orpc/openapi": "^1.14.5",
     "@orpc/server": "^1.14.5",
@@ -42,6 +44,7 @@
     "@tanstack/react-router": "^1.170.15",
     "@tanstack/react-start": "^1.168.25",
     "@tanstack/react-store": "^0.11.0",
+    "@valibot/to-json-schema": "^1.7.1",
     "better-auth": "^1.6.16",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

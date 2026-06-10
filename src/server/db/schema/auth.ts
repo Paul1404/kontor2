@@ -1,4 +1,4 @@
-import { boolean, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { bigint, boolean, integer, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("user_role", ["admin", "vorstand", "readonly"]);
 
@@ -78,6 +78,43 @@ export const invitations = pgTable("invitations", {
   acceptedAt: timestamp("accepted_at", { withTimezone: true }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * API keys for the MCP endpoint (/api/mcp), managed by the better-auth
+ * `@better-auth/api-key` plugin (model `apikey`; with `usePlural: true` the
+ * adapter schema key must be `apikeys`). `key` holds only the SHA-256 hash of
+ * the issued key; the plaintext is shown exactly once at creation. The owner
+ * lives in `referenceId` (a users.id): a key acts with that user's role, so
+ * revoking the user (cascade) or disabling the key cuts off access.
+ * Duration fields are milliseconds; `bigint` because int4 overflows past ~24
+ * days of ms.
+ */
+export const apikeys = pgTable("apikeys", {
+  id: text("id").primaryKey(),
+  configId: text("config_id").notNull().default("default"),
+  name: text("name"),
+  start: text("start"),
+  prefix: text("prefix"),
+  key: text("key").notNull(),
+  referenceId: text("reference_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  refillInterval: bigint("refill_interval", { mode: "number" }),
+  refillAmount: integer("refill_amount"),
+  lastRefillAt: timestamp("last_refill_at", { withTimezone: true }),
+  enabled: boolean("enabled").default(true),
+  rateLimitEnabled: boolean("rate_limit_enabled").default(true),
+  rateLimitTimeWindow: bigint("rate_limit_time_window", { mode: "number" }),
+  rateLimitMax: integer("rate_limit_max"),
+  requestCount: integer("request_count").default(0),
+  remaining: integer("remaining"),
+  lastRequest: timestamp("last_request", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  permissions: text("permissions"),
+  metadata: text("metadata"),
 });
 
 export type Role = (typeof roleEnum.enumValues)[number];
