@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.53.0",
+    date: "2026-06-10",
+    title: "Detailansichten für Rundschreiben und Bestandserhebung",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Rundschreiben: Der Verlauf hat jetzt je Eintrag eine Detailansicht mit allen Empfängern und ihrem Zustellstatus, inklusive der Fehlermeldung bei nicht zugestellten E-Mails.",
+      },
+      {
+        category: "feature",
+        description:
+          "Bestandserhebung: Archivierte Erhebungen lassen sich aufklappen und zeigen Stichtag, Signoff, vollständigen SHA-256 und die hinterlegte Notiz.",
+      },
+    ],
+  },
+  {
     version: "0.52.0",
     date: "2026-06-10",
     title: "Beziehungen bearbeiten, Ehrungen zurücknehmen",
