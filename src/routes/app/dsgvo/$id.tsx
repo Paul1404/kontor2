@@ -1,14 +1,35 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Calendar, CheckCircle2, FileLock2, Hash, User } from "lucide-react";
-import type { ReactNode } from "react";
-import { Card, CardContent } from "~/components/ui/card";
+import {
+  ArrowLeft,
+  Calendar,
+  CheckCircle2,
+  FileLock2,
+  Hash,
+  Loader2,
+  Save,
+  User,
+} from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Label } from "~/components/ui/label";
+import { Textarea } from "~/components/ui/textarea";
+import { toast } from "~/components/ui/toaster";
 import { formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/dsgvo/$id")({
   component: DsgvoDetailPage,
 });
+
+const STATUS_OPTIONS = [
+  { value: "open", label: "Offen" },
+  { value: "in_progress", label: "In Bearbeitung" },
+  { value: "completed", label: "Erledigt" },
+  { value: "rejected", label: "Abgelehnt" },
+] as const;
+type RequestStatus = (typeof STATUS_OPTIONS)[number]["value"];
 
 const TYPE_LABEL: Record<string, string> = {
   auskunft: "Auskunft (Art. 15)",
@@ -27,9 +48,28 @@ const STATUS_LABEL: Record<string, string> = {
 
 function DsgvoDetailPage() {
   const { id } = Route.useParams();
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["dsgvo.get", id],
     queryFn: () => orpc.dsgvo.getRequest({ id }),
+  });
+
+  const [status, setStatus] = useState<RequestStatus>("open");
+  const [notes, setNotes] = useState("");
+  useEffect(() => {
+    if (!data) return;
+    setStatus(data.status as RequestStatus);
+    setNotes(data.notes ?? "");
+  }, [data]);
+
+  const save = useMutation({
+    mutationFn: () => orpc.dsgvo.updateRequestStatus({ id, status, notes: notes.trim() || null }),
+    onSuccess: () => {
+      toast.success("Gespeichert.");
+      qc.invalidateQueries({ queryKey: ["dsgvo.get", id] });
+      qc.invalidateQueries({ queryKey: ["dsgvo.list"] });
+    },
+    onError: (e: Error) => toast.error("Speichern fehlgeschlagen", { description: e.message }),
   });
 
   if (isLoading || !data) {
@@ -102,16 +142,47 @@ function DsgvoDetailPage() {
         </CardContent>
       </Card>
 
-      {data.notes ? (
-        <Card>
-          <CardContent className="p-5">
-            <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-              Notizen
-            </div>
-            <div className="whitespace-pre-wrap text-sm">{data.notes}</div>
-          </CardContent>
-        </Card>
-      ) : null}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Save className="size-5 text-muted-foreground" /> Bearbeitung
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <Label className="flex flex-col gap-1.5 sm:max-w-xs">
+            <span>Status</span>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as RequestStatus)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Label>
+          <Label className="flex flex-col gap-1.5">
+            <span>Notizen</span>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} />
+          </Label>
+          <Button
+            type="button"
+            variant="outline"
+            className="self-start"
+            disabled={save.isPending}
+            onClick={() => save.mutate()}
+          >
+            {save.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Save className="size-4" />
+            )}
+            Speichern
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="p-5 text-sm text-muted-foreground">

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { KeyRound, Loader2, ShieldAlert, Trash2, XCircle } from "lucide-react";
+import { KeyRound, Loader2, Power, PowerOff, ShieldAlert, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -63,6 +63,15 @@ function ApiKeysPage() {
 
   const revoke = useMutation({
     mutationFn: (input: { id: string }) => orpc.apiKeys.revoke(input),
+    onSuccess: () => {
+      setError(null);
+      qc.invalidateQueries({ queryKey: ["apiKeys"] });
+    },
+    onError: (err) => setError((err as Error).message),
+  });
+
+  const setEnabled = useMutation({
+    mutationFn: (input: { id: string; enabled: boolean }) => orpc.apiKeys.setEnabled(input),
     onSuccess: () => {
       setError(null);
       qc.invalidateQueries({ queryKey: ["apiKeys"] });
@@ -252,7 +261,16 @@ function ApiKeysPage() {
                 ) : (
                   keys.data?.map((k) => (
                     <tr key={k.id} className="transition-colors hover:bg-muted/30">
-                      <td className="px-4 py-3">{orEmpty(k.name)}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex flex-wrap items-center gap-2">
+                          {orEmpty(k.name)}
+                          {k.enabled === false ? (
+                            <span className="rounded-md border border-transparent bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Deaktiviert
+                            </span>
+                          ) : null}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground">{k.userEmail}</td>
                       <td className="px-4 py-3">{ROLE_LABEL[k.userRole] ?? k.userRole}</td>
                       <td className="px-4 py-3">
@@ -265,16 +283,41 @@ function ApiKeysPage() {
                         {k.expiresAt ? formatDate(k.expiresAt) : "unbegrenzt"}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Schlüssel ${k.name ?? ""} widerrufen`}
-                          title="Widerrufen"
-                          onClick={() => setPendingRevoke({ id: k.id, name: k.name })}
-                        >
-                          <Trash2 className="size-4 text-destructive" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={
+                              k.enabled === false
+                                ? `Schlüssel ${k.name ?? ""} aktivieren`
+                                : `Schlüssel ${k.name ?? ""} deaktivieren`
+                            }
+                            title={k.enabled === false ? "Aktivieren" : "Deaktivieren"}
+                            disabled={setEnabled.isPending && setEnabled.variables?.id === k.id}
+                            onClick={() =>
+                              setEnabled.mutate({ id: k.id, enabled: k.enabled === false })
+                            }
+                          >
+                            {setEnabled.isPending && setEnabled.variables?.id === k.id ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : k.enabled === false ? (
+                              <Power className="size-4 text-success" />
+                            ) : (
+                              <PowerOff className="size-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Schlüssel ${k.name ?? ""} widerrufen`}
+                            title="Widerrufen"
+                            onClick={() => setPendingRevoke({ id: k.id, name: k.name })}
+                          >
+                            <Trash2 className="size-4 text-destructive" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))

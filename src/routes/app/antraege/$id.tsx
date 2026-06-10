@@ -10,8 +10,9 @@ import {
   MailCheck,
   MailWarning,
   MailX,
+  Save,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -69,6 +70,16 @@ const EMAIL_DETAIL_LABEL: Record<string, string> = {
   no_recipient: "Keine E-Mail-Adresse hinterlegt",
 };
 
+// Non-terminal workflow statuses an application can be moved between. Module
+// scope (not in-component) so it's a stable reference and not a hook dep.
+const WORKFLOW_STATUS = [
+  "neu",
+  "scan_eingegangen",
+  "dokument_hochgeladen",
+  "in_bearbeitung",
+] as const;
+type WorkflowStatus = (typeof WORKFLOW_STATUS)[number];
+
 function AntragDetailPage() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
@@ -88,10 +99,34 @@ function AntragDetailPage() {
   const [declineReason, setDeclineReason] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
 
+  const [notes, setNotes] = useState("");
+  const [workStatus, setWorkStatus] = useState<WorkflowStatus>("neu");
+  // Seed the editor from the loaded application; re-seed whenever a different
+  // application is opened (id change) so stale edits don't leak across rows.
+  useEffect(() => {
+    if (!detail.data) return;
+    setNotes(detail.data.notes ?? "");
+    const s = detail.data.status;
+    setWorkStatus(
+      (WORKFLOW_STATUS as readonly string[]).includes(s) ? (s as WorkflowStatus) : "neu",
+    );
+  }, [detail.data]);
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["applications.get", id] });
     qc.invalidateQueries({ queryKey: ["applications.list"] });
+    qc.invalidateQueries({ queryKey: ["applications.stats"] });
   };
+
+  const save = useMutation({
+    mutationFn: () =>
+      orpc.applications.update({ id, status: workStatus, notes: notes.trim() || null }),
+    onSuccess: () => {
+      setMsg("Gespeichert.");
+      invalidate();
+    },
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Speichern fehlgeschlagen."),
+  });
 
   const approve = useMutation({
     mutationFn: () =>
@@ -258,6 +293,55 @@ function AntragDetailPage() {
 
       {!terminal ? (
         <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Save className="size-5 text-muted-foreground" /> Bearbeitung
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <Label className="flex flex-col gap-1.5 sm:max-w-xs">
+                <span>Status</span>
+                <select
+                  value={workStatus}
+                  onChange={(e) => setWorkStatus(e.target.value as WorkflowStatus)}
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="neu">Eingegangen</option>
+                  <option value="scan_eingegangen">Scan eingegangen</option>
+                  <option value="dokument_hochgeladen">Dokument hochgeladen</option>
+                  <option value="in_bearbeitung">In Bearbeitung</option>
+                </select>
+              </Label>
+              <Label className="flex flex-col gap-1.5">
+                <span>Interne Notizen</span>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Nur intern sichtbar"
+                />
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                className="self-start"
+                disabled={save.isPending}
+                onClick={() => {
+                  setMsg(null);
+                  save.mutate();
+                }}
+              >
+                {save.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
+                )}
+                Speichern
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

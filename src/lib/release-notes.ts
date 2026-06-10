@@ -41,6 +41,118 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.53.0",
+    date: "2026-06-10",
+    title: "Detailansichten für Rundschreiben und Bestandserhebung",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Rundschreiben: Der Verlauf hat jetzt je Eintrag eine Detailansicht mit allen Empfängern und ihrem Zustellstatus, inklusive der Fehlermeldung bei nicht zugestellten E-Mails.",
+      },
+      {
+        category: "feature",
+        description:
+          "Bestandserhebung: Archivierte Erhebungen lassen sich aufklappen und zeigen Stichtag, Signoff, vollständigen SHA-256 und die hinterlegte Notiz.",
+      },
+    ],
+  },
+  {
+    version: "0.52.0",
+    date: "2026-06-10",
+    title: "Beziehungen bearbeiten, Ehrungen zurücknehmen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Beziehungen am Mitglied lassen sich jetzt bearbeiten: Beziehungsart, Notiz sowie Von- und Bis-Datum können nachträglich geändert werden, nicht nur die Vertretung und das Löschen.",
+      },
+      {
+        category: "feature",
+        description:
+          "Ehrungen: Ein versehentlich gesetzter Ehrungsvermerk lässt sich in der Ehrungsliste direkt zurücknehmen.",
+      },
+    ],
+  },
+  {
+    version: "0.51.0",
+    date: "2026-06-10",
+    title: "DSGVO-Status und KI-Schlüssel deaktivieren",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "DSGVO-Anträge lassen sich jetzt bearbeiten: Status setzen (Offen, In Bearbeitung, Erledigt, Abgelehnt) und Notizen pflegen. Wird ein Antrag auf Erledigt gesetzt, wird der Abschlusszeitpunkt vermerkt. Jede Änderung landet im Audit-Protokoll.",
+      },
+      {
+        category: "feature",
+        description:
+          "KI-Zugriff: API-Schlüssel können deaktiviert und wieder aktiviert werden, ohne sie zu löschen. Ein deaktivierter Schlüssel wird abgewiesen, behält aber seine Historie.",
+      },
+    ],
+  },
+  {
+    version: "0.50.0",
+    date: "2026-06-10",
+    title: "Anträge bearbeiten, Portal-Zugänge widerrufen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Anträge: In der Detailansicht lassen sich jetzt der Bearbeitungsstatus (Eingegangen, Scan eingegangen, Dokument hochgeladen, In Bearbeitung) setzen und interne Notizen pflegen, ohne den Antrag schon genehmigen oder ablehnen zu müssen.",
+      },
+      {
+        category: "feature",
+        description:
+          "Anträge: CSV-Export der Liste und eine kurze Übersicht (gesamt, genehmigt, offen) oben auf der Seite.",
+      },
+      {
+        category: "feature",
+        description:
+          "Portal-Zugang: Beim Mitglied werden die ausgegebenen Zugangslinks mit Status angezeigt und lassen sich einzeln widerrufen. Ein widerrufener Link beendet auch eine bereits laufende Portal-Sitzung.",
+      },
+    ],
+  },
+  {
+    version: "0.49.0",
+    date: "2026-06-10",
+    title: "Passwörter und Sitzungen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Passwort vergessen: Auf der Anmeldeseite gibt es jetzt einen Link, über den man sich einen Link zum Zurücksetzen per E-Mail schicken lassen kann. Der Link ist eine Stunde gültig. Funktioniert nur, wenn SMTP eingerichtet ist.",
+      },
+      {
+        category: "feature",
+        description:
+          "Eigenes Passwort ändern: In der Benutzer-Verwaltung lässt sich das Passwort des eigenen Kontos ändern. Andere offene Sitzungen werden dabei beendet.",
+      },
+      {
+        category: "feature",
+        description:
+          "Admin-Werkzeuge je Benutzer: Passwort zurücksetzen (erzeugt ein temporäres Passwort, das einmalig angezeigt wird) und alle Sitzungen beenden (erzwingt eine erneute Anmeldung). Beides wird im Audit-Protokoll vermerkt.",
+      },
+    ],
+  },
+  {
+    version: "0.48.0",
+    date: "2026-06-10",
+    title: "Benutzer verwalten: sperren und löschen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Benutzer-Verwaltung kann Konten jetzt sperren und endgültig löschen, nicht nur einladen und die Rolle ändern. Gesperrte Benutzer können sich nicht mehr anmelden, laufende Sitzungen werden beendet, die Sperre lässt sich wieder aufheben. Beim Löschen werden Sitzungen, Zugänge und API-Schlüssel mit entfernt. Der letzte aktive Administrator und das eigene Konto sind geschützt. Beides landet im Audit-Protokoll.",
+      },
+      {
+        category: "feature",
+        description:
+          "Versendete Einladungen sind jetzt sichtbar. Eine neue Liste zeigt offene, eingelöste, widerrufene und abgelaufene Einladungen mit Status; offene Einladungen lassen sich direkt widerrufen.",
+      },
+    ],
+  },
+  {
     version: "0.47.0",
     date: "2026-06-10",
     title: "Mitglieder zusammenführen",

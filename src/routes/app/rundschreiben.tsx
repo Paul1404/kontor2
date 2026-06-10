@@ -38,6 +38,13 @@ function RundschreibenPage() {
   const [body, setBody] = useState(DEFAULT_BODY);
   const [status, setStatus] = useState<StatusFilter>("lebende");
   const [abteilungId, setAbteilungId] = useState("");
+  const [detailId, setDetailId] = useState<string | null>(null);
+
+  const detail = useQuery({
+    queryKey: ["rundschreiben.get", detailId],
+    queryFn: () => orpc.rundschreiben.get({ id: detailId as string }),
+    enabled: detailId !== null,
+  });
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const filter = useMemo(
@@ -354,7 +361,8 @@ function RundschreibenPage() {
                   <th className="py-1 pr-3 text-right">Zugestellt</th>
                   <th className="py-1 pr-3 text-right">Fehler</th>
                   <th className="py-1 pr-3">Gesendet</th>
-                  <th className="py-1">Von</th>
+                  <th className="py-1 pr-3">Von</th>
+                  <th className="py-1" />
                 </tr>
               </thead>
               <tbody>
@@ -375,8 +383,13 @@ function RundschreibenPage() {
                     <td className="py-1.5 pr-3 text-muted-foreground tabular-nums">
                       {formatDateTime(h.createdAt)}
                     </td>
-                    <td className="py-1.5 text-muted-foreground">
+                    <td className="py-1.5 pr-3 text-muted-foreground">
                       {h.createdByEmail || EMPTY_VALUE}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      <Button variant="ghost" size="sm" onClick={() => setDetailId(h.id)}>
+                        Details
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -397,6 +410,55 @@ function RundschreibenPage() {
         loading={send.isPending}
         onConfirm={() => send.mutate()}
       />
+
+      <ConfirmDialog
+        open={detailId !== null}
+        onOpenChange={(o) => {
+          if (!o) setDetailId(null);
+        }}
+        title={detail.data?.run.subject ?? "Rundschreiben"}
+        description="Empfänger und Zustellstatus dieses Rundschreibens."
+        confirmLabel="Schließen"
+        cancelLabel="Schließen"
+        onConfirm={() => setDetailId(null)}
+      >
+        {detail.isLoading ? (
+          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> Lade…
+          </span>
+        ) : detail.data && detail.data.recipients.length > 0 ? (
+          <table className="w-full text-sm">
+            <thead className="text-left text-muted-foreground">
+              <tr>
+                <th className="py-1 pr-3">Name</th>
+                <th className="py-1 pr-3">E-Mail</th>
+                <th className="py-1">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detail.data.recipients.map((r) => (
+                <tr key={`${r.email}-${r.name}`} className="border-t">
+                  <td className="py-1.5 pr-3">{r.name || EMPTY_VALUE}</td>
+                  <td className="py-1.5 pr-3 text-muted-foreground">{r.email || EMPTY_VALUE}</td>
+                  <td className="py-1.5">
+                    {r.status === "sent" ? (
+                      <span className="text-success">Zugestellt</span>
+                    ) : r.status === "failed" ? (
+                      <span className="text-destructive" title={r.error ?? undefined}>
+                        Fehler{r.error ? `: ${r.error}` : ""}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">{r.status}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="text-sm text-muted-foreground">Keine Empfänger erfasst.</p>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

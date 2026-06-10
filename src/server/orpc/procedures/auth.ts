@@ -1,9 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { and, count, eq, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, ne, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import { auth } from "~/server/auth/auth";
+import { invitationStatus } from "~/server/auth/invitation-status";
+import { wouldRemoveLastAdmin } from "~/server/auth/last-admin-guard";
 import { sendInviteEmail } from "~/server/auth/send-invite";
 import { completeSetup, isInSetupMode } from "~/server/auth/setup";
 import { invitations, roleEnum, users } from "~/server/db/schema/auth";
@@ -160,6 +162,277 @@ export const authRouter = {
       return { ok: true };
     }),
 
+  /**
+   * Permanently removes a user and everything keyed to them (sessions,
+   * accounts, API keys, invitations they issued — all cascade in the schema).
+   * Routed through the better-auth admin API rather than a direct Drizzle
+   * delete on purpose: sessions live in Redis (secondary storage), so a raw
+   * `delete from users` would cascade the database rows but leave the user's
+   * Redis session valid until expiry. `removeUser` revokes those too.
+   * Guards mirror `setRole`: never delete yourself, never delete the last
+   * active admin.
+   */
+  deleteUser: adminProc
+    .input(v.object({ userId: v.string() }))
+    .handler(async ({ context, input }) => {
+      if (input.userId === context.session!.user.id) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Eigenes Konto kann nicht gelöscht werden.",
+        });
+      }
+      const [target] = await context.db
+        .select({ email: users.email, role: users.role })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!target) {
+        throw new ORPCError("NOT_FOUND", { message: "Benutzer nicht gefunden." });
+      }
+      if (await wouldRemoveLastAdmin(input.userId, "delete")) {
+        throw new ORPCError("CONFLICT", {
+          message:
+            "Letzten Administrator kann nicht löschen. Bitte zuerst einen anderen Benutzer zum Administrator machen.",
+        });
+      }
+
+      try {
+        await auth().api.removeUser({
+          body: { userId: input.userId },
+          headers: context.headers,
+        });
+      } catch (err) {
+        logger.error("auth.deleteUser.failed", {
+          userId: input.userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Benutzer konnte nicht gelöscht werden.",
+        });
+      }
+
+      await appendAudit(context.db, {
+        entityType: "user",
+        entityId: input.userId,
+        action: "delete",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: {
+          email: { before: target.email, after: null },
+          role: { before: target.role, after: null },
+        },
+        requestId: context.requestId ?? null,
+      });
+      return { ok: true };
+    }),
+
+  /**
+   * Bans a user: blocks new logins and revokes existing sessions (the latter
+   * is why this goes through the better-auth admin API and not a raw column
+   * update). A banned account is kept, just locked, and can be unbanned. Same
+   * guards as a demotion: not yourself, not the last active admin.
+   */
+  banUser: adminProc
+    .input(
+      v.object({
+        userId: v.string(),
+        reason: v.optional(v.pipe(v.string(), v.maxLength(500))),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      if (input.userId === context.session!.user.id) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Eigenes Konto kann nicht gesperrt werden.",
+        });
+      }
+      const [target] = await context.db
+        .select({ email: users.email, banned: users.banned })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!target) {
+        throw new ORPCError("NOT_FOUND", { message: "Benutzer nicht gefunden." });
+      }
+      if (await wouldRemoveLastAdmin(input.userId, "ban")) {
+        throw new ORPCError("CONFLICT", {
+          message:
+            "Letzten aktiven Administrator kann nicht sperren. Bitte zuerst einen anderen Benutzer zum Administrator machen.",
+        });
+      }
+
+      const reason = input.reason?.trim();
+      try {
+        await auth().api.banUser({
+          body: { userId: input.userId, ...(reason ? { banReason: reason } : {}) },
+          headers: context.headers,
+        });
+      } catch (err) {
+        logger.error("auth.banUser.failed", {
+          userId: input.userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Benutzer konnte nicht gesperrt werden.",
+        });
+      }
+
+      await appendAudit(context.db, {
+        entityType: "user",
+        entityId: input.userId,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: {
+          banned: { before: target.banned ?? false, after: true },
+          banReason: { before: null, after: reason ?? null },
+        },
+        requestId: context.requestId ?? null,
+      });
+      return { ok: true };
+    }),
+
+  /** Lifts a ban. Safe by definition, so no last-admin guard. */
+  unbanUser: adminProc
+    .input(v.object({ userId: v.string() }))
+    .handler(async ({ context, input }) => {
+      const [target] = await context.db
+        .select({ email: users.email, banned: users.banned })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!target) {
+        throw new ORPCError("NOT_FOUND", { message: "Benutzer nicht gefunden." });
+      }
+
+      try {
+        await auth().api.unbanUser({
+          body: { userId: input.userId },
+          headers: context.headers,
+        });
+      } catch (err) {
+        logger.error("auth.unbanUser.failed", {
+          userId: input.userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Sperre konnte nicht aufgehoben werden.",
+        });
+      }
+
+      await appendAudit(context.db, {
+        entityType: "user",
+        entityId: input.userId,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: { banned: { before: target.banned ?? false, after: false } },
+        requestId: context.requestId ?? null,
+      });
+      return { ok: true };
+    }),
+
+  /**
+   * Force-logout: revokes all of a user's sessions (DB rows and the Redis
+   * secondary-storage copies) so the next request from any of their devices
+   * requires a fresh login. The user keeps their account and role. Allowed on
+   * yourself too — a deliberate "sign out everywhere".
+   */
+  revokeUserSessions: adminProc
+    .input(v.object({ userId: v.string() }))
+    .handler(async ({ context, input }) => {
+      const [target] = await context.db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!target) {
+        throw new ORPCError("NOT_FOUND", { message: "Benutzer nicht gefunden." });
+      }
+
+      try {
+        await auth().api.revokeUserSessions({
+          body: { userId: input.userId },
+          headers: context.headers,
+        });
+      } catch (err) {
+        logger.error("auth.revokeUserSessions.failed", {
+          userId: input.userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Sitzungen konnten nicht beendet werden.",
+        });
+      }
+
+      await appendAudit(context.db, {
+        entityType: "user",
+        entityId: input.userId,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: { sessionsRevoked: { before: null, after: true } },
+        requestId: context.requestId ?? null,
+      });
+      return { ok: true };
+    }),
+
+  /**
+   * Admin password reset: sets a freshly generated temporary password and
+   * returns it ONCE so the admin can hand it to a locked-out colleague. The
+   * password itself is never persisted in the audit log (only the fact that a
+   * reset happened). Sessions are revoked so any old, possibly compromised
+   * login is cut off and the user must sign in with the new password.
+   */
+  resetUserPassword: adminProc
+    .input(v.object({ userId: v.string() }))
+    .handler(async ({ context, input }) => {
+      const [target] = await context.db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!target) {
+        throw new ORPCError("NOT_FOUND", { message: "Benutzer nicht gefunden." });
+      }
+
+      // base64url of 18 random bytes -> 24 url-safe chars, comfortably above
+      // the 12-char minimum and high entropy.
+      const tempPassword = randomBytes(18).toString("base64url");
+      try {
+        await auth().api.setUserPassword({
+          body: { userId: input.userId, newPassword: tempPassword },
+          headers: context.headers,
+        });
+        await auth().api.revokeUserSessions({
+          body: { userId: input.userId },
+          headers: context.headers,
+        });
+      } catch (err) {
+        logger.error("auth.resetUserPassword.failed", {
+          userId: input.userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Passwort konnte nicht zurückgesetzt werden.",
+        });
+      }
+
+      await appendAudit(context.db, {
+        entityType: "user",
+        entityId: input.userId,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: { passwordReset: { before: null, after: true } },
+        requestId: context.requestId ?? null,
+      });
+      return { email: target.email, tempPassword };
+    }),
+
   invite: adminProc
     .input(v.object({ email: v.pipe(v.string(), v.email()), role: RoleSchema }))
     .handler(async ({ context, input }) => {
@@ -256,6 +529,25 @@ export const authRouter = {
       });
       return { ok: true };
     }),
+
+  /**
+   * All invites with a derived status, newest first. Backs the "Offene
+   * Einladungen" list on the Benutzer page so an admin can see who has a
+   * pending invite and revoke it (the email-only `invite` flow otherwise
+   * leaves no trace in the UI).
+   */
+  listInvitations: adminProc.input(v.void()).handler(async ({ context }) => {
+    const rows = await context.db.select().from(invitations).orderBy(desc(invitations.createdAt));
+    const now = new Date();
+    return rows.map((r) => ({
+      id: r.id,
+      email: r.email,
+      role: r.role,
+      status: invitationStatus(r, now),
+      createdAt: r.createdAt,
+      expiresAt: r.expiresAt,
+    }));
+  }),
 
   /** Used by the /invite/:token page to fetch invite details before submit. */
   getInvitation: publicProc

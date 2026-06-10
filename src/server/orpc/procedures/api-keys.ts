@@ -120,4 +120,35 @@ export const apiKeysRouter = {
 
     return { ok: true };
   }),
+
+  /**
+   * Enable or disable a key without deleting it. A disabled key is rejected
+   * at the MCP endpoint but keeps its history and can be re-enabled, which is
+   * the softer alternative to revoke (a permanent delete).
+   */
+  setEnabled: adminProc
+    .input(v.object({ id: v.string(), enabled: v.boolean() }))
+    .handler(async ({ context, input }) => {
+      const [updated] = await context.db
+        .update(apikeys)
+        .set({ enabled: input.enabled, updatedAt: new Date() })
+        .where(eq(apikeys.id, input.id))
+        .returning({ id: apikeys.id, name: apikeys.name });
+      if (!updated) {
+        throw new ORPCError("NOT_FOUND", { message: "Schlüssel nicht gefunden." });
+      }
+
+      await appendAudit(context.db, {
+        entityType: "apiKey",
+        entityId: updated.id,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: { enabled: { before: !input.enabled, after: input.enabled } },
+        requestId: context.requestId,
+      });
+
+      return { ok: true };
+    }),
 };

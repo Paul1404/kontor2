@@ -19,6 +19,7 @@ export const EMAIL_KIND = {
   dunning: "dunning",
   invite: "invite",
   portalInvite: "portal_invite",
+  passwordReset: "password_reset",
   testMail: "test_mail",
 } as const;
 

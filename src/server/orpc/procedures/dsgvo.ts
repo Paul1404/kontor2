@@ -109,6 +109,56 @@ export const dsgvoRouter = {
     }),
 
   /**
+   * Move a request through its lifecycle (open / in_progress / completed /
+   * rejected) and optionally update the notes. Setting "completed" stamps the
+   * completion time and actor; moving back out of "completed" clears them so
+   * the field reflects reality. Recorded in the audit log.
+   */
+  updateRequestStatus: vorstandProc
+    .input(
+      v.object({
+        id: v.pipe(v.string(), v.uuid()),
+        status: RequestStatus,
+        notes: v.optional(v.nullable(v.string())),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const [existing] = await context.db
+        .select({ status: dsgvoRequestsTable.status })
+        .from(dsgvoRequestsTable)
+        .where(eq(dsgvoRequestsTable.id, input.id))
+        .limit(1);
+      if (!existing) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+
+      const actor = context.session?.user;
+      const now = new Date();
+      const patch: Record<string, unknown> = { status: input.status };
+      if (input.status === "completed") {
+        patch.completedAt = now;
+        patch.completedBy = actor?.id ?? null;
+      } else {
+        patch.completedAt = null;
+        patch.completedBy = null;
+      }
+      if (input.notes !== undefined) patch.notes = input.notes;
+
+      await context.db.transaction(async (tx) => {
+        await tx.update(dsgvoRequestsTable).set(patch).where(eq(dsgvoRequestsTable.id, input.id));
+        await appendAudit(tx, {
+          entityType: "dsgvo_request",
+          entityId: input.id,
+          action: "update",
+          source: "dsgvo",
+          actorId: actor?.id ?? null,
+          actorEmail: actor?.email ?? null,
+          changes: { status: { before: existing.status, after: input.status } },
+          requestId: context.requestId ?? null,
+        });
+      });
+      return { ok: true };
+    }),
+
+  /**
    * One-shot: create request, build dossier, render PDF, mark completed,
    * return the JSON + base64 PDF for immediate download. Caller stores both.
    */

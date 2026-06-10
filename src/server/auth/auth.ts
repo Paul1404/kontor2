@@ -3,10 +3,13 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
+import { sendPasswordResetEmail } from "~/server/auth/send-invite";
 import { getSessionConfig } from "~/server/auth/session-config";
 import { db } from "~/server/db/client";
 import * as schema from "~/server/db/schema";
 import { env } from "~/server/env";
+import { logger } from "~/server/lib/logger";
+import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { redis } from "~/server/redis/client";
 
 function buildAuth() {
@@ -30,6 +33,30 @@ function buildAuth() {
       autoSignIn: true,
       disableSignUp: true,
       minPasswordLength: 12,
+      // Self-service password reset. better-auth issues the token; we mail a
+      // link to our own /passwort-zuruecksetzen route (not better-auth's URL)
+      // so the flow stays inside the app. The send is best-effort and never
+      // throws: a thrown sender would turn the public request-reset endpoint
+      // into an email-enumeration oracle (configured vs. unconfigured SMTP,
+      // existing vs. missing user). Every attempt is recorded in the mail log.
+      sendResetPassword: async ({ user, token }) => {
+        const resetUrl = `${env().BETTER_AUTH_URL}/passwort-zuruecksetzen?token=${token}`;
+        const result = await sendPasswordResetEmail({ to: user.email, resetUrl });
+        if (!result.ok && result.reason !== "smtp_not_configured") {
+          logger.warn("auth.password-reset.send-failed", { reason: result.reason });
+        }
+        await recordEmail({
+          kind: EMAIL_KIND.passwordReset,
+          ...statusFromSend(result),
+          recipient: user.email,
+          subject: "Passwort zurücksetzen",
+          entityType: "user",
+          entityId: user.id,
+        });
+      },
+      // One hour, matching better-auth's default; stated explicitly so the
+      // mail copy ("eine Stunde gültig") cannot drift from the real window.
+      resetPasswordTokenExpiresIn: 60 * 60,
     },
     // Brute-force protection. Without this the credential login endpoint
     // accepts unlimited guesses against a known email. Rate-limit records live
