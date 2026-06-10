@@ -41,17 +41,6 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
-    version: "0.56.2",
-    date: "2026-06-11",
-    changes: [
-      {
-        category: "internal",
-        description:
-          "Das Laufzeit-Image enthält keine Build-Werkzeuge mehr und ist rund 95 MB kleiner. Deployments übertragen und starten dadurch schneller.",
-      },
-    ],
-  },
-  {
     version: "0.56.1",
     date: "2026-06-10",
     changes: [
