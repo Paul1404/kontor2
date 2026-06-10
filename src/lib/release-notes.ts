@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.43.0",
+    date: "2026-06-10",
+    title: "Sicherheits-Update",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Anmeldung, Einladungs-Links, Portal-Zugangslinks und die Antrags-Statusabfrage sind jetzt gegen automatisiertes Durchprobieren abgesichert. Nach zu vielen Versuchen in kurzer Zeit wird kurz pausiert. Im normalen Gebrauch ist davon nichts zu merken.",
+      },
+      {
+        category: "internal",
+        description:
+          "Datei-Downloads setzen den Dateinamen jetzt nach Standard und entschärfen Sonderzeichen. Der Dokumente-Import begrenzt die entpackte Größe gegen manipulierte ZIP-Dateien. Der Server läuft im Container ohne Root-Rechte.",
+      },
+    ],
+  },
+  {
     version: "0.42.0",
     date: "2026-06-10",
     title: "SVUMS Antrags-Import",

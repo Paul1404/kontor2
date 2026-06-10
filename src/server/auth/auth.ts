@@ -29,6 +29,35 @@ function buildAuth() {
       disableSignUp: true,
       minPasswordLength: 12,
     },
+    // Brute-force protection. Without this the credential login endpoint
+    // accepts unlimited guesses against a known email. Rate-limit records live
+    // in the same Redis we use for sessions (`secondary-storage`), so this
+    // works across container instances and survives a redeploy. Enabled in
+    // production only; dev/test would otherwise throttle the test suite and
+    // local iteration. Keying is per client IP (see `advanced.ipAddress`).
+    rateLimit: {
+      enabled: env().NODE_ENV === "production",
+      storage: "secondary-storage",
+      // Generous global default so normal browsing of auth endpoints (session
+      // refresh, get-session) is never throttled.
+      window: 60,
+      max: 120,
+      customRules: {
+        // The expensive, attackable endpoints: credential sign-in and the
+        // password-reset request. 10 attempts per 5 minutes per IP is well
+        // above a human mistyping a password and far below a useful brute
+        // force.
+        "/sign-in/email": { window: 300, max: 10 },
+        "/forget-password": { window: 300, max: 5 },
+        "/reset-password": { window: 300, max: 10 },
+      },
+    },
+    advanced: {
+      // Railway terminates TLS and forwards the real client IP in
+      // `x-forwarded-for`. Pin the rate limiter (and session IP tracking) to
+      // that header so throttling keys on the visitor, not the proxy.
+      ipAddress: { ipAddressHeaders: ["x-forwarded-for"] },
+    },
     user: {
       additionalFields: {
         role: {

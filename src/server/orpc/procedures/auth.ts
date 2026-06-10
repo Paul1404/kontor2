@@ -8,8 +8,31 @@ import { sendInviteEmail } from "~/server/auth/send-invite";
 import { completeSetup, isInSetupMode } from "~/server/auth/setup";
 import { invitations, roleEnum, users } from "~/server/db/schema/auth";
 import { env } from "~/server/env";
+import { clientIp } from "~/server/lib/client-ip";
+import { logger } from "~/server/lib/logger";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { adminProc, authedProc, publicProc } from "~/server/orpc/base";
+import { rateLimit } from "~/server/redis/client";
+
+/**
+ * Throttle an unauthenticated, token-bearing endpoint by client IP. These
+ * procedures (setup, invite lookup/acceptance) are guessing targets: the token
+ * space is large, but rate limiting removes online brute force as an option and
+ * caps abuse of the account-creation path. Throws TOO_MANY_REQUESTS when the
+ * window is exhausted.
+ */
+async function throttle(headers: Headers, scope: string, limit: number): Promise<void> {
+  const res = await rateLimit({
+    key: `auth:${scope}:${clientIp(headers)}`,
+    limit,
+    windowSeconds: 300,
+  });
+  if (!res.allowed) {
+    throw new ORPCError("TOO_MANY_REQUESTS", {
+      message: "Zu viele Versuche. Bitte versuchen Sie es in einigen Minuten erneut.",
+    });
+  }
+}
 
 /** SHA-256 hex of the raw invite token; only the hash is persisted. */
 function sha256(s: string): string {
@@ -43,7 +66,8 @@ export const authRouter = {
         name: v.pipe(v.string(), v.minLength(1)),
       }),
     )
-    .handler(async ({ input }) => {
+    .handler(async ({ context, input }) => {
+      await throttle(context.headers, "setup", 10);
       const result = await completeSetup(input);
       if (!result.ok) {
         if (result.reason === "already_initialized") {
@@ -237,6 +261,7 @@ export const authRouter = {
   getInvitation: publicProc
     .input(v.object({ token: v.string() }))
     .handler(async ({ context, input }) => {
+      await throttle(context.headers, "invite-lookup", 20);
       const rows = await context.db
         .select()
         .from(invitations)
@@ -261,6 +286,7 @@ export const authRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
+      await throttle(context.headers, "invite-accept", 10);
       // Atomically mark the invitation accepted with a conditional update.
       // If 0 rows change, another request already accepted/revoked it (or
       // it expired) — fail without creating the user. This sidesteps the
@@ -343,9 +369,11 @@ export const authRouter = {
             });
           }
           userId = orphan.id;
-          console.log(
-            `[invite] adopting orphan user ${userId} for invitation ${inv.id} (retry after partial failure)`,
-          );
+          logger.info("invite.adopt-orphan", {
+            userId,
+            invitationId: inv.id,
+            note: "retry after partial failure",
+          });
         }
 
         await context.db
@@ -376,7 +404,10 @@ export const authRouter = {
             .set({ acceptedAt: null })
             .where(eq(invitations.id, inv.id));
         } catch (rollbackError) {
-          console.error("[invite] failed to roll back claim:", rollbackError);
+          logger.error("invite.rollback-failed", {
+            invitationId: inv.id,
+            error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          });
         }
         throw e;
       }
