@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.51.0",
+    date: "2026-06-10",
+    title: "DSGVO-Status und KI-Schlüssel deaktivieren",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "DSGVO-Anträge lassen sich jetzt bearbeiten: Status setzen (Offen, In Bearbeitung, Erledigt, Abgelehnt) und Notizen pflegen. Wird ein Antrag auf Erledigt gesetzt, wird der Abschlusszeitpunkt vermerkt. Jede Änderung landet im Audit-Protokoll.",
+      },
+      {
+        category: "feature",
+        description:
+          "KI-Zugriff: API-Schlüssel können deaktiviert und wieder aktiviert werden, ohne sie zu löschen. Ein deaktivierter Schlüssel wird abgewiesen, behält aber seine Historie.",
+      },
+    ],
+  },
+  {
     version: "0.50.0",
     date: "2026-06-10",
     title: "Anträge bearbeiten, Portal-Zugänge widerrufen",
