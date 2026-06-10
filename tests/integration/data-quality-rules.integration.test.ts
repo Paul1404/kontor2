@@ -88,10 +88,12 @@ describe.skipIf(!onTestDb)("data-quality new rules (integration)", () => {
     match.telefon_nur_vorwahl = await addMember({ telefon1: "09521" });
     control.telefon_nur_vorwahl = await addMember({ telefon1: "09521 123456" });
 
-    // mitgliedsnummer_kollision (two live rows, same number)
-    match.mitgliedsnummer_kollision = await addMember({ mitgliedsnummer: `${MARKER}-COLL` });
-    await addMember({ mitgliedsnummer: `${MARKER}-COLL` });
-    control.mitgliedsnummer_kollision = await addMember({ mitgliedsnummer: `${MARKER}-UNIQ` });
+    // NOTE: `mitgliedsnummer_kollision` is intentionally NOT fixture-tested
+    // here. The partial unique index from migration 0048 makes two non-deleted
+    // rows with the same Mitgliedsnummer impossible to insert, so the state the
+    // rule detects cannot be reproduced. The rule stays in the registry as a
+    // defensive/pre-migration check; the summary test below confirms it is
+    // present (count 0).
 
     // name_reihenfolge_vertauscht: build a "common firstname" set with a marker.
     await addMember({ vorname: `${MARKER}fn`, nachname: `${MARKER}a` });
@@ -197,7 +199,6 @@ describe.skipIf(!onTestDb)("data-quality new rules (integration)", () => {
 
   const cases: CategoryId[] = [
     "telefon_nur_vorwahl",
-    "mitgliedsnummer_kollision",
     "name_reihenfolge_vertauscht",
     "mehrere_personen_im_datensatz",
     "strasse_ohne_hausnummer",
