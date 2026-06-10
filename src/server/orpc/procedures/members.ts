@@ -23,7 +23,12 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
-import { deriveGeschlecht, deriveStatus, type MemberStatus } from "~/server/domain/member";
+import {
+  deriveGeschlecht,
+  deriveStatus,
+  type MemberStatus,
+  memberRef,
+} from "~/server/domain/member";
 import { onboardMember } from "~/server/domain/member/onboard";
 import { generateMemberNumber } from "~/server/domain/member-number";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
@@ -32,7 +37,7 @@ import {
   planReactivateCascade,
   toIsoDay,
 } from "~/server/lib/member-lifecycle";
-import { authedProc, vorstandProc } from "~/server/orpc/base";
+import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import {
   CACHE_NS,
   cached,
@@ -939,6 +944,230 @@ export const membersRouter = {
         }),
       );
 
+      await invalidateMemberCaches();
+      return result;
+    }),
+
+  /**
+   * Merge a duplicate member ("loser") into a surviving one ("winner"): every
+   * child record (contracts, SEPA mandates, postings, relationships, Ehrungen,
+   * Abteilungen, tasks, documents, consents, ...) is repointed from the loser
+   * to the winner, then the loser is soft-deleted. The winner's own Stammdaten
+   * are left untouched.
+   *
+   * The legacy mirror keys several tables on `adrNr` with a uniqueness
+   * constraint (contracts, SEPA mandates, relationships, Ehrungen, Abteilungen,
+   * source records). A loser row that would collide with one the winner already
+   * has is LEFT on the loser instead of crashing the merge; it stays reachable
+   * on the soft-deleted record and is counted in `skipped`. Nothing is
+   * hard-deleted, so the soft-deleted loser row plus the audit entry keep the
+   * merge reversible by hand.
+   *
+   * Postings (soll_stellungen, fee_run_items) follow their contract's new owner
+   * so a skipped contract never leaves an orphaned posting on the winner.
+   *
+   * Destructive and admin-only; callers must pass `confirm: true`.
+   */
+  merge: adminProc
+    .input(
+      v.object({
+        winnerId: v.string(),
+        loserId: v.string(),
+        confirm: v.literal(true),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      if (input.winnerId === input.loserId) {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: "Zielmitglied und Quellmitglied müssen unterschiedlich sein.",
+        });
+      }
+      const result = await context.db.transaction(async (tx) => {
+        const rows = await tx
+          .select({
+            id: membersTable.id,
+            adrNr: membersTable.adrNr,
+            memberNo: membersTable.memberNo,
+            kontaktNo: membersTable.kontaktNo,
+            mitgliedsnummer: membersTable.mitgliedsnummer,
+            deletedAt: membersTable.deletedAt,
+          })
+          .from(membersTable)
+          .where(inArray(membersTable.id, [input.winnerId, input.loserId]));
+        const winner = rows.find((r) => r.id === input.winnerId);
+        const loser = rows.find((r) => r.id === input.loserId);
+        if (!winner || !loser) {
+          throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        }
+        if (winner.deletedAt) {
+          throw new ORPCError("CONFLICT", { message: "Das Zielmitglied ist gelöscht." });
+        }
+        if (loser.deletedAt) {
+          throw new ORPCError("CONFLICT", { message: "Das Quellmitglied ist bereits gelöscht." });
+        }
+
+        const w = input.winnerId;
+        const l = input.loserId;
+        const wAdr = winner.adrNr;
+        const lAdr = loser.adrNr;
+        const moved: Record<string, number> = {};
+        const skipped: Record<string, number> = {};
+
+        const runCount = async (q: ReturnType<typeof sql>): Promise<number> =>
+          ((await tx.execute(q)) as unknown as unknown[]).length;
+        const leftover = async (table: string): Promise<number> => {
+          const r = (await tx.execute(
+            sql`select count(*)::int as c from ${sql.raw(table)} where member_id = ${l}`,
+          )) as unknown as Array<{ c: number }>;
+          return Number(r[0]?.c ?? 0);
+        };
+
+        // -- contracts: repoint member + adrNr; skip (adrNr, vertragNr, art) dups.
+        moved.contracts = await runCount(sql`
+          update contracts t set member_id = ${w}, adr_nr = ${wAdr}
+          where t.member_id = ${l}
+            and not exists (
+              select 1 from contracts x
+              where x.adr_nr = ${wAdr} and x.vertrag_nr = t.vertrag_nr and x.art = t.art
+            )
+          returning t.id`);
+        skipped.contracts = await leftover("contracts");
+        // Alternate-payer pointer (abweichende AdrNr) follows the merge too.
+        await tx.execute(sql`update contracts set abw_adr_nr = ${wAdr} where abw_adr_nr = ${lAdr}`);
+
+        // -- postings follow their contract's (possibly unchanged) owner.
+        moved.sollStellungen = await runCount(sql`
+          update soll_stellungen s set member_id = c.member_id
+          from contracts c where s.contract_id = c.id and s.member_id = ${l} returning s.id`);
+        moved.feeRunItems = await runCount(sql`
+          update fee_run_items s set member_id = c.member_id
+          from contracts c where s.contract_id = c.id and s.member_id = ${l} returning s.id`);
+
+        // -- SEPA mandates: repoint member + adrNr; skip (adrNr, mandatsNr) dups.
+        moved.sepaMandates = await runCount(sql`
+          update sepa_mandates t set member_id = ${w}, adr_nr = ${wAdr}
+          where t.member_id = ${l}
+            and not exists (
+              select 1 from sepa_mandates x where x.adr_nr = ${wAdr} and x.mandats_nr = t.mandats_nr
+            )
+          returning t.id`);
+        skipped.sepaMandates = await leftover("sepa_mandates");
+
+        // -- Ehrungen: skip on the partial unique (member_id, jubilaeum_jahre).
+        moved.ehrungen = await runCount(sql`
+          update ehrungen t set member_id = ${w}
+          where t.member_id = ${l}
+            and not exists (
+              select 1 from ehrungen x
+              where x.member_id = ${w} and x.jubilaeum_jahre = t.jubilaeum_jahre
+                and x.jubilaeum_jahre is not null and x.deleted_at is null
+            )
+          returning t.id`);
+        skipped.ehrungen = await leftover("ehrungen");
+
+        // -- Abteilungen: skip on PK (member_id, abteilung_id, eintrittsdatum).
+        moved.abteilungen = await runCount(sql`
+          update member_abteilungen t set member_id = ${w}
+          where t.member_id = ${l}
+            and not exists (
+              select 1 from member_abteilungen x
+              where x.member_id = ${w} and x.abteilung_id = t.abteilung_id
+                and x.eintrittsdatum = t.eintrittsdatum
+            )
+          returning t.member_id`);
+        skipped.abteilungen = await leftover("member_abteilungen");
+
+        // -- Source records: repoint member + adrNr; skip (member_id, source_table) dups.
+        moved.sourceRecords = await runCount(sql`
+          update member_source_records t set member_id = ${w}, adr_nr = ${wAdr}
+          where t.member_id = ${l}
+            and not exists (
+              select 1 from member_source_records x
+              where x.member_id = ${w} and x.source_table = t.source_table
+            )
+          returning t.id`);
+        skipped.sourceRecords = await leftover("member_source_records");
+
+        // -- Relationships: drop the loser<->winner edge (no self-links), then
+        // repoint each side, skipping rows that would duplicate (from_adr_nr,
+        // to_adr_nr); leftover loser edges are redundant and removed.
+        await tx.execute(sql`
+          delete from relationships
+          where (from_member_id = ${l} and to_member_id = ${w})
+             or (from_member_id = ${w} and to_member_id = ${l})`);
+        const movedFrom = await runCount(sql`
+          update relationships t set from_member_id = ${w}, from_adr_nr = ${wAdr}
+          where t.from_member_id = ${l}
+            and not exists (
+              select 1 from relationships x where x.from_adr_nr = ${wAdr} and x.to_adr_nr = t.to_adr_nr
+            )
+          returning t.id`);
+        const movedTo = await runCount(sql`
+          update relationships t set to_member_id = ${w}, to_adr_nr = ${wAdr}
+          where t.to_member_id = ${l}
+            and not exists (
+              select 1 from relationships x where x.from_adr_nr = t.from_adr_nr and x.to_adr_nr = ${wAdr}
+            )
+          returning t.id`);
+        moved.relationships = movedFrom + movedTo;
+        const relLeft = (await tx.execute(
+          sql`select count(*)::int as c from relationships where from_member_id = ${l} or to_member_id = ${l}`,
+        )) as unknown as Array<{ c: number }>;
+        skipped.relationships = Number(relLeft[0]?.c ?? 0);
+        await tx.execute(
+          sql`delete from relationships where from_member_id = ${l} or to_member_id = ${l}`,
+        );
+
+        // -- Plain member_id tables: no member-scoped uniqueness, repoint all.
+        const simpleTables = [
+          "member_tasks",
+          "attachments",
+          "pending_uploads",
+          "portal_tokens",
+          "portal_sessions",
+          "portal_change_requests",
+          "dsgvo_requests",
+          "dsgvo_consent_log",
+          "cancellation_letters",
+          "rundschreiben_recipients",
+          "membership_applications",
+          "sepa_returns",
+          "dunning_items",
+        ];
+        for (const table of simpleTables) {
+          moved[table] = await runCount(
+            sql`update ${sql.raw(table)} set member_id = ${w} where member_id = ${l} returning member_id`,
+          );
+        }
+
+        // -- Soft-delete the loser; its row and any skipped children remain.
+        await tx.update(membersTable).set({ deletedAt: new Date() }).where(eq(membersTable.id, l));
+
+        const winnerRef = memberRef(winner);
+        const loserRef = memberRef(loser);
+        const auditId = await appendAudit(tx, {
+          entityType: "member",
+          entityId: l,
+          action: "delete",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            __mergedInto: { before: null, after: winnerRef },
+            __moved: { before: null, after: JSON.stringify(moved) },
+            __skipped: { before: null, after: JSON.stringify(skipped) },
+          },
+          requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, w, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
+        });
+
+        return { winnerId: w, loserId: l, winnerRef, loserRef, moved, skipped };
+      });
       await invalidateMemberCaches();
       return result;
     }),

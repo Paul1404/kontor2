@@ -112,5 +112,7 @@ describe.skipIf(!onTestDb)("mcp api key (integration)", () => {
     const names = payload.result?.tools.map((t) => t.name) ?? [];
     expect(names).toContain("update_member");
     expect(names).toContain("member_stats");
+    // merge_members is admin-only and must not surface for a vorstand key.
+    expect(names).not.toContain("merge_members");
   });
 });

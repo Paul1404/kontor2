@@ -35,6 +35,7 @@ const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
   create_contract: "vorstand",
   update_contract: "vorstand",
   create_sepa_mandate: "vorstand",
+  merge_members: "admin",
 };
 
 const MUTATION_TOOLS = [
@@ -46,6 +47,7 @@ const MUTATION_TOOLS = [
   "create_contract",
   "update_contract",
   "create_sepa_mandate",
+  "merge_members",
 ];
 
 describe("mcp tool registry", () => {

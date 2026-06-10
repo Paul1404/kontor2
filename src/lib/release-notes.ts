@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.47.0",
+    date: "2026-06-10",
+    title: "Mitglieder zusammenführen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Doppelt erfasste Mitglieder lassen sich jetzt zusammenführen. Alle Verträge, SEPA-Mandate, Sollstellungen, Beziehungen, Ehrungen, Abteilungen, Aufgaben und Dokumente wandern auf den behaltenen Datensatz, der andere wird gelöscht. Einträge, die sonst eine Dublette erzeugen würden, bleiben am gelöschten Datensatz und werden im Ergebnis ausgewiesen. Nichts wird unwiderruflich entfernt. Die Funktion ist nur für Administratoren und steht auch KI-Assistenten mit Admin-Schlüssel zur Verfügung.",
+      },
+    ],
+  },
+  {
     version: "0.46.0",
     date: "2026-06-10",
     title: "KI-Zugriff: Datenqualität beheben",

@@ -395,6 +395,14 @@ const TOOLS: McpTool[] = [
     input: McpSepaMandateInput,
     execute: (context, input) => call(appRouter.sepa.create, input, { context }),
   }),
+  defineTool({
+    name: "merge_members",
+    description:
+      "Merge two duplicate member records (use after confirming a pair from data_quality_members 'moegliche_dubletten'). Moves all contracts, SEPA mandates, postings, relationships, Ehrungen, Abteilungen, tasks and documents from the loser onto the winner, then soft-deletes the loser. Pass winnerId (kept) and loserId (removed) as internal member ids, and confirm: true. Destructive and ADMIN ONLY. Rows that would break a uniqueness constraint stay on the soft-deleted loser and are reported as 'skipped'; nothing is hard-deleted. The change is audited.",
+    minRole: "admin",
+    input: v.object({ winnerId: v.string(), loserId: v.string(), confirm: v.literal(true) }),
+    execute: (context, input) => call(appRouter.members.merge, input, { context }),
+  }),
 ];
 
 export function allTools(): readonly McpTool[] {
