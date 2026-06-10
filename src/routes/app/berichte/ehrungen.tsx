@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Award, Check, Download, Loader2, Printer, Trophy } from "lucide-react";
+import { Award, Check, Download, Loader2, Printer, Trophy, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -87,6 +87,18 @@ function EhrungenPage() {
       await invalidateStatus();
     },
     onError: (e: Error) => toast.error("Urkunde fehlgeschlagen", { description: e.message }),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => orpc.ehrungen.remove({ id }),
+    onSuccess: async () => {
+      await invalidateStatus();
+      toast.success("Vermerk zurückgenommen");
+    },
+    onError: (e: Error) =>
+      toast.error("Konnte nicht zurückgenommen werden", {
+        description: e.message,
+      }),
   });
 
   function toggle(j: number) {
@@ -240,16 +252,28 @@ function EhrungenPage() {
                                   {honor.verliehenAm ? ` ${formatDate(honor.verliehenAm)}` : ""}
                                 </Badge>
                                 {canEdit ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="print:hidden"
-                                    disabled={busy}
-                                    onClick={() => urkunde.mutate(honor.ehrungId)}
-                                    title="Ehrenurkunde erzeugen und herunterladen"
-                                  >
-                                    <Award className="size-4" /> Urkunde
-                                  </Button>
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="print:hidden"
+                                      disabled={busy}
+                                      onClick={() => urkunde.mutate(honor.ehrungId)}
+                                      title="Ehrenurkunde erzeugen und herunterladen"
+                                    >
+                                      <Award className="size-4" /> Urkunde
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-muted-foreground hover:text-destructive print:hidden"
+                                      disabled={busy || remove.isPending}
+                                      onClick={() => remove.mutate(honor.ehrungId)}
+                                      title="Ehrungsvermerk zurücknehmen"
+                                    >
+                                      <X className="size-4" /> Zurücknehmen
+                                    </Button>
+                                  </>
                                 ) : null}
                               </div>
                             ) : canEdit ? (

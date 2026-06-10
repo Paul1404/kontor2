@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Inbox, Loader2, Search } from "lucide-react";
+import { Download, Inbox, Loader2, Search } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
 import { cn } from "~/lib/cn";
+import { exportCsvFile } from "~/lib/export";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/antraege/")({
@@ -49,6 +51,8 @@ function AntraegeListPage() {
   const [q, setQ] = useState("");
   const [tab, setTab] = useState<StatusFilter>("alle");
 
+  const [exporting, setExporting] = useState(false);
+
   const list = useQuery({
     queryKey: ["applications.list", q, tab],
     queryFn: () =>
@@ -60,11 +64,44 @@ function AntraegeListPage() {
       }),
   });
 
+  const stats = useQuery({
+    queryKey: ["applications.stats"],
+    queryFn: () => orpc.applications.stats(),
+  });
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Inbox className="size-6 text-brand" />
         <h1 className="text-2xl font-semibold tracking-tight">Anträge</h1>
+        {stats.data ? (
+          <span className="text-sm text-muted-foreground">
+            {stats.data.total} gesamt · {stats.data.byStatus.genehmigt ?? 0} genehmigt ·{" "}
+            {(stats.data.byStatus.neu ?? 0) +
+              (stats.data.byStatus.dokument_hochgeladen ?? 0) +
+              (stats.data.byStatus.in_bearbeitung ?? 0)}{" "}
+            offen
+          </span>
+        ) : null}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="ml-auto"
+          disabled={exporting}
+          onClick={async () => {
+            setExporting(true);
+            await exportCsvFile(() => orpc.applications.exportCsv({}));
+            setExporting(false);
+          }}
+        >
+          {exporting ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Download className="size-4" />
+          )}
+          CSV-Export
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

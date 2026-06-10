@@ -12,7 +12,9 @@ import {
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { exportBase64File, exportCsvFile } from "~/lib/export";
+import { EMPTY_VALUE, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/berichte/bestandserhebung")({
@@ -54,6 +56,13 @@ function BestandserhebungPage() {
   const archived = useQuery({
     queryKey: ["verbandsmeldung.listArchived"],
     queryFn: () => orpc.verbandsmeldung.listArchived(),
+  });
+
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = useQuery({
+    queryKey: ["verbandsmeldung.getArchived", detailId],
+    queryFn: () => orpc.verbandsmeldung.getArchived({ id: detailId as string }),
+    enabled: detailId !== null,
   });
 
   const archive = useMutation({
@@ -286,6 +295,7 @@ function BestandserhebungPage() {
                   <th className="py-2 font-medium">Erstellt</th>
                   <th className="py-2 font-medium">Signoff</th>
                   <th className="py-2 font-medium">SHA-256</th>
+                  <th className="py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -311,6 +321,11 @@ function BestandserhebungPage() {
                     <td className="py-2 font-mono text-xs text-muted-foreground">
                       {row.deliverableSha256?.slice(0, 16) ?? "—"}…
                     </td>
+                    <td className="py-2 text-right">
+                      <Button variant="ghost" size="sm" onClick={() => setDetailId(row.id)}>
+                        Details
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -318,6 +333,58 @@ function BestandserhebungPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={detailId !== null}
+        onOpenChange={(o) => {
+          if (!o) setDetailId(null);
+        }}
+        title={
+          detail.data ? `Bestandserhebung ${String(detail.data.stichtag)}` : "Bestandserhebung"
+        }
+        description="Details der archivierten Erhebung."
+        confirmLabel="Schließen"
+        cancelLabel="Schließen"
+        onConfirm={() => setDetailId(null)}
+      >
+        {detail.isLoading ? (
+          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> Lade…
+          </span>
+        ) : detail.data ? (
+          <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+            <DetailRow label="Stichtag">{String(detail.data.stichtag)}</DetailRow>
+            <DetailRow label="Erstellt">
+              {formatDateTime(detail.data.createdAt)} · {detail.data.createdByEmail ?? EMPTY_VALUE}
+            </DetailRow>
+            <DetailRow label="Signoff">
+              {detail.data.signedOff
+                ? `Ja${detail.data.signedOffAt ? ` · ${formatDateTime(detail.data.signedOffAt)}` : ""}${
+                    detail.data.signedOffByEmail ? ` · ${detail.data.signedOffByEmail}` : ""
+                  }`
+                : "Offen"}
+            </DetailRow>
+            <DetailRow label="SHA-256">
+              <span className="break-all font-mono text-xs">
+                {detail.data.deliverableSha256 ?? EMPTY_VALUE}
+              </span>
+            </DetailRow>
+            <div className="sm:col-span-2">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">Notiz</dt>
+              <dd className="mt-0.5 whitespace-pre-wrap">{detail.data.notes || EMPTY_VALUE}</dd>
+            </div>
+          </dl>
+        ) : null}
+      </ConfirmDialog>
+    </div>
+  );
+}
+
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5">{children}</dd>
     </div>
   );
 }

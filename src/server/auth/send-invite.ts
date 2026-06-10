@@ -121,6 +121,36 @@ export async function sendInviteEmail(opts: {
   }
 }
 
+export async function sendPasswordResetEmail(opts: {
+  to: string;
+  resetUrl: string;
+}): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const cfg = await loadSmtpConfig();
+  if (!cfg) return { ok: false, reason: "smtp_not_configured" };
+  const t = transporterFor(cfg);
+  const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
+  try {
+    await t.sendMail({
+      from,
+      to: opts.to,
+      subject: "Passwort zurücksetzen",
+      text: [
+        `Hallo,`,
+        ``,
+        `für Ihr Konto in der SVUWV Vereinsverwaltung wurde das Zurücksetzen des`,
+        `Passworts angefordert. Folgen Sie dem Link und vergeben Sie ein neues Passwort:`,
+        opts.resetUrl,
+        ``,
+        `Der Link ist eine Stunde gültig. Wenn Sie das nicht waren, ignorieren Sie`,
+        `diese E-Mail. Ihr Passwort bleibt dann unverändert.`,
+      ].join("\n"),
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: (err as Error).message };
+  }
+}
+
 /**
  * Send a test mail. If `inline` is provided, the saved DB config is bypassed
  * and a one-shot transporter is built from the supplied values. Lets admins

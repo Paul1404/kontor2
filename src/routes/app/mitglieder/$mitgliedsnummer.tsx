@@ -4,12 +4,14 @@ import {
   AlertTriangle,
   ArchiveRestore,
   ArrowLeft,
+  Ban,
   ChevronDown,
   Contact,
   Copy,
   FileText,
   History,
   KeyRound,
+  Loader2,
   LogOut,
   Pencil,
   RotateCcw,
@@ -1070,6 +1072,7 @@ function AuditEntry({ entry }: { entry: AuditEntryRow }) {
 }
 
 function PortalAccessButton({ memberId, email }: { memberId: string; email: string | null }) {
+  const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<
     | { ok: true; url: string; mailSent: boolean; mailReason: string | null; expiresAt: string }
@@ -1078,6 +1081,14 @@ function PortalAccessButton({ memberId, email }: { memberId: string; email: stri
   >(null);
   const [overrideEmail, setOverrideEmail] = useState(email ?? "");
   const [ttlDays, setTtlDays] = useState(14);
+
+  const tokens = useQuery({
+    queryKey: ["portal.tokens", memberId],
+    queryFn: () => orpc.portal.listTokensForMember({ memberId }),
+    enabled: open,
+  });
+
+  const refreshTokens = () => qc.invalidateQueries({ queryKey: ["portal.tokens", memberId] });
 
   const issue = useMutation({
     mutationFn: (sendEmail: boolean) =>
@@ -1097,9 +1108,32 @@ function PortalAccessButton({ memberId, email }: { memberId: string; email: stri
           r.expiresAt instanceof Date ? r.expiresAt.toISOString() : (r.expiresAt as string),
       });
       if (r.emailSent) toast.success("Portal-Zugang per E-Mail versendet.");
+      refreshTokens();
     },
     onError: (e: Error) => setResult({ ok: false, message: e.message }),
   });
+
+  const revoke = useMutation({
+    mutationFn: (id: string) => orpc.portal.revokeToken({ id }),
+    onSuccess: () => {
+      toast.success("Zugang widerrufen.");
+      refreshTokens();
+    },
+    onError: (e: Error) => toast.error("Widerrufen fehlgeschlagen", { description: e.message }),
+  });
+
+  const now = Date.now();
+  function tokenState(t: {
+    revokedAt: Date | string | null;
+    consumedAt: Date | string | null;
+    expiresAt: Date | string;
+  }): { label: string; active: boolean } {
+    if (t.revokedAt) return { label: "Widerrufen", active: false };
+    if (new Date(t.expiresAt).getTime() < now && !t.consumedAt)
+      return { label: "Abgelaufen", active: false };
+    if (t.consumedAt) return { label: "Aktiv (eingelöst)", active: true };
+    return { label: "Offen", active: true };
+  }
 
   return (
     <>
@@ -1172,6 +1206,49 @@ function PortalAccessButton({ memberId, email }: { memberId: string; email: stri
             {result && !result.ok ? (
               <p className="mt-4 text-xs text-destructive">{result.message}</p>
             ) : null}
+
+            <div className="mt-5 border-t pt-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Ausgegebene Zugänge
+              </p>
+              {tokens.isLoading ? (
+                <p className="mt-2 text-xs text-muted-foreground">Lade…</p>
+              ) : tokens.data && tokens.data.length > 0 ? (
+                <ul className="mt-2 flex flex-col divide-y divide-border">
+                  {tokens.data.map((t) => {
+                    const st = tokenState(t);
+                    return (
+                      <li key={t.id} className="flex items-center gap-3 py-2 text-xs">
+                        <div className="flex flex-1 flex-col">
+                          <span className="font-medium">{t.sentToEmail ?? EMPTY_VALUE}</span>
+                          <span className="text-muted-foreground">
+                            {st.label} · gültig bis {formatDate(t.expiresAt)}
+                          </span>
+                        </div>
+                        {st.active ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            disabled={revoke.isPending && revoke.variables === t.id}
+                            onClick={() => revoke.mutate(t.id)}
+                          >
+                            {revoke.isPending && revoke.variables === t.id ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Ban className="size-3.5" />
+                            )}
+                            Widerrufen
+                          </Button>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">Noch keine Zugänge ausgegeben.</p>
+              )}
+            </div>
 
             <div className="mt-5 flex justify-end gap-2">
               <Button
