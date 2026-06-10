@@ -23,6 +23,23 @@ FROM base AS prod-deps
 COPY package.json bun.lock ./
 RUN --mount=type=cache,id=s/83b908ee-38bf-4cc4-bc5e-0e02252c9f4f-bun-cache,target=/root/.bun/install/cache \
     bun install --production --frozen-lockfile
+# Strip build-only tooling that production deps drag in transitively (the
+# bundler, transpilers, drizzle-kit, the router build plugins). None of it is
+# imported by the built server or the runtime migrator -- verified against the
+# external imports in dist/server -- so removing it trims ~95 MB from the
+# runtime image without touching a single runtime dependency. Scope-level
+# deletes are arch-agnostic, so they catch the Linux rolldown/esbuild binaries.
+RUN rm -rf \
+      node_modules/typescript \
+      node_modules/drizzle-kit \
+      node_modules/vite node_modules/rolldown node_modules/@rolldown \
+      node_modules/esbuild node_modules/@esbuild \
+      node_modules/@babel node_modules/tsx node_modules/@swc \
+      node_modules/lightningcss node_modules/@types \
+      node_modules/@tanstack/react-start \
+      node_modules/@tanstack/router-plugin \
+      node_modules/@tanstack/router-generator \
+      node_modules/@tanstack/router-utils
 
 # Runtime: built output plus production node_modules only. No node toolchain --
 # everything (server, migrator, scheduler) runs under Bun.
