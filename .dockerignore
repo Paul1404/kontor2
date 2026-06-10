@@ -16,3 +16,7 @@ coverage
 README.md
 .github
 drizzle/.snapshots
+tests
+docs
+reference
+.claude
