@@ -37,6 +37,11 @@ import {
   realAge,
 } from "~/server/domain/application/antragstyp";
 import { calculateFee } from "~/server/domain/application/fees";
+import {
+  mapSvumsApplication,
+  parseSvumsExport,
+  svumsDedupeKey,
+} from "~/server/domain/application/svums-import";
 import { onboardMember } from "~/server/domain/member/onboard";
 import { env } from "~/server/env";
 import { lookupBankByIban } from "~/server/lib/blz";
@@ -47,7 +52,7 @@ import {
   sendApplicationDocumentMail,
   sendApplicationMails,
 } from "~/server/mail/send-application-mail";
-import { errorLogFields, publicProc, vorstandProc } from "~/server/orpc/base";
+import { adminProc, errorLogFields, publicProc, vorstandProc } from "~/server/orpc/base";
 import { buildBeitrittModel } from "~/server/pdf/beitrittserklaerung-model";
 import { clubLogoDataUri } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
@@ -1471,6 +1476,200 @@ export const applicationsRouter = {
     )[0];
     return { total, byStatus, revenueApproved: revenueRow?.revenue ?? "0" };
   }),
+
+  /**
+   * One-off import of the historical Anträge from the standalone svums app.
+   * Input is the saved JSON of svums `GET /api/admin/applications` (IBANs
+   * arrive decrypted there). Idempotent: rows are matched on name + birth
+   * date + the exact svums creation timestamp, so re-uploading the same
+   * export never duplicates. Files (PDFs, scans) are NOT migrated; approved
+   * applications are linked to an existing member when the Mitgliedsnummer
+   * matches exactly one member.
+   */
+  importSvums: adminProc
+    .input(
+      v.object({
+        filename: v.string(),
+        contentBase64: v.pipe(v.string(), v.minLength(1)),
+        includeTest: v.optional(v.boolean(), false),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const buf = Buffer.from(input.contentBase64, "base64");
+      if (buf.length === 0) {
+        throw new ORPCError("BAD_REQUEST", { message: "Leere Datei." });
+      }
+      if (buf.length > 20 * 1024 * 1024) {
+        throw new ORPCError("PAYLOAD_TOO_LARGE", { message: "Datei zu groß. Maximum: 20 MB." });
+      }
+
+      let items: ReturnType<typeof parseSvumsExport>["items"];
+      const errors: string[] = [];
+      try {
+        const parsed = parseSvumsExport(buf.toString("utf8"));
+        items = parsed.items;
+        errors.push(...parsed.errors);
+      } catch (err) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: err instanceof Error ? err.message : "Datei konnte nicht gelesen werden.",
+        });
+      }
+      if (items.length === 0 && errors.length === 0) {
+        throw new ORPCError("BAD_REQUEST", { message: "Keine Anträge in der Datei gefunden." });
+      }
+
+      const t = membershipApplicationsTable;
+
+      // Abteilungen arrive as names; resolve against ALL local Abteilungen
+      // (inactive included, historical Anträge may reference retired ones).
+      const abts = await context.db
+        .select({ id: abteilungenTable.id, name: abteilungenTable.name })
+        .from(abteilungenTable);
+      const abteilungIdByName = new Map(abts.map((a) => [a.name.trim().toLowerCase(), a.id]));
+
+      // Existing rows: dedupe keys for idempotency plus the set of taken
+      // Antragsnummern (svums and svuwv mint the same ANT-YYYY-NNNN format,
+      // so collisions are possible and trigger a re-mint).
+      const existing = await context.db
+        .select({
+          antragsnummer: t.antragsnummer,
+          vorname: t.vorname,
+          nachname: t.nachname,
+          geburtsdatum: t.geburtsdatum,
+          createdAt: t.createdAt,
+        })
+        .from(t);
+      const usedNummern = new Set(existing.map((r) => r.antragsnummer));
+      const seen = new Set(existing.map((r) => svumsDedupeKey(r)));
+
+      // Approved svums Anträge carry the Linear Mitgliedsnummer; link the
+      // application to the member when exactly one (non-deleted) match exists.
+      const incomingNummern = [
+        ...new Set(
+          items
+            .map((i) => i.mitgliedsnummer?.split(",")[0]?.trim())
+            .filter((n): n is string => Boolean(n)),
+        ),
+      ];
+      const memberRows =
+        incomingNummern.length > 0
+          ? await context.db
+              .select({ id: membersTable.id, mitgliedsnummer: membersTable.mitgliedsnummer })
+              .from(membersTable)
+              .where(
+                and(
+                  inArray(membersTable.mitgliedsnummer, incomingNummern),
+                  isNull(membersTable.deletedAt),
+                ),
+              )
+          : [];
+      const memberIdsByNummer = new Map<string, string[]>();
+      for (const m of memberRows) {
+        if (!m.mitgliedsnummer) continue;
+        const list = memberIdsByNummer.get(m.mitgliedsnummer) ?? [];
+        list.push(m.id);
+        memberIdsByNummer.set(m.mitgliedsnummer, list);
+      }
+
+      const importedAt = new Date();
+      const warnings: string[] = [];
+      let imported = 0;
+      let skippedExisting = 0;
+      let skippedTest = 0;
+      let linkedMembers = 0;
+
+      for (const item of items) {
+        const label = item.antragsnummer ?? `SVUMS #${item.id}`;
+        try {
+          if (item.is_test && !input.includeTest) {
+            skippedTest += 1;
+            continue;
+          }
+          const mapped = mapSvumsApplication(item, { abteilungIdByName, importedAt });
+          const key = svumsDedupeKey(mapped.values);
+          if (seen.has(key)) {
+            skippedExisting += 1;
+            continue;
+          }
+          seen.add(key);
+          warnings.push(...mapped.warnings.map((w) => `${label}: ${w}`));
+
+          let memberId: string | null = null;
+          if (mapped.values.status === "genehmigt" && mapped.values.mitgliedsnummer) {
+            const first = mapped.values.mitgliedsnummer.split(",")[0]?.trim();
+            const hits = first ? (memberIdsByNummer.get(first) ?? []) : [];
+            if (hits.length === 1) {
+              memberId = hits[0]!;
+              linkedMembers += 1;
+            }
+          }
+
+          await context.db.transaction(async (tx) => {
+            let antragsnummer = mapped.originalAntragsnummer;
+            if (!antragsnummer || usedNummern.has(antragsnummer)) {
+              const minted = await allocateDocRef(
+                tx,
+                "ANT",
+                mapped.values.createdAt.getUTCFullYear(),
+              );
+              if (antragsnummer) {
+                warnings.push(
+                  `${label}: Antragsnummer bereits vergeben, neu vergeben als ${minted}.`,
+                );
+              }
+              antragsnummer = minted;
+            }
+            usedNummern.add(antragsnummer);
+
+            const [row] = await tx
+              .insert(t)
+              .values({
+                ...mapped.values,
+                antragsnummer,
+                ibanLast4: mapped.values.iban ? lastFour(mapped.values.iban) : null,
+                memberId,
+              })
+              .returning({ id: t.id });
+            if (!row) throw new Error("Anlage fehlgeschlagen.");
+            await appendAudit(tx, {
+              entityType: "membership_application",
+              entityId: row.id,
+              action: "create",
+              source: "import",
+              actorId: context.session!.user.id,
+              actorEmail: context.session!.user.email,
+              changes: {
+                antragsnummer: { before: null, after: antragsnummer },
+                status: { before: null, after: mapped.values.status },
+              },
+              requestId: context.requestId ?? null,
+            });
+          });
+          imported += 1;
+        } catch (err) {
+          errors.push(`${label}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      logger.info("applications.import_svums", {
+        filename: input.filename,
+        total: items.length,
+        imported,
+        skippedExisting,
+        skippedTest,
+        linkedMembers,
+        errors: errors.length,
+      });
+      return {
+        total: items.length,
+        imported,
+        skippedExisting,
+        skippedTest,
+        linkedMembers,
+        warnings,
+        errors,
+      };
+    }),
 
   /** Export applications as a German CSV (semicolon, BOM). */
   exportCsv: vorstandProc

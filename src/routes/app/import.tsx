@@ -64,11 +64,13 @@ function ImportPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Linear Webverein Import</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Datenimport</h1>
         <p className="text-sm text-muted-foreground">
-          SQL-Dump (mysqldump-Format) hochladen. Maximalgröße 50 MB.
+          Mitgliederdaten aus Linear Webverein und Anträge aus SVUMS übernehmen.
         </p>
       </div>
+
+      <h2 className="text-lg font-semibold tracking-tight">Linear Webverein</h2>
 
       <InfoBox title="So läuft der Import" collapsible defaultOpen={false}>
         <ol className="ml-4 list-decimal space-y-1">
@@ -244,6 +246,178 @@ function ImportPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <h2 className="mt-2 text-lg font-semibold tracking-tight">SVUMS Anträge</h2>
+      <SvumsImportSection />
     </div>
+  );
+}
+
+function SvumsImportSection() {
+  const [file, setFile] = useState<File | null>(null);
+  const [includeTest, setIncludeTest] = useState(false);
+
+  const upload = useMutation({
+    mutationFn: async () => {
+      if (!file) throw new Error("Keine Datei ausgewählt.");
+      const contentBase64 = await fileToBase64(file);
+      return orpc.applications.importSvums({
+        filename: file.name,
+        contentBase64,
+        includeTest,
+      });
+    },
+  });
+
+  const result = upload.data;
+
+  return (
+    <>
+      <InfoBox title="So läuft der Antrags-Import" collapsible defaultOpen={false}>
+        <ol className="ml-4 list-decimal space-y-1">
+          <li>
+            <strong>Export aus SVUMS</strong>: In SVUMS als Admin anmelden, dann im selben Browser{" "}
+            <span className="font-mono">/api/admin/applications?per_page=10000</span> öffnen und die
+            Antwort als <span className="font-mono">.json</span>-Datei speichern. Der Export enthält
+            alle Anträge inklusive entschlüsselter IBANs.
+          </li>
+          <li>
+            <strong>Übernahme</strong>: Status, Antragsnummer, Stammdaten, Familie (Partner und
+            Kinder), Bankverbindung und Einwilligungen werden übernommen. Abteilungen werden über
+            den Namen zugeordnet. Genehmigte Anträge werden mit dem Mitglied verknüpft, wenn die
+            Mitgliedsnummer eindeutig passt.
+          </li>
+          <li>
+            <strong>Nicht übernommen</strong>: Dokumente (PDFs, Scans) bleiben in SVUMS. Bei Bedarf
+            dort herunterladen und manuell ablegen.
+          </li>
+        </ol>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Der Import ist idempotent. Mehrfaches Hochladen desselben Exports führt nicht zu
+          Duplikaten. Testanträge werden standardmäßig übersprungen.
+        </p>
+      </InfoBox>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Export-Datei hochladen</CardTitle>
+          <CardDescription>
+            JSON-Export der SVUMS-Antragsverwaltung. Maximalgröße 20 MB.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/30 px-6 py-10 text-center transition-colors hover:bg-muted/50">
+            <Upload className="size-6 text-muted-foreground" />
+            <span className="text-sm">
+              <span className="font-medium text-foreground">Klicken zum Auswählen</span>
+              <span className="text-muted-foreground"> oder Datei hier ablegen</span>
+            </span>
+            <span className="text-xs text-muted-foreground">.json · max. 20 MB</span>
+            <input
+              type="file"
+              accept=".json,application/json"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="hidden"
+            />
+          </label>
+          {file ? (
+            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm">
+              <span className="font-medium">{file.name}</span>
+              <span className="text-muted-foreground tabular-nums">
+                {(file.size / 1024 / 1024).toFixed(1)} MB
+              </span>
+            </div>
+          ) : null}
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-input bg-card/50 p-3 text-sm">
+            <input
+              type="checkbox"
+              checked={includeTest}
+              onChange={(e) => setIncludeTest(e.target.checked)}
+              className="mt-0.5 size-4 accent-primary"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="font-medium">Testanträge ebenfalls importieren</span>
+              <span className="text-xs text-muted-foreground">
+                Anträge, die in SVUMS als Test markiert sind, werden sonst übersprungen.
+              </span>
+            </span>
+          </label>
+          <div className="flex items-center gap-3">
+            <Button onClick={() => upload.mutate()} disabled={!file || upload.isPending}>
+              {upload.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Upload className="size-4" />
+              )}
+              {upload.isPending ? "Wird verarbeitet…" : "Anträge importieren"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {upload.isError ? (
+        <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm shadow-soft">
+          <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+          <span>Fehler: {(upload.error as Error).message}</span>
+        </div>
+      ) : null}
+
+      {result ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="size-5 text-success" />
+              <CardTitle>Import abgeschlossen</CardTitle>
+            </div>
+            <CardDescription>
+              {result.total.toLocaleString("de-DE")} Anträge in der Datei
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+              <li>
+                Importiert: <span className="font-medium tabular-nums">{result.imported}</span>
+              </li>
+              <li>
+                Bereits vorhanden:{" "}
+                <span className="font-medium tabular-nums">{result.skippedExisting}</span>
+              </li>
+              <li>
+                Testanträge übersprungen:{" "}
+                <span className="font-medium tabular-nums">{result.skippedTest}</span>
+              </li>
+              <li>
+                Mit Mitglied verknüpft:{" "}
+                <span className="font-medium tabular-nums">{result.linkedMembers}</span>
+              </li>
+            </ul>
+            {result.warnings.length > 0 ? (
+              <details className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
+                <summary className="cursor-pointer text-sm text-warning">
+                  {result.warnings.length} Hinweise
+                </summary>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+                  {result.warnings.slice(0, 50).map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+            {result.errors.length > 0 ? (
+              <details className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <summary className="cursor-pointer text-sm text-destructive">
+                  {result.errors.length} Fehler
+                </summary>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+                  {result.errors.slice(0, 50).map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+    </>
   );
 }

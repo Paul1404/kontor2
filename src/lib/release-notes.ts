@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.42.0",
+    date: "2026-06-10",
+    title: "SVUMS Antrags-Import",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Bereits bearbeitete Anträge aus der alten SVUMS-Anwendung lassen sich jetzt unter Datenimport übernehmen. Grundlage ist der JSON-Export der SVUMS-Antragsliste. Status, Stammdaten, Familie, Bankverbindung und Einwilligungen werden importiert, genehmigte Anträge werden mit dem passenden Mitglied verknüpft. Der Import ist idempotent, mehrfaches Hochladen erzeugt keine Duplikate.",
+      },
+    ],
+  },
+  {
     version: "0.41.1",
     date: "2026-06-10",
     changes: [
