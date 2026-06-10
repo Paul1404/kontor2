@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.56.1",
+    date: "2026-06-10",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Läuft die Anmeldung während der Nutzung ab, bleibt die App nicht mehr im Ladebildschirm hängen, sondern leitet zur Anmeldung weiter.",
+      },
+    ],
+  },
+  {
     version: "0.56.0",
     date: "2026-06-10",
     title: "Mitgliederliste leichter bedienen",
