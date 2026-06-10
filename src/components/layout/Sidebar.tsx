@@ -13,6 +13,7 @@ import {
   FileWarning,
   History,
   Inbox,
+  KeyRound,
   Landmark,
   Layers,
   LayoutDashboard,
@@ -161,6 +162,12 @@ const SECTIONS: NavSection[] = [
         to: "/app/einstellungen/smtp",
         label: "SMTP",
         icon: <Mail className="size-[18px]" />,
+        adminOnly: true,
+      },
+      {
+        to: "/app/einstellungen/ki-zugriff",
+        label: "KI-Zugriff",
+        icon: <KeyRound className="size-[18px]" />,
         adminOnly: true,
       },
       {

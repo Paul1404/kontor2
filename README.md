@@ -223,6 +223,23 @@ The parts that took real engineering, not just CRUD:
 - SMTP configurable from the admin UI, with SNI hostname, a self-signed-cert
   toggle and a "Test mail" button that validates a config before it is saved.
 
+### MCP endpoint (KI-Zugriff)
+
+- Remote MCP server (Model Context Protocol, Streamable HTTP) at `/api/mcp`
+  for AI assistants like Claude Code and Claude Desktop.
+- Auth via admin-issued API keys (better-auth api-key plugin, hashed at rest,
+  per-key rate limit and optional expiry), sent as an `x-api-key` header. Keys
+  are managed under Einstellungen, KI-Zugriff and shown exactly once.
+- A key acts with the role of the user it is bound to. Tools call the existing
+  oRPC procedures, so role checks, audit entries and logging are identical to
+  browser requests. Readonly keys get query tools only (member search/detail,
+  dashboard, reports, dunning status); Vorstand keys additionally get curated
+  mutations (members, tasks, mark postings paid). Beitrags-/Mahnläufe, SEPA,
+  imports, settings and the danger zone are not exposed.
+- Connect: `claude mcp add --transport http svuwv https://<host>/api/mcp
+  --header "x-api-key: <KEY>"` (Claude Desktop goes through `mcp-remote`; the
+  settings page shows ready-to-copy snippets).
+
 ### Admin
 
 - CRUD for Abteilungen, Beitragsarten, Benutzer, SMTP, Vereinsdaten.
