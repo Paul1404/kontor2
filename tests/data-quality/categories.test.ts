@@ -10,7 +10,7 @@ describe("data-quality categories", () => {
 
   it("uses only known severities and non-empty copy", () => {
     for (const c of CATEGORIES) {
-      expect(["warn", "info"]).toContain(c.severity);
+      expect(["error", "warn", "info"]).toContain(c.severity);
       expect(c.label.trim().length).toBeGreaterThan(0);
       expect(c.description.trim().length).toBeGreaterThan(0);
     }

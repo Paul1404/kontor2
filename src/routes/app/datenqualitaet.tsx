@@ -42,9 +42,19 @@ type CategoryId =
   | "geschlecht_unbekannt"
   | "vertrag_ohne_beitragsart"
   | "mahnsperre_gesetzt"
-  | "moegliche_dubletten";
+  | "moegliche_dubletten"
+  | "telefon_nur_vorwahl"
+  | "mandat_abgelaufen"
+  | "mandat_laeuft_bald_ab"
+  | "mitgliedsnummer_kollision"
+  | "name_reihenfolge_vertauscht"
+  | "mehrere_personen_im_datensatz"
+  | "strasse_ohne_hausnummer"
+  | "vertrag_betrag_null"
+  | "dublette_name_ohne_gebdatum";
 
-type SeverityFilter = "alle" | "warn" | "info";
+type Severity = "error" | "warn" | "info";
+type SeverityFilter = "alle" | Severity;
 
 function DatenqualitaetPage() {
   const summary = useQuery({
@@ -58,6 +68,7 @@ function DatenqualitaetPage() {
   const [showClean, setShowClean] = useState(false);
 
   const categories = summary.data?.categories ?? [];
+  const errorHits = categories.filter((c) => c.severity === "error" && c.count > 0).length;
   const warnHits = categories.filter((c) => c.severity === "warn" && c.count > 0).length;
   const infoHits = categories.filter((c) => c.severity === "info" && c.count > 0).length;
   const visible = categories
@@ -102,6 +113,7 @@ function DatenqualitaetPage() {
                 {summary.data.total}
               </span>{" "}
               offene Hinweise.{" "}
+              <span className="font-medium text-destructive tabular-nums">{errorHits}</span> Fehler,{" "}
               <span className="font-medium text-amber-600 tabular-nums dark:text-amber-400">
                 {warnHits}
               </span>{" "}
@@ -112,6 +124,7 @@ function DatenqualitaetPage() {
               {(
                 [
                   ["alle", "Alle"],
+                  ["error", "Fehler"],
                   ["warn", "Warnungen"],
                   ["info", "Hinweise"],
                 ] as const
@@ -506,7 +519,7 @@ function CategorySection({
   id: CategoryId;
   label: string;
   description: string;
-  severity: "warn" | "info";
+  severity: Severity;
   count: number;
   open: boolean;
   onToggle: () => void;
@@ -531,7 +544,17 @@ function CategorySection({
           <span className="font-medium tracking-tight">{label}</span>
           <span className="text-xs text-muted-foreground">{description}</span>
         </div>
-        <Badge variant={empty ? "outline" : severity === "warn" ? "warning" : "default"}>
+        <Badge
+          variant={
+            empty
+              ? "outline"
+              : severity === "error"
+                ? "destructive"
+                : severity === "warn"
+                  ? "warning"
+                  : "default"
+          }
+        >
           {count}
         </Badge>
       </button>

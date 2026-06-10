@@ -235,7 +235,7 @@ export const dashboardRouter = {
    */
   insights: authedProc.input(v.void()).handler(async ({ context }) =>
     cached(CACHE_NS.dashboard, "insights", 300, async () => {
-      const [membersOverTime, revenueRows, funnelRows, zahlartRows, pyramidRows] =
+      const [membersOverTime, revenueRows, funnelRows, zahlartRows, pyramidRows, dqTrendRows] =
         await Promise.all([
           context.db.execute<{
             year: number;
@@ -311,6 +311,25 @@ export const dashboardRouter = {
         ) t
         group by bucket
       `),
+          // Datenqualität über Zeit (issue #81): per-day totals from the
+          // nightly snapshot, last 90 days, so a bad import shows as a spike.
+          context.db.execute<{
+            date: string;
+            errors: number;
+            warnings: number;
+            infos: number;
+            total: number;
+          }>(sql`
+        select snapshot_date::text as date,
+          sum(case when severity = 'error' then count else 0 end)::int as errors,
+          sum(case when severity = 'warn' then count else 0 end)::int as warnings,
+          sum(case when severity = 'info' then count else 0 end)::int as infos,
+          sum(count)::int as total
+        from data_quality_snapshots
+        where snapshot_date >= current_date - interval '90 days'
+        group by snapshot_date
+        order by snapshot_date
+      `),
         ]);
 
       const overTime = membersOverTime as unknown as Array<{
@@ -365,6 +384,21 @@ export const dashboardRouter = {
         dunningFunnel: funnel,
         zahlart: { lastschrift: Number(zahlart.lastschrift), rechnung: Number(zahlart.rechnung) },
         agePyramid: pyramid,
+        datenqualitaetVerlauf: (
+          dqTrendRows as unknown as Array<{
+            date: string;
+            errors: number;
+            warnings: number;
+            infos: number;
+            total: number;
+          }>
+        ).map((r) => ({
+          date: r.date,
+          errors: Number(r.errors),
+          warnings: Number(r.warnings),
+          infos: Number(r.infos),
+          total: Number(r.total),
+        })),
       };
     }),
   ),

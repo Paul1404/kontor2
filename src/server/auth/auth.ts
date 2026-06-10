@@ -127,14 +127,21 @@ function buildAuth() {
       // API keys for the MCP endpoint (/api/mcp). `enableSessionForAPIKeys`
       // stays at its false default on purpose: keys are only honored where we
       // verify them explicitly (the MCP route), never as a session for the
-      // whole app or better-auth's own endpoints. Per-key rate limits are set
-      // here because the plugin default is 10 requests per day, far too low
-      // for an AI assistant session.
+      // whole app or better-auth's own endpoints.
+      //
+      // The plugin's own rate limit is deliberately NOT used as the real
+      // throttle: when it trips, `verifyApiKey` returns `valid: false`, which
+      // the route can only surface as a 401 — telling an AI client to
+      // re-authenticate when it should back off. So the ceiling is raised to
+      // effectively unlimited (the plugin still tracks `lastRequest` for the
+      // KI-Zugriff UI) and the real per-key limit lives in
+      // `src/server/mcp/rate-limit.ts`, where a breach returns a proper 429 +
+      // Retry-After. See issues #77 and #82.
       apiKey({
         apiKeyHeaders: "x-api-key",
         defaultPrefix: "svuwv_",
         enableMetadata: true,
-        rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 120 },
+        rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 1_000_000 },
       }),
       // MUST remain the last plugin (cookie handling in TanStack Start).
       tanstackStartCookies(),

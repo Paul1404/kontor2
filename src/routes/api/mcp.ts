@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { resolveApiKeyContext } from "~/server/mcp/auth";
+import { enforceMcpRateLimit } from "~/server/mcp/rate-limit";
 import { handleMcpRequest } from "~/server/mcp/server";
 import { createContext } from "~/server/orpc/context";
 
@@ -31,12 +32,42 @@ function unauthorized(): Response {
   );
 }
 
-async function handle({ request }: { request: Request }): Promise<Response> {
+/**
+ * 429 for a throttled (but valid) key. A `Retry-After` header tells the client
+ * how long to back off. Distinct from `unauthorized()` (401), which is reserved
+ * for genuine auth failures so a client never confuses "slow down" with "your
+ * key is invalid, re-authenticate".
+ */
+function rateLimited(retryAfterSeconds: number): Response {
+  return new Response(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      error: {
+        code: -32029,
+        message: `Too many requests. Retry after ${retryAfterSeconds}s.`,
+      },
+      id: null,
+    }),
+    {
+      status: 429,
+      headers: {
+        "content-type": "application/json",
+        "retry-after": String(retryAfterSeconds),
+      },
+    },
+  );
+}
+
+export async function handle({ request }: { request: Request }): Promise<Response> {
   const base = await createContext(request);
   const rawKey = request.headers.get("x-api-key");
   if (!rawKey) return unauthorized();
   const context = await resolveApiKeyContext(base, rawKey);
+  // null means a genuine auth failure (unknown/disabled/expired key or banned
+  // owner) — never a rate limit, which is handled below with a 429.
   if (!context) return unauthorized();
+  const limit = await enforceMcpRateLimit(rawKey);
+  if (!limit.allowed) return rateLimited(limit.retryAfterSeconds);
   return handleMcpRequest(request, context);
 }
 

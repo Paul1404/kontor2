@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import * as v from "valibot";
+import type { DB } from "~/server/db/client";
 import { memberDisplayName, memberRef } from "~/server/domain/member";
 import { vorstandProc } from "~/server/orpc/base";
 
@@ -33,6 +34,16 @@ export const CATEGORY_IDS = [
   "vertrag_ohne_beitragsart",
   "mahnsperre_gesetzt",
   "moegliche_dubletten",
+  // --- v0.55 additions (issue #79) ---------------------------------------
+  "telefon_nur_vorwahl",
+  "mandat_abgelaufen",
+  "mandat_laeuft_bald_ab",
+  "mitgliedsnummer_kollision",
+  "name_reihenfolge_vertauscht",
+  "mehrere_personen_im_datensatz",
+  "strasse_ohne_hausnummer",
+  "vertrag_betrag_null",
+  "dublette_name_ohne_gebdatum",
 ] as const;
 
 export type CategoryId = (typeof CATEGORY_IDS)[number];
@@ -43,8 +54,12 @@ export type CategoryMeta = {
   label: string;
   /** One-sentence explanation of what the check finds and why it matters. */
   description: string;
-  /** "warn" = should be fixed, "info" = worth a look. Drives the UI accent. */
-  severity: "warn" | "info";
+  /**
+   * "error" = a hard data fault that breaks a process (an expired mandate
+   * blocks the Einzug, a duplicate Mitgliedsnummer breaks identity); "warn" =
+   * should be fixed; "info" = worth a look. Drives the UI accent.
+   */
+  severity: "error" | "warn" | "info";
 };
 
 export const CATEGORIES: CategoryMeta[] = [
@@ -163,6 +178,69 @@ export const CATEGORIES: CategoryMeta[] = [
       "Mehrere Datensätze mit gleichem Namen und Geburtsdatum. Eventuell ist jemand doppelt erfasst.",
     severity: "info",
   },
+  {
+    id: "telefon_nur_vorwahl",
+    label: "Telefon nur Vorwahl",
+    description:
+      "Telefonnummer enthält nach Entfernen der Sonderzeichen nur eine Vorwahl ohne Anschluss. So ist niemand erreichbar.",
+    severity: "warn",
+  },
+  {
+    id: "mandat_abgelaufen",
+    label: "SEPA-Mandat abgelaufen",
+    description:
+      "Aktives Mandat, dessen Gültigkeit abgelaufen ist, während noch ein Lastschrift-Vertrag läuft. Ein Einzug ist nicht zulässig.",
+    severity: "error",
+  },
+  {
+    id: "mandat_laeuft_bald_ab",
+    label: "SEPA-Mandat läuft bald ab",
+    description:
+      "Aktives Mandat, das in den nächsten 90 Tagen abläuft, während ein Lastschrift-Vertrag besteht. Rechtzeitig erneuern.",
+    severity: "info",
+  },
+  {
+    id: "mitgliedsnummer_kollision",
+    label: "Mitgliedsnummer doppelt vergeben",
+    description:
+      "Dieselbe Mitgliedsnummer liegt auf mehr als einem aktiven Datensatz. Die Nummer identifiziert dann niemanden eindeutig.",
+    severity: "error",
+  },
+  {
+    id: "name_reihenfolge_vertauscht",
+    label: "Vor- und Nachname vertauscht",
+    description:
+      "Im Nachnamenfeld steht ein häufiger Vorname, im Vornamenfeld nicht. Vermutlich sind die Felder vertauscht.",
+    severity: "warn",
+  },
+  {
+    id: "mehrere_personen_im_datensatz",
+    label: "Mehrere Personen in einem Datensatz",
+    description:
+      "Name enthält ein Verbindungswort (u., und, &). Vermutlich sind zwei Personen in einen Datensatz gepackt.",
+    severity: "warn",
+  },
+  {
+    id: "strasse_ohne_hausnummer",
+    label: "Straße ohne Hausnummer",
+    description:
+      "Die Straße enthält keine Ziffer und es ist keine Hausnummer hinterlegt. Der Postversand kann scheitern.",
+    severity: "info",
+  },
+  {
+    id: "vertrag_betrag_null",
+    label: "Vertrag mit Betrag 0",
+    description:
+      "Vertrag mit Betrag 0 bei einem nicht beitragsbefreiten Mitglied. Oft ein Tippfehler statt einer echten Befreiung.",
+    severity: "info",
+  },
+  {
+    id: "dublette_name_ohne_gebdatum",
+    label: "Mögliche Dublette ohne Geburtsdatum",
+    description:
+      "Gleicher Name auf mehreren Datensätzen, von denen mindestens einer kein Geburtsdatum hat. Die Geburtsdatums-Dublettenprüfung übersieht diese.",
+    severity: "info",
+  },
 ];
 
 /** A live member: not soft-deleted, neither exited nor deceased. */
@@ -186,8 +264,12 @@ const ANREDE_HAS_GENDER =
   "(lower(btrim(coalesce(anrede, ''))) in ('herr','hr','hr.','herrn','frau','fr','fr.','divers') " +
   "or lower(btrim(coalesce(anrede, ''))) like 'herr %' or lower(btrim(coalesce(anrede, ''))) like 'frau %')";
 
-/** WHERE clause per category. No user input -- safe to compose with sql.raw. */
-const WHERE: Record<CategoryId, string> = {
+/**
+ * WHERE clause per category. No user input -- safe to compose with sql.raw.
+ * Exported so the nightly snapshot writer (issue #81) can reuse the exact same
+ * clauses for counts and for the error-rule drill-down.
+ */
+export const WHERE: Record<CategoryId, string> = {
   lastschrift_ohne_mandat: `${ACTIVE} and ${ACTIVE_DD} and not exists (select 1 from sepa_mandates s where s.member_id = members.id and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null)`,
   fehlende_iban: `${ACTIVE} and ${ACTIVE_DD} and (iban1_last4 is null or btrim(iban1_last4) = '')`,
   fehlende_adresse: `${ACTIVE} and (strasse is null or btrim(strasse) = '' or plz is null or btrim(plz) = '' or ort is null or btrim(ort) = '')`,
@@ -201,14 +283,45 @@ const WHERE: Record<CategoryId, string> = {
     "deleted_at is null and austritt is not null and exists (select 1 from contracts c where c.member_id = members.id and c.gekuend_zum is null and c.vertrag_ende is null)",
   fehlende_email: `${ACTIVE} and (email is null or btrim(email) = '')`,
   email_ungueltig: `${ACTIVE} and email is not null and btrim(email) <> '' and btrim(email) !~ '^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$'`,
+  // Refined (issue #79): only flag a shared email when at least one other
+  // holder sits at a DIFFERENT address. A matching address is a household
+  // sharing one mailbox (common for couples/families) and is not a problem.
   email_mehrfach:
-    "deleted_at is null and email is not null and btrim(email) <> '' and exists (select 1 from members m2 where m2.deleted_at is null and m2.id <> members.id and lower(btrim(m2.email)) = lower(btrim(members.email)))",
+    "deleted_at is null and email is not null and btrim(email) <> '' and exists (select 1 from members m2 where m2.deleted_at is null and m2.id <> members.id and lower(btrim(m2.email)) = lower(btrim(members.email)) and (lower(btrim(coalesce(m2.strasse,''))) is distinct from lower(btrim(coalesce(members.strasse,''))) or lower(btrim(coalesce(m2.plz,''))) is distinct from lower(btrim(coalesce(members.plz,''))) or lower(btrim(coalesce(m2.ort,''))) is distinct from lower(btrim(coalesce(members.ort,'')))))",
   plz_ungueltig: `${ACTIVE} and plz is not null and btrim(plz) <> '' and (land is null or btrim(land) = '' or lower(btrim(land)) in ('de','d','deutschland','germany')) and btrim(plz) !~ '^[0-9]{5}$'`,
   geschlecht_unbekannt: `${ACTIVE} and (geschlecht is null or geschlecht = 'unbekannt') and not ${ANREDE_HAS_GENDER}`,
   vertrag_ohne_beitragsart: `${ACTIVE} and exists (select 1 from contracts c where c.member_id = members.id and (c.art_name is null or btrim(c.art_name) = ''))`,
   mahnsperre_gesetzt: `${ACTIVE} and dunning_blocked = true`,
   moegliche_dubletten:
     "deleted_at is null and nachname is not null and geburtsdatum is not null and exists (select 1 from members m2 where m2.deleted_at is null and m2.id <> members.id and lower(m2.nachname) = lower(members.nachname) and lower(coalesce(m2.vorname, '')) = lower(coalesce(members.vorname, '')) and m2.geburtsdatum = members.geburtsdatum)",
+  // Phone field holds only a Vorwahl: after stripping non-digits, 1-5 digits
+  // remain (a German area code is 3-5 digits) with no subscriber number.
+  telefon_nur_vorwahl: `${ACTIVE} and telefon1 is not null and btrim(telefon1) <> '' and char_length(regexp_replace(telefon1, '[^0-9]', '', 'g')) between 1 and 5`,
+  // Active mandate whose validity has already lapsed while a Lastschrift
+  // contract still runs: the next Einzug would be unauthorized.
+  mandat_abgelaufen: `${ACTIVE} and ${ACTIVE_DD} and exists (select 1 from sepa_mandates s where s.member_id = members.id and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null and lower(btrim(coalesce(s.status, ''))) = 'aktiv' and s.gultig_bis is not null and s.gultig_bis::date < current_date)`,
+  // Same, but the mandate still has up to 90 days left: a heads-up to renew.
+  mandat_laeuft_bald_ab: `${ACTIVE} and ${ACTIVE_DD} and exists (select 1 from sepa_mandates s where s.member_id = members.id and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null and lower(btrim(coalesce(s.status, ''))) = 'aktiv' and s.gultig_bis is not null and s.gultig_bis::date >= current_date and s.gultig_bis::date < current_date + interval '90 days')`,
+  // Same Mitgliedsnummer on more than one non-deleted record (see migration
+  // 0048, which also adds a DB-level partial unique index).
+  mitgliedsnummer_kollision:
+    "deleted_at is null and mitgliedsnummer is not null and btrim(mitgliedsnummer) <> '' and exists (select 1 from members m2 where m2.deleted_at is null and m2.id <> members.id and m2.mitgliedsnummer = members.mitgliedsnummer)",
+  // Nachname holds a name that occurs as a Vorname on >= 2 other records, while
+  // the Vorname is not itself such a common first name: likely swapped fields.
+  name_reihenfolge_vertauscht:
+    "deleted_at is null and nachname is not null and btrim(nachname) <> '' and lower(btrim(nachname)) in (select lower(btrim(vorname)) from members where deleted_at is null and vorname is not null and btrim(vorname) <> '' group by lower(btrim(vorname)) having count(*) >= 2) and lower(btrim(coalesce(vorname, ''))) not in (select lower(btrim(vorname)) from members where deleted_at is null and vorname is not null and btrim(vorname) <> '' group by lower(btrim(vorname)) having count(*) >= 2)",
+  // A couple crammed into one record: the name carries a connector word.
+  mehrere_personen_im_datensatz:
+    "deleted_at is null and (coalesce(vorname, '') || ' ' || coalesce(nachname, '')) ~* '(^|[^[:alnum:]])(u\\.|und|&)([^[:alnum:]]|$)'",
+  // Street with no house number in the Strasse field and an empty Hausnummer.
+  strasse_ohne_hausnummer: `${ACTIVE} and strasse is not null and btrim(strasse) <> '' and strasse !~ '[0-9]' and (hausnummer is null or btrim(hausnummer) = '')`,
+  // Contract priced at 0 for a member that is not formally beitragsbefreit:
+  // separates real exemptions from a mistyped amount.
+  vertrag_betrag_null: `${ACTIVE} and beitragsbefreit = false and exists (select 1 from contracts c where c.member_id = members.id and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date) and c.betrag is not null and c.betrag = 0)`,
+  // Same (vorname, nachname) on >1 record where at least one lacks a
+  // Geburtsdatum, which the birthdate-based dubletten check cannot catch.
+  dublette_name_ohne_gebdatum:
+    "deleted_at is null and nachname is not null and btrim(nachname) <> '' and exists (select 1 from members m2 where m2.deleted_at is null and m2.id <> members.id and lower(m2.nachname) = lower(members.nachname) and lower(coalesce(m2.vorname, '')) = lower(coalesce(members.vorname, '')) and (m2.geburtsdatum is null or members.geburtsdatum is null))",
 };
 
 /** Cap the drill-down so a pathological dataset cannot return everything. */
@@ -254,43 +367,65 @@ function toItem(r: MemberRow) {
   };
 }
 
+/**
+ * One combined query returning the count for every category. Shared by the
+ * summary procedure (sidebar badge) and the nightly snapshot writer so both see
+ * identical numbers. Cheap enough to keep warm with a long client staleTime.
+ */
+export async function dataQualityCounts(db: DB): Promise<Array<CategoryMeta & { count: number }>> {
+  const selects = CATEGORY_IDS.map(
+    (id) => `(select count(*)::int from members where ${WHERE[id]}) as "${id}"`,
+  ).join(", ");
+  const rows = (await db.execute(sql.raw(`select ${selects}`))) as unknown as Array<
+    Record<CategoryId, number>
+  >;
+  const counts = rows[0] ?? ({} as Record<CategoryId, number>);
+  return CATEGORIES.map((c) => ({ ...c, count: Number(counts[c.id] ?? 0) }));
+}
+
 export const dataQualityRouter = {
-  /**
-   * One combined query returning the count for every category. Cheap enough to
-   * also back the sidebar badge; the client keeps it warm with a long
-   * staleTime so navigation does not re-run it.
-   */
   summary: vorstandProc.input(v.void()).handler(async ({ context }) => {
-    const selects = CATEGORY_IDS.map(
-      (id) => `(select count(*)::int from members where ${WHERE[id]}) as "${id}"`,
-    ).join(", ");
-    const rows = (await context.db.execute(sql.raw(`select ${selects}`))) as unknown as Array<
-      Record<CategoryId, number>
-    >;
-    const counts = rows[0] ?? ({} as Record<CategoryId, number>);
-    const categories = CATEGORIES.map((c) => ({ ...c, count: Number(counts[c.id] ?? 0) }));
+    const categories = await dataQualityCounts(context.db);
     return {
       categories,
       total: categories.reduce((sum, c) => sum + c.count, 0),
     };
   }),
 
-  /** Affected members for one category, capped at LIST_LIMIT. */
+  /**
+   * Affected members for one category, paged at LIST_LIMIT rows. Returns the
+   * `cap` (page size) and a `nextCursor` so a client (incl. MCP) knows it did
+   * not get everything and can fetch the next page (issue #83). The cursor is
+   * an opaque offset; the WHERE clause is deterministic so offset paging is
+   * stable across calls.
+   */
   list: vorstandProc
-    .input(v.object({ category: v.picklist(CATEGORY_IDS) }))
+    .input(
+      v.object({
+        category: v.picklist(CATEGORY_IDS),
+        cursor: v.optional(v.nullable(v.string()), null),
+      }),
+    )
     .handler(async ({ context, input }) => {
+      const offset = input.cursor ? Math.max(0, Number.parseInt(input.cursor, 10) || 0) : 0;
       const rows = (await context.db.execute(
         sql.raw(
           `select id, member_no, kontakt_no, mitgliedsnummer, adr_nr, vorname, nachname, kurzname, firma1, ort, email, geburtsdatum, austritt ` +
             `from members where ${WHERE[input.category]} ` +
-            `order by nachname nulls last, vorname nulls last limit ${LIST_LIMIT}`,
+            `order by nachname nulls last, vorname nulls last, id ` +
+            `limit ${LIST_LIMIT} offset ${offset}`,
         ),
       )) as unknown as MemberRow[];
       const meta = CATEGORIES.find((c) => c.id === input.category) ?? null;
+      const capped = rows.length >= LIST_LIMIT;
       return {
         category: meta,
         items: rows.map(toItem),
-        capped: rows.length >= LIST_LIMIT,
+        capped,
+        /** The page size cap, so the client knows the limit. */
+        cap: LIST_LIMIT,
+        /** Opaque cursor for the next page, or null when this is the last. */
+        nextCursor: capped ? String(offset + rows.length) : null,
       };
     }),
 };

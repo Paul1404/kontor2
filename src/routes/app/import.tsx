@@ -8,6 +8,7 @@ import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { orpc } from "~/lib/orpc";
+import type { BatchReport } from "~/server/validation/member-fields";
 
 export const Route = createFileRoute("/app/import")({
   component: ImportPage,
@@ -245,6 +246,7 @@ function ImportPage() {
                 </ul>
               </details>
             ) : null}
+            <ImportValidationReport report={upload.data.validationReport} />
           </CardContent>
         </Card>
       ) : null}
@@ -252,6 +254,54 @@ function ImportPage() {
       <h2 className="mt-2 text-lg font-semibold tracking-tight">SVUMS Anträge</h2>
       <SvumsImportSection />
     </div>
+  );
+}
+
+const FIELD_LABEL: Record<string, string> = {
+  email: "E-Mail",
+  iban1: "IBAN",
+  bic1: "BIC",
+  plz: "PLZ",
+  telefon1: "Telefon 1",
+  telefon2: "Telefon 2",
+  geburtsdatum: "Geburtsdatum",
+};
+
+/**
+ * Pre-commit data-quality report over the imported batch (issue #80). Leads
+ * with the totals so a bad import is obvious; the per-field breakdown and the
+ * duplicate Mitgliedsnummern sit behind a details toggle.
+ */
+function ImportValidationReport({ report }: { report: BatchReport }) {
+  const fields = Object.entries(report.byField);
+  const hasDupes = report.duplicateMitgliedsnummern.length > 0;
+  if (report.flaggedRecords === 0 && !hasDupes) {
+    return (
+      <p className="mt-4 text-sm text-success">
+        Keine Datenqualitäts-Auffälligkeiten im Stapel ({report.total} Datensätze geprüft).
+      </p>
+    );
+  }
+  return (
+    <details className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
+      <summary className="cursor-pointer text-sm font-medium">
+        Datenqualität: {report.errors} Fehler, {report.warnings} Warnungen in{" "}
+        {report.flaggedRecords} von {report.total} Datensätzen
+        {hasDupes ? `, ${report.duplicateMitgliedsnummern.length} doppelte Mitgliedsnummern` : ""}
+      </summary>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+        {fields.map(([field, counts]) => (
+          <li key={field}>
+            {FIELD_LABEL[field] ?? field}: {counts.error} Fehler, {counts.warning} Warnungen
+          </li>
+        ))}
+        {hasDupes ? (
+          <li>
+            Doppelte Mitgliedsnummern: {report.duplicateMitgliedsnummern.slice(0, 20).join(", ")}
+          </li>
+        ) : null}
+      </ul>
+    </details>
   );
 }
 

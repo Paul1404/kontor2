@@ -50,6 +50,14 @@ import {
 } from "~/server/search/cache";
 import { validateIban } from "~/server/sepa/iban";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
+import {
+  type FieldResult,
+  validateBic,
+  validateEmail,
+  validateGeburtsdatum,
+  validatePhone,
+  validatePlz,
+} from "~/server/validation/member-fields";
 
 const StatusSchema = v.picklist([
   "aktiv",
@@ -255,6 +263,28 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
     patch.iban1Last4 = lastFour(norm);
   }
 
+  // Reject the same bad inputs the import gate flags, using the shared field
+  // validators (issue #80) so the two surfaces cannot drift. Only fields
+  // actually present in the patch are checked; an error-level result is a hard
+  // reject (warnings are left to the Datenqualitaet view).
+  const reject = (result: FieldResult): void => {
+    if (result.level === "error") {
+      throw new ORPCError("VALIDATION_FAILED", { message: result.message ?? "Eingabe ungültig." });
+    }
+  };
+  if ("email" in input) reject(validateEmail(patch.email as string | null));
+  if ("bic1" in input) reject(validateBic(patch.bic1 as string | null));
+  if ("telefon1" in input) reject(validatePhone(patch.telefon1 as string | null));
+  if ("telefon2" in input) reject(validatePhone(patch.telefon2 as string | null));
+  if ("plz" in input) {
+    reject(
+      validatePlz(patch.plz as string | null, {
+        land: ("land" in input ? (patch.land as string | null) : null) ?? undefined,
+      }),
+    );
+  }
+  if ("geburtsdatum" in input) reject(validateGeburtsdatum(patch.geburtsdatum as Date | null));
+
   return patch;
 }
 
@@ -314,7 +344,18 @@ export const membersRouter = {
     // "Exited" means the Austritt date has actually arrived. A member who has
     // only given notice for a future date is still active and must stay in the
     // default and "aktiv"/"passiv" views (see `memberNotExited`).
-    if (!input.deletedOnly && !input.includeAusgetretene && input.status !== "ausgetreten") {
+    //
+    // `status === "alle"` is the explicit "no lifecycle filter" request: it must
+    // return the full union (aktiv + passiv + gekuendigt + ausgetreten +
+    // verstorben + Kontakte), still respecting `deletedAt IS NULL`. Excluding it
+    // here was the silent bug that made "alle" collapse to "aktiv" and dropped
+    // every ausgetretenes Mitglied from exports and Serienbriefe.
+    if (
+      !input.deletedOnly &&
+      !input.includeAusgetretene &&
+      input.status !== "ausgetreten" &&
+      input.status !== "alle"
+    ) {
       conditions.push(memberNotExited() as never);
     }
     if (!input.deletedOnly && input.status === "ausgetreten") {
@@ -461,16 +502,24 @@ export const membersRouter = {
       // contacts), then fall back to the preserved legacy Linear number so
       // references on old Mahnungen and bookmarks still open.
       const ref = input.mitgliedsnummer;
+      const matchers = [
+        eq(membersTable.memberNo, ref),
+        eq(membersTable.kontaktNo, ref),
+        eq(membersTable.mitgliedsnummer, ref),
+      ];
+      // Also resolve by the internal UUID id. Data-quality drill-downs and the
+      // MCP audit reference records by their internal id, and a Kontakt without
+      // a memberNo/kontaktNo was otherwise unreachable here. Guard the
+      // comparison behind a UUID-shape check: `eq(uuid_col, 'M-123')` would
+      // raise a Postgres "invalid input syntax for type uuid" for every
+      // non-UUID ref, which previously surfaced as an opaque error (issue #82).
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref)) {
+        matchers.push(eq(membersTable.id, ref));
+      }
       const rows = await context.db
         .select()
         .from(membersTable)
-        .where(
-          or(
-            eq(membersTable.memberNo, ref),
-            eq(membersTable.kontaktNo, ref),
-            eq(membersTable.mitgliedsnummer, ref),
-          ),
-        )
+        .where(or(...matchers))
         // A soft-deleted row can share a reused number with a live one (the
         // unique indexes are partial on deletedAt IS NULL). Prefer the live row
         // so a reference never resolves to the deleted predecessor.
@@ -664,6 +713,67 @@ export const membersRouter = {
         incomingBeziehungenCount: incoming?.c ?? 0,
         sollstellungen,
       };
+    }),
+
+  /**
+   * Cursor-paged export of the whole member base for AI/MCP clients (issue
+   * #83), so a client can pull everyone in a few page calls instead of N
+   * individual `get` lookups (which tripped the rate limit during the audit).
+   * Keyset pagination on the internal id (stable, no offset drift). The full
+   * IBAN is never exported; only the masked last four.
+   */
+  bulkExport: authedProc
+    .input(
+      v.object({
+        cursor: v.optional(v.nullable(v.pipe(v.string(), v.uuid())), null),
+        limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(500)), 200),
+        includeDeleted: v.optional(v.boolean(), false),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const conditions = [] as ReturnType<typeof eq>[];
+      if (!input.includeDeleted) conditions.push(memberNotDeleted() as never);
+      if (input.cursor) conditions.push(sql`${membersTable.id} > ${input.cursor}` as never);
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const rows = await context.db
+        .select({
+          id: membersTable.id,
+          adrNr: membersTable.adrNr,
+          memberNo: membersTable.memberNo,
+          kontaktNo: membersTable.kontaktNo,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
+          anrede: membersTable.anrede,
+          vorname: membersTable.vorname,
+          nachname: membersTable.nachname,
+          geschlecht: membersTable.geschlecht,
+          geburtsdatum: membersTable.geburtsdatum,
+          strasse: membersTable.strasse,
+          hausnummer: membersTable.hausnummer,
+          plz: membersTable.plz,
+          ort: membersTable.ort,
+          telefon1: membersTable.telefon1,
+          telefon2: membersTable.telefon2,
+          email: membersTable.email,
+          iban1Last4: membersTable.iban1Last4,
+          bic1: membersTable.bic1,
+          status: membersTable.status,
+          eintritt: membersTable.eintritt,
+          austritt: membersTable.austritt,
+          verstorbenAm: membersTable.verstorbenAm,
+          beitragsbefreit: membersTable.beitragsbefreit,
+          dunningBlocked: membersTable.dunningBlocked,
+          directDebitBlocked: membersTable.directDebitBlocked,
+        })
+        .from(membersTable)
+        .where(where)
+        .orderBy(asc(membersTable.id))
+        .limit(input.limit);
+
+      // Another page exists only when this one filled the limit; the cursor is
+      // the last id returned (keyset).
+      const nextCursor = rows.length === input.limit ? (rows[rows.length - 1]?.id ?? null) : null;
+      return { rows, nextCursor };
     }),
 
   abteilungenList: authedProc.input(v.void()).handler(async ({ context }) =>
