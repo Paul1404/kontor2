@@ -1,8 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveApiKeyContext } from "~/server/mcp/auth";
-import { enforceMcpRateLimit } from "~/server/mcp/rate-limit";
-import { handleMcpRequest } from "~/server/mcp/server";
-import { createContext } from "~/server/orpc/context";
 
 /**
  * MCP endpoint (Model Context Protocol, Streamable HTTP) for AI assistants
@@ -59,6 +55,19 @@ function rateLimited(retryAfterSeconds: number): Response {
 }
 
 export async function handle({ request }: { request: Request }): Promise<Response> {
+  // Server imports loaded lazily so the server graph stays out of the client
+  // bundle (see api/rpc.$.ts).
+  const [
+    { resolveApiKeyContext },
+    { enforceMcpRateLimit },
+    { handleMcpRequest },
+    { createContext },
+  ] = await Promise.all([
+    import("~/server/mcp/auth"),
+    import("~/server/mcp/rate-limit"),
+    import("~/server/mcp/server"),
+    import("~/server/orpc/context"),
+  ]);
   const base = await createContext(request);
   const rawKey = request.headers.get("x-api-key");
   if (!rawKey) return unauthorized();

@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.56.4",
+    date: "2026-06-11",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die Anmeldung funktioniert wieder. Ein Servermodul war versehentlich im Browser-Code gelandet und ließ die Oberfläche nach dem Laden abstürzen, sodass das Anmeldeformular nur zurückgesetzt wurde und nichts passierte.",
+      },
+    ],
+  },
+  {
     version: "0.56.3",
     date: "2026-06-11",
     changes: [

@@ -1,9 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { db } from "~/server/db/client";
-import { buildPortalCookie, consumePortalToken, isSecureRequest } from "~/server/portal/auth";
-import { rateLimit } from "~/server/redis/client";
 
+// Server imports loaded lazily inside the handler so the server graph never
+// reaches the client bundle. See `api/rpc.$.ts`.
 async function handle({ request, params }: { request: Request; params: { token: string } }) {
+  const [{ db }, portalAuth, { rateLimit }] = await Promise.all([
+    import("~/server/db/client"),
+    import("~/server/portal/auth"),
+    import("~/server/redis/client"),
+  ]);
+  const { buildPortalCookie, consumePortalToken, isSecureRequest } = portalAuth;
   const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
   const userAgent = request.headers.get("user-agent");
 

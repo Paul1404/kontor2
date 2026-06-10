@@ -1,15 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { eq } from "drizzle-orm";
-import { db } from "~/server/db/client";
-import { portalSessionsTable } from "~/server/db/schema/portal";
-import {
-  clearPortalCookieHeader,
-  getPortalCookieFromHeaders,
-  isSecureRequest,
-  resolvePortalSession,
-} from "~/server/portal/auth";
 
+// Server imports (incl. drizzle-orm) loaded lazily inside the handler so the
+// server graph never reaches the client bundle. See `api/rpc.$.ts`.
 async function handle({ request }: { request: Request }) {
+  const [{ eq }, { db }, { portalSessionsTable }, portalAuth] = await Promise.all([
+    import("drizzle-orm"),
+    import("~/server/db/client"),
+    import("~/server/db/schema/portal"),
+    import("~/server/portal/auth"),
+  ]);
+  const {
+    clearPortalCookieHeader,
+    getPortalCookieFromHeaders,
+    isSecureRequest,
+    resolvePortalSession,
+  } = portalAuth;
   const cookieValue = getPortalCookieFromHeaders(request.headers);
   const session = await resolvePortalSession(db(), cookieValue);
   if (session) {

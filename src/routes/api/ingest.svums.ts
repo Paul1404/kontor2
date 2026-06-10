@@ -14,12 +14,6 @@
  * the `svums_push` ingest source and the `SVUMS_PUSH_SECRET` env var.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { verifySignature } from "~/server/crypto/hmac";
-import { db } from "~/server/db/client";
-import { env } from "~/server/env";
-import { runIngest } from "~/server/importer/ingest-pipeline";
-import { logger } from "~/server/lib/logger";
-import { acquireNonce, rateLimit } from "~/server/redis/client";
 
 // Mirror the 50 MB cap the interactive SQL-dump import enforces, so a
 // compromised or buggy SVUMS sender can't exhaust memory with an unbounded
@@ -34,6 +28,23 @@ function tooLarge(): Response {
 }
 
 async function handle({ request }: { request: Request }): Promise<Response> {
+  // Server imports loaded lazily so the server graph stays out of the client
+  // bundle (see api/rpc.$.ts).
+  const [
+    { verifySignature },
+    { db },
+    { env },
+    { runIngest },
+    { logger },
+    { acquireNonce, rateLimit },
+  ] = await Promise.all([
+    import("~/server/crypto/hmac"),
+    import("~/server/db/client"),
+    import("~/server/env"),
+    import("~/server/importer/ingest-pipeline"),
+    import("~/server/lib/logger"),
+    import("~/server/redis/client"),
+  ]);
   const declaredLength = Number(request.headers.get("content-length") ?? "");
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BYTES) {
     return tooLarge();

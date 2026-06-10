@@ -1,10 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { auth } from "~/server/auth/auth";
-import { ensureBootstrapAdmin } from "~/server/auth/bootstrap";
-import { guardAdminPluginRequest } from "~/server/auth/last-admin-guard";
-import { ensureSessionConfigLoaded } from "~/server/auth/session-config";
 
+// Server imports are loaded lazily inside the handler, never at module top
+// level: this route module is part of the client route tree, and a static
+// `import { auth }` would drag the whole better-auth + mail + db graph
+// (nodemailer touches the Node-only `Buffer`) into the browser bundle and
+// break hydration. See the note in `api/rpc.$.ts`.
 const handle = async ({ request }: { request: Request }) => {
+  const [
+    { auth },
+    { ensureBootstrapAdmin },
+    { guardAdminPluginRequest },
+    { ensureSessionConfigLoaded },
+  ] = await Promise.all([
+    import("~/server/auth/auth"),
+    import("~/server/auth/bootstrap"),
+    import("~/server/auth/last-admin-guard"),
+    import("~/server/auth/session-config"),
+  ]);
   await ensureSessionConfigLoaded();
   await ensureBootstrapAdmin();
   // Block last-admin-locking POSTs to the better-auth admin plugin

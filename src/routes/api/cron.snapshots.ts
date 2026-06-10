@@ -1,9 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { verifySignature } from "~/server/crypto/hmac";
-import { env } from "~/server/env";
-import { logger } from "~/server/lib/logger";
-import { rateLimit } from "~/server/redis/client";
-import { runNightlySnapshot } from "~/server/snapshots/scheduler";
 
 /**
  * External trigger for the nightly snapshot run. Use this when the
@@ -14,6 +9,16 @@ import { runNightlySnapshot } from "~/server/snapshots/scheduler";
  * has integrity (and the timestamp guards against replay).
  */
 async function handle({ request }: { request: Request }): Promise<Response> {
+  // Server imports loaded lazily so the server graph stays out of the client
+  // bundle (see api/rpc.$.ts).
+  const [{ verifySignature }, { env }, { logger }, { rateLimit }, { runNightlySnapshot }] =
+    await Promise.all([
+      import("~/server/crypto/hmac"),
+      import("~/server/env"),
+      import("~/server/lib/logger"),
+      import("~/server/redis/client"),
+      import("~/server/snapshots/scheduler"),
+    ]);
   const limit = await rateLimit({
     key: `cron-snapshots:${request.headers.get("x-forwarded-for") ?? "ip"}`,
     limit: 6,
