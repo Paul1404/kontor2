@@ -2,6 +2,7 @@ import { call } from "@orpc/server";
 import { toJsonSchema } from "@valibot/to-json-schema";
 import * as v from "valibot";
 import type { Role } from "~/server/db/schema/auth";
+import { withIdempotency } from "~/server/mcp/idempotency";
 import type { AppContext } from "~/server/orpc/context";
 import { CATEGORY_IDS } from "~/server/orpc/procedures/data-quality";
 import { appRouter } from "~/server/orpc/router";
@@ -58,6 +59,12 @@ function defineTool<TSchema extends v.GenericSchema>(def: {
 const PageInput = v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)));
 const YearInput = v.pipe(v.number(), v.integer(), v.minValue(1900), v.maxValue(2200));
 const DateInput = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
+
+/**
+ * Optional idempotency key for write tools (issue #83): a retried create with
+ * the same key returns the first call's result instead of creating a duplicate.
+ */
+const IdempotencyKeyInput = v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(200)));
 
 /**
  * Subset of the member Stammdaten allow-list (members.ts StammdatenInput)
@@ -150,6 +157,18 @@ const TOOLS: McpTool[] = [
     minRole: "readonly",
     input: v.object({ mitgliedsnummer: v.string() }),
     execute: (context, input) => call(appRouter.members.get, input, { context }),
+  }),
+  defineTool({
+    name: "bulk_export_members",
+    description:
+      "Export all members in pages, instead of many individual get_member calls. Returns compact member records (masked bank data: iban1Last4 only) plus a `nextCursor`; pass it back to fetch the next page, and stop when it is null. `limit` defaults to 200 (max 500).",
+    minRole: "readonly",
+    input: v.object({
+      cursor: v.optional(v.nullable(v.string())),
+      limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(500))),
+      includeDeleted: v.optional(v.boolean()),
+    }),
+    execute: (context, input) => call(appRouter.members.bulkExport, input, { context }),
   }),
   defineTool({
     name: "member_stats",
@@ -314,9 +333,12 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "data_quality_members",
     description:
-      "Drill into one data_quality_summary category and list the affected members (the rows behind a count). Pass a category id from data_quality_summary, e.g. 'aktiv_ohne_vertrag', 'lastschrift_ohne_mandat' or 'moegliche_dubletten'. Returns each member's reference, name, Ort, email, Geburtsdatum and Austritt; capped at 500 rows.",
+      "Drill into one data_quality_summary category and list the affected members (the rows behind a count). Pass a category id from data_quality_summary, e.g. 'aktiv_ohne_vertrag', 'lastschrift_ohne_mandat' or 'moegliche_dubletten'. Returns each member's reference, name, Ort, email, Geburtsdatum and Austritt, plus `cap` (page size) and `nextCursor`; pass the cursor back to fetch the next page (null = last page).",
     minRole: "vorstand",
-    input: v.object({ category: v.picklist(CATEGORY_IDS) }),
+    input: v.object({
+      category: v.picklist(CATEGORY_IDS),
+      cursor: v.optional(v.nullable(v.string())),
+    }),
     execute: (context, input) => call(appRouter.dataQuality.list, input, { context }),
   }),
   // ---- Vorstand: mutations ----
@@ -325,8 +347,11 @@ const TOOLS: McpTool[] = [
     description:
       "Create a new member with the given Stammdaten (name, address, contact, Eintritt, optionally IBAN/BIC and legal-representative fields). The Mitgliedsnummer is assigned automatically. The change is audited.",
     minRole: "vorstand",
-    input: v.object({ patch: McpStammdatenInput }),
-    execute: (context, input) => call(appRouter.members.create, input, { context }),
+    input: v.object({ patch: McpStammdatenInput, idempotencyKey: IdempotencyKeyInput }),
+    execute: (context, input) =>
+      withIdempotency(context.db, "create_member", input.idempotencyKey, () =>
+        call(appRouter.members.create, { patch: input.patch }, { context }),
+      ),
   }),
   defineTool({
     name: "update_member",
@@ -349,8 +374,12 @@ const TOOLS: McpTool[] = [
       title: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
       notes: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(2000)))),
       dueDate: v.optional(v.nullable(DateInput)),
+      idempotencyKey: IdempotencyKeyInput,
     }),
-    execute: (context, input) => call(appRouter.tasks.create, input, { context }),
+    execute: (context, { idempotencyKey, ...rest }) =>
+      withIdempotency(context.db, "create_task", idempotencyKey, () =>
+        call(appRouter.tasks.create, rest, { context }),
+      ),
   }),
   defineTool({
     name: "set_task_status",
@@ -375,8 +404,19 @@ const TOOLS: McpTool[] = [
     description:
       "Create a membership contract (Beitrag/Vertrag) for a member (by internal member id), fixing 'Mitglied ohne Vertrag'. Needs a Vertragsnummer and the Beitragsart id (`art`, resolve via list_fee_types). Money relevant: this creates a billable obligation. The change is audited.",
     minRole: "vorstand",
-    input: v.object({ memberId: v.string(), patch: McpContractInput }),
-    execute: (context, input) => call(appRouter.contracts.create, input, { context }),
+    input: v.object({
+      memberId: v.string(),
+      patch: McpContractInput,
+      idempotencyKey: IdempotencyKeyInput,
+    }),
+    execute: (context, input) =>
+      withIdempotency(context.db, "create_contract", input.idempotencyKey, () =>
+        call(
+          appRouter.contracts.create,
+          { memberId: input.memberId, patch: input.patch },
+          { context },
+        ),
+      ),
   }),
   defineTool({
     name: "update_contract",
@@ -391,8 +431,11 @@ const TOOLS: McpTool[] = [
     description:
       "Create a SEPA direct-debit mandate for a member (by internal member id), fixing 'Lastschrift ohne SEPA-Mandat'. The mandate reference is assigned automatically if omitted. Set the member's IBAN first via update_member. Bank and money relevant. The change is audited.",
     minRole: "vorstand",
-    input: McpSepaMandateInput,
-    execute: (context, input) => call(appRouter.sepa.create, input, { context }),
+    input: v.object({ ...McpSepaMandateInput.entries, idempotencyKey: IdempotencyKeyInput }),
+    execute: (context, { idempotencyKey, ...rest }) =>
+      withIdempotency(context.db, "create_sepa_mandate", idempotencyKey, () =>
+        call(appRouter.sepa.create, rest, { context }),
+      ),
   }),
   defineTool({
     name: "merge_members",

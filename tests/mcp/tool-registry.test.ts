@@ -9,6 +9,7 @@ import { allTools, toolJsonSchema, toolsForRole } from "~/server/mcp/tools";
 const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
   search_members: "readonly",
   get_member: "readonly",
+  bulk_export_members: "readonly",
   member_stats: "readonly",
   list_departments: "readonly",
   list_fee_types: "readonly",

@@ -44,11 +44,15 @@ export const apiKeysRouter = {
           v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(365))),
           null,
         ),
+        // A key inherits the role of its user, so a vorstand/admin user yields a
+        // write-capable key. Default to refusing that: the caller must set
+        // `allowWrite: true` to bind a key to a non-readonly user (issue #83).
+        allowWrite: v.optional(v.boolean(), false),
       }),
     )
     .handler(async ({ context, input }) => {
       const [owner] = await context.db
-        .select({ id: users.id, email: users.email, banned: users.banned })
+        .select({ id: users.id, email: users.email, banned: users.banned, role: users.role })
         .from(users)
         .where(eq(users.id, input.userId))
         .limit(1);
@@ -58,6 +62,13 @@ export const apiKeysRouter = {
       if (owner.banned) {
         throw new ORPCError("BAD_REQUEST", {
           message: "Für gesperrte Benutzer können keine Schlüssel erstellt werden.",
+        });
+      }
+      // Readonly by default: a write-capable key needs an explicit opt-in.
+      if (owner.role !== "readonly" && !input.allowWrite) {
+        throw new ORPCError("BAD_REQUEST", {
+          message:
+            "Dieser Benutzer hat Schreibrechte. Für einen schreibfähigen Schlüssel den Schreibzugriff ausdrücklich bestätigen.",
         });
       }
 

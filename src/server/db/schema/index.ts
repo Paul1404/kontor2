@@ -15,6 +15,7 @@ export * from "./email-log";
 export * from "./fee-runs";
 export * from "./fee-type-history";
 export * from "./fee-types";
+export * from "./idempotency";
 export * from "./import-batches";
 export * from "./kulanz";
 export * from "./legacy-sepa";

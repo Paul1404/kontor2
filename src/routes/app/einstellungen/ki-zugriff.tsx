@@ -31,6 +31,9 @@ function ApiKeysPage() {
   const [name, setName] = useState("");
   const [userId, setUserId] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("");
+  // Readonly by default: a write-capable key (bound to a vorstand/admin user)
+  // requires this explicit opt-in (issue #83).
+  const [allowWrite, setAllowWrite] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdKey, setCreatedKey] = useState<{ name: string; key: string } | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<{ id: string; name: string | null } | null>(
@@ -50,6 +53,7 @@ function ApiKeysPage() {
         name,
         userId,
         expiresInDays: expiresInDays ? Number(expiresInDays) : null,
+        allowWrite,
       }),
     onSuccess: (data) => {
       setError(null);
@@ -130,8 +134,9 @@ function ApiKeysPage() {
         <CardHeader>
           <CardTitle>Schlüssel erstellen</CardTitle>
           <CardDescription>
-            Der Schlüssel erhält die Rolle des gewählten Benutzers. Für reinen Lesezugriff einen
-            Readonly-Benutzer wählen.
+            Der Schlüssel erhält die Rolle des gewählten Benutzers. Standardmäßig sind nur
+            Readonly-Benutzer wählbar. Für einen schreibfähigen Schlüssel den Schreibzugriff
+            ausdrücklich erlauben.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -169,6 +174,9 @@ function ApiKeysPage() {
                 </option>
                 {users.data
                   ?.filter((u) => !u.banned)
+                  // Without the write opt-in, only readonly users are
+                  // selectable, so a new key is readonly by default.
+                  .filter((u) => allowWrite || u.role === "readonly")
                   .map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.email} ({ROLE_LABEL[u.role] ?? u.role})
@@ -176,6 +184,23 @@ function ApiKeysPage() {
                   ))}
               </select>
             </div>
+            <label className="flex items-center gap-2 self-end pb-2.5 text-sm">
+              <input
+                type="checkbox"
+                className="size-4 rounded border-input"
+                checked={allowWrite}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setAllowWrite(next);
+                  // Clear a now-disallowed selection when turning write access off.
+                  if (!next) {
+                    const selected = users.data?.find((u) => u.id === userId);
+                    if (selected && selected.role !== "readonly") setUserId("");
+                  }
+                }}
+              />
+              Schreibzugriff erlauben
+            </label>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="key-expiry">Gültig (Tage, optional)</Label>
               <Input

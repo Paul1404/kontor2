@@ -715,6 +715,67 @@ export const membersRouter = {
       };
     }),
 
+  /**
+   * Cursor-paged export of the whole member base for AI/MCP clients (issue
+   * #83), so a client can pull everyone in a few page calls instead of N
+   * individual `get` lookups (which tripped the rate limit during the audit).
+   * Keyset pagination on the internal id (stable, no offset drift). The full
+   * IBAN is never exported; only the masked last four.
+   */
+  bulkExport: authedProc
+    .input(
+      v.object({
+        cursor: v.optional(v.nullable(v.pipe(v.string(), v.uuid())), null),
+        limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(500)), 200),
+        includeDeleted: v.optional(v.boolean(), false),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const conditions = [] as ReturnType<typeof eq>[];
+      if (!input.includeDeleted) conditions.push(memberNotDeleted() as never);
+      if (input.cursor) conditions.push(sql`${membersTable.id} > ${input.cursor}` as never);
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const rows = await context.db
+        .select({
+          id: membersTable.id,
+          adrNr: membersTable.adrNr,
+          memberNo: membersTable.memberNo,
+          kontaktNo: membersTable.kontaktNo,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
+          anrede: membersTable.anrede,
+          vorname: membersTable.vorname,
+          nachname: membersTable.nachname,
+          geschlecht: membersTable.geschlecht,
+          geburtsdatum: membersTable.geburtsdatum,
+          strasse: membersTable.strasse,
+          hausnummer: membersTable.hausnummer,
+          plz: membersTable.plz,
+          ort: membersTable.ort,
+          telefon1: membersTable.telefon1,
+          telefon2: membersTable.telefon2,
+          email: membersTable.email,
+          iban1Last4: membersTable.iban1Last4,
+          bic1: membersTable.bic1,
+          status: membersTable.status,
+          eintritt: membersTable.eintritt,
+          austritt: membersTable.austritt,
+          verstorbenAm: membersTable.verstorbenAm,
+          beitragsbefreit: membersTable.beitragsbefreit,
+          dunningBlocked: membersTable.dunningBlocked,
+          directDebitBlocked: membersTable.directDebitBlocked,
+        })
+        .from(membersTable)
+        .where(where)
+        .orderBy(asc(membersTable.id))
+        .limit(input.limit);
+
+      // Another page exists only when this one filled the limit; the cursor is
+      // the last id returned (keyset).
+      const nextCursor = rows.length === input.limit ? (rows[rows.length - 1]?.id ?? null) : null;
+      return { rows, nextCursor };
+    }),
+
   abteilungenList: authedProc.input(v.void()).handler(async ({ context }) =>
     cached(CACHE_NS.abteilungen, "members-list", 300, () =>
       context.db

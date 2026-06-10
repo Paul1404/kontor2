@@ -392,22 +392,40 @@ export const dataQualityRouter = {
     };
   }),
 
-  /** Affected members for one category, capped at LIST_LIMIT. */
+  /**
+   * Affected members for one category, paged at LIST_LIMIT rows. Returns the
+   * `cap` (page size) and a `nextCursor` so a client (incl. MCP) knows it did
+   * not get everything and can fetch the next page (issue #83). The cursor is
+   * an opaque offset; the WHERE clause is deterministic so offset paging is
+   * stable across calls.
+   */
   list: vorstandProc
-    .input(v.object({ category: v.picklist(CATEGORY_IDS) }))
+    .input(
+      v.object({
+        category: v.picklist(CATEGORY_IDS),
+        cursor: v.optional(v.nullable(v.string()), null),
+      }),
+    )
     .handler(async ({ context, input }) => {
+      const offset = input.cursor ? Math.max(0, Number.parseInt(input.cursor, 10) || 0) : 0;
       const rows = (await context.db.execute(
         sql.raw(
           `select id, member_no, kontakt_no, mitgliedsnummer, adr_nr, vorname, nachname, kurzname, firma1, ort, email, geburtsdatum, austritt ` +
             `from members where ${WHERE[input.category]} ` +
-            `order by nachname nulls last, vorname nulls last limit ${LIST_LIMIT}`,
+            `order by nachname nulls last, vorname nulls last, id ` +
+            `limit ${LIST_LIMIT} offset ${offset}`,
         ),
       )) as unknown as MemberRow[];
       const meta = CATEGORIES.find((c) => c.id === input.category) ?? null;
+      const capped = rows.length >= LIST_LIMIT;
       return {
         category: meta,
         items: rows.map(toItem),
-        capped: rows.length >= LIST_LIMIT,
+        capped,
+        /** The page size cap, so the client knows the limit. */
+        cap: LIST_LIMIT,
+        /** Opaque cursor for the next page, or null when this is the last. */
+        nextCursor: capped ? String(offset + rows.length) : null,
       };
     }),
 };
