@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.48.0",
+    date: "2026-06-10",
+    title: "Benutzer verwalten: sperren und löschen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Benutzer-Verwaltung kann Konten jetzt sperren und endgültig löschen, nicht nur einladen und die Rolle ändern. Gesperrte Benutzer können sich nicht mehr anmelden, laufende Sitzungen werden beendet, die Sperre lässt sich wieder aufheben. Beim Löschen werden Sitzungen, Zugänge und API-Schlüssel mit entfernt. Der letzte aktive Administrator und das eigene Konto sind geschützt. Beides landet im Audit-Protokoll.",
+      },
+      {
+        category: "feature",
+        description:
+          "Versendete Einladungen sind jetzt sichtbar. Eine neue Liste zeigt offene, eingelöste, widerrufene und abgelaufene Einladungen mit Status; offene Einladungen lassen sich direkt widerrufen.",
+      },
+    ],
+  },
+  {
     version: "0.47.0",
     date: "2026-06-10",
     title: "Mitglieder zusammenführen",

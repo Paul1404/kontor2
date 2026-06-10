@@ -1,24 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
+  Ban,
   CheckCircle2,
   Clock,
   Eye,
   Loader2,
+  Mail,
   Save,
   ShieldCheck,
+  ShieldOff,
+  Trash2,
   UserPlus,
   Users,
   XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { ConfirmDialog, TypeToConfirmDialog } from "~/components/ui/confirm-dialog";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { QueryError, QueryErrorRow } from "~/components/ui/query-error";
+import { Textarea } from "~/components/ui/textarea";
+import { toast } from "~/components/ui/toaster";
+import { EMPTY_VALUE, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/einstellungen/benutzer")({
@@ -53,6 +61,7 @@ function UsersPage() {
       );
       setEmail("");
       qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["invitations"] });
     },
     onError: (err) => setMsg({ kind: "error", text: (err as Error).message }),
   });
@@ -65,6 +74,57 @@ function UsersPage() {
       qc.invalidateQueries({ queryKey: ["users"] });
     },
     onError: (err) => setMsg({ kind: "error", text: (err as Error).message }),
+  });
+
+  const invitations = useQuery({
+    queryKey: ["invitations"],
+    queryFn: () => orpc.auth.listInvitations(),
+  });
+
+  const [pendingDelete, setPendingDelete] = useState<{ userId: string; email: string } | null>(
+    null,
+  );
+  const [pendingBan, setPendingBan] = useState<{ userId: string; email: string } | null>(null);
+  const [banReason, setBanReason] = useState("");
+
+  const deleteUser = useMutation({
+    mutationFn: (userId: string) => orpc.auth.deleteUser({ userId }),
+    onSuccess: (_d, _userId) => {
+      toast.success("Benutzer gelöscht.");
+      setPendingDelete(null);
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["invitations"] });
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  const banUser = useMutation({
+    mutationFn: (input: { userId: string; reason?: string }) => orpc.auth.banUser(input),
+    onSuccess: () => {
+      toast.success("Benutzer gesperrt.");
+      setPendingBan(null);
+      setBanReason("");
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  const unbanUser = useMutation({
+    mutationFn: (userId: string) => orpc.auth.unbanUser({ userId }),
+    onSuccess: () => {
+      toast.success("Sperre aufgehoben.");
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  const revokeInvite = useMutation({
+    mutationFn: (invitationId: string) => orpc.auth.revokeInvite({ invitationId }),
+    onSuccess: () => {
+      toast.success("Einladung widerrufen.");
+      qc.invalidateQueries({ queryKey: ["invitations"] });
+    },
+    onError: (err) => toast.error((err as Error).message),
   });
 
   const sessionSettings = useQuery({
@@ -214,35 +274,43 @@ function UsersPage() {
                   <th className="px-4 py-3 font-medium">E-Mail</th>
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Rolle</th>
+                  <th className="px-4 py-3 text-right font-medium">Aktionen</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {users.isLoading ? (
                   <tr>
-                    <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                       Wird geladen…
                     </td>
                   </tr>
                 ) : users.isError ? (
-                  <QueryErrorRow colSpan={3} onRetry={() => users.refetch()} />
+                  <QueryErrorRow colSpan={4} onRetry={() => users.refetch()} />
                 ) : users.data && users.data.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                       Keine Benutzer.
                     </td>
                   </tr>
                 ) : (
                   users.data?.map((u) => {
                     const isSelf = u.id === me.data?.id;
+                    const busy =
+                      (deleteUser.isPending && deleteUser.variables === u.id) ||
+                      (banUser.isPending && banUser.variables?.userId === u.id) ||
+                      (unbanUser.isPending && unbanUser.variables === u.id);
                     return (
                       <tr key={u.id} className="transition-colors hover:bg-muted/30">
                         <td className="px-4 py-3">
-                          {u.email}
-                          {isSelf ? (
-                            <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              Sie
-                            </span>
-                          ) : null}
+                          <span className="inline-flex flex-wrap items-center gap-2">
+                            {u.email}
+                            {isSelf ? (
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                Sie
+                              </span>
+                            ) : null}
+                            {u.banned ? <Badge variant="destructive">Gesperrt</Badge> : null}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{u.name}</td>
                         <td className="px-4 py-3">
@@ -264,6 +332,152 @@ function UsersPage() {
                             <option value="vorstand">Vorstand</option>
                             <option value="admin">Admin</option>
                           </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {isSelf ? (
+                              <span className="text-xs text-muted-foreground">Eigenes Konto</span>
+                            ) : (
+                              <>
+                                {u.banned ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={busy}
+                                    onClick={() => unbanUser.mutate(u.id)}
+                                  >
+                                    {busy ? (
+                                      <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                      <ShieldOff className="size-4" />
+                                    )}
+                                    Entsperren
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={busy}
+                                    onClick={() => setPendingBan({ userId: u.id, email: u.email })}
+                                  >
+                                    <Ban className="size-4" />
+                                    Sperren
+                                  </Button>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                  aria-label={`Benutzer ${u.email} löschen`}
+                                  disabled={busy}
+                                  onClick={() => setPendingDelete({ userId: u.id, email: u.email })}
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden p-0">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="size-5 text-muted-foreground" />
+            Einladungen
+          </CardTitle>
+          <CardDescription>
+            Versendete Einladungen und ihr Status. Offene Einladungen lassen sich widerrufen, bevor
+            sie eingelöst werden.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-medium">E-Mail</th>
+                  <th className="px-4 py-3 font-medium">Rolle</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Läuft ab</th>
+                  <th className="px-4 py-3 text-right font-medium">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {invitations.isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                      Wird geladen…
+                    </td>
+                  </tr>
+                ) : invitations.isError ? (
+                  <QueryErrorRow colSpan={5} onRetry={() => invitations.refetch()} />
+                ) : invitations.data && invitations.data.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                      Keine Einladungen.
+                    </td>
+                  </tr>
+                ) : (
+                  invitations.data?.map((inv) => {
+                    const role =
+                      inv.role === "admin"
+                        ? "Admin"
+                        : inv.role === "vorstand"
+                          ? "Vorstand"
+                          : "Readonly";
+                    return (
+                      <tr key={inv.id} className="transition-colors hover:bg-muted/30">
+                        <td className="px-4 py-3">{inv.email}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{role}</td>
+                        <td className="px-4 py-3">
+                          {inv.status === "pending" ? (
+                            <Badge variant="info">Offen</Badge>
+                          ) : inv.status === "accepted" ? (
+                            <Badge variant="success">Eingelöst</Badge>
+                          ) : inv.status === "revoked" ? (
+                            <Badge variant="secondary">Widerrufen</Badge>
+                          ) : (
+                            <Badge variant="warning">Abgelaufen</Badge>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {inv.status === "pending" ? formatDate(inv.expiresAt) : EMPTY_VALUE}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end">
+                            {inv.status === "pending" ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={
+                                  revokeInvite.isPending && revokeInvite.variables === inv.id
+                                }
+                                onClick={() => revokeInvite.mutate(inv.id)}
+                              >
+                                {revokeInvite.isPending && revokeInvite.variables === inv.id ? (
+                                  <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                  <XCircle className="size-4" />
+                                )}
+                                Widerrufen
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">{EMPTY_VALUE}</span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -381,6 +595,65 @@ function UsersPage() {
           if (!pendingDowngrade) return;
           setRoleMutation.mutate({ userId: pendingDowngrade.userId, role: pendingDowngrade.next });
           setPendingDowngrade(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingBan !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setPendingBan(null);
+            setBanReason("");
+          }
+        }}
+        title="Benutzer sperren?"
+        description={
+          pendingBan
+            ? `${pendingBan.email} kann sich nicht mehr anmelden. Laufende Sitzungen werden beendet. Die Sperre lässt sich jederzeit wieder aufheben.`
+            : undefined
+        }
+        confirmLabel="Sperren"
+        destructive
+        loading={banUser.isPending}
+        onConfirm={() => {
+          if (!pendingBan) return;
+          const reason = banReason.trim();
+          banUser.mutate({ userId: pendingBan.userId, reason: reason || undefined });
+        }}
+      >
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="ban-reason">Grund (optional)</Label>
+          <Textarea
+            id="ban-reason"
+            value={banReason}
+            onChange={(e) => setBanReason(e.target.value)}
+            maxLength={500}
+            placeholder="z. B. Mitarbeiter ausgeschieden"
+          />
+        </div>
+      </ConfirmDialog>
+
+      <TypeToConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(o) => {
+          if (!o) setPendingDelete(null);
+        }}
+        title="Benutzer endgültig löschen?"
+        description={
+          pendingDelete ? (
+            <span>
+              Das Konto von <strong>{pendingDelete.email}</strong> wird mit allen Sitzungen,
+              Zugängen und API-Schlüsseln unwiderruflich entfernt. Soll der Zugang nur vorübergehend
+              gesperrt werden, nutzen Sie stattdessen „Sperren“.
+            </span>
+          ) : undefined
+        }
+        confirmLabel="Endgültig löschen"
+        confirmPhrase={pendingDelete?.email ?? ""}
+        loading={deleteUser.isPending}
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          deleteUser.mutate(pendingDelete.userId);
         }}
       />
     </div>
