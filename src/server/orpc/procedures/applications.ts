@@ -1,5 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import { type AnyColumn, and, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { unzipSync } from "fflate";
 import * as v from "valibot";
 import { lookupPlz, searchStreets } from "~/server/address/nominatim";
 import {
@@ -38,7 +39,9 @@ import {
 } from "~/server/domain/application/antragstyp";
 import { calculateFee } from "~/server/domain/application/fees";
 import {
+  fileBasename,
   mapSvumsApplication,
+  mimeForFilename,
   parseSvumsExport,
   svumsDedupeKey,
 } from "~/server/domain/application/svums-import";
@@ -1482,9 +1485,15 @@ export const applicationsRouter = {
    * Input is the saved JSON of svums `GET /api/admin/applications` (IBANs
    * arrive decrypted there). Idempotent: rows are matched on name + birth
    * date + the exact svums creation timestamp, so re-uploading the same
-   * export never duplicates. Files (PDFs, scans) are NOT migrated; approved
-   * applications are linked to an existing member when the Mitgliedsnummer
-   * matches exactly one member.
+   * export never duplicates. Approved applications are linked to an existing
+   * member when the Mitgliedsnummer matches exactly one member.
+   *
+   * Documents: svums keeps them in its own object storage under flat keys
+   * (`ANT-..._signed.pdf`, `ANT-..._approved.pdf`). An optional ZIP of that
+   * bucket is matched per application via the `uploaded_file` /
+   * `admin_approved_file` keys in the export and stored as `signed_scan` /
+   * `approved_pdf` files. Also idempotent: a kind that already has a file is
+   * skipped, so the ZIP can be delivered in parts across several runs.
    */
   importSvums: adminProc
     .input(
@@ -1492,6 +1501,8 @@ export const applicationsRouter = {
         filename: v.string(),
         contentBase64: v.pipe(v.string(), v.minLength(1)),
         includeTest: v.optional(v.boolean(), false),
+        /** Optional ZIP of the svums storage bucket (documents). */
+        filesZipBase64: v.optional(v.nullable(v.pipe(v.string(), v.minLength(1))), null),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -1501,6 +1512,32 @@ export const applicationsRouter = {
       }
       if (buf.length > 20 * 1024 * 1024) {
         throw new ORPCError("PAYLOAD_TOO_LARGE", { message: "Datei zu groß. Maximum: 20 MB." });
+      }
+
+      // Unpack the optional documents ZIP into basename -> bytes. Folder
+      // prefixes inside the ZIP do not matter, svums keys are flat.
+      const zipEntries = new Map<string, Uint8Array>();
+      if (input.filesZipBase64) {
+        const zipBuf = Buffer.from(input.filesZipBase64, "base64");
+        if (zipBuf.length > 100 * 1024 * 1024) {
+          throw new ORPCError("PAYLOAD_TOO_LARGE", {
+            message:
+              "Dokumente-ZIP zu groß. Maximum: 100 MB. Das ZIP kann aufgeteilt und in mehreren Durchläufen hochgeladen werden.",
+          });
+        }
+        let unzipped: Record<string, Uint8Array>;
+        try {
+          unzipped = unzipSync(new Uint8Array(zipBuf));
+        } catch {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Dokumente-ZIP konnte nicht gelesen werden.",
+          });
+        }
+        for (const [name, bytes] of Object.entries(unzipped)) {
+          if (name.endsWith("/") || name.includes("__MACOSX") || bytes.length === 0) continue;
+          const base = fileBasename(name).toLowerCase();
+          if (base) zipEntries.set(base, bytes);
+        }
       }
 
       let items: ReturnType<typeof parseSvumsExport>["items"];
@@ -1532,6 +1569,7 @@ export const applicationsRouter = {
       // so collisions are possible and trigger a re-mint).
       const existing = await context.db
         .select({
+          id: t.id,
           antragsnummer: t.antragsnummer,
           vorname: t.vorname,
           nachname: t.nachname,
@@ -1540,7 +1578,7 @@ export const applicationsRouter = {
         })
         .from(t);
       const usedNummern = new Set(existing.map((r) => r.antragsnummer));
-      const seen = new Set(existing.map((r) => svumsDedupeKey(r)));
+      const idByDedupeKey = new Map(existing.map((r) => [svumsDedupeKey(r), r.id]));
 
       // Approved svums Anträge carry the Linear Mitgliedsnummer; link the
       // application to the member when exactly one (non-deleted) match exists.
@@ -1577,6 +1615,48 @@ export const applicationsRouter = {
       let skippedExisting = 0;
       let skippedTest = 0;
       let linkedMembers = 0;
+      let documentsImported = 0;
+
+      /** Store one svums document from the ZIP, unless the kind already exists. */
+      const attachDocument = async (
+        applicationId: string,
+        label: string,
+        storageKey: string,
+        kind: "signed_scan" | "approved_pdf",
+        uploadedAt: Date | null,
+      ): Promise<void> => {
+        const base = fileBasename(storageKey);
+        if (!base) return;
+        const [already] = await context.db
+          .select({ id: membershipApplicationFilesTable.id })
+          .from(membershipApplicationFilesTable)
+          .where(
+            and(
+              eq(membershipApplicationFilesTable.applicationId, applicationId),
+              eq(membershipApplicationFilesTable.kind, kind),
+            ),
+          )
+          .limit(1);
+        if (already) return;
+        const bytes = zipEntries.get(base.toLowerCase());
+        if (!bytes) {
+          warnings.push(`${label}: Dokument ${base} nicht im ZIP gefunden.`);
+          return;
+        }
+        const mimeType = mimeForFilename(base);
+        const s3Key = `applications/${applicationId}/svums-${base}`;
+        await putObject({ key: s3Key, body: Buffer.from(bytes), contentType: mimeType });
+        await context.db.insert(membershipApplicationFilesTable).values({
+          applicationId,
+          kind,
+          s3Key,
+          filename: base,
+          mimeType,
+          sizeBytes: bytes.byteLength,
+          ...(uploadedAt ? { uploadedAt } : {}),
+        });
+        documentsImported += 1;
+      };
 
       for (const item of items) {
         const label = item.antragsnummer ?? `SVUMS #${item.id}`;
@@ -1587,65 +1667,88 @@ export const applicationsRouter = {
           }
           const mapped = mapSvumsApplication(item, { abteilungIdByName, importedAt });
           const key = svumsDedupeKey(mapped.values);
-          if (seen.has(key)) {
+          let applicationId = idByDedupeKey.get(key) ?? null;
+          if (applicationId) {
             skippedExisting += 1;
-            continue;
-          }
-          seen.add(key);
-          warnings.push(...mapped.warnings.map((w) => `${label}: ${w}`));
+          } else {
+            warnings.push(...mapped.warnings.map((w) => `${label}: ${w}`));
 
-          let memberId: string | null = null;
-          if (mapped.values.status === "genehmigt" && mapped.values.mitgliedsnummer) {
-            const first = mapped.values.mitgliedsnummer.split(",")[0]?.trim();
-            const hits = first ? (memberIdsByNummer.get(first) ?? []) : [];
-            if (hits.length === 1) {
-              memberId = hits[0]!;
-              linkedMembers += 1;
-            }
-          }
-
-          await context.db.transaction(async (tx) => {
-            let antragsnummer = mapped.originalAntragsnummer;
-            if (!antragsnummer || usedNummern.has(antragsnummer)) {
-              const minted = await allocateDocRef(
-                tx,
-                "ANT",
-                mapped.values.createdAt.getUTCFullYear(),
-              );
-              if (antragsnummer) {
-                warnings.push(
-                  `${label}: Antragsnummer bereits vergeben, neu vergeben als ${minted}.`,
-                );
+            let memberId: string | null = null;
+            if (mapped.values.status === "genehmigt" && mapped.values.mitgliedsnummer) {
+              const first = mapped.values.mitgliedsnummer.split(",")[0]?.trim();
+              const hits = first ? (memberIdsByNummer.get(first) ?? []) : [];
+              if (hits.length === 1) {
+                memberId = hits[0]!;
+                linkedMembers += 1;
               }
-              antragsnummer = minted;
             }
-            usedNummern.add(antragsnummer);
 
-            const [row] = await tx
-              .insert(t)
-              .values({
-                ...mapped.values,
-                antragsnummer,
-                ibanLast4: mapped.values.iban ? lastFour(mapped.values.iban) : null,
-                memberId,
-              })
-              .returning({ id: t.id });
-            if (!row) throw new Error("Anlage fehlgeschlagen.");
-            await appendAudit(tx, {
-              entityType: "membership_application",
-              entityId: row.id,
-              action: "create",
-              source: "import",
-              actorId: context.session!.user.id,
-              actorEmail: context.session!.user.email,
-              changes: {
-                antragsnummer: { before: null, after: antragsnummer },
-                status: { before: null, after: mapped.values.status },
-              },
-              requestId: context.requestId ?? null,
+            applicationId = await context.db.transaction(async (tx) => {
+              let antragsnummer = mapped.originalAntragsnummer;
+              if (!antragsnummer || usedNummern.has(antragsnummer)) {
+                const minted = await allocateDocRef(
+                  tx,
+                  "ANT",
+                  mapped.values.createdAt.getUTCFullYear(),
+                );
+                if (antragsnummer) {
+                  warnings.push(
+                    `${label}: Antragsnummer bereits vergeben, neu vergeben als ${minted}.`,
+                  );
+                }
+                antragsnummer = minted;
+              }
+              usedNummern.add(antragsnummer);
+
+              const [row] = await tx
+                .insert(t)
+                .values({
+                  ...mapped.values,
+                  antragsnummer,
+                  ibanLast4: mapped.values.iban ? lastFour(mapped.values.iban) : null,
+                  memberId,
+                })
+                .returning({ id: t.id });
+              if (!row) throw new Error("Anlage fehlgeschlagen.");
+              await appendAudit(tx, {
+                entityType: "membership_application",
+                entityId: row.id,
+                action: "create",
+                source: "import",
+                actorId: context.session!.user.id,
+                actorEmail: context.session!.user.email,
+                changes: {
+                  antragsnummer: { before: null, after: antragsnummer },
+                  status: { before: null, after: mapped.values.status },
+                },
+                requestId: context.requestId ?? null,
+              });
+              return row.id;
             });
-          });
-          imported += 1;
+            idByDedupeKey.set(key, applicationId);
+            imported += 1;
+          }
+
+          if (zipEntries.size > 0) {
+            if (mapped.uploadedFile) {
+              await attachDocument(
+                applicationId,
+                label,
+                mapped.uploadedFile,
+                "signed_scan",
+                mapped.uploadedAt,
+              );
+            }
+            if (mapped.adminApprovedFile) {
+              await attachDocument(
+                applicationId,
+                label,
+                mapped.adminApprovedFile,
+                "approved_pdf",
+                null,
+              );
+            }
+          }
         } catch (err) {
           errors.push(`${label}: ${err instanceof Error ? err.message : String(err)}`);
         }
@@ -1658,6 +1761,7 @@ export const applicationsRouter = {
         skippedExisting,
         skippedTest,
         linkedMembers,
+        documentsImported,
         errors: errors.length,
       });
       return {
@@ -1666,6 +1770,7 @@ export const applicationsRouter = {
         skippedExisting,
         skippedTest,
         linkedMembers,
+        documentsImported,
         warnings,
         errors,
       };

@@ -71,6 +71,12 @@ export const SvumsApplicationSchema = v.looseObject({
   is_test: NullableBool,
   source: NullableStr,
   created_at: v.string(),
+  // Object-storage keys of the documents in svums (flat, derived from the
+  // Antragsnummer, e.g. "ANT-2024-0007_signed.pdf"). Used to match entries
+  // of an optionally uploaded ZIP of the svums bucket.
+  uploaded_file: NullableStr,
+  uploaded_at: NullableStr,
+  admin_approved_file: NullableStr,
 });
 
 export type SvumsApplication = v.InferOutput<typeof SvumsApplicationSchema>;
@@ -231,9 +237,34 @@ export type SvumsMappedApplication = {
   svumsId: number;
   /** Original reference, kept when free; the procedure re-mints on collision. */
   originalAntragsnummer: string | null;
+  /** Storage key of the signed scan in svums, for the optional documents ZIP. */
+  uploadedFile: string | null;
+  uploadedAt: Date | null;
+  /** Storage key of the countersigned approval PDF in svums. */
+  adminApprovedFile: string | null;
   values: SvumsMappedValues;
   warnings: string[];
 };
+
+/** Last path segment of an svums storage key (ZIPs may add folder prefixes). */
+export function fileBasename(key: string): string {
+  return key.split("/").pop()?.trim() ?? "";
+}
+
+const MIME_BY_EXT: Record<string, string> = {
+  pdf: "application/pdf",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  heic: "image/heic",
+  heif: "image/heif",
+};
+
+/** Content type for an svums document filename (matches the svums allow-list). */
+export function mimeForFilename(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  return MIME_BY_EXT[ext] ?? "application/octet-stream";
+}
 
 /**
  * Map one svums application onto the `membership_applications` insert shape.
@@ -344,6 +375,9 @@ export function mapSvumsApplication(
   return {
     svumsId: item.id,
     originalAntragsnummer: item.antragsnummer?.trim().toUpperCase() || null,
+    uploadedFile: item.uploaded_file?.trim() || null,
+    uploadedAt: parseSvumsTimestamp(item.uploaded_at),
+    adminApprovedFile: item.admin_approved_file?.trim() || null,
     warnings,
     values: {
       antragstyp,

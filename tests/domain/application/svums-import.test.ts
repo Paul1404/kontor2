@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  fileBasename,
   mapSvumsApplication,
+  mimeForFilename,
   normalizeBeitrag,
   parseSvumsExport,
   parseSvumsTimestamp,
@@ -56,6 +58,9 @@ function baseItem(overrides: Partial<SvumsApplication> = {}): SvumsApplication {
     is_test: false,
     source: "online",
     created_at: "2024-05-03T14:23:11.123456",
+    uploaded_file: "ANT-2024-0007_signed.pdf",
+    uploaded_at: "2024-05-04T09:00:00",
+    admin_approved_file: "ANT-2024-0007_approved.pdf",
     ...overrides,
   };
 }
@@ -156,6 +161,19 @@ describe("mapSvumsApplication", () => {
     expect(values.notes).toContain("Importiert aus SVUMS (Antrag ANT-2024-0007)");
   });
 
+  it("exposes the svums document storage keys for the ZIP matching", () => {
+    const mapped = mapSvumsApplication(baseItem(), opts);
+    expect(mapped.uploadedFile).toBe("ANT-2024-0007_signed.pdf");
+    expect(mapped.uploadedAt?.toISOString()).toBe("2024-05-04T09:00:00.000Z");
+    expect(mapped.adminApprovedFile).toBe("ANT-2024-0007_approved.pdf");
+    const ohne = mapSvumsApplication(
+      baseItem({ uploaded_file: null, uploaded_at: null, admin_approved_file: null }),
+      opts,
+    );
+    expect(ohne.uploadedFile).toBeNull();
+    expect(ohne.adminApprovedFile).toBeNull();
+  });
+
   it("maps family applications including partner and kinder Abteilungen", () => {
     const { values } = mapSvumsApplication(
       baseItem({
@@ -225,6 +243,22 @@ describe("mapSvumsApplication", () => {
     expect(() => mapSvumsApplication(baseItem({ created_at: "kaputt" }), opts)).toThrow(
       /Eingangsdatum/,
     );
+  });
+});
+
+describe("fileBasename", () => {
+  it("strips folder prefixes that a ZIP may add", () => {
+    expect(fileBasename("bucket/ANT-2024-0007_signed.pdf")).toBe("ANT-2024-0007_signed.pdf");
+    expect(fileBasename("ANT-2024-0007_approved.pdf")).toBe("ANT-2024-0007_approved.pdf");
+  });
+});
+
+describe("mimeForFilename", () => {
+  it("maps the svums upload extensions", () => {
+    expect(mimeForFilename("a_signed.pdf")).toBe("application/pdf");
+    expect(mimeForFilename("scan.JPG")).toBe("image/jpeg");
+    expect(mimeForFilename("foto.heic")).toBe("image/heic");
+    expect(mimeForFilename("unbekannt.bin")).toBe("application/octet-stream");
   });
 });
 

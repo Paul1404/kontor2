@@ -50,6 +50,11 @@ export const RELEASES: Release[] = [
         description:
           "Bereits bearbeitete Anträge aus der alten SVUMS-Anwendung lassen sich jetzt unter Datenimport übernehmen. Grundlage ist der JSON-Export der SVUMS-Antragsliste. Status, Stammdaten, Familie, Bankverbindung und Einwilligungen werden importiert, genehmigte Anträge werden mit dem passenden Mitglied verknüpft. Der Import ist idempotent, mehrfaches Hochladen erzeugt keine Duplikate.",
       },
+      {
+        category: "feature",
+        description:
+          "Auch die Dokumente der SVUMS-Anträge können mitkommen: Den Speicher-Bucket von SVUMS als ZIP hochladen, die unterschriebenen Scans und genehmigten PDFs werden über den Dateinamen dem richtigen Antrag zugeordnet und in der Dokumentenliste angezeigt.",
+      },
     ],
   },
   {

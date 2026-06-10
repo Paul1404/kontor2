@@ -255,16 +255,19 @@ function ImportPage() {
 
 function SvumsImportSection() {
   const [file, setFile] = useState<File | null>(null);
+  const [zipFile, setZipFile] = useState<File | null>(null);
   const [includeTest, setIncludeTest] = useState(false);
 
   const upload = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("Keine Datei ausgewählt.");
       const contentBase64 = await fileToBase64(file);
+      const filesZipBase64 = zipFile ? await fileToBase64(zipFile) : null;
       return orpc.applications.importSvums({
         filename: file.name,
         contentBase64,
         includeTest,
+        filesZipBase64,
       });
     },
   });
@@ -288,13 +291,19 @@ function SvumsImportSection() {
             Mitgliedsnummer eindeutig passt.
           </li>
           <li>
-            <strong>Nicht übernommen</strong>: Dokumente (PDFs, Scans) bleiben in SVUMS. Bei Bedarf
-            dort herunterladen und manuell ablegen.
+            <strong>Dokumente (optional)</strong>: Die unterschriebenen Scans und genehmigten PDFs
+            liegen im Object Storage von SVUMS. Den Bucket-Inhalt herunterladen (z. B. über das
+            Tigris-Dashboard oder <span className="font-mono">aws s3 sync</span>), als{" "}
+            <span className="font-mono">.zip</span> packen und zusätzlich hochladen. Die Zuordnung
+            erfolgt über die Dateinamen (<span className="font-mono">ANT-…_signed.pdf</span>,{" "}
+            <span className="font-mono">ANT-…_approved.pdf</span>), Ordner im ZIP sind egal.
           </li>
         </ol>
         <p className="mt-2 text-xs text-muted-foreground">
           Der Import ist idempotent. Mehrfaches Hochladen desselben Exports führt nicht zu
-          Duplikaten. Testanträge werden standardmäßig übersprungen.
+          Duplikaten, bereits übernommene Dokumente werden übersprungen. Ein großes ZIP kann deshalb
+          aufgeteilt und in mehreren Durchläufen hochgeladen werden. Testanträge werden
+          standardmäßig übersprungen.
         </p>
       </InfoBox>
 
@@ -325,6 +334,28 @@ function SvumsImportSection() {
               <span className="font-medium">{file.name}</span>
               <span className="text-muted-foreground tabular-nums">
                 {(file.size / 1024 / 1024).toFixed(1)} MB
+              </span>
+            </div>
+          ) : null}
+          <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/30 px-6 py-6 text-center transition-colors hover:bg-muted/50">
+            <Upload className="size-5 text-muted-foreground" />
+            <span className="text-sm">
+              <span className="font-medium text-foreground">Dokumente-ZIP (optional)</span>
+              <span className="text-muted-foreground"> auswählen oder hier ablegen</span>
+            </span>
+            <span className="text-xs text-muted-foreground">.zip · max. 100 MB</span>
+            <input
+              type="file"
+              accept=".zip,application/zip,application/x-zip-compressed"
+              onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
+              className="hidden"
+            />
+          </label>
+          {zipFile ? (
+            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm">
+              <span className="font-medium">{zipFile.name}</span>
+              <span className="text-muted-foreground tabular-nums">
+                {(zipFile.size / 1024 / 1024).toFixed(1)} MB
               </span>
             </div>
           ) : null}
@@ -389,6 +420,10 @@ function SvumsImportSection() {
               <li>
                 Mit Mitglied verknüpft:{" "}
                 <span className="font-medium tabular-nums">{result.linkedMembers}</span>
+              </li>
+              <li>
+                Dokumente importiert:{" "}
+                <span className="font-medium tabular-nums">{result.documentsImported}</span>
               </li>
             </ul>
             {result.warnings.length > 0 ? (
