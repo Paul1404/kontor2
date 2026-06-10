@@ -16,8 +16,6 @@ import {
   Search,
   ShieldBan,
   Trash2,
-  UserCheck,
-  UserMinus,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -67,6 +65,7 @@ type MemberRow = {
   verstorbenAm: string | Date | null;
   status: string | null;
   deletedAt: string | Date | null;
+  hatAktiveAbteilung: boolean;
 };
 
 type MembersSearch = {
@@ -382,7 +381,6 @@ function MembersListPage() {
 
   async function runBulk(
     action:
-      | { type: "setAktivPasiv"; value: "A" | "P" }
       | { type: "addAbteilung"; abteilungId: string }
       | { type: "removeAbteilung"; abteilungId: string }
       | { type: "setDunningBlocked"; value: boolean }
@@ -710,39 +708,6 @@ function MembersListPage() {
           >
             <X className="size-4" />
           </button>
-          <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={bulkBusy}
-            onClick={() =>
-              setConfirm({
-                title: "Als aktiv markieren",
-                description: `${selectedCount} ausgewählte Mitglieder auf "Aktiv" setzen?`,
-                destructive: false,
-                run: () => runBulk({ type: "setAktivPasiv", value: "A" }, "auf Aktiv gesetzt"),
-              })
-            }
-          >
-            <UserCheck className="size-4" /> Aktiv
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={bulkBusy}
-            onClick={() =>
-              setConfirm({
-                title: "Als passiv markieren",
-                description: `${selectedCount} ausgewählte Mitglieder auf "Passiv" setzen?`,
-                destructive: false,
-                run: () => runBulk({ type: "setAktivPasiv", value: "P" }, "auf Passiv gesetzt"),
-              })
-            }
-          >
-            <UserMinus className="size-4" /> Passiv
-          </Button>
           <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
           <div className="flex items-center gap-1.5">
             <Layers className="size-4 text-muted-foreground" />

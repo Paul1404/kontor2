@@ -50,8 +50,10 @@ describe("translateLinearMember", () => {
     });
     expect(deceased?.status).toBe("verstorben");
 
-    const passiv = translateLinearMember({ AdrNr: 3, AktivPasiv: "P" });
-    expect(passiv?.status).toBe("passiv");
+    // aktiv/passiv is no longer stored: a live member is always `aktiv`. The
+    // passive distinction is derived on read from the member's Abteilungen.
+    const live = translateLinearMember({ AdrNr: 3, AktivPasiv: "P" });
+    expect(live?.status).toBe("aktiv");
 
     const blocked = translateLinearMember({ AdrNr: 4, MahnSperre: "gesperrt" });
     expect(blocked?.dunningBlocked).toBe(true);

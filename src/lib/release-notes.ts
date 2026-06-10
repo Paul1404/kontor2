@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.48.0",
+    date: "2026-06-10",
+    title: "Aktiv und passiv aus den Abteilungen",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Ob ein Mitglied aktiv oder passiv ist, ergibt sich jetzt aus den Abteilungen statt aus einem getrennt gepflegten Schalter. Wer in mindestens einer echten Abteilung aktiv ist, gilt als aktiv, sonst als passiv. Der Schalter im Mitgliederformular, der Schnellumschalter in der Liste, die Sammelaktion Aktiv und Passiv sowie die Option Auf passiv setzen beim Austritt entfallen. Mitgliederliste, Statistik, CSV-Export und Rundschreiben-Segmente rechnen einheitlich nach dieser Regel.",
+      },
+    ],
+  },
+  {
     version: "0.47.0",
     date: "2026-06-10",
     title: "Mitglieder zusammenführen",

@@ -330,6 +330,13 @@
       "when": 1781081825737,
       "tag": "0046_flippant_peter_quill",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1781100000000,
+      "tag": "0047_derive_passiv_from_abteilung",
+      "breakpoints": true
     }
   ]
 }

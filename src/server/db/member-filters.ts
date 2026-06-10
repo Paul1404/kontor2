@@ -1,4 +1,6 @@
 import { and, isNull, or, type SQL, sql } from "drizzle-orm";
+import { KEINE_ABTEILUNG_NAME } from "~/lib/abteilung-filter";
+import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
 
 /**
@@ -67,4 +69,32 @@ export function memberIsCurrent(): SQL {
  */
 export function memberHasPendingExit(): SQL {
   return sql`${membersTable.austritt} is not null and ${membersTable.austritt}::date > current_date and ${membersTable.verstorbenAm} is null`;
+}
+
+/**
+ * "Has an active membership in a real Abteilung": at least one
+ * `member_abteilungen` row that is still open (no Austritt, or a future one)
+ * and whose department is not the canonical "Keine Abteilung" sentinel. This
+ * is the single source of truth for aktiv vs passiv: a live member with an
+ * active Sparte is aktiv, one without is passiv. Derived on read, never stored,
+ * so the distinction cannot drift from the Abteilung data.
+ */
+export function memberHasRealAbteilung(): SQL {
+  return sql`exists (
+    select 1 from ${memberAbteilungenTable} ma
+    join ${abteilungenTable} a on a.id = ma.abteilung_id
+    where ma.member_id = ${membersTable.id}
+      and (ma.austrittsdatum is null or ma.austrittsdatum > current_date)
+      and a.name <> ${KEINE_ABTEILUNG_NAME}
+  )` as SQL;
+}
+
+/**
+ * The derived "passiv" segment: a live member (not exited, not deceased) with
+ * no active real Abteilung. Use this everywhere the old stored `status =
+ * 'passiv'` filter was used, so list, stats, export, Rundschreiben and the
+ * member badge all agree.
+ */
+export function memberIsPassiv(): SQL {
+  return and(memberNotExited(), memberNotDeceased(), sql`not ${memberHasRealAbteilung()}`) as SQL;
 }

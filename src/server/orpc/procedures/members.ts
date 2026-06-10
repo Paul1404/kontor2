@@ -9,6 +9,8 @@ import {
   memberHasDied,
   memberHasExited,
   memberHasPendingExit,
+  memberHasRealAbteilung,
+  memberIsPassiv,
   memberNotDeceased,
   memberNotDeleted,
   memberNotExited,
@@ -105,9 +107,6 @@ const StammdatenInput = v.object({
   eintritt: v.optional(v.nullable(v.string())),
   austritt: v.optional(v.nullable(v.string())),
   verstorbenAm: v.optional(v.nullable(v.string())),
-  // UI membership type. Mapped to the normalized `status` on the server; not a
-  // stored column of its own.
-  aktivPasiv: v.optional(v.nullable(v.picklist(["A", "P"]))),
   bic1: v.optional(v.nullable(v.string())),
   iban1: v.optional(v.nullable(v.string())),
   abwKontoInh: v.optional(v.nullable(v.string())),
@@ -185,19 +184,12 @@ function validateBetragString(value: string | null | undefined, field: string): 
  * changes.
  */
 /**
- * Fold the form's A/P membership type plus the exit/death dates into the
- * normalized `status`. When the form does not send an A/P (left "Unbekannt"),
- * fall back to the member's current status so an edit does not silently flip an
- * active member to passive or vice versa.
+ * Derive the normalized lifecycle `status` from the form's exit/death dates.
+ * aktiv vs passiv is no longer set here: it is derived on read from the
+ * member's active Abteilungen, so the form only drives the lifecycle axis.
  */
-function memberStatusFromForm(
-  ap: "A" | "P" | null | undefined,
-  austritt: Date | null,
-  verstorbenAm: Date | null,
-  existingStatus?: MemberStatus | null,
-): MemberStatus {
-  const effective = ap ?? (existingStatus === "passiv" ? "P" : "A");
-  return deriveStatus({ austritt, verstorbenAm, aktivPasiv: effective });
+function memberStatusFromForm(austritt: Date | null, verstorbenAm: Date | null): MemberStatus {
+  return deriveStatus({ austritt, verstorbenAm });
 }
 
 function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<string, unknown> {
@@ -232,8 +224,6 @@ function buildMemberPatch(input: v.InferOutput<typeof StammdatenInput>): Record<
   setIfPresent("firma1");
   setIfPresent("funktion");
   setIfPresent("spender");
-  // `aktivPasiv` is intentionally not written as a column -- the handler folds
-  // it into the normalized `status`.
   setIfPresent("bic1");
   setIfPresent("abwKontoInh");
   setIfPresent("vertreterAnrede");
@@ -274,7 +264,6 @@ const AustrittInput = v.object({
   austrittDatum: DateStringInput,
   /** "verstorben" stamps verstorbenAm instead of austritt and skips the Frist. */
   reason: v.optional(v.picklist(["austritt", "verstorben"]), "austritt"),
-  setPassiv: v.optional(v.boolean(), true),
   revokeSepa: v.optional(v.boolean(), true),
   /** Restrict the department closing; null/omitted closes all open ones. */
   abteilungIds: v.optional(v.nullable(v.array(v.string())), null),
@@ -348,13 +337,10 @@ export const membersRouter = {
       conditions.push(memberNotDeceased() as never);
     }
     if (!input.deletedOnly && input.status === "passiv") {
-      // The normalized status already means "passive and neither exited nor
-      // deceased" (deriveStatus precedence). The date guards are belt-and-braces
-      // in case status ever drifts from the exit/death dates (e.g. a raw field
-      // restore that wrote `austritt` without re-deriving status).
-      conditions.push(eq(membersTable.status, "passiv") as never);
-      conditions.push(memberNotExited() as never);
-      conditions.push(memberNotDeceased() as never);
+      // Passiv is derived, not stored: a live member with no active membership
+      // in a real Abteilung. `memberIsPassiv` already excludes exited and
+      // deceased members.
+      conditions.push(memberIsPassiv() as never);
     }
 
     // "Verwaiste Kontakte" filter: Kontakt (no mitgliedsnummer) AND no relationship
@@ -450,6 +436,9 @@ export const membersRouter = {
           status: membersTable.status,
           abteilung: membersTable.abteilung,
           deletedAt: membersTable.deletedAt,
+          // Derived aktiv/passiv signal for the badge: true when the member
+          // holds an active membership in a real Abteilung.
+          hatAktiveAbteilung: memberHasRealAbteilung(),
         })
         .from(membersTable)
         .where(where)
@@ -710,7 +699,7 @@ export const membersRouter = {
           context.db
             .select({ c: count() })
             .from(membersTable)
-            .where(and(lebt, eq(membersTable.status, "passiv"))),
+            .where(and(lebt, sql`not ${memberHasRealAbteilung()}`)),
           context.db
             .select({ c: count() })
             .from(membersTable)
@@ -810,10 +799,8 @@ export const membersRouter = {
         // other clean columns (mitgliedsnummer, dunning_blocked) are not edited
         // here, so they are left untouched.
         const nextStatus = memberStatusFromForm(
-          input.patch.aktivPasiv,
           (projected.austritt as Date | null) ?? null,
           (projected.verstorbenAm as Date | null) ?? null,
-          existing.status,
         );
         patch.status = nextStatus;
         projected.status = nextStatus;
@@ -892,7 +879,6 @@ export const membersRouter = {
           const cleanCols = {
             memberNo,
             status: memberStatusFromForm(
-              input.patch.aktivPasiv,
               (patch.austritt as Date | null) ?? null,
               (patch.verstorbenAm as Date | null) ?? null,
             ),
@@ -1273,7 +1259,6 @@ export const membersRouter = {
           v.maxLength(500, "Zu viele Mitglieder auf einmal (max. 500)."),
         ),
         action: v.variant("type", [
-          v.object({ type: v.literal("setAktivPasiv"), value: v.picklist(["A", "P"]) }),
           v.object({ type: v.literal("addAbteilung"), abteilungId: v.pipe(v.string(), v.uuid()) }),
           v.object({
             type: v.literal("removeAbteilung"),
@@ -1320,45 +1305,7 @@ export const membersRouter = {
             continue;
           }
 
-          if (input.action.type === "setAktivPasiv") {
-            // Fold the A/P choice into the normalized status; exited/deceased
-            // members keep their status (dates win in deriveStatus).
-            const bulkStatus = deriveStatus({
-              austritt: existing.austritt,
-              verstorbenAm: existing.verstorbenAm,
-              aktivPasiv: input.action.value,
-            });
-            if (existing.status === bulkStatus) {
-              skipped += 1;
-              continue;
-            }
-            await tx
-              .update(membersTable)
-              .set({
-                status: bulkStatus,
-                updatedAt: new Date(),
-              } as never)
-              .where(eq(membersTable.id, memberId));
-            const auditId = await appendAudit(tx, {
-              entityType: "member",
-              entityId: memberId,
-              action: "update",
-              source: "ui",
-              actorId,
-              actorEmail,
-              changes: {
-                status: { before: existing.status, after: bulkStatus },
-              },
-              requestId,
-            });
-            await takeMemberSnapshot(tx, memberId, {
-              trigger: "mutation",
-              actorId,
-              actorEmail,
-              auditId,
-            });
-            changed += 1;
-          } else if (input.action.type === "addAbteilung") {
+          if (input.action.type === "addAbteilung") {
             // Skip members that already hold an active membership in this
             // Abteilung (austrittsdatum is null) — re-adding would be a no-op.
             const [active] = await tx
@@ -1628,12 +1575,11 @@ export const membersRouter = {
       }
       // Normalized status as of today: a leave date that has arrived flips the
       // member to ausgetreten/verstorben, but a *future* leave date leaves them
-      // aktiv/passiv (notice given, still a member until then). The nightly
-      // reconcile flips them once the date passes.
+      // live (notice given, still a member until then). The nightly reconcile
+      // flips them once the date passes.
       memberSet.status = deriveStatus({
         austritt: (memberSet.austritt as Date | null) ?? member.austritt,
         verstorbenAm: (memberSet.verstorbenAm as Date | null) ?? member.verstorbenAm,
-        aktivPasiv: input.setPassiv ? "P" : member.status === "passiv" ? "P" : "A",
       });
       await tx
         .update(membersTable)
@@ -1780,7 +1726,6 @@ export const membersRouter = {
         const reactivatedStatus = deriveStatus({
           austritt: null,
           verstorbenAm: member.verstorbenAm,
-          aktivPasiv: "A",
         });
         await tx
           .update(membersTable)
@@ -1893,7 +1838,6 @@ export const membersRouter = {
       const fallbackEintritt = eintrittIso ?? new Date().toISOString().slice(0, 10);
       const isKontakt = input.kind === "kontakt";
       const status = memberStatusFromForm(
-        input.patch.aktivPasiv,
         (patch.austritt as Date | null) ?? null,
         (patch.verstorbenAm as Date | null) ?? null,
       );

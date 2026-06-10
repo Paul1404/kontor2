@@ -1,10 +1,16 @@
 import { ORPCError } from "@orpc/server";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { type MergeVars, renderTemplate, SAMPLE_VARS } from "~/lib/rundschreiben";
 import { getMailer } from "~/server/auth/send-invite";
 import type { DB } from "~/server/db/client";
-import { memberNotDeleted } from "~/server/db/member-filters";
+import {
+  memberHasRealAbteilung,
+  memberIsPassiv,
+  memberNotDeceased,
+  memberNotDeleted,
+  memberNotExited,
+} from "~/server/db/member-filters";
 import { memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
@@ -46,11 +52,17 @@ type RecipientRow = {
 async function loadSegment(db: DB, filter: Filter): Promise<RecipientRow[]> {
   const conditions = [memberNotDeleted()];
   if (filter.status === "lebende") {
-    conditions.push(inArray(membersTable.status, ["aktiv", "passiv"]));
+    // Live members (aktiv and passiv together), neither exited nor deceased.
+    conditions.push(memberNotExited());
+    conditions.push(memberNotDeceased());
   } else if (filter.status === "aktiv") {
-    conditions.push(eq(membersTable.status, "aktiv"));
+    // aktiv = live with an active membership in a real Abteilung.
+    conditions.push(memberNotExited());
+    conditions.push(memberNotDeceased());
+    conditions.push(memberHasRealAbteilung());
   } else if (filter.status === "passiv") {
-    conditions.push(eq(membersTable.status, "passiv"));
+    // passiv = live with no active real Abteilung.
+    conditions.push(memberIsPassiv());
   }
   if (filter.abteilungId) {
     conditions.push(

@@ -97,16 +97,12 @@ describe("memberDisplayName", () => {
 });
 
 describe("deriveStatus", () => {
-  it("ranks death over exit over the active/passive flag", () => {
-    expect(deriveStatus({ austritt: new Date(), verstorbenAm: new Date(), aktivPasiv: "A" })).toBe(
-      "verstorben",
-    );
-    expect(deriveStatus({ austritt: new Date(), verstorbenAm: null, aktivPasiv: "A" })).toBe(
-      "ausgetreten",
-    );
-    expect(deriveStatus({ austritt: null, verstorbenAm: null, aktivPasiv: "P" })).toBe("passiv");
-    expect(deriveStatus({ austritt: null, verstorbenAm: null, aktivPasiv: "A" })).toBe("aktiv");
-    expect(deriveStatus({ austritt: null, verstorbenAm: null, aktivPasiv: null })).toBe("aktiv");
+  it("ranks death over exit, otherwise the member is live", () => {
+    expect(deriveStatus({ austritt: new Date(), verstorbenAm: new Date() })).toBe("verstorben");
+    expect(deriveStatus({ austritt: new Date(), verstorbenAm: null })).toBe("ausgetreten");
+    // aktiv/passiv is derived from Abteilungen on read, never stored here, so a
+    // live member is always `aktiv`.
+    expect(deriveStatus({ austritt: null, verstorbenAm: null })).toBe("aktiv");
   });
   it("isActiveStatus is true only for aktiv/passiv", () => {
     expect(isActiveStatus("aktiv")).toBe(true);
@@ -121,30 +117,17 @@ describe("deriveStatus", () => {
     const past = new Date("2026-01-01T00:00:00Z");
 
     // Notice given for year-end: still a member today.
-    expect(deriveStatus({ austritt: future, verstorbenAm: null, aktivPasiv: "A" }, asOf)).toBe(
-      "aktiv",
-    );
-    expect(deriveStatus({ austritt: future, verstorbenAm: null, aktivPasiv: "P" }, asOf)).toBe(
-      "passiv",
-    );
+    expect(deriveStatus({ austritt: future, verstorbenAm: null }, asOf)).toBe("aktiv");
     // The exit has come due.
-    expect(deriveStatus({ austritt: past, verstorbenAm: null, aktivPasiv: "A" }, asOf)).toBe(
-      "ausgetreten",
-    );
+    expect(deriveStatus({ austritt: past, verstorbenAm: null }, asOf)).toBe("ausgetreten");
     // The leave date itself counts as effective (first non-member day).
-    expect(deriveStatus({ austritt: asOf, verstorbenAm: null, aktivPasiv: "A" }, asOf)).toBe(
-      "ausgetreten",
-    );
+    expect(deriveStatus({ austritt: asOf, verstorbenAm: null }, asOf)).toBe("ausgetreten");
   });
 
   it("accepts YYYY-MM-DD strings for the exit date", () => {
     const asOf = new Date("2026-06-09T12:00:00Z");
-    expect(
-      deriveStatus({ austritt: "2026-12-31", verstorbenAm: null, aktivPasiv: "A" }, asOf),
-    ).toBe("aktiv");
-    expect(
-      deriveStatus({ austritt: "2026-01-01", verstorbenAm: null, aktivPasiv: "A" }, asOf),
-    ).toBe("ausgetreten");
+    expect(deriveStatus({ austritt: "2026-12-31", verstorbenAm: null }, asOf)).toBe("aktiv");
+    expect(deriveStatus({ austritt: "2026-01-01", verstorbenAm: null }, asOf)).toBe("ausgetreten");
   });
 });
 

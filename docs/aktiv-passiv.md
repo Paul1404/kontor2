@@ -1,7 +1,8 @@
 # Aktiv / Passiv
 
 Brauchen wir das `aktiv` / `passiv`-Flag überhaupt? Decision Record.
-Status: **Vorschlag**, Entscheidung offen.
+Status: **Umgesetzt** (v0.48.0). aktiv/passiv ist kein gespeicherter Wert mehr,
+sondern wird aus den Abteilungen abgeleitet.
 
 ## Die Frage
 
@@ -57,21 +58,33 @@ Kein eigenes, manuell gepflegtes `aktiv` / `passiv`-Flag. Die echte Information
 Geld im Vertrag, der Lebenszyklus in den Daten. "Passiv / fördernd" ist
 vollständig ableitbar:
 
-> **passiv = Mitglied mit lebender Mitgliedschaft, aber ohne laufende
-> Abteilungszugehörigkeit.** Sonst aktiv.
+> **passiv = Mitglied mit lebender Mitgliedschaft, aber ohne aktive
+> Mitgliedschaft in einer echten Abteilung.** Sonst aktiv.
 
-Konkret:
+"Echt" heißt: nicht der kanonische Sentinel "Keine Abteilung", auf den der
+Importer alle leeren Abteilungswerte abbildet. "Aktiv" = `austrittsdatum` der
+Abteilungsmitgliedschaft ist leer oder in der Zukunft.
 
-- Lebenszyklus bleibt eine eigene Achse (`ausgetreten` / `verstorben` aus den
-  Daten, `ruhend` als eigenes Flag).
-- Falls das "Passiv"-Badge erhalten bleiben soll, wird es aus
-  `member_abteilungen` abgeleitet statt aus dem `status`-Enum gelesen.
-- Das Legacy-Feld `aktivPasiv` bleibt nur als Import-Fallback für Zeilen ohne
-  gepflegte Abteilung.
+## Umsetzung (v0.48.0)
+
+- Gemeinsame Helfer `memberHasRealAbteilung` und `memberIsPassiv` in
+  `src/server/db/member-filters.ts` sind die einzige Quelle der Wahrheit.
+- `deriveStatus` (`src/server/domain/member.ts`) gibt kein `passiv` mehr aus;
+  der gespeicherte `status` trägt nur noch den Lebenszyklus (`aktiv` /
+  `ausgetreten` / `verstorben`). Migration `0047` setzt Altbestand `passiv` auf
+  `aktiv`.
+- Anzeige (`memberStatusView`), Mitgliederliste plus Statistik, CSV-Export
+  (`reports`) und Rundschreiben-Segmente leiten passiv über dieselben Helfer ab.
+- Alle manuellen Setter sind entfernt: das Statusfeld im Formular, der
+  Schnellumschalter und die Sammelaktion in der Liste, die Option "Auf passiv
+  setzen" beim Austritt.
+- Der Lebenszyklus bleibt eine eigene Achse (`ausgetreten` / `verstorben` aus
+  den Daten, `ruhend` als eigenes Flag). Die Roh-Spalte `aktivPasiv` bleibt als
+  importiertes Linear-Datum erhalten (DSGVO-Auskunft), steuert aber nichts mehr.
 
 ## Vorbehalt
 
-Vor dem Rückbau prüfen, ob der Verein an "förderndes Mitglied" eine harte Regel
-knüpft, die nicht aus Abteilung plus Vertrag folgt, zum Beispiel ein
-eingeschränktes Stimmrecht in der Satzung. Findet sich keine solche Regel, ist
-das Flag reine Dekoration und kann abgeleitet werden.
+Sollte der Verein an "förderndes Mitglied" doch eine harte Regel knüpfen, die
+nicht aus Abteilung plus Vertrag folgt (zum Beispiel ein eingeschränktes
+Stimmrecht laut Satzung), bräuchte das ein eigenes Feld statt der Ableitung.
+Bis dahin trägt die Abteilungszugehörigkeit die Unterscheidung.
