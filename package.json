@@ -1,6 +1,6 @@
 {
   "name": "svuwv",
-  "version": "0.41.1",
+  "version": "0.42.0",
   "private": true,
   "license": "UNLICENSED",
   "author": "Paul Dresch <paul.dresch@untereuerheim.com>",
@@ -47,6 +47,7 @@
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
     "drizzle-valibot": "^0.4.2",
+    "fflate": "^0.8.3",
     "ioredis": "^5.11.1",
     "lucide-react": "^1.17.0",
     "nodemailer": "^8.0.10",
