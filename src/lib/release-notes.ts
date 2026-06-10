@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.52.0",
+    date: "2026-06-10",
+    title: "Beziehungen bearbeiten, Ehrungen zurücknehmen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Beziehungen am Mitglied lassen sich jetzt bearbeiten: Beziehungsart, Notiz sowie Von- und Bis-Datum können nachträglich geändert werden, nicht nur die Vertretung und das Löschen.",
+      },
+      {
+        category: "feature",
+        description:
+          "Ehrungen: Ein versehentlich gesetzter Ehrungsvermerk lässt sich in der Ehrungsliste direkt zurücknehmen.",
+      },
+    ],
+  },
+  {
     version: "0.51.0",
     date: "2026-06-10",
     title: "DSGVO-Status und KI-Schlüssel deaktivieren",

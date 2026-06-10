@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Loader2, Plus, Search, ShieldCheck, Trash2, X } from "lucide-react";
+import { Check, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, X } from "lucide-react";
 import { useId, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -35,6 +35,12 @@ type TargetSearchHit = {
   plz: string | null;
   ort: string | null;
 };
+
+/** Coerce a stored date (Date or ISO string) to the YYYY-MM-DD a date input wants. */
+function toDateInput(v: string | Date | null): string {
+  if (!v) return "";
+  return typeof v === "string" ? v.slice(0, 10) : v.toISOString().slice(0, 10);
+}
 
 export function BeziehungenCard({
   memberId,
@@ -85,6 +91,27 @@ export function BeziehungenCard({
     },
   });
 
+  // Inline edit of a connection's metadata (kind, note, dates). The vertreter
+  // flag stays on its own toggle button; this form covers the rest, which had
+  // no UI before even though the update procedure already accepted them.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState({ beziehung: "", notiz: "", datVon: "", datBis: "" });
+  const editRelation = useMutation({
+    mutationFn: (args: {
+      id: string;
+      patch: {
+        beziehung: string | null;
+        notiz: string | null;
+        datVon: string | null;
+        datBis: string | null;
+      };
+    }) => orpc.relationships.update({ id: args.id, patch: args.patch }),
+    onSuccess: async () => {
+      setEditingId(null);
+      await refresh();
+    },
+  });
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -118,6 +145,90 @@ export function BeziehungenCard({
                 [b.toVorname, b.toNachname].filter(Boolean).join(" ") ||
                 b.fallbackName ||
                 `AdrNr ${b.toAdrNr}`;
+              if (editingId === b.id && canEdit) {
+                return (
+                  <li key={b.id} className="flex flex-col gap-3 py-3">
+                    <span className="text-sm font-medium">{name}</span>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="flex flex-col gap-1.5">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Beziehungsart
+                        </Label>
+                        <Input
+                          value={editDraft.beziehung}
+                          onChange={(e) =>
+                            setEditDraft({ ...editDraft, beziehung: e.target.value })
+                          }
+                          placeholder="z. B. Familienmitglied"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Notiz
+                        </Label>
+                        <Input
+                          value={editDraft.notiz}
+                          onChange={(e) => setEditDraft({ ...editDraft, notiz: e.target.value })}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Von
+                        </Label>
+                        <Input
+                          type="date"
+                          value={editDraft.datVon}
+                          onChange={(e) => setEditDraft({ ...editDraft, datVon: e.target.value })}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Bis
+                        </Label>
+                        <Input
+                          type="date"
+                          value={editDraft.datBis}
+                          onChange={(e) => setEditDraft({ ...editDraft, datBis: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingId(null)}
+                        disabled={editRelation.isPending}
+                      >
+                        Abbrechen
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={editRelation.isPending}
+                        onClick={() =>
+                          editRelation.mutate({
+                            id: b.id,
+                            patch: {
+                              beziehung: editDraft.beziehung.trim() || null,
+                              notiz: editDraft.notiz.trim() || null,
+                              datVon: editDraft.datVon || null,
+                              datBis: editDraft.datBis || null,
+                            },
+                          })
+                        }
+                      >
+                        {editRelation.isPending ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Check className="size-4" />
+                        )}
+                        Speichern
+                      </Button>
+                    </div>
+                  </li>
+                );
+              }
               return (
                 <li
                   key={b.id}
@@ -158,6 +269,23 @@ export function BeziehungenCard({
                   </div>
                   {canEdit ? (
                     <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditDraft({
+                            beziehung: b.beziehung ?? "",
+                            notiz: b.notiz ?? "",
+                            datVon: toDateInput(b.datVon),
+                            datBis: toDateInput(b.datBis),
+                          });
+                          setEditingId(b.id);
+                        }}
+                        aria-label="Beziehung bearbeiten"
+                        title="Bearbeiten"
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
                       <Button
                         size="sm"
                         variant={b.istVertreter ? "secondary" : "ghost"}
