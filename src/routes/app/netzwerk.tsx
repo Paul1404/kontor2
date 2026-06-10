@@ -24,8 +24,8 @@ function NetzwerkPage() {
           <Share2 className="size-6 text-brand" /> Beziehungsnetzwerk
         </h1>
         <p className="text-sm text-muted-foreground">
-          Alle Verknüpfungen zwischen Mitgliedern und Kontakten als Karte. Ziehen zum Verschieben,
-          scrollen zum Zoomen, Klick auf eine Person zeigt ihre Verbindungen.
+          Jede Familie liegt als eigene Blase in der Karte, die größten in der Mitte. Ziehen zum
+          Verschieben, scrollen zum Zoomen, Klick auf eine Person zeigt ihre Verbindungen.
         </p>
       </div>
 
