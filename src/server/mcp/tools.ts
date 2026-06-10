@@ -20,9 +20,13 @@ import { appRouter } from "~/server/orpc/router";
  * single source for both runtime validation and the JSON Schema advertised in
  * `tools/list`.
  *
- * Deliberately NOT exposed: dangerZone.*, import.*, settings.*, DSGVO
- * erasure, SEPA/feeRuns mutations (money movement), and all PDF/CSV/XML
- * download procedures (binary outputs do not fit MCP text results).
+ * Bank details (IBAN/BIC), SEPA mandates, contracts and legal-representative
+ * fields ARE exposed as curated write tools so the Datenqualitaet findings can
+ * be fixed over MCP; each delegates to its vorstand procedure and is audited.
+ * Deliberately still NOT exposed: dangerZone.* (incl. any member merge),
+ * import.*, settings.*, DSGVO erasure, fee/Sollstellung runs (bulk money
+ * movement), and all PDF/CSV/XML download procedures (binary outputs do not
+ * fit MCP text results).
  */
 export type McpTool = {
   /** snake_case, English. */
@@ -57,8 +61,10 @@ const DateInput = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
 
 /**
  * Subset of the member Stammdaten allow-list (members.ts StammdatenInput)
- * exposed over MCP. Bank details (IBAN/BIC), legal-representative fields and
- * billing-exemption flags stay UI-only on purpose.
+ * exposed over MCP. Includes bank details (IBAN/BIC) and legal-representative
+ * fields so the Datenqualitaet findings (missing IBAN, minors without a
+ * representative) can be fixed over MCP; members.update encrypts the IBAN and
+ * derives iban1Last4. Billing-exemption flags stay UI-only on purpose.
  */
 const McpStammdatenInput = v.object({
   anrede: v.optional(v.nullable(v.string())),
@@ -79,6 +85,45 @@ const McpStammdatenInput = v.object({
   austritt: v.optional(v.nullable(DateInput)),
   aktivPasiv: v.optional(v.nullable(v.picklist(["A", "P"]))),
   notes: v.optional(v.nullable(v.string())),
+  iban1: v.optional(v.nullable(v.string())),
+  bic1: v.optional(v.nullable(v.string())),
+  vertreterAnrede: v.optional(v.nullable(v.string())),
+  vertreterName: v.optional(v.nullable(v.string())),
+  vertreterStrasse: v.optional(v.nullable(v.string())),
+  vertreterHausnummer: v.optional(v.nullable(v.string())),
+  vertreterPlz: v.optional(v.nullable(v.string())),
+  vertreterOrt: v.optional(v.nullable(v.string())),
+});
+
+/**
+ * Curated contract (Beitrag/Vertrag) input, mirroring contracts.ts
+ * ContractInput. `art` is the Beitragsart id (resolve via list_fee_types);
+ * `betrag`/`aufnahmegeb` are decimal strings, dates are YYYY-MM-DD. The
+ * procedure re-validates and audits.
+ */
+const McpContractInput = v.object({
+  vertragNr: v.pipe(v.string(), v.minLength(1)),
+  art: v.pipe(v.number(), v.integer()),
+  artName: v.optional(v.nullable(v.string())),
+  betrag: v.optional(v.nullable(v.string())),
+  aufnahmegeb: v.optional(v.nullable(v.string())),
+  sollstellung: v.optional(v.nullable(v.string())),
+  vertragBegin: v.optional(v.nullable(DateInput)),
+  vertragEnde: v.optional(v.nullable(DateInput)),
+  gekuendAm: v.optional(v.nullable(DateInput)),
+  gekuendZum: v.optional(v.nullable(DateInput)),
+});
+
+/** Curated SEPA mandate input, mirroring sepa.ts CreateInput. */
+const McpSepaMandateInput = v.object({
+  memberId: v.string(),
+  mandatsNr: v.optional(v.nullable(v.string())),
+  lastschriftart: v.optional(v.nullable(v.string())),
+  typ: v.optional(v.nullable(v.string())),
+  status: v.optional(v.nullable(v.string())),
+  unterschriftDatum: v.optional(v.nullable(DateInput)),
+  gueltigAb: v.optional(v.nullable(DateInput)),
+  gultigBis: v.optional(v.nullable(DateInput)),
 });
 
 const TOOLS: McpTool[] = [
@@ -122,6 +167,14 @@ const TOOLS: McpTool[] = [
     minRole: "readonly",
     input: v.object({}),
     execute: (context) => call(appRouter.abteilungen.list, undefined, { context }),
+  }),
+  defineTool({
+    name: "list_fee_types",
+    description:
+      "List all Beitragsarten (fee types) with their ids and names. Use this to resolve the numeric Beitragsart id (the `art` field) required by create_contract.",
+    minRole: "readonly",
+    input: v.object({}),
+    execute: (context) => call(appRouter.feeTypes.list, undefined, { context }),
   }),
   defineTool({
     name: "member_timeline",
@@ -271,7 +324,7 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "create_member",
     description:
-      "Create a new member with the given Stammdaten (name, address, contact, Eintritt). The Mitgliedsnummer is assigned automatically. The change is audited.",
+      "Create a new member with the given Stammdaten (name, address, contact, Eintritt, optionally IBAN/BIC and legal-representative fields). The Mitgliedsnummer is assigned automatically. The change is audited.",
     minRole: "vorstand",
     input: v.object({ patch: McpStammdatenInput }),
     execute: (context, input) => call(appRouter.members.create, input, { context }),
@@ -279,7 +332,7 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "update_member",
     description:
-      "Update a member's Stammdaten by internal member id (from search_members/get_member). Only the provided fields change; the change is audited. Bank details cannot be changed over MCP.",
+      "Update a member's Stammdaten by internal member id (from search_members/get_member). Only the provided fields change; the change is audited. Supports IBAN/BIC (fixes 'Lastschrift ohne IBAN') and legal-representative fields (fixes 'Minderjaehrig ohne Vertretung').",
     minRole: "vorstand",
     input: v.object({
       memberId: v.string(),
@@ -317,6 +370,30 @@ const TOOLS: McpTool[] = [
       notes: v.optional(v.nullable(v.string())),
     }),
     execute: (context, input) => call(appRouter.dunning.markPaid, input, { context }),
+  }),
+  defineTool({
+    name: "create_contract",
+    description:
+      "Create a membership contract (Beitrag/Vertrag) for a member (by internal member id), fixing 'Mitglied ohne Vertrag'. Needs a Vertragsnummer and the Beitragsart id (`art`, resolve via list_fee_types). Money relevant: this creates a billable obligation. The change is audited.",
+    minRole: "vorstand",
+    input: v.object({ memberId: v.string(), patch: McpContractInput }),
+    execute: (context, input) => call(appRouter.contracts.create, input, { context }),
+  }),
+  defineTool({
+    name: "update_contract",
+    description:
+      "Update a contract by its id (from get_member). Use to set a missing Beitragsart name ('Vertrag ohne Beitragsart') or adjust amounts and dates. Same fields as create_contract. The change is audited.",
+    minRole: "vorstand",
+    input: v.object({ id: v.string(), patch: McpContractInput }),
+    execute: (context, input) => call(appRouter.contracts.update, input, { context }),
+  }),
+  defineTool({
+    name: "create_sepa_mandate",
+    description:
+      "Create a SEPA direct-debit mandate for a member (by internal member id), fixing 'Lastschrift ohne SEPA-Mandat'. The mandate reference is assigned automatically if omitted. Set the member's IBAN first via update_member. Bank and money relevant. The change is audited.",
+    minRole: "vorstand",
+    input: McpSepaMandateInput,
+    execute: (context, input) => call(appRouter.sepa.create, input, { context }),
   }),
 ];
 

@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.46.0",
+    date: "2026-06-10",
+    title: "KI-Zugriff: Datenqualität beheben",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "KI-Assistenten (MCP) können erkannte Datenqualitätsprobleme jetzt auch direkt beheben, nicht nur anzeigen. Am Mitglied lassen sich IBAN, BIC und die gesetzliche Vertretung pflegen, Verträge anlegen und ändern sowie SEPA-Mandate anlegen. Die Beitragsarten sind dafür über die Schnittstelle abrufbar. Alle Änderungen brauchen Vorstand-Rechte und landen im Audit-Protokoll. Mitglieder zusammenführen, Beitragsläufe, Import und Einstellungen bleiben gesperrt.",
+      },
+    ],
+  },
+  {
     version: "0.45.0",
     date: "2026-06-10",
     title: "KI-Zugriff: Datenqualität im Detail",
