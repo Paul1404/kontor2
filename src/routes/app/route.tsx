@@ -4,8 +4,10 @@ import {
   createFileRoute,
   Outlet,
   redirect,
+  useNavigate,
   useRouterState,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { AppShell } from "~/components/layout/AppShell";
 import { ErrorPanel, NotFoundPanel } from "~/components/layout/ErrorPanel";
 import { orpc } from "~/lib/orpc";
@@ -37,16 +39,33 @@ export const Route = createFileRoute("/app")({
 });
 
 function AppLayout() {
+  const navigate = useNavigate();
   // beforeLoad guarantees the cookie is valid; this query keeps role/email
-  // in sync after sign-in and survives invalidations elsewhere.
+  // in sync after sign-in and survives invalidations elsewhere. One retry
+  // absorbs a transient blip without bouncing the user to login.
   const me = useQuery({
     queryKey: ["me"],
     queryFn: () => orpc.auth.me(),
-    retry: false,
+    retry: 1,
   });
   // Reset the catch boundary on every navigation so a failed page doesn't
   // remain in the error state after the user moves elsewhere.
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  // The session can lapse while the app is open: the 5-minute cookie cache lets
+  // `beforeLoad` pass without re-reading the session store, so we can land here
+  // holding a cookie that no longer maps to a live session. When the `me` query
+  // then fails, don't hang on the loading state forever — send the user to
+  // login, the same recovery `beforeLoad` does on a hard miss.
+  useEffect(() => {
+    if (me.isError) {
+      navigate({ to: "/login", search: { expired: true, redirect: pathname } });
+    }
+  }, [me.isError, navigate, pathname]);
+
+  if (me.isError) {
+    return null;
+  }
 
   if (me.isLoading || !me.data) {
     return (
