@@ -671,6 +671,20 @@ export const applicationsRouter = {
   lookupStatus: publicProc
     .input(v.object({ antragsnummer: v.string() }))
     .handler(async ({ context, input }) => {
+      // Throttle per IP: the Antragsnummer is a low-entropy reference
+      // (ANT-YYYY-NNNN), so without a limit the status of every application
+      // could be enumerated. 20 lookups per 5 minutes covers an applicant
+      // checking back without enabling a sweep.
+      const limit = await rateLimit({
+        key: `antrag-status:${clientIp(context.headers)}`,
+        limit: 20,
+        windowSeconds: 300,
+      });
+      if (!limit.allowed) {
+        throw new ORPCError("TOO_MANY_REQUESTS", {
+          message: "Zu viele Anfragen. Bitte versuchen Sie es in einigen Minuten erneut.",
+        });
+      }
       const [row] = await context.db
         .select({
           antragsnummer: membershipApplicationsTable.antragsnummer,
@@ -1788,7 +1802,18 @@ export const applicationsRouter = {
             message: "Dokumente-ZIP konnte nicht gelesen werden.",
           });
         }
+        // Zip-bomb guard: a small compressed archive can inflate to gigabytes.
+        // Cap the total decompressed size so a malicious ZIP can't exhaust
+        // memory even though the compressed payload passed the 100 MB check.
+        const MAX_DECOMPRESSED = 500 * 1024 * 1024;
+        let totalDecompressed = 0;
         for (const [name, bytes] of Object.entries(unzipped)) {
+          totalDecompressed += bytes.length;
+          if (totalDecompressed > MAX_DECOMPRESSED) {
+            throw new ORPCError("PAYLOAD_TOO_LARGE", {
+              message: "Die entpackten Dokumente sind zu groß. Bitte das ZIP aufteilen.",
+            });
+          }
           if (name.endsWith("/") || name.includes("__MACOSX") || bytes.length === 0) continue;
           const base = fileBasename(name).toLowerCase();
           if (base) zipEntries.set(base, bytes);

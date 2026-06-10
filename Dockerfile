@@ -34,5 +34,12 @@ COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/package.json ./package.json
 COPY --from=prod-deps /app/node_modules ./node_modules
+
+# Drop privileges: run as the unprivileged `bun` user that ships in the base
+# image (uid 1000) instead of root. The app writes nothing to the container
+# filesystem at runtime (state lives in Postgres, Redis and S3) and the copied
+# files are world-readable, so no chown is needed. Limits the blast radius if
+# the process is ever compromised.
+USER bun
 EXPOSE 3000
 CMD ["bun", "scripts/serve.ts"]
