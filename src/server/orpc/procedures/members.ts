@@ -314,7 +314,18 @@ export const membersRouter = {
     // "Exited" means the Austritt date has actually arrived. A member who has
     // only given notice for a future date is still active and must stay in the
     // default and "aktiv"/"passiv" views (see `memberNotExited`).
-    if (!input.deletedOnly && !input.includeAusgetretene && input.status !== "ausgetreten") {
+    //
+    // `status === "alle"` is the explicit "no lifecycle filter" request: it must
+    // return the full union (aktiv + passiv + gekuendigt + ausgetreten +
+    // verstorben + Kontakte), still respecting `deletedAt IS NULL`. Excluding it
+    // here was the silent bug that made "alle" collapse to "aktiv" and dropped
+    // every ausgetretenes Mitglied from exports and Serienbriefe.
+    if (
+      !input.deletedOnly &&
+      !input.includeAusgetretene &&
+      input.status !== "ausgetreten" &&
+      input.status !== "alle"
+    ) {
       conditions.push(memberNotExited() as never);
     }
     if (!input.deletedOnly && input.status === "ausgetreten") {
@@ -461,16 +472,24 @@ export const membersRouter = {
       // contacts), then fall back to the preserved legacy Linear number so
       // references on old Mahnungen and bookmarks still open.
       const ref = input.mitgliedsnummer;
+      const matchers = [
+        eq(membersTable.memberNo, ref),
+        eq(membersTable.kontaktNo, ref),
+        eq(membersTable.mitgliedsnummer, ref),
+      ];
+      // Also resolve by the internal UUID id. Data-quality drill-downs and the
+      // MCP audit reference records by their internal id, and a Kontakt without
+      // a memberNo/kontaktNo was otherwise unreachable here. Guard the
+      // comparison behind a UUID-shape check: `eq(uuid_col, 'M-123')` would
+      // raise a Postgres "invalid input syntax for type uuid" for every
+      // non-UUID ref, which previously surfaced as an opaque error (issue #82).
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref)) {
+        matchers.push(eq(membersTable.id, ref));
+      }
       const rows = await context.db
         .select()
         .from(membersTable)
-        .where(
-          or(
-            eq(membersTable.memberNo, ref),
-            eq(membersTable.kontaktNo, ref),
-            eq(membersTable.mitgliedsnummer, ref),
-          ),
-        )
+        .where(or(...matchers))
         // A soft-deleted row can share a reused number with a live one (the
         // unique indexes are partial on deletedAt IS NULL). Prefer the live row
         // so a reference never resolves to the deleted predecessor.
