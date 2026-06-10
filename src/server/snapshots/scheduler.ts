@@ -1,4 +1,5 @@
 import { eq, isNull } from "drizzle-orm";
+import { runDataQualitySnapshot } from "~/server/data-quality/snapshot";
 import { db, sql } from "~/server/db/client";
 import { membersTable } from "~/server/db/schema/members";
 import { memberSnapshotsTable, snapshotRunsTable } from "~/server/db/schema/snapshots";
@@ -106,6 +107,22 @@ export async function runNightlySnapshot(
       .update(snapshotRunsTable)
       .set({ finishedAt: new Date(), memberCount, bytesTotal })
       .where(eq(snapshotRunsTable.id, run.id));
+
+    // Data-quality snapshot + error->task wiring (issue #81). Runs under the
+    // same advisory lock so only one replica writes it. Best-effort: a failure
+    // here must not fail the member-snapshot run.
+    try {
+      const dq = await runDataQualitySnapshot(handle);
+      logger.info("data quality snapshot", {
+        date: dq.date,
+        total: dq.total,
+        tasksCreated: dq.tasksCreated,
+      });
+    } catch (err) {
+      logger.error("data quality snapshot failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     return { runId: run.id, memberCount, skippedCount, bytesTotal, acquiredLock: true };
   } finally {

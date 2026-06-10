@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import * as v from "valibot";
+import type { DB } from "~/server/db/client";
 import { memberDisplayName, memberRef } from "~/server/domain/member";
 import { vorstandProc } from "~/server/orpc/base";
 
@@ -263,8 +264,12 @@ const ANREDE_HAS_GENDER =
   "(lower(btrim(coalesce(anrede, ''))) in ('herr','hr','hr.','herrn','frau','fr','fr.','divers') " +
   "or lower(btrim(coalesce(anrede, ''))) like 'herr %' or lower(btrim(coalesce(anrede, ''))) like 'frau %')";
 
-/** WHERE clause per category. No user input -- safe to compose with sql.raw. */
-const WHERE: Record<CategoryId, string> = {
+/**
+ * WHERE clause per category. No user input -- safe to compose with sql.raw.
+ * Exported so the nightly snapshot writer (issue #81) can reuse the exact same
+ * clauses for counts and for the error-rule drill-down.
+ */
+export const WHERE: Record<CategoryId, string> = {
   lastschrift_ohne_mandat: `${ACTIVE} and ${ACTIVE_DD} and not exists (select 1 from sepa_mandates s where s.member_id = members.id and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null)`,
   fehlende_iban: `${ACTIVE} and ${ACTIVE_DD} and (iban1_last4 is null or btrim(iban1_last4) = '')`,
   fehlende_adresse: `${ACTIVE} and (strasse is null or btrim(strasse) = '' or plz is null or btrim(plz) = '' or ort is null or btrim(ort) = '')`,
@@ -362,21 +367,25 @@ function toItem(r: MemberRow) {
   };
 }
 
+/**
+ * One combined query returning the count for every category. Shared by the
+ * summary procedure (sidebar badge) and the nightly snapshot writer so both see
+ * identical numbers. Cheap enough to keep warm with a long client staleTime.
+ */
+export async function dataQualityCounts(db: DB): Promise<Array<CategoryMeta & { count: number }>> {
+  const selects = CATEGORY_IDS.map(
+    (id) => `(select count(*)::int from members where ${WHERE[id]}) as "${id}"`,
+  ).join(", ");
+  const rows = (await db.execute(sql.raw(`select ${selects}`))) as unknown as Array<
+    Record<CategoryId, number>
+  >;
+  const counts = rows[0] ?? ({} as Record<CategoryId, number>);
+  return CATEGORIES.map((c) => ({ ...c, count: Number(counts[c.id] ?? 0) }));
+}
+
 export const dataQualityRouter = {
-  /**
-   * One combined query returning the count for every category. Cheap enough to
-   * also back the sidebar badge; the client keeps it warm with a long
-   * staleTime so navigation does not re-run it.
-   */
   summary: vorstandProc.input(v.void()).handler(async ({ context }) => {
-    const selects = CATEGORY_IDS.map(
-      (id) => `(select count(*)::int from members where ${WHERE[id]}) as "${id}"`,
-    ).join(", ");
-    const rows = (await context.db.execute(sql.raw(`select ${selects}`))) as unknown as Array<
-      Record<CategoryId, number>
-    >;
-    const counts = rows[0] ?? ({} as Record<CategoryId, number>);
-    const categories = CATEGORIES.map((c) => ({ ...c, count: Number(counts[c.id] ?? 0) }));
+    const categories = await dataQualityCounts(context.db);
     return {
       categories,
       total: categories.reduce((sum, c) => sum + c.count, 0),
