@@ -371,9 +371,9 @@
  * disabled under prefers-reduced-motion.
  */
 :root {
-  --aurora-1: rgba(220, 38, 38, 0.1);
-  --aurora-2: rgba(251, 146, 60, 0.09);
-  --aurora-3: rgba(244, 114, 182, 0.08);
+  --aurora-1: rgba(220, 38, 38, 0.14);
+  --aurora-2: rgba(168, 85, 247, 0.12);
+  --aurora-3: rgba(56, 189, 248, 0.12);
 }
 
 .dark {

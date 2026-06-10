@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.56.0",
+    date: "2026-06-10",
+    title: "Mitgliederliste leichter bedienen",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "In der Mitgliederliste öffnet ein Klick auf die ganze Zeile das Mitglied, nicht mehr nur der Klick auf den Namen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Der Schnellzugriff am Status, über den sich aus der Liste eine Abteilung hinzufügen ließ, entfällt. Abteilungen pflegt man im Mitglied oder über die Massenaktion. Der Status zeigt aktiv oder passiv jetzt nur noch an.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Der helle Modus bekommt einen weichen Farbverlauf im Hintergrund, passend zum dunklen Modus.",
+      },
+    ],
+  },
+  {
     version: "0.55.0",
     date: "2026-06-10",
     title: "KI-Schnittstelle und Datenqualität",
