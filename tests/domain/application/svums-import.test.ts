@@ -4,6 +4,7 @@ import {
   mapSvumsApplication,
   mimeForFilename,
   normalizeBeitrag,
+  normalizeSvumsBaseUrl,
   parseSvumsExport,
   parseSvumsTimestamp,
   type SvumsApplication,
@@ -259,6 +260,26 @@ describe("mimeForFilename", () => {
     expect(mimeForFilename("scan.JPG")).toBe("image/jpeg");
     expect(mimeForFilename("foto.heic")).toBe("image/heic");
     expect(mimeForFilename("unbekannt.bin")).toBe("application/octet-stream");
+  });
+});
+
+describe("normalizeSvumsBaseUrl", () => {
+  it("defaults to https and strips path, query and trailing slashes", () => {
+    expect(normalizeSvumsBaseUrl("antrag.mein-verein.de")).toBe("https://antrag.mein-verein.de");
+    expect(normalizeSvumsBaseUrl("https://antrag.mein-verein.de/")).toBe(
+      "https://antrag.mein-verein.de",
+    );
+    expect(normalizeSvumsBaseUrl("https://antrag.mein-verein.de/admin?x=1")).toBe(
+      "https://antrag.mein-verein.de",
+    );
+    expect(normalizeSvumsBaseUrl("http://localhost:8000")).toBe("http://localhost:8000");
+  });
+
+  it("rejects empty values, other schemes and embedded credentials", () => {
+    expect(normalizeSvumsBaseUrl("")).toBeNull();
+    expect(normalizeSvumsBaseUrl("   ")).toBeNull();
+    expect(normalizeSvumsBaseUrl("ftp://host")).toBeNull();
+    expect(normalizeSvumsBaseUrl("https://user:pass@host")).toBeNull();
   });
 });
 

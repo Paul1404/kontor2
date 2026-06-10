@@ -267,6 +267,28 @@ export function mimeForFilename(filename: string): string {
 }
 
 /**
+ * Normalize the user-entered svums base URL: trim, default to https when no
+ * scheme was typed, drop trailing slashes and any path/query. Returns null
+ * for values that are not a usable http(s) origin.
+ */
+export function normalizeSvumsBaseUrl(value: string): string | null {
+  const raw = value.trim();
+  if (!raw) return null;
+  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw);
+  if (hasScheme && !/^https?:\/\//i.test(raw)) return null;
+  const withScheme = hasScheme ? raw : `https://${raw}`;
+  let url: URL;
+  try {
+    url = new URL(withScheme);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+  if (url.username || url.password) return null;
+  return url.origin;
+}
+
+/**
  * Map one svums application onto the `membership_applications` insert shape.
  * Abteilungen arrive as display names; they are resolved against the local
  * Abteilungen by case-insensitive name. Unresolvable names are dropped from

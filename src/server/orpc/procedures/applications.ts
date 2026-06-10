@@ -12,7 +12,7 @@ import {
 import { appendAudit } from "~/server/audit/log";
 import { getMailer } from "~/server/auth/send-invite";
 import { lastFour } from "~/server/crypto/encrypt";
-import type { DBOrTx } from "~/server/db/client";
+import type { DB, DBOrTx } from "~/server/db/client";
 import { allocateDocRef } from "~/server/db/doc-ref";
 import { escapeLike } from "~/server/db/like";
 import { withUniqueRetry } from "~/server/db/retry";
@@ -42,7 +42,10 @@ import {
   fileBasename,
   mapSvumsApplication,
   mimeForFilename,
+  normalizeSvumsBaseUrl,
   parseSvumsExport,
+  type SvumsApplication,
+  type SvumsMappedApplication,
   svumsDedupeKey,
 } from "~/server/domain/application/svums-import";
 import { onboardMember } from "~/server/domain/member/onboard";
@@ -269,6 +272,258 @@ async function buildApprovedPdf(
     sizeBytes: pdf.byteLength,
   });
   return pdf;
+}
+
+/* ---- SVUMS Antrags-Import (shared by file upload and direct pull) --------- */
+
+type SvumsDocFetch = (
+  application: SvumsMappedApplication,
+  kind: "signed_scan" | "approved_pdf",
+  storageKey: string,
+) => Promise<{ bytes: Buffer; mimeType: string | null } | { warning: string }>;
+
+/**
+ * Core of the svums Antrags-Import: maps the exported applications onto
+ * `membership_applications`, links approved ones to their member, and
+ * optionally attaches documents via the supplied fetcher (ZIP lookup or a
+ * live pull from the svums API). Idempotent on both levels: rows dedupe on
+ * name + birth date + svums creation timestamp, and a document kind that
+ * already exists on an application is never fetched again.
+ */
+async function runSvumsImport(opts: {
+  db: DB;
+  actorId: string;
+  actorEmail: string;
+  requestId: string | null;
+  /** Log label: the uploaded filename or the svums base URL. */
+  sourceLabel: string;
+  items: SvumsApplication[];
+  initialErrors: string[];
+  includeTest: boolean;
+  fetchDocument: SvumsDocFetch | null;
+}) {
+  const t = membershipApplicationsTable;
+  const errors = [...opts.initialErrors];
+
+  // Abteilungen arrive as names; resolve against ALL local Abteilungen
+  // (inactive included, historical Anträge may reference retired ones).
+  const abts = await opts.db
+    .select({ id: abteilungenTable.id, name: abteilungenTable.name })
+    .from(abteilungenTable);
+  const abteilungIdByName = new Map(abts.map((a) => [a.name.trim().toLowerCase(), a.id]));
+
+  // Existing rows: dedupe keys for idempotency plus the set of taken
+  // Antragsnummern (svums and svuwv mint the same ANT-YYYY-NNNN format,
+  // so collisions are possible and trigger a re-mint).
+  const existing = await opts.db
+    .select({
+      id: t.id,
+      antragsnummer: t.antragsnummer,
+      vorname: t.vorname,
+      nachname: t.nachname,
+      geburtsdatum: t.geburtsdatum,
+      createdAt: t.createdAt,
+    })
+    .from(t);
+  const usedNummern = new Set(existing.map((r) => r.antragsnummer));
+  const idByDedupeKey = new Map(existing.map((r) => [svumsDedupeKey(r), r.id]));
+
+  // Approved svums Anträge carry the Linear Mitgliedsnummer; link the
+  // application to the member when exactly one (non-deleted) match exists.
+  const incomingNummern = [
+    ...new Set(
+      opts.items
+        .map((i) => i.mitgliedsnummer?.split(",")[0]?.trim())
+        .filter((n): n is string => Boolean(n)),
+    ),
+  ];
+  const memberRows =
+    incomingNummern.length > 0
+      ? await opts.db
+          .select({ id: membersTable.id, mitgliedsnummer: membersTable.mitgliedsnummer })
+          .from(membersTable)
+          .where(
+            and(
+              inArray(membersTable.mitgliedsnummer, incomingNummern),
+              isNull(membersTable.deletedAt),
+            ),
+          )
+      : [];
+  const memberIdsByNummer = new Map<string, string[]>();
+  for (const m of memberRows) {
+    if (!m.mitgliedsnummer) continue;
+    const list = memberIdsByNummer.get(m.mitgliedsnummer) ?? [];
+    list.push(m.id);
+    memberIdsByNummer.set(m.mitgliedsnummer, list);
+  }
+
+  const importedAt = new Date();
+  const warnings: string[] = [];
+  let imported = 0;
+  let skippedExisting = 0;
+  let skippedTest = 0;
+  let linkedMembers = 0;
+  let documentsImported = 0;
+
+  /** Fetch + store one svums document, unless the kind already exists. */
+  const attachDocument = async (
+    applicationId: string,
+    label: string,
+    mapped: SvumsMappedApplication,
+    storageKey: string,
+    kind: "signed_scan" | "approved_pdf",
+    uploadedAt: Date | null,
+  ): Promise<void> => {
+    if (!opts.fetchDocument) return;
+    const base = fileBasename(storageKey);
+    if (!base) return;
+    const [already] = await opts.db
+      .select({ id: membershipApplicationFilesTable.id })
+      .from(membershipApplicationFilesTable)
+      .where(
+        and(
+          eq(membershipApplicationFilesTable.applicationId, applicationId),
+          eq(membershipApplicationFilesTable.kind, kind),
+        ),
+      )
+      .limit(1);
+    if (already) return;
+    const res = await opts.fetchDocument(mapped, kind, storageKey);
+    if ("warning" in res) {
+      warnings.push(`${label}: ${res.warning}`);
+      return;
+    }
+    const mimeType = res.mimeType ?? mimeForFilename(base);
+    const s3Key = `applications/${applicationId}/svums-${base}`;
+    await putObject({ key: s3Key, body: res.bytes, contentType: mimeType });
+    await opts.db.insert(membershipApplicationFilesTable).values({
+      applicationId,
+      kind,
+      s3Key,
+      filename: base,
+      mimeType,
+      sizeBytes: res.bytes.byteLength,
+      ...(uploadedAt ? { uploadedAt } : {}),
+    });
+    documentsImported += 1;
+  };
+
+  for (const item of opts.items) {
+    const label = item.antragsnummer ?? `SVUMS #${item.id}`;
+    try {
+      if (item.is_test && !opts.includeTest) {
+        skippedTest += 1;
+        continue;
+      }
+      const mapped = mapSvumsApplication(item, { abteilungIdByName, importedAt });
+      const key = svumsDedupeKey(mapped.values);
+      let applicationId = idByDedupeKey.get(key) ?? null;
+      if (applicationId) {
+        skippedExisting += 1;
+      } else {
+        warnings.push(...mapped.warnings.map((w) => `${label}: ${w}`));
+
+        let memberId: string | null = null;
+        if (mapped.values.status === "genehmigt" && mapped.values.mitgliedsnummer) {
+          const first = mapped.values.mitgliedsnummer.split(",")[0]?.trim();
+          const hits = first ? (memberIdsByNummer.get(first) ?? []) : [];
+          if (hits.length === 1) {
+            memberId = hits[0]!;
+            linkedMembers += 1;
+          }
+        }
+
+        applicationId = await opts.db.transaction(async (tx) => {
+          let antragsnummer = mapped.originalAntragsnummer;
+          if (!antragsnummer || usedNummern.has(antragsnummer)) {
+            const minted = await allocateDocRef(
+              tx,
+              "ANT",
+              mapped.values.createdAt.getUTCFullYear(),
+            );
+            if (antragsnummer) {
+              warnings.push(
+                `${label}: Antragsnummer bereits vergeben, neu vergeben als ${minted}.`,
+              );
+            }
+            antragsnummer = minted;
+          }
+          usedNummern.add(antragsnummer);
+
+          const [row] = await tx
+            .insert(t)
+            .values({
+              ...mapped.values,
+              antragsnummer,
+              ibanLast4: mapped.values.iban ? lastFour(mapped.values.iban) : null,
+              memberId,
+            })
+            .returning({ id: t.id });
+          if (!row) throw new Error("Anlage fehlgeschlagen.");
+          await appendAudit(tx, {
+            entityType: "membership_application",
+            entityId: row.id,
+            action: "create",
+            source: "import",
+            actorId: opts.actorId,
+            actorEmail: opts.actorEmail,
+            changes: {
+              antragsnummer: { before: null, after: antragsnummer },
+              status: { before: null, after: mapped.values.status },
+            },
+            requestId: opts.requestId,
+          });
+          return row.id;
+        });
+        idByDedupeKey.set(key, applicationId);
+        imported += 1;
+      }
+
+      if (mapped.uploadedFile) {
+        await attachDocument(
+          applicationId,
+          label,
+          mapped,
+          mapped.uploadedFile,
+          "signed_scan",
+          mapped.uploadedAt,
+        );
+      }
+      if (mapped.adminApprovedFile) {
+        await attachDocument(
+          applicationId,
+          label,
+          mapped,
+          mapped.adminApprovedFile,
+          "approved_pdf",
+          null,
+        );
+      }
+    } catch (err) {
+      errors.push(`${label}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  logger.info("applications.import_svums", {
+    source: opts.sourceLabel,
+    total: opts.items.length,
+    imported,
+    skippedExisting,
+    skippedTest,
+    linkedMembers,
+    documentsImported,
+    errors: errors.length,
+  });
+  return {
+    total: opts.items.length,
+    imported,
+    skippedExisting,
+    skippedTest,
+    linkedMembers,
+    documentsImported,
+    warnings,
+    errors,
+  };
 }
 
 export const applicationsRouter = {
@@ -1540,240 +1795,189 @@ export const applicationsRouter = {
         }
       }
 
-      let items: ReturnType<typeof parseSvumsExport>["items"];
-      const errors: string[] = [];
+      let items: SvumsApplication[];
+      let parseErrors: string[];
       try {
         const parsed = parseSvumsExport(buf.toString("utf8"));
         items = parsed.items;
-        errors.push(...parsed.errors);
+        parseErrors = parsed.errors;
       } catch (err) {
         throw new ORPCError("BAD_REQUEST", {
           message: err instanceof Error ? err.message : "Datei konnte nicht gelesen werden.",
         });
       }
-      if (items.length === 0 && errors.length === 0) {
+      if (items.length === 0 && parseErrors.length === 0) {
         throw new ORPCError("BAD_REQUEST", { message: "Keine Anträge in der Datei gefunden." });
       }
 
-      const t = membershipApplicationsTable;
-
-      // Abteilungen arrive as names; resolve against ALL local Abteilungen
-      // (inactive included, historical Anträge may reference retired ones).
-      const abts = await context.db
-        .select({ id: abteilungenTable.id, name: abteilungenTable.name })
-        .from(abteilungenTable);
-      const abteilungIdByName = new Map(abts.map((a) => [a.name.trim().toLowerCase(), a.id]));
-
-      // Existing rows: dedupe keys for idempotency plus the set of taken
-      // Antragsnummern (svums and svuwv mint the same ANT-YYYY-NNNN format,
-      // so collisions are possible and trigger a re-mint).
-      const existing = await context.db
-        .select({
-          id: t.id,
-          antragsnummer: t.antragsnummer,
-          vorname: t.vorname,
-          nachname: t.nachname,
-          geburtsdatum: t.geburtsdatum,
-          createdAt: t.createdAt,
-        })
-        .from(t);
-      const usedNummern = new Set(existing.map((r) => r.antragsnummer));
-      const idByDedupeKey = new Map(existing.map((r) => [svumsDedupeKey(r), r.id]));
-
-      // Approved svums Anträge carry the Linear Mitgliedsnummer; link the
-      // application to the member when exactly one (non-deleted) match exists.
-      const incomingNummern = [
-        ...new Set(
-          items
-            .map((i) => i.mitgliedsnummer?.split(",")[0]?.trim())
-            .filter((n): n is string => Boolean(n)),
-        ),
-      ];
-      const memberRows =
-        incomingNummern.length > 0
-          ? await context.db
-              .select({ id: membersTable.id, mitgliedsnummer: membersTable.mitgliedsnummer })
-              .from(membersTable)
-              .where(
-                and(
-                  inArray(membersTable.mitgliedsnummer, incomingNummern),
-                  isNull(membersTable.deletedAt),
-                ),
-              )
-          : [];
-      const memberIdsByNummer = new Map<string, string[]>();
-      for (const m of memberRows) {
-        if (!m.mitgliedsnummer) continue;
-        const list = memberIdsByNummer.get(m.mitgliedsnummer) ?? [];
-        list.push(m.id);
-        memberIdsByNummer.set(m.mitgliedsnummer, list);
-      }
-
-      const importedAt = new Date();
-      const warnings: string[] = [];
-      let imported = 0;
-      let skippedExisting = 0;
-      let skippedTest = 0;
-      let linkedMembers = 0;
-      let documentsImported = 0;
-
-      /** Store one svums document from the ZIP, unless the kind already exists. */
-      const attachDocument = async (
-        applicationId: string,
-        label: string,
-        storageKey: string,
-        kind: "signed_scan" | "approved_pdf",
-        uploadedAt: Date | null,
-      ): Promise<void> => {
-        const base = fileBasename(storageKey);
-        if (!base) return;
-        const [already] = await context.db
-          .select({ id: membershipApplicationFilesTable.id })
-          .from(membershipApplicationFilesTable)
-          .where(
-            and(
-              eq(membershipApplicationFilesTable.applicationId, applicationId),
-              eq(membershipApplicationFilesTable.kind, kind),
-            ),
-          )
-          .limit(1);
-        if (already) return;
-        const bytes = zipEntries.get(base.toLowerCase());
-        if (!bytes) {
-          warnings.push(`${label}: Dokument ${base} nicht im ZIP gefunden.`);
-          return;
-        }
-        const mimeType = mimeForFilename(base);
-        const s3Key = `applications/${applicationId}/svums-${base}`;
-        await putObject({ key: s3Key, body: Buffer.from(bytes), contentType: mimeType });
-        await context.db.insert(membershipApplicationFilesTable).values({
-          applicationId,
-          kind,
-          s3Key,
-          filename: base,
-          mimeType,
-          sizeBytes: bytes.byteLength,
-          ...(uploadedAt ? { uploadedAt } : {}),
-        });
-        documentsImported += 1;
-      };
-
-      for (const item of items) {
-        const label = item.antragsnummer ?? `SVUMS #${item.id}`;
-        try {
-          if (item.is_test && !input.includeTest) {
-            skippedTest += 1;
-            continue;
-          }
-          const mapped = mapSvumsApplication(item, { abteilungIdByName, importedAt });
-          const key = svumsDedupeKey(mapped.values);
-          let applicationId = idByDedupeKey.get(key) ?? null;
-          if (applicationId) {
-            skippedExisting += 1;
-          } else {
-            warnings.push(...mapped.warnings.map((w) => `${label}: ${w}`));
-
-            let memberId: string | null = null;
-            if (mapped.values.status === "genehmigt" && mapped.values.mitgliedsnummer) {
-              const first = mapped.values.mitgliedsnummer.split(",")[0]?.trim();
-              const hits = first ? (memberIdsByNummer.get(first) ?? []) : [];
-              if (hits.length === 1) {
-                memberId = hits[0]!;
-                linkedMembers += 1;
-              }
+      const fetchFromZip: SvumsDocFetch | null =
+        zipEntries.size > 0
+          ? async (_app, _kind, storageKey) => {
+              const base = fileBasename(storageKey);
+              const bytes = zipEntries.get(base.toLowerCase());
+              if (!bytes) return { warning: `Dokument ${base} nicht im ZIP gefunden.` };
+              return { bytes: Buffer.from(bytes), mimeType: mimeForFilename(base) };
             }
+          : null;
 
-            applicationId = await context.db.transaction(async (tx) => {
-              let antragsnummer = mapped.originalAntragsnummer;
-              if (!antragsnummer || usedNummern.has(antragsnummer)) {
-                const minted = await allocateDocRef(
-                  tx,
-                  "ANT",
-                  mapped.values.createdAt.getUTCFullYear(),
-                );
-                if (antragsnummer) {
-                  warnings.push(
-                    `${label}: Antragsnummer bereits vergeben, neu vergeben als ${minted}.`,
-                  );
-                }
-                antragsnummer = minted;
-              }
-              usedNummern.add(antragsnummer);
-
-              const [row] = await tx
-                .insert(t)
-                .values({
-                  ...mapped.values,
-                  antragsnummer,
-                  ibanLast4: mapped.values.iban ? lastFour(mapped.values.iban) : null,
-                  memberId,
-                })
-                .returning({ id: t.id });
-              if (!row) throw new Error("Anlage fehlgeschlagen.");
-              await appendAudit(tx, {
-                entityType: "membership_application",
-                entityId: row.id,
-                action: "create",
-                source: "import",
-                actorId: context.session!.user.id,
-                actorEmail: context.session!.user.email,
-                changes: {
-                  antragsnummer: { before: null, after: antragsnummer },
-                  status: { before: null, after: mapped.values.status },
-                },
-                requestId: context.requestId ?? null,
-              });
-              return row.id;
-            });
-            idByDedupeKey.set(key, applicationId);
-            imported += 1;
-          }
-
-          if (zipEntries.size > 0) {
-            if (mapped.uploadedFile) {
-              await attachDocument(
-                applicationId,
-                label,
-                mapped.uploadedFile,
-                "signed_scan",
-                mapped.uploadedAt,
-              );
-            }
-            if (mapped.adminApprovedFile) {
-              await attachDocument(
-                applicationId,
-                label,
-                mapped.adminApprovedFile,
-                "approved_pdf",
-                null,
-              );
-            }
-          }
-        } catch (err) {
-          errors.push(`${label}: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
-
-      logger.info("applications.import_svums", {
-        filename: input.filename,
-        total: items.length,
-        imported,
-        skippedExisting,
-        skippedTest,
-        linkedMembers,
-        documentsImported,
-        errors: errors.length,
+      return runSvumsImport({
+        db: context.db,
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        requestId: context.requestId ?? null,
+        sourceLabel: input.filename,
+        items,
+        initialErrors: parseErrors,
+        includeTest: input.includeTest,
+        fetchDocument: fetchFromZip,
       });
-      return {
-        total: items.length,
-        imported,
-        skippedExisting,
-        skippedTest,
-        linkedMembers,
-        documentsImported,
-        warnings,
-        errors,
+    }),
+
+  /**
+   * Variant of `importSvums` that needs no exports at all: given the URL and
+   * admin password of the still-running svums instance, the server logs in
+   * (`POST /api/admin/login`, CSRF-exempt), pages through
+   * `GET /api/admin/applications` and pulls each Antrag's documents over the
+   * per-application download endpoints. Same idempotent core as the file path.
+   */
+  importSvumsRemote: adminProc
+    .input(
+      v.object({
+        baseUrl: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(300)),
+        password: v.pipe(v.string(), v.minLength(1)),
+        includeTest: v.optional(v.boolean(), false),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const base = normalizeSvumsBaseUrl(input.baseUrl);
+      if (!base) {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: "Die SVUMS-Adresse ist keine gültige http(s)-URL.",
+        });
+      }
+
+      // Login: svums sets a signed session cookie; all reads below are GETs,
+      // so no CSRF token is needed.
+      let loginRes: Response;
+      try {
+        loginRes = await fetch(`${base}/api/admin/login`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ password: input.password }),
+          redirect: "manual",
+          signal: AbortSignal.timeout(15_000),
+        });
+      } catch {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "SVUMS ist unter dieser Adresse nicht erreichbar.",
+        });
+      }
+      if (loginRes.status === 401) {
+        throw new ORPCError("UNAUTHORIZED", { message: "SVUMS-Anmeldung: falsches Passwort." });
+      }
+      if (loginRes.status === 429) {
+        throw new ORPCError("TOO_MANY_REQUESTS", {
+          message:
+            "SVUMS blockiert die Anmeldung wegen zu vieler Fehlversuche. Bitte später erneut versuchen.",
+        });
+      }
+      if (!loginRes.ok) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `SVUMS-Anmeldung fehlgeschlagen (HTTP ${loginRes.status}).`,
+        });
+      }
+      const setCookies =
+        typeof loginRes.headers.getSetCookie === "function"
+          ? loginRes.headers.getSetCookie()
+          : [loginRes.headers.get("set-cookie") ?? ""];
+      const cookie = setCookies
+        .map((c) => c.split(";")[0]?.trim() ?? "")
+        .filter(Boolean)
+        .join("; ");
+      if (!cookie) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "SVUMS hat keine Sitzung ausgestellt. Ist die Adresse korrekt?",
+        });
+      }
+
+      // Page through the full application list (200 per page, hard cap 100
+      // pages = 20.000 Anträge, far beyond any real instance).
+      const items: SvumsApplication[] = [];
+      const parseErrors: string[] = [];
+      for (let page = 1; page <= 100; page += 1) {
+        let res: Response;
+        try {
+          res = await fetch(`${base}/api/admin/applications?page=${page}&per_page=200`, {
+            headers: { cookie },
+            signal: AbortSignal.timeout(30_000),
+          });
+        } catch {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Die Antragsliste konnte nicht aus SVUMS geladen werden (Netzwerkfehler).",
+          });
+        }
+        if (!res.ok) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: `Die Antragsliste konnte nicht aus SVUMS geladen werden (HTTP ${res.status}).`,
+          });
+        }
+        let parsed: ReturnType<typeof parseSvumsExport>;
+        try {
+          parsed = parseSvumsExport(await res.text());
+        } catch (err) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: err instanceof Error ? err.message : "Unerwartete Antwort von SVUMS.",
+          });
+        }
+        items.push(...parsed.items);
+        parseErrors.push(...parsed.errors);
+        if (parsed.items.length + parsed.errors.length < 200) break;
+      }
+      if (items.length === 0 && parseErrors.length === 0) {
+        throw new ORPCError("BAD_REQUEST", { message: "SVUMS hat keine Anträge zurückgegeben." });
+      }
+
+      // Documents come from the per-application admin download endpoints; a
+      // missing or failing document is a per-row warning, never an abort.
+      const fetchFromApi: SvumsDocFetch = async (app, kind, storageKey) => {
+        const path = kind === "signed_scan" ? "upload" : "approved";
+        const name = fileBasename(storageKey);
+        try {
+          const res = await fetch(`${base}/api/admin/applications/${app.svumsId}/${path}`, {
+            headers: { cookie },
+            signal: AbortSignal.timeout(60_000),
+          });
+          if (res.status === 404) {
+            return { warning: `Dokument ${name} ist in SVUMS nicht (mehr) vorhanden.` };
+          }
+          if (!res.ok) {
+            return {
+              warning: `Dokument ${name} konnte nicht geladen werden (HTTP ${res.status}).`,
+            };
+          }
+          const bytes = Buffer.from(await res.arrayBuffer());
+          if (bytes.byteLength === 0) return { warning: `Dokument ${name} ist leer.` };
+          if (bytes.byteLength > 25 * 1024 * 1024) {
+            return { warning: `Dokument ${name} ist größer als 25 MB, übersprungen.` };
+          }
+          const mimeType = res.headers.get("content-type")?.split(";")[0]?.trim() || null;
+          return { bytes, mimeType };
+        } catch {
+          return { warning: `Dokument ${name} konnte nicht geladen werden (Netzwerkfehler).` };
+        }
       };
+
+      return runSvumsImport({
+        db: context.db,
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        requestId: context.requestId ?? null,
+        sourceLabel: base,
+        items,
+        initialErrors: parseErrors,
+        includeTest: input.includeTest,
+        fetchDocument: fetchFromApi,
+      });
     }),
 
   /** Export applications as a German CSV (semicolon, BOM). */

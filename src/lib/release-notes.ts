@@ -53,7 +53,7 @@ export const RELEASES: Release[] = [
       {
         category: "feature",
         description:
-          "Auch die Dokumente der SVUMS-Anträge können mitkommen: Den Speicher-Bucket von SVUMS als ZIP hochladen, die unterschriebenen Scans und genehmigten PDFs werden über den Dateinamen dem richtigen Antrag zugeordnet und in der Dokumentenliste angezeigt.",
+          "Der SVUMS-Import braucht keine Exporte: Adresse der laufenden SVUMS-Instanz und Admin-Passwort eingeben, Anträge und Dokumente (unterschriebene Scans, genehmigte PDFs) werden automatisch abgerufen und dem richtigen Antrag zugeordnet. Alternativ funktioniert der Datei-Weg mit JSON-Export und optionalem Dokumente-ZIP.",
       },
     ],
   },

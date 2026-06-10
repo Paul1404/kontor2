@@ -1,10 +1,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, Loader2, Upload, XCircle } from "lucide-react";
+import { CheckCircle2, Globe, Loader2, Upload, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/import")({
@@ -254,12 +256,20 @@ function ImportPage() {
 }
 
 function SvumsImportSection() {
+  const [mode, setMode] = useState<"direct" | "file">("direct");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [password, setPassword] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [zipFile, setZipFile] = useState<File | null>(null);
   const [includeTest, setIncludeTest] = useState(false);
 
   const upload = useMutation({
     mutationFn: async () => {
+      if (mode === "direct") {
+        if (!baseUrl.trim()) throw new Error("Keine SVUMS-Adresse angegeben.");
+        if (!password) throw new Error("Kein Admin-Passwort angegeben.");
+        return orpc.applications.importSvumsRemote({ baseUrl, password, includeTest });
+      }
       if (!file) throw new Error("Keine Datei ausgewählt.");
       const contentBase64 = await fileToBase64(file);
       const filesZipBase64 = zipFile ? await fileToBase64(zipFile) : null;
@@ -273,92 +283,150 @@ function SvumsImportSection() {
   });
 
   const result = upload.data;
+  const canStart =
+    mode === "direct" ? baseUrl.trim().length > 0 && password.length > 0 : file !== null;
 
   return (
     <>
       <InfoBox title="So läuft der Antrags-Import" collapsible defaultOpen={false}>
         <ol className="ml-4 list-decimal space-y-1">
           <li>
-            <strong>Export aus SVUMS</strong>: In SVUMS als Admin anmelden, dann im selben Browser{" "}
+            <strong>Direkt aus SVUMS (empfohlen)</strong>: Adresse der laufenden SVUMS-Instanz und
+            das Admin-Passwort eingeben. Anträge und Dokumente werden automatisch abgerufen, es muss
+            nichts exportiert werden. Das Passwort wird nur für diesen Abruf verwendet und nicht
+            gespeichert.
+          </li>
+          <li>
+            <strong>Aus Datei (Alternative)</strong>: Falls die SVUMS-Instanz nicht mehr läuft: In
+            SVUMS als Admin anmelden, im selben Browser{" "}
             <span className="font-mono">/api/admin/applications?per_page=10000</span> öffnen und die
-            Antwort als <span className="font-mono">.json</span>-Datei speichern. Der Export enthält
-            alle Anträge inklusive entschlüsselter IBANs.
+            Antwort als <span className="font-mono">.json</span>-Datei speichern. Dokumente optional
+            als ZIP des SVUMS Storage-Buckets dazu; die Zuordnung erfolgt über die Dateinamen (
+            <span className="font-mono">ANT-…_signed.pdf</span>,{" "}
+            <span className="font-mono">ANT-…_approved.pdf</span>).
           </li>
           <li>
             <strong>Übernahme</strong>: Status, Antragsnummer, Stammdaten, Familie (Partner und
             Kinder), Bankverbindung und Einwilligungen werden übernommen. Abteilungen werden über
             den Namen zugeordnet. Genehmigte Anträge werden mit dem Mitglied verknüpft, wenn die
-            Mitgliedsnummer eindeutig passt.
-          </li>
-          <li>
-            <strong>Dokumente (optional)</strong>: Die unterschriebenen Scans und genehmigten PDFs
-            liegen im Object Storage von SVUMS. Den Bucket-Inhalt herunterladen (z. B. über das
-            Tigris-Dashboard oder <span className="font-mono">aws s3 sync</span>), als{" "}
-            <span className="font-mono">.zip</span> packen und zusätzlich hochladen. Die Zuordnung
-            erfolgt über die Dateinamen (<span className="font-mono">ANT-…_signed.pdf</span>,{" "}
-            <span className="font-mono">ANT-…_approved.pdf</span>), Ordner im ZIP sind egal.
+            Mitgliedsnummer eindeutig passt. Unterschriebene Scans und genehmigte PDFs erscheinen in
+            der Dokumentenliste des Antrags.
           </li>
         </ol>
         <p className="mt-2 text-xs text-muted-foreground">
-          Der Import ist idempotent. Mehrfaches Hochladen desselben Exports führt nicht zu
-          Duplikaten, bereits übernommene Dokumente werden übersprungen. Ein großes ZIP kann deshalb
-          aufgeteilt und in mehreren Durchläufen hochgeladen werden. Testanträge werden
-          standardmäßig übersprungen.
+          Der Import ist idempotent. Ein erneuter Durchlauf führt nicht zu Duplikaten, bereits
+          übernommene Dokumente werden übersprungen. Testanträge werden standardmäßig übersprungen.
         </p>
       </InfoBox>
 
       <Card>
         <CardHeader>
-          <CardTitle>Export-Datei hochladen</CardTitle>
+          <CardTitle>SVUMS-Anträge importieren</CardTitle>
           <CardDescription>
-            JSON-Export der SVUMS-Antragsverwaltung. Maximalgröße 20 MB.
+            {mode === "direct"
+              ? "Direkt von der laufenden SVUMS-Instanz abrufen."
+              : "JSON-Export hochladen, Dokumente optional als ZIP. Maximalgröße 20 MB bzw. 100 MB."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/30 px-6 py-10 text-center transition-colors hover:bg-muted/50">
-            <Upload className="size-6 text-muted-foreground" />
-            <span className="text-sm">
-              <span className="font-medium text-foreground">Klicken zum Auswählen</span>
-              <span className="text-muted-foreground"> oder Datei hier ablegen</span>
-            </span>
-            <span className="text-xs text-muted-foreground">.json · max. 20 MB</span>
-            <input
-              type="file"
-              accept=".json,application/json"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="hidden"
-            />
-          </label>
-          {file ? (
-            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm">
-              <span className="font-medium">{file.name}</span>
-              <span className="text-muted-foreground tabular-nums">
-                {(file.size / 1024 / 1024).toFixed(1)} MB
-              </span>
-            </div>
-          ) : null}
-          <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/30 px-6 py-6 text-center transition-colors hover:bg-muted/50">
-            <Upload className="size-5 text-muted-foreground" />
-            <span className="text-sm">
-              <span className="font-medium text-foreground">Dokumente-ZIP (optional)</span>
-              <span className="text-muted-foreground"> auswählen oder hier ablegen</span>
-            </span>
-            <span className="text-xs text-muted-foreground">.zip · max. 100 MB</span>
-            <input
-              type="file"
-              accept=".zip,application/zip,application/x-zip-compressed"
-              onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
-              className="hidden"
-            />
-          </label>
-          {zipFile ? (
-            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm">
-              <span className="font-medium">{zipFile.name}</span>
-              <span className="text-muted-foreground tabular-nums">
-                {(zipFile.size / 1024 / 1024).toFixed(1)} MB
-              </span>
-            </div>
-          ) : null}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={mode === "direct" ? "default" : "outline"}
+              onClick={() => setMode("direct")}
+            >
+              <Globe className="size-4" />
+              Direkt aus SVUMS
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={mode === "file" ? "default" : "outline"}
+              onClick={() => setMode("file")}
+            >
+              <Upload className="size-4" />
+              Aus Datei
+            </Button>
+          </div>
+
+          {mode === "direct" ? (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Label className="flex flex-col gap-1.5">
+                  <span>SVUMS-Adresse</span>
+                  <Input
+                    placeholder="https://antrag.mein-verein.de"
+                    value={baseUrl}
+                    onChange={(e) => setBaseUrl(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </Label>
+                <Label className="flex flex-col gap-1.5">
+                  <span>Admin-Passwort</span>
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="off"
+                  />
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Das ist das Passwort der SVUMS-Verwaltung. Es wird nur für diesen Abruf verwendet
+                und nicht gespeichert.
+              </p>
+            </>
+          ) : (
+            <>
+              <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/30 px-6 py-10 text-center transition-colors hover:bg-muted/50">
+                <Upload className="size-6 text-muted-foreground" />
+                <span className="text-sm">
+                  <span className="font-medium text-foreground">Klicken zum Auswählen</span>
+                  <span className="text-muted-foreground"> oder Datei hier ablegen</span>
+                </span>
+                <span className="text-xs text-muted-foreground">.json · max. 20 MB</span>
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  className="hidden"
+                />
+              </label>
+              {file ? (
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm">
+                  <span className="font-medium">{file.name}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {(file.size / 1024 / 1024).toFixed(1)} MB
+                  </span>
+                </div>
+              ) : null}
+              <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/30 px-6 py-6 text-center transition-colors hover:bg-muted/50">
+                <Upload className="size-5 text-muted-foreground" />
+                <span className="text-sm">
+                  <span className="font-medium text-foreground">Dokumente-ZIP (optional)</span>
+                  <span className="text-muted-foreground"> auswählen oder hier ablegen</span>
+                </span>
+                <span className="text-xs text-muted-foreground">.zip · max. 100 MB</span>
+                <input
+                  type="file"
+                  accept=".zip,application/zip,application/x-zip-compressed"
+                  onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
+                  className="hidden"
+                />
+              </label>
+              {zipFile ? (
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm">
+                  <span className="font-medium">{zipFile.name}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {(zipFile.size / 1024 / 1024).toFixed(1)} MB
+                  </span>
+                </div>
+              ) : null}
+            </>
+          )}
+
           <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-input bg-card/50 p-3 text-sm">
             <input
               type="checkbox"
@@ -374,13 +442,19 @@ function SvumsImportSection() {
             </span>
           </label>
           <div className="flex items-center gap-3">
-            <Button onClick={() => upload.mutate()} disabled={!file || upload.isPending}>
+            <Button onClick={() => upload.mutate()} disabled={!canStart || upload.isPending}>
               {upload.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
+              ) : mode === "direct" ? (
+                <Globe className="size-4" />
               ) : (
                 <Upload className="size-4" />
               )}
-              {upload.isPending ? "Wird verarbeitet…" : "Anträge importieren"}
+              {upload.isPending
+                ? "Wird verarbeitet…"
+                : mode === "direct"
+                  ? "Aus SVUMS importieren"
+                  : "Anträge importieren"}
             </Button>
           </div>
         </CardContent>
@@ -401,7 +475,7 @@ function SvumsImportSection() {
               <CardTitle>Import abgeschlossen</CardTitle>
             </div>
             <CardDescription>
-              {result.total.toLocaleString("de-DE")} Anträge in der Datei
+              {result.total.toLocaleString("de-DE")} Anträge gefunden
             </CardDescription>
           </CardHeader>
           <CardContent>
