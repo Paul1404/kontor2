@@ -31,8 +31,6 @@ export type MemberNameParts = MemberRefParts & {
 export type MemberStatusParts = {
   austritt: Date | string | null;
   verstorbenAm: Date | string | null;
-  /** Legacy active/passive flag (Linear `AktivPasiv`): "A", "P", or null. */
-  aktivPasiv: string | null;
 };
 
 /**
@@ -125,12 +123,18 @@ function takesEffectBy(value: Date | string | null | undefined, asOf: Date): boo
 }
 
 /**
- * Collapse the legacy status signals into one canonical status as of `asOf`
+ * Collapse the lifecycle signals into one canonical status as of `asOf`
  * (default: now). Precedence: a death that has occurred wins, then an exit that
- * has taken effect, then the active/passive flag.
+ * has taken effect, otherwise the member is live (`aktiv`).
+ *
+ * The stored status carries only the lifecycle axis. The aktiv-vs-passiv
+ * distinction (does the member do sport?) is no longer stored here: it is
+ * derived on read from the member's active Abteilungen
+ * (`memberHasRealAbteilung` / `memberIsPassiv`), so it cannot drift from the
+ * Sparte data. `passiv` therefore never comes out of this function.
  *
  * Crucially, a *future* exit date does not flip the member yet: someone who has
- * given notice effective at year-end is still aktiv/passiv until that day, so
+ * given notice effective at year-end is still a live member until that day, so
  * they keep counting in fee runs, dunning, and the Bestandserhebung. The stored
  * status is reconciled to `ausgetreten` once the date arrives (see
  * `reconcileMemberStatuses` in the nightly scheduler). Death dates are facts,
@@ -139,7 +143,6 @@ function takesEffectBy(value: Date | string | null | undefined, asOf: Date): boo
 export function deriveStatus(m: MemberStatusParts, asOf: Date = new Date()): MemberStatus {
   if (takesEffectBy(m.verstorbenAm, asOf)) return "verstorben";
   if (takesEffectBy(m.austritt, asOf)) return "ausgetreten";
-  if ((m.aktivPasiv ?? "").trim().toUpperCase() === "P") return "passiv";
   return "aktiv";
 }
 

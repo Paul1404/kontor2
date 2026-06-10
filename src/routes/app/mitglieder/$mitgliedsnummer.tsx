@@ -41,6 +41,7 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { Tabs } from "~/components/ui/tabs";
 import { toast } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { isKeineAbteilung } from "~/lib/abteilung-filter";
 import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/audit-labels";
 import { formatLand } from "~/lib/country";
 import { triggerDownload } from "~/lib/download";
@@ -181,6 +182,14 @@ function MemberDetailPage() {
     !member.mitgliedsnummer && beziehungen.length === 0 && incomingBeziehungenCount === 0;
   const isDeleted = (member as { deletedAt?: string | Date | null }).deletedAt != null;
 
+  // aktiv vs passiv is derived: a live member counts as aktiv only while they
+  // hold an active membership in a real Abteilung (not "Keine Abteilung").
+  const hatAktiveAbteilung = abteilungen.some(
+    (a) =>
+      !isKeineAbteilung(a.name) &&
+      (a.austrittsdatum == null || new Date(a.austrittsdatum) > new Date()),
+  );
+
   // Bank name is derived from the IBAN; the legacy free-text bank field was
   // dropped. BIC prefers the IBAN-derived value over the stored one.
   const bankDisplay = ibanInfo?.name ?? null;
@@ -199,7 +208,7 @@ function MemberDetailPage() {
           </Link>
           <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
             {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")}
-            <MemberStatusBadge member={member} />
+            <MemberStatusBadge member={member} hatAktiveAbteilung={hatAktiveAbteilung} />
             {!member.memberNo ? (
               <Tooltip content="Zahlt für ein Mitglied, ist aber selbst keines">
                 <Badge variant="outline">Kontakt</Badge>
@@ -754,22 +763,24 @@ function formatBirthdayWithAge(value: string | Date | null | undefined): string 
 
 function MemberStatusBadge({
   member,
+  hatAktiveAbteilung,
 }: {
   member: {
     austritt?: string | Date | null;
     verstorbenAm?: string | Date | null;
-    aktivPasiv?: string | null;
     mitgliedsnummer?: string | null;
   };
+  hatAktiveAbteilung: boolean;
 }) {
   // Kontakte (no Mitgliedsnummer) carry their own badge in the header; a
   // membership status would be misleading for them.
   if (!member.mitgliedsnummer) return null;
   // Date-aware: a future-dated Austritt reads "Kündigt zum …", not "Ausgetreten".
+  // aktiv vs passiv is derived from the member's active Abteilungen.
   const view = memberStatusView({
     austritt: member.austritt,
     verstorbenAm: member.verstorbenAm,
-    status: member.aktivPasiv === "P" ? "passiv" : "aktiv",
+    hatAktiveAbteilung,
   });
   return <Badge variant={view.variant}>{view.label}</Badge>;
 }

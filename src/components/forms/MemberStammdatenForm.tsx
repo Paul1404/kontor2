@@ -31,7 +31,6 @@ export type StammdatenValues = {
   spender: string;
   eintritt: string;
   austritt: string;
-  aktivPasiv: "A" | "P" | "";
   iban1: string;
   abwKontoInh: string;
   vertreterAnrede: string;
@@ -68,7 +67,6 @@ export const EMPTY_STAMM: StammdatenValues = {
   spender: "",
   eintritt: "",
   austritt: "",
-  aktivPasiv: "",
   iban1: "",
   abwKontoInh: "",
   vertreterAnrede: "",
@@ -132,10 +130,6 @@ export function buildInitialValues(
     spender: (member.spender as string) ?? "",
     eintritt: toDateInput(member.eintritt as string | Date | null),
     austritt: toDateInput(member.austritt as string | Date | null),
-    aktivPasiv: ((member as Record<string, unknown>).status === "passiv" ? "P" : "A") as
-      | "A"
-      | "P"
-      | "",
     iban1: ((member.iban1 as string | null | undefined) ?? "").replace(/\s+/g, "").toUpperCase(),
     abwKontoInh: (member.abwKontoInh as string) ?? "",
     vertreterAnrede: (member.vertreterAnrede as string) ?? "",
@@ -182,9 +176,6 @@ export function buildPatch(
   out.spender = nullable(values.spender);
   out.eintritt = nullable(values.eintritt);
   out.austritt = nullable(values.austritt);
-  if (values.aktivPasiv === "A" || values.aktivPasiv === "P") {
-    out.aktivPasiv = values.aktivPasiv;
-  }
   if (values.geschlecht) {
     out.geschlecht = values.geschlecht;
   }
@@ -347,17 +338,6 @@ export function MemberStammdatenForm({
                     {opt.label}
                   </option>
                 ))}
-              </select>
-            </FormField>
-            <FormField label="Status">
-              <select
-                value={values.aktivPasiv}
-                onChange={(e) => update("aktivPasiv", e.target.value as "A" | "P" | "")}
-                className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-              >
-                <option value="">Unbekannt</option>
-                <option value="A">Aktiv</option>
-                <option value="P">Passiv</option>
               </select>
             </FormField>
             <FormField label="Telefon">

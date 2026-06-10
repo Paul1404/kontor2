@@ -54,11 +54,7 @@ export function translateLinearMember(d: LinearRow): CleanMemberInput | null {
     eintritt: coerceDate(d.Eintritt ?? null),
     austritt,
     verstorbenAm,
-    status: deriveStatus({
-      austritt,
-      verstorbenAm,
-      aktivPasiv: coerceStr(d.AktivPasiv ?? null, 1),
-    }),
+    status: deriveStatus({ austritt, verstorbenAm }),
     dunningBlocked: isDunningBlocked(coerceStr(d.MahnSperre ?? null, 4)),
     abteilung: coerceStr(d.Abteilung ?? null, 80),
     isDeleted: coerceBool(d.Geloscht ?? null) === true,

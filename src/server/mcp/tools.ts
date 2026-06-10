@@ -83,7 +83,6 @@ const McpStammdatenInput = v.object({
   email: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.email()))),
   eintritt: v.optional(v.nullable(DateInput)),
   austritt: v.optional(v.nullable(DateInput)),
-  aktivPasiv: v.optional(v.nullable(v.picklist(["A", "P"]))),
   notes: v.optional(v.nullable(v.string())),
   iban1: v.optional(v.nullable(v.string())),
   bic1: v.optional(v.nullable(v.string())),

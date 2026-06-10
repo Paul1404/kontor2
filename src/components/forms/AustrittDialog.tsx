@@ -46,7 +46,6 @@ export function AustrittDialog({
   onLeft: (austrittDatum: string) => void;
 }) {
   const [austrittDatum, setAustrittDatum] = useState(today);
-  const [setPassiv, setSetPassiv] = useState(true);
   const [revokeSepa, setRevokeSepa] = useState(true);
 
   const openAbteilungen = useMemo(
@@ -72,7 +71,7 @@ export function AustrittDialog({
   }, [sollstellungen]);
 
   const mut = useMutation({
-    mutationFn: () => orpc.members.austritt({ memberId, austrittDatum, setPassiv, revokeSepa }),
+    mutationFn: () => orpc.members.austritt({ memberId, austrittDatum, revokeSepa }),
     onSuccess: (res) => {
       const parts = [
         `${res.abteilungen} Abteilung(en)`,
@@ -137,13 +136,6 @@ export function AustrittDialog({
           </div>
         ) : null}
 
-        <Switch
-          id="austritt-passiv"
-          checked={setPassiv}
-          onChange={(e) => setSetPassiv(e.target.checked)}
-          label="Auf passiv setzen"
-          description="Das Mitglied zählt nicht mehr zu den aktiven Mitgliedern."
-        />
         <Switch
           id="austritt-sepa"
           checked={revokeSepa}

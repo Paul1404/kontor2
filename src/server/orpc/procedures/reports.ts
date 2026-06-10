@@ -5,6 +5,8 @@ import {
   memberHasDied,
   memberHasExited,
   memberHasPendingExit,
+  memberHasRealAbteilung,
+  memberIsPassiv,
   memberNotDeceased,
   memberNotDeleted,
   memberNotExited,
@@ -71,6 +73,21 @@ function formatDateDE(value: Date | string | null | undefined): string {
   return `${day}.${month}.${d.getUTCFullYear()}`;
 }
 
+/**
+ * Derived Aktiv/Passiv label for the CSV export. The stored `status` no longer
+ * carries the passive axis; this mirrors the on-screen badge: deceased and
+ * exited win, otherwise a member is aktiv while they hold an active membership
+ * in a real Abteilung, else passiv.
+ */
+function aktivPasivLabel() {
+  return sql<string>`case
+    when ${membersTable.verstorbenAm} is not null and ${membersTable.verstorbenAm}::date <= current_date then 'verstorben'
+    when ${membersTable.austritt} is not null and ${membersTable.austritt}::date <= current_date then 'ausgetreten'
+    when ${memberHasRealAbteilung()} then 'aktiv'
+    else 'passiv'
+  end`;
+}
+
 function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>) {
   const conditions: ReturnType<typeof eq>[] = [];
   // "Exited" means the Austritt date has arrived; a notice for a future date
@@ -96,11 +113,10 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
     conditions.push(memberNotDeceased() as never);
   }
   if (input.status === "passiv") {
-    // The normalized status already implies neither exited nor deceased; the
-    // date guards keep the export correct even if status ever drifts.
-    conditions.push(eq(membersTable.status, "passiv") as never);
-    conditions.push(memberNotExited() as never);
-    conditions.push(memberNotDeceased() as never);
+    // Passiv is derived, not stored: a live member with no active membership
+    // in a real Abteilung. `memberIsPassiv` already excludes exited and
+    // deceased members, matching the members list.
+    conditions.push(memberIsPassiv() as never);
   }
   conditions.push(memberNotDeleted() as never);
   if (input.q.trim()) {
@@ -448,7 +464,7 @@ export const reportsRouter = {
           eintritt: membersTable.eintritt,
           austritt: membersTable.austritt,
           verstorbenAm: membersTable.verstorbenAm,
-          aktivPasiv: membersTable.status,
+          aktivPasiv: aktivPasivLabel(),
         })
         .from(membersTable)
         .where(and(inArray(membersTable.id, ids), memberNotDeleted()))

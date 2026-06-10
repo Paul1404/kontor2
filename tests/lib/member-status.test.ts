@@ -36,9 +36,10 @@ describe("memberStatusView", () => {
     ).toBe("Verstorben");
   });
 
-  it("falls back to the active/passive flag", () => {
-    expect(memberStatusView({ status: "passiv" }, asOf).label).toBe("Passiv");
-    expect(memberStatusView({ status: "aktiv" }, asOf).label).toBe("Aktiv");
+  it("derives aktiv/passiv from the presence of an active Abteilung", () => {
+    expect(memberStatusView({ hatAktiveAbteilung: false }, asOf).label).toBe("Passiv");
+    expect(memberStatusView({ hatAktiveAbteilung: true }, asOf).label).toBe("Aktiv");
+    // No Abteilung signal at all: a live member renders as aktiv.
     expect(memberStatusView({}, asOf).label).toBe("Aktiv");
   });
 });
