@@ -146,6 +146,15 @@ export const membersTable = pgTable(
     // Partial unique: a soft-deleted row frees its number for reuse (v0.18.0).
     uniqueIndex("members_member_no_uk").on(t.memberNo).where(sql`${t.deletedAt} is null`),
     uniqueIndex("members_kontakt_no_uk").on(t.kontaktNo).where(sql`${t.deletedAt} is null`),
+    // Preserved legacy Linear number must be unique among live rows: the same
+    // Mitgliedsnummer on two non-deleted records (observed: 1272 ×2) is a data
+    // bug. NULLs are exempt (Kontakte and app-created members have none) and a
+    // soft-deleted row frees its number, mirroring the member_no/kontakt_no
+    // indexes above. See migration 0048 for the loud pre-check that refuses to
+    // apply while a collision still exists.
+    uniqueIndex("members_mitgliedsnummer_uk")
+      .on(t.mitgliedsnummer)
+      .where(sql`${t.deletedAt} is null`),
     index("members_nachname_vorname_idx").on(t.nachname, t.vorname),
     index("members_plz_idx").on(t.plz),
     index("members_austritt_idx").on(t.austritt),
