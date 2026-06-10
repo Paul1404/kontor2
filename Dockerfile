@@ -23,6 +23,23 @@ FROM base AS prod-deps
 COPY package.json bun.lock ./
 RUN --mount=type=cache,id=s/83b908ee-38bf-4cc4-bc5e-0e02252c9f4f-bun-cache,target=/root/.bun/install/cache \
     bun install --production --frozen-lockfile
+# Strip build-only tooling that production deps drag in transitively. Only the
+# unambiguous bundlers/transpilers/generators are removed -- NOT the @swc or
+# @babel scopes, which also hold runtime helper libraries (@swc/helpers,
+# @babel/runtime) that fontkit/@react-pdf load lazily. Verified by rendering a
+# PDF and loading the built server against the pruned tree; the /api/health
+# check renders a PDF too, so a bad prune fails the healthcheck instead of
+# going live. Scope-level deletes are arch-agnostic (Linux rolldown/esbuild).
+RUN rm -rf \
+      node_modules/typescript \
+      node_modules/drizzle-kit \
+      node_modules/vite node_modules/rolldown node_modules/@rolldown \
+      node_modules/esbuild node_modules/@esbuild \
+      node_modules/tsx node_modules/lightningcss node_modules/@types \
+      node_modules/@tanstack/react-start \
+      node_modules/@tanstack/router-plugin \
+      node_modules/@tanstack/router-generator \
+      node_modules/@tanstack/router-utils
 
 # Runtime: built output plus production node_modules only. No node toolchain --
 # everything (server, migrator, scheduler) runs under Bun.
