@@ -19,7 +19,6 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { InlineStatusEdit } from "~/components/forms/InlineStatusEdit";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
@@ -32,6 +31,7 @@ import { ABTEILUNG_NONE_FILTER } from "~/lib/abteilung-filter";
 import { triggerDownload } from "~/lib/download";
 import { EMPTY_VALUE, formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
+import { memberStatusView } from "~/lib/member-status";
 import { orpc } from "~/lib/orpc";
 import {
   createView,
@@ -956,11 +956,21 @@ function MembersListPage() {
                     <tr
                       key={m.id}
                       ref={isCursor ? cursorRowRef : undefined}
-                      className={`transition-colors ${
+                      className={`cursor-pointer transition-colors ${
                         isCursor ? "bg-primary/10 ring-2 ring-inset ring-primary/40" : ""
                       } ${isSelected && !isCursor ? "bg-primary/5" : ""} ${
                         !isSelected && !isCursor ? "hover:bg-muted/30" : ""
                       }`}
+                      onClick={(e) => {
+                        // The whole row opens the member. Real controls inside
+                        // the row (select checkbox, the name link) handle their
+                        // own clicks and must not also trigger navigation.
+                        if ((e.target as HTMLElement).closest("a, button, input, label")) return;
+                        navigate({
+                          to: "/app/mitglieder/$mitgliedsnummer",
+                          params: { mitgliedsnummer: memberRef(m) },
+                        });
+                      }}
                     >
                       {canEdit ? (
                         <td className="px-4 py-3">
@@ -1009,16 +1019,10 @@ function MembersListPage() {
                       <td className="px-4 py-3 text-muted-foreground">{m.email || EMPTY_VALUE}</td>
                       <td className="px-4 py-3 text-muted-foreground">{formatDate(m.eintritt)}</td>
                       <td className="px-4 py-3">
-                        <InlineStatusEdit
-                          member={m}
-                          canEdit={canEdit}
-                          abteilungen={abteilungen.data ?? []}
-                          onChanged={() => {
-                            list.refetch();
-                            stats.refetch();
-                            abteilungen.refetch();
-                          }}
-                        />
+                        {(() => {
+                          const view = memberStatusView(m);
+                          return <Badge variant={view.variant}>{view.label}</Badge>;
+                        })()}
                       </td>
                     </tr>
                   );
