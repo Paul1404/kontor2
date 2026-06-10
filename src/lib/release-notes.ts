@@ -41,6 +41,58 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.55.0",
+    date: "2026-06-10",
+    title: "KI-Schnittstelle und Datenqualität",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die Mitgliedersuche mit Status Alle liefert wieder den gesamten Bestand, also auch ausgetretene und gekündigte Mitglieder sowie Kontakte, statt nur die aktiven.",
+      },
+      {
+        category: "fix",
+        description:
+          "Die KI-Schnittstelle antwortet bei zu vielen Anfragen jetzt mit 429 und einem Retry-After-Hinweis statt mit 401. Ein gültiger Schlüssel wird unter Last nicht mehr fälschlich als ungültig gemeldet.",
+      },
+      {
+        category: "fix",
+        description:
+          "Mitglieder lassen sich über die KI-Schnittstelle auch über ihre interne ID abrufen. Bestimmte Kontakte führten vorher zu einem Fehler.",
+      },
+      {
+        category: "feature",
+        description:
+          "Neues Werkzeug für den Massenexport aller Mitglieder über die KI-Schnittstelle, seitenweise per Cursor, statt vieler Einzelabrufe. Die Drill-down-Listen der Datenqualität geben jetzt zusätzlich die Obergrenze und einen Cursor zurück.",
+      },
+      {
+        category: "feature",
+        description:
+          "Neue Datenqualitäts-Prüfungen: abgelaufene SEPA-Mandate, bald ablaufende Mandate, doppelt vergebene Mitgliedsnummern, vertauschte Vor- und Nachnamen, mehrere Personen in einem Datensatz, Telefon nur Vorwahl, Straße ohne Hausnummer, Vertrag mit Betrag 0 und mögliche Dubletten ohne Geburtsdatum. Echte Fehler werden farblich hervorgehoben.",
+      },
+      {
+        category: "feature",
+        description:
+          "Nächtliche Auswertung der Datenqualität mit Verlauf im Dashboard, sodass ein fehlerhafter Import am nächsten Morgen als Ausschlag sichtbar wird. Für Fehler wird automatisch eine Aufgabe am betroffenen Mitglied angelegt.",
+      },
+      {
+        category: "feature",
+        description:
+          "Gemeinsame Prüf- und Normalisierungsregeln für Import und Mitgliederformular. Der Import zeigt vor dem Übernehmen einen Qualitätsbericht mit Zählern je Feld und doppelten Mitgliedsnummern.",
+      },
+      {
+        category: "improvement",
+        description:
+          "KI-Zugriff: neue Schlüssel sind standardmäßig nur lesend. Schreibrechte müssen beim Anlegen ausdrücklich erlaubt werden. Schreibende Aktionen lassen sich mit einem Idempotency-Key gegen doppelte Ausführung absichern.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Mitgliedsnummern müssen jetzt eindeutig sein. Vor dem Einspielen müssen vorhandene Doppelvergaben aufgelöst werden, sonst bricht die Datenbank-Migration mit Hinweis auf die betroffenen Datensätze ab.",
+      },
+    ],
+  },
+  {
     version: "0.54.0",
     date: "2026-06-10",
     title: "Aktiv und passiv aus den Abteilungen",
