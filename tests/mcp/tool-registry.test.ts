@@ -25,6 +25,7 @@ const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
   report_finance: "vorstand",
   report_department_stats: "vorstand",
   data_quality_summary: "vorstand",
+  data_quality_members: "vorstand",
   create_member: "vorstand",
   update_member: "vorstand",
   create_task: "vorstand",

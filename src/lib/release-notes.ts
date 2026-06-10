@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.45.0",
+    date: "2026-06-10",
+    title: "KI-Zugriff: Datenqualität im Detail",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "KI-Assistenten (MCP) können jetzt nicht nur die Datenqualität zählen, sondern auch die betroffenen Mitglieder einer Kategorie auflisten. So lässt sich direkt nachfragen, welche Mitglieder etwa eine Lastschrift ohne Mandat oder keinen laufenden Vertrag haben. Lesend, nur mit Vorstand-Rechten, höchstens 500 Treffer.",
+      },
+    ],
+  },
+  {
     version: "0.44.0",
     date: "2026-06-10",
     title: "KI-Zugriff (MCP)",

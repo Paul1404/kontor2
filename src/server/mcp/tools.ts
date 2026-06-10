@@ -3,6 +3,7 @@ import { toJsonSchema } from "@valibot/to-json-schema";
 import * as v from "valibot";
 import type { Role } from "~/server/db/schema/auth";
 import type { AppContext } from "~/server/orpc/context";
+import { CATEGORY_IDS } from "~/server/orpc/procedures/data-quality";
 import { appRouter } from "~/server/orpc/router";
 
 /**
@@ -257,6 +258,14 @@ const TOOLS: McpTool[] = [
     minRole: "vorstand",
     input: v.object({}),
     execute: (context) => call(appRouter.dataQuality.summary, undefined, { context }),
+  }),
+  defineTool({
+    name: "data_quality_members",
+    description:
+      "Drill into one data_quality_summary category and list the affected members (the rows behind a count). Pass a category id from data_quality_summary, e.g. 'aktiv_ohne_vertrag', 'lastschrift_ohne_mandat' or 'moegliche_dubletten'. Returns each member's reference, name, Ort, email, Geburtsdatum and Austritt; capped at 500 rows.",
+    minRole: "vorstand",
+    input: v.object({ category: v.picklist(CATEGORY_IDS) }),
+    execute: (context, input) => call(appRouter.dataQuality.list, input, { context }),
   }),
   // ---- Vorstand: mutations ----
   defineTool({
