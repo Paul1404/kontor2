@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.56.5",
+    date: "2026-06-11",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "In der Mitgliederliste wird aktiv und passiv wieder korrekt angezeigt. Durch einen Fehler in der Abfrage galten zuletzt alle Mitglieder als passiv, obwohl die Detailansicht den Status richtig zeigte.",
+      },
+    ],
+  },
+  {
     version: "0.56.4",
     date: "2026-06-11",
     changes: [

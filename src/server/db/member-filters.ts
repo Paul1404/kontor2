@@ -1,4 +1,4 @@
-import { and, isNull, or, type SQL, sql } from "drizzle-orm";
+import { and, getTableName, isNull, or, type SQL, sql } from "drizzle-orm";
 import { KEINE_ABTEILUNG_NAME } from "~/lib/abteilung-filter";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
@@ -80,10 +80,17 @@ export function memberHasPendingExit(): SQL {
  * so the distinction cannot drift from the Abteilung data.
  */
 export function memberHasRealAbteilung(): SQL {
+  // The correlation MUST be fully qualified. `${membersTable.id}` renders as a
+  // bare `"id"`, which Postgres resolves to the joined `abteilungen."id"` inside
+  // this subquery (member_abteilungen has no `id` column) -- so the link to the
+  // outer member is silently lost and `exists` is false for everyone, making
+  // every member look passiv. Emit `"members"."id"` explicitly (table name
+  // derived so a rename can't reintroduce the bug).
+  const memberId = sql`${sql.identifier(getTableName(membersTable))}.${sql.identifier("id")}`;
   return sql`exists (
     select 1 from ${memberAbteilungenTable} ma
     join ${abteilungenTable} a on a.id = ma.abteilung_id
-    where ma.member_id = ${membersTable.id}
+    where ma.member_id = ${memberId}
       and (ma.austrittsdatum is null or ma.austrittsdatum > current_date)
       and a.name <> ${KEINE_ABTEILUNG_NAME}
   )` as SQL;
