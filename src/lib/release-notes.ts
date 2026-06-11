@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.58.0",
+    date: "2026-06-11",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Seite Netzwerk entfällt. Die Familien-Seite beantwortet die Frage nach Zusammengehörigkeit jetzt direkt und mit klaren Rollen. Beziehungen am einzelnen Mitglied bleiben erhalten, ebenso die Vertreter-Regelung für das Mahnwesen.",
+      },
+    ],
+  },
+  {
     version: "0.57.0",
     date: "2026-06-11",
     title: "Familienmitgliedschaften",

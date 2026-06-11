@@ -28,7 +28,6 @@ import { Route as AppZahlungsabgleichRouteImport } from './app/zahlungsabgleich'
 import { Route as AppWiedervorlagenRouteImport } from './app/wiedervorlagen'
 import { Route as AppRundschreibenRouteImport } from './app/rundschreiben'
 import { Route as AppPortalAnfragenRouteImport } from './app/portal-anfragen'
-import { Route as AppNetzwerkRouteImport } from './app/netzwerk'
 import { Route as AppMuseumRouteImport } from './app/museum'
 import { Route as AppImportRouteImport } from './app/import'
 import { Route as AppFamilienRouteImport } from './app/familien'
@@ -175,11 +174,6 @@ const AppRundschreibenRoute = AppRundschreibenRouteImport.update({
 const AppPortalAnfragenRoute = AppPortalAnfragenRouteImport.update({
   id: '/portal-anfragen',
   path: '/portal-anfragen',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppNetzwerkRoute = AppNetzwerkRouteImport.update({
-  id: '/netzwerk',
-  path: '/netzwerk',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppMuseumRoute = AppMuseumRouteImport.update({
@@ -476,7 +470,6 @@ export interface FileRoutesByFullPath {
   '/app/familien': typeof AppFamilienRoute
   '/app/import': typeof AppImportRoute
   '/app/museum': typeof AppMuseumRoute
-  '/app/netzwerk': typeof AppNetzwerkRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/app/rundschreiben': typeof AppRundschreibenRoute
   '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
@@ -547,7 +540,6 @@ export interface FileRoutesByTo {
   '/app/familien': typeof AppFamilienRoute
   '/app/import': typeof AppImportRoute
   '/app/museum': typeof AppMuseumRoute
-  '/app/netzwerk': typeof AppNetzwerkRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/app/rundschreiben': typeof AppRundschreibenRoute
   '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
@@ -622,7 +614,6 @@ export interface FileRoutesById {
   '/app/familien': typeof AppFamilienRoute
   '/app/import': typeof AppImportRoute
   '/app/museum': typeof AppMuseumRoute
-  '/app/netzwerk': typeof AppNetzwerkRoute
   '/app/portal-anfragen': typeof AppPortalAnfragenRoute
   '/app/rundschreiben': typeof AppRundschreibenRoute
   '/app/wiedervorlagen': typeof AppWiedervorlagenRoute
@@ -698,7 +689,6 @@ export interface FileRouteTypes {
     | '/app/familien'
     | '/app/import'
     | '/app/museum'
-    | '/app/netzwerk'
     | '/app/portal-anfragen'
     | '/app/rundschreiben'
     | '/app/wiedervorlagen'
@@ -769,7 +759,6 @@ export interface FileRouteTypes {
     | '/app/familien'
     | '/app/import'
     | '/app/museum'
-    | '/app/netzwerk'
     | '/app/portal-anfragen'
     | '/app/rundschreiben'
     | '/app/wiedervorlagen'
@@ -843,7 +832,6 @@ export interface FileRouteTypes {
     | '/app/familien'
     | '/app/import'
     | '/app/museum'
-    | '/app/netzwerk'
     | '/app/portal-anfragen'
     | '/app/rundschreiben'
     | '/app/wiedervorlagen'
@@ -1054,13 +1042,6 @@ declare module '@tanstack/react-router' {
       path: '/portal-anfragen'
       fullPath: '/app/portal-anfragen'
       preLoaderRoute: typeof AppPortalAnfragenRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/netzwerk': {
-      id: '/app/netzwerk'
-      path: '/netzwerk'
-      fullPath: '/app/netzwerk'
-      preLoaderRoute: typeof AppNetzwerkRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/museum': {
@@ -1454,7 +1435,6 @@ interface AppRouteRouteChildren {
   AppFamilienRoute: typeof AppFamilienRoute
   AppImportRoute: typeof AppImportRoute
   AppMuseumRoute: typeof AppMuseumRoute
-  AppNetzwerkRoute: typeof AppNetzwerkRoute
   AppPortalAnfragenRoute: typeof AppPortalAnfragenRoute
   AppRundschreibenRoute: typeof AppRundschreibenRoute
   AppWiedervorlagenRoute: typeof AppWiedervorlagenRoute
@@ -1503,7 +1483,6 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppFamilienRoute: AppFamilienRoute,
   AppImportRoute: AppImportRoute,
   AppMuseumRoute: AppMuseumRoute,
-  AppNetzwerkRoute: AppNetzwerkRoute,
   AppPortalAnfragenRoute: AppPortalAnfragenRoute,
   AppRundschreibenRoute: AppRundschreibenRoute,
   AppWiedervorlagenRoute: AppWiedervorlagenRoute,
