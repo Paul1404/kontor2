@@ -911,6 +911,96 @@ export const feeRunsRouter = {
     return { ...header, hasXml: !!run.xmlContent, items };
   }),
 
+  /**
+   * Storniert eine einzelne Sollstellung (Status -> cancelled). Gedacht für
+   * importierte Posten, die Linear fälschlich als eingezogen führte (z. B.
+   * geplatzte Lastschrift, die nie als Rückläufer erfasst wurde): nach dem
+   * Storno gilt der Vertrag für das Jahr als unabgerechnet und der nächste
+   * Beitragslauf zieht ihn wieder ein.
+   *
+   * Bewusst NUR für Posten, die nie durch einen App-Lauf gelaufen sind
+   * (keine fee_run_items): bei App-eingezogenen Posten ist der richtige Weg
+   * der Rückläufer (sepa_returns) plus Wiedereinzug, damit die Historie
+   * stimmt. Rückläufer-Posten (returned) sind ebenfalls gesperrt, die gehören
+   * in den Wiedereinzug.
+   */
+  stornoSollstellung: vorstandProc
+    .input(
+      v.object({
+        sollStellungId: v.string(),
+        notes: v.optional(v.nullable(v.string()), null),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      await context.db.transaction(async (tx) => {
+        const [row] = await tx
+          .select({
+            id: sollStellungenTable.id,
+            status: sollStellungenTable.status,
+            paidAmount: sollStellungenTable.paidAmount,
+            openAmount: sollStellungenTable.openAmount,
+            notes: sollStellungenTable.notes,
+          })
+          .from(sollStellungenTable)
+          .where(eq(sollStellungenTable.id, input.sollStellungId))
+          .limit(1);
+        if (!row) {
+          throw new ORPCError("NOT_FOUND", { message: "Sollstellung nicht gefunden." });
+        }
+        if (row.status === "cancelled") return;
+        if (row.status === "returned") {
+          throw new ORPCError("VALIDATION_FAILED", {
+            message:
+              "Rückläufer werden nicht storniert. Diesen Posten über den Wiedereinzug erneut einziehen.",
+          });
+        }
+        if (row.status === "paid") {
+          throw new ORPCError("VALIDATION_FAILED", {
+            message: "Ein bezahlter Posten wird nicht storniert. Erst die Zahlung klären.",
+          });
+        }
+        const [item] = await tx
+          .select({ id: feeRunItemsTable.id })
+          .from(feeRunItemsTable)
+          .where(eq(feeRunItemsTable.sollStellungId, input.sollStellungId))
+          .limit(1);
+        if (item) {
+          throw new ORPCError("VALIDATION_FAILED", {
+            message:
+              "Dieser Posten wurde über einen Beitragslauf eingezogen. Geplatzte Lastschriften als Rückläufer erfassen und über den Wiedereinzug erneut einziehen.",
+          });
+        }
+
+        await tx
+          .update(sollStellungenTable)
+          .set({
+            status: "cancelled",
+            paidAmount: "0",
+            openAmount: "0",
+            notes: input.notes ?? row.notes,
+            updatedAt: new Date(),
+          })
+          .where(eq(sollStellungenTable.id, input.sollStellungId));
+
+        await appendAudit(tx, {
+          entityType: "soll_stellung",
+          entityId: row.id,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            status: { before: row.status, after: "cancelled" },
+            paidAmount: { before: row.paidAmount, after: "0" },
+            openAmount: { before: row.openAmount, after: "0" },
+            ...(input.notes ? { notes: { before: row.notes, after: input.notes } } : {}),
+          },
+          requestId: context.requestId ?? null,
+        });
+      });
+      return { ok: true };
+    }),
+
   downloadXml: vorstandProc
     .input(v.object({ id: v.string() }))
     .handler(async ({ context, input }) => {

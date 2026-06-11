@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.59.0",
+    date: "2026-06-11",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Sollstellungen lassen sich stornieren. Gedacht für importierte Posten, die in Linear fälschlich als eingezogen standen, etwa nach einer geplatzten Lastschrift. Nach dem Storno zieht der nächste Beitragslauf den Vertrag wieder ein. Posten aus einem App-Beitragslauf sind geschützt, dort bleibt der Weg über Rückläufer und Wiedereinzug.",
+      },
+    ],
+  },
+  {
     version: "0.58.0",
     date: "2026-06-11",
     changes: [
