@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   UserCog,
   Users,
+  UsersRound,
   X,
 } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
@@ -56,6 +57,12 @@ const SECTIONS: NavSection[] = [
         to: "/app/antraege",
         label: "Anträge",
         icon: <Inbox className="size-[18px]" />,
+        vorstandOnly: true,
+      },
+      {
+        to: "/app/familien",
+        label: "Familien",
+        icon: <UsersRound className="size-[18px]" />,
         vorstandOnly: true,
       },
       {

@@ -31,6 +31,7 @@ import { Route as AppPortalAnfragenRouteImport } from './app/portal-anfragen'
 import { Route as AppNetzwerkRouteImport } from './app/netzwerk'
 import { Route as AppMuseumRouteImport } from './app/museum'
 import { Route as AppImportRouteImport } from './app/import'
+import { Route as AppFamilienRouteImport } from './app/familien'
 import { Route as AppDatenqualitaetRouteImport } from './app/datenqualitaet'
 import { Route as AppAuditRouteImport } from './app/audit'
 import { Route as ApiMcpRouteImport } from './api/mcp'
@@ -189,6 +190,11 @@ const AppMuseumRoute = AppMuseumRouteImport.update({
 const AppImportRoute = AppImportRouteImport.update({
   id: '/import',
   path: '/import',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppFamilienRoute = AppFamilienRouteImport.update({
+  id: '/familien',
+  path: '/familien',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppDatenqualitaetRoute = AppDatenqualitaetRouteImport.update({
@@ -467,6 +473,7 @@ export interface FileRoutesByFullPath {
   '/api/mcp': typeof ApiMcpRoute
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
+  '/app/familien': typeof AppFamilienRoute
   '/app/import': typeof AppImportRoute
   '/app/museum': typeof AppMuseumRoute
   '/app/netzwerk': typeof AppNetzwerkRoute
@@ -537,6 +544,7 @@ export interface FileRoutesByTo {
   '/api/mcp': typeof ApiMcpRoute
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
+  '/app/familien': typeof AppFamilienRoute
   '/app/import': typeof AppImportRoute
   '/app/museum': typeof AppMuseumRoute
   '/app/netzwerk': typeof AppNetzwerkRoute
@@ -611,6 +619,7 @@ export interface FileRoutesById {
   '/api/mcp': typeof ApiMcpRoute
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
+  '/app/familien': typeof AppFamilienRoute
   '/app/import': typeof AppImportRoute
   '/app/museum': typeof AppMuseumRoute
   '/app/netzwerk': typeof AppNetzwerkRoute
@@ -686,6 +695,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/app/audit'
     | '/app/datenqualitaet'
+    | '/app/familien'
     | '/app/import'
     | '/app/museum'
     | '/app/netzwerk'
@@ -756,6 +766,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/app/audit'
     | '/app/datenqualitaet'
+    | '/app/familien'
     | '/app/import'
     | '/app/museum'
     | '/app/netzwerk'
@@ -829,6 +840,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/app/audit'
     | '/app/datenqualitaet'
+    | '/app/familien'
     | '/app/import'
     | '/app/museum'
     | '/app/netzwerk'
@@ -1063,6 +1075,13 @@ declare module '@tanstack/react-router' {
       path: '/import'
       fullPath: '/app/import'
       preLoaderRoute: typeof AppImportRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/familien': {
+      id: '/app/familien'
+      path: '/familien'
+      fullPath: '/app/familien'
+      preLoaderRoute: typeof AppFamilienRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/datenqualitaet': {
@@ -1432,6 +1451,7 @@ const AntragRouteRouteWithChildren = AntragRouteRoute._addFileChildren(
 interface AppRouteRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppDatenqualitaetRoute: typeof AppDatenqualitaetRoute
+  AppFamilienRoute: typeof AppFamilienRoute
   AppImportRoute: typeof AppImportRoute
   AppMuseumRoute: typeof AppMuseumRoute
   AppNetzwerkRoute: typeof AppNetzwerkRoute
@@ -1480,6 +1500,7 @@ interface AppRouteRouteChildren {
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppDatenqualitaetRoute: AppDatenqualitaetRoute,
+  AppFamilienRoute: AppFamilienRoute,
   AppImportRoute: AppImportRoute,
   AppMuseumRoute: AppMuseumRoute,
   AppNetzwerkRoute: AppNetzwerkRoute,

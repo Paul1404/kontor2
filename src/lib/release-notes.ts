@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.57.0",
+    date: "2026-06-11",
+    title: "Familienmitgliedschaften",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Familien sind jetzt ein eigenes Konzept. Die neue Seite Familien zeigt, wer zu welcher Familienmitgliedschaft gehört und wer zahlt. Vorschläge entstehen aus Familienbeitrag, Verknüpfungen und gemeinsamer Adresse und werden einzeln bestätigt.",
+      },
+      {
+        category: "feature",
+        description:
+          "Auf der Mitgliederseite zeigt eine neue Karte die Familie des Mitglieds. Dort lassen sich Familien anlegen, Mitglieder aufnehmen und Zugehörigkeiten beenden. Rollen: Zahler, Partner, Kind.",
+      },
+    ],
+  },
+  {
     version: "0.56.5",
     date: "2026-06-11",
     changes: [
