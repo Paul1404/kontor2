@@ -14,6 +14,7 @@ import { dsgvoRouter } from "~/server/orpc/procedures/dsgvo";
 import { dunningRouter } from "~/server/orpc/procedures/dunning";
 import { ehrungenRouter } from "~/server/orpc/procedures/ehrungen";
 import { emailLogRouter } from "~/server/orpc/procedures/email-log";
+import { familienRouter } from "~/server/orpc/procedures/familien";
 import { feeRunsRouter } from "~/server/orpc/procedures/fee-runs";
 import { feeTypesRouter } from "~/server/orpc/procedures/fee-types";
 import { importRouter } from "~/server/orpc/procedures/import";
@@ -42,6 +43,7 @@ export const appRouter = {
   abteilungen: abteilungenRouter,
   apiKeys: apiKeysRouter,
   relationships: relationshipsRouter,
+  familien: familienRouter,
   contracts: contractsRouter,
   feeTypes: feeTypesRouter,
   sepa: sepaRouter,

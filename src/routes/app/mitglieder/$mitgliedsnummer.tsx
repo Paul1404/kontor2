@@ -29,6 +29,7 @@ import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
 import { DsgvoCard } from "~/components/forms/DsgvoCard";
 import { EhrungenCard } from "~/components/forms/EhrungenCard";
+import { FamilieCard } from "~/components/forms/FamilieCard";
 import { SepaCard } from "~/components/forms/SepaCard";
 import { WiedervorlagenCard } from "~/components/forms/WiedervorlagenCard";
 import { SnapshotsTab } from "~/components/snapshots/SnapshotsTab";
@@ -528,6 +529,8 @@ function MemberDetailPage() {
             abteilungen={abteilungen as never}
             canEdit={canEdit}
           />
+
+          <FamilieCard memberId={member.id} memberNachname={member.nachname} canEdit={canEdit} />
 
           <BeziehungenCard
             memberId={member.id}
