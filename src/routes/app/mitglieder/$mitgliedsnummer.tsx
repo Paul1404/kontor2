@@ -826,6 +826,7 @@ function SollstellungenCard({
 }) {
   const qc = useQueryClient();
   const [target, setTarget] = useState<SollstellungRow | null>(null);
+  const [stornoTarget, setStornoTarget] = useState<SollstellungRow | null>(null);
 
   const markNichtEingezogen = useMutation({
     mutationFn: (id: string) => orpc.dunning.markNichtEingezogen({ sollStellungIds: [id] }),
@@ -845,6 +846,24 @@ function SollstellungenCard({
     },
   });
 
+  const storno = useMutation({
+    mutationFn: (id: string) =>
+      orpc.feeRuns.stornoSollstellung({
+        sollStellungId: id,
+        notes: "Storniert über die Mitgliederansicht",
+      }),
+    onSuccess: () => {
+      toast.success("Storniert. Der nächste Beitragslauf berücksichtigt den Vertrag wieder.");
+      setStornoTarget(null);
+      qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
+      qc.invalidateQueries({ queryKey: ["dunning.open"] });
+    },
+    onError: (e: Error) => {
+      setStornoTarget(null);
+      toast.error("Storno fehlgeschlagen", { description: e.message });
+    },
+  });
+
   if (!rows || rows.length === 0) {
     return (
       <Card>
@@ -859,7 +878,7 @@ function SollstellungenCard({
       </Card>
     );
   }
-  const showActions = canEdit && rows.some((r) => r.status === "eingezogen");
+  const showActions = canEdit && rows.some((r) => r.status === "eingezogen" || r.status === "open");
   return (
     <Card>
       <CardHeader>
@@ -907,6 +926,16 @@ function SollstellungenCard({
                         Nicht eingezogen
                       </Button>
                     ) : null}
+                    {r.status === "eingezogen" || r.status === "open" ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setStornoTarget(r)}
+                        disabled={storno.isPending}
+                      >
+                        Stornieren
+                      </Button>
+                    ) : null}
                   </td>
                 ) : null}
               </tr>
@@ -930,6 +959,25 @@ function SollstellungenCard({
         loading={markNichtEingezogen.isPending}
         onConfirm={() => {
           if (target) markNichtEingezogen.mutate(target.id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={stornoTarget !== null}
+        onOpenChange={(o) => {
+          if (!o && !storno.isPending) setStornoTarget(null);
+        }}
+        title="Sollstellung stornieren"
+        description={
+          stornoTarget
+            ? `Sollstellung ${stornoTarget.billingYear} (${formatCurrency(stornoTarget.amount)}) stornieren? Der Posten wird ungültig und der Vertrag wird beim nächsten Beitragslauf für ${stornoTarget.billingYear} wieder eingezogen. Für Posten aus einem App-Beitragslauf stattdessen den Rückläufer erfassen.`
+            : ""
+        }
+        confirmLabel="Stornieren"
+        destructive
+        loading={storno.isPending}
+        onConfirm={() => {
+          if (stornoTarget) storno.mutate(stornoTarget.id);
         }}
       />
     </Card>
