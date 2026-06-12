@@ -580,6 +580,17 @@ export const membersRouter = {
               gekuendZum: contractsTable.gekuendZum,
               lastschrift: contractsTable.lastschrift,
               abwKontoInh: contractsTable.abwKontoInh,
+              isDirectDebit: contractsTable.isDirectDebit,
+              zahlerMemberId: contractsTable.zahlerMemberId,
+              // Explicit, qualified correlation (contracts.zahler_member_id) so
+              // Drizzle does not emit a bare "zahler_member_id" that the inner
+              // `members z` could shadow.
+              zahlerName: sql<
+                string | null
+              >`(select z.nachname || coalesce(', ' || z.vorname, '') from members z where z.id = contracts.zahler_member_id)`,
+              zahlerRef: sql<
+                string | null
+              >`(select coalesce(z.member_no, z.kontakt_no, z.mitgliedsnummer) from members z where z.id = contracts.zahler_member_id)`,
             })
             .from(contractsTable)
             .where(eq(contractsTable.memberId, m.id))

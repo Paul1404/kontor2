@@ -64,6 +64,9 @@ describe.skipIf(!onTestDb)("data-quality nightly snapshot (integration)", () => 
         vertragNr: `${MARKER}-V`,
         art: 1,
         isDirectDebit: true,
+        // Positiver Betrag: 0-EUR-Verträge lösen die Mandat-Regeln bewusst
+        // nicht mehr aus.
+        betrag: "60",
       });
     await db()
       .insert(sepaMandatesTable)

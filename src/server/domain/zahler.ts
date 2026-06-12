@@ -18,18 +18,23 @@
  * Vertrag zahlt selbst, solange kein expliziter Zahler gepflegt ist.
  */
 
-export type ZahlerQuelle = "familie" | "vertreter" | "selbst";
+export type ZahlerQuelle = "vertrag" | "familie" | "vertreter" | "selbst";
 
 export type ZahlerResolution = { zahlerId: string; quelle: ZahlerQuelle };
 
 export function resolveZahler(opts: {
   memberId: string;
+  /** Expliziter Zahler am Vertrag (Stufe 2). Hat Vorrang vor allem. */
+  explicitZahlerId?: string | null;
   /** Zahler der Familie, in der das Mitglied aktives Kind ist (sonst null). */
   familieZahlerId: string | null;
   /** Ziel der Beziehung mit Vertreter-Flag (sonst null). */
   vertreterId: string | null;
   minderjaehrig: boolean;
 }): ZahlerResolution {
+  if (opts.explicitZahlerId && opts.explicitZahlerId !== opts.memberId) {
+    return { zahlerId: opts.explicitZahlerId, quelle: "vertrag" };
+  }
   if (opts.familieZahlerId && opts.familieZahlerId !== opts.memberId) {
     return { zahlerId: opts.familieZahlerId, quelle: "familie" };
   }

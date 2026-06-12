@@ -23,6 +23,18 @@ export const contractsTable = pgTable(
     memberId: uuid("member_id")
       .notNull()
       .references(() => membersTable.id, { onDelete: "cascade" }),
+    /**
+     * Expliziter Zahler dieses Vertrags (Zahler-Konzept Stufe 2): wessen Konto
+     * belastet und wessen Mandat genutzt wird. Hat Vorrang vor der
+     * automatischen Auflösung (Familie -> Vertreter -> selbst). Für Fälle, die
+     * sich nicht aus Familie/Vertreter ableiten lassen, z. B. ein Erwachsener,
+     * dessen Beitrag jemand anderes zahlt. Set-null beim Löschen des Zahlers.
+     * ACHTUNG: wird beim Vertrags-Reimport überschrieben, bis der Importer die
+     * Spalte erhält (siehe docs/zahler-konzept.md).
+     */
+    zahlerMemberId: uuid("zahler_member_id").references(() => membersTable.id, {
+      onDelete: "set null",
+    }),
     adrNr: integer("adr_nr").notNull(),
     vertragNr: text("vertrag_nr").notNull(),
     art: integer("art").notNull(),

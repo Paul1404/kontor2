@@ -139,10 +139,11 @@ describe.skipIf(!onTestDb)("data-quality new rules (integration)", () => {
     await addContract(vbnCtrl, await adrOf(vbnCtrl), { betrag: "12.50" });
     control.vertrag_betrag_null = vbnCtrl;
 
-    // mandat_abgelaufen / mandat_laeuft_bald_ab (need an active DD contract)
+    // mandat_abgelaufen / mandat_laeuft_bald_ab (need an active DD contract
+    // with a positive Betrag: 0-EUR-Verträge lösen bewusst keinen Treffer aus)
     const expiredM = await addMember({ memberNo: `${MARKER}-EXP-M` });
     const expiredAdr = await adrOf(expiredM);
-    await addContract(expiredM, expiredAdr, { isDirectDebit: true });
+    await addContract(expiredM, expiredAdr, { isDirectDebit: true, betrag: "60" });
     await addMandate(expiredM, expiredAdr, {
       status: "Aktiv",
       isDeleted: false,
@@ -152,13 +153,13 @@ describe.skipIf(!onTestDb)("data-quality new rules (integration)", () => {
 
     const soonM = await addMember({ memberNo: `${MARKER}-SOON-M` });
     const soonAdr = await adrOf(soonM);
-    await addContract(soonM, soonAdr, { isDirectDebit: true });
+    await addContract(soonM, soonAdr, { isDirectDebit: true, betrag: "60" });
     await addMandate(soonM, soonAdr, { status: "Aktiv", isDeleted: false, gultigBis: soon });
     match.mandat_laeuft_bald_ab = soonM;
 
     const validM = await addMember({ memberNo: `${MARKER}-VALID-M` });
     const validAdr = await adrOf(validM);
-    await addContract(validM, validAdr, { isDirectDebit: true });
+    await addContract(validM, validAdr, { isDirectDebit: true, betrag: "60" });
     await addMandate(validM, validAdr, { status: "Aktiv", isDeleted: false, gultigBis: farFuture });
     control.mandat_abgelaufen = validM;
     control.mandat_laeuft_bald_ab = validM;

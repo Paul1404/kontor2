@@ -262,20 +262,24 @@ const ACTIVE_DD_POS =
   "and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date) and c.betrag > 0)";
 
 /**
- * Resolved payer (Zahler) of a member, as a scalar member id: the active
- * family payer (kind role) -> the Vertreter (minors only) -> the member itself.
- * Mirrors `resolveZahler` so the mandate/IBAN checks follow who actually pays
- * instead of flagging a child whose parent or family holds the mandate.
- * (The per-contract `zahler_member_id` override of Zahler-Konzept Stufe 2 is
- * not folded in here yet; prepend it once it exists.)
+ * Resolved payer (Zahler) of a direct-debit contract `c`, as a scalar member
+ * id, mirroring `resolveZahler`: the explicit per-contract Zahler -> the active
+ * family payer (kind role) -> the Vertreter (minors only) -> the billed member.
+ * Lets the mandate/IBAN checks follow who actually pays instead of flagging a
+ * child whose parent/family holds the mandate.
  */
-const PAYER =
-  "coalesce(" +
+const FAMILIE_ZAHLER =
   "(select fam.zahler_member_id from familien_mitglieder fm join familien fam on fam.id = fm.familie_id " +
-  "where fm.member_id = members.id and fm.bis is null and fm.rolle = 'kind' limit 1), " +
+  "where fm.member_id = members.id and fm.bis is null and fm.rolle = 'kind' limit 1)";
+const VERTRETER =
   "(select r.to_member_id from relationships r where r.from_member_id = members.id and r.ist_vertreter = true " +
-  "and members.geburtsdatum is not null and members.geburtsdatum > current_date - interval '18 years' limit 1), " +
-  "members.id)";
+  "and members.geburtsdatum is not null and members.geburtsdatum > current_date - interval '18 years' limit 1)";
+/** Payer of contract `c` (correlated to outer `members`). */
+const PAYER_FOR_C = `coalesce(c.zahler_member_id, ${FAMILIE_ZAHLER}, ${VERTRETER}, members.id)`;
+/** Active direct-debit contract `c` with an amount to collect. */
+const DD_CONTRACT_C =
+  "c.member_id = members.id and c.is_direct_debit = true and c.gekuend_zum is null " +
+  "and (c.vertrag_ende is null or c.vertrag_ende >= current_date) and c.betrag > 0";
 
 /** Any contract that is currently in force (not cancelled, not expired). */
 const ACTIVE_CONTRACT =
@@ -296,8 +300,8 @@ const ANREDE_HAS_GENDER =
  * clauses for counts and for the error-rule drill-down.
  */
 export const WHERE: Record<CategoryId, string> = {
-  lastschrift_ohne_mandat: `${ACTIVE} and ${ACTIVE_DD_POS} and not exists (select 1 from sepa_mandates s where s.member_id = (${PAYER}) and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null)`,
-  fehlende_iban: `${ACTIVE} and ${ACTIVE_DD_POS} and not exists (select 1 from members p where p.id = (${PAYER}) and p.iban1_last4 is not null and btrim(p.iban1_last4) <> '')`,
+  lastschrift_ohne_mandat: `${ACTIVE} and exists (select 1 from contracts c where ${DD_CONTRACT_C} and not exists (select 1 from sepa_mandates s where s.member_id = (${PAYER_FOR_C}) and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null))`,
+  fehlende_iban: `${ACTIVE} and exists (select 1 from contracts c where ${DD_CONTRACT_C} and not exists (select 1 from members p where p.id = (${PAYER_FOR_C}) and p.iban1_last4 is not null and btrim(p.iban1_last4) <> ''))`,
   fehlende_adresse: `${ACTIVE} and (strasse is null or btrim(strasse) = '' or plz is null or btrim(plz) = '' or ort is null or btrim(ort) = '')`,
   name_fehlt: `${ACTIVE} and coalesce(btrim(nachname), '') = '' and coalesce(btrim(firma1), '') = '' and coalesce(btrim(kurzname), '') = ''`,
   aktiv_ohne_vertrag: `${ACTIVE} and member_no is not null and not ${ACTIVE_CONTRACT}`,
