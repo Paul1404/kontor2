@@ -2,11 +2,15 @@ import { ORPCError } from "@orpc/server";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
+import type { DB } from "~/server/db/client";
 import { withUniqueRetry } from "~/server/db/retry";
 import { membersTable } from "~/server/db/schema/members";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { planMandatNachtrag } from "~/server/domain/mandat-nachtrag";
+import { isMinorAt } from "~/server/domain/member";
+import { resolveZahler } from "~/server/domain/zahler";
 import { vorstandProc } from "~/server/orpc/base";
+import { loadZahlerContext } from "~/server/sepa/zahler-context";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 function toDateOrNull(value: string | null | undefined, field: string): Date | null {
@@ -30,6 +34,165 @@ const CreateInput = v.object({
   gueltigAb: v.optional(v.nullable(v.string())),
   gultigBis: v.optional(v.nullable(v.string())),
 });
+
+type NachtragKandidat = {
+  zahlerMemberId: string;
+  reference: string;
+  name: string;
+  /** Unterschriftsdatum für einen Nachtrag: früheste Beitrittserklärung, die der Zahler unterschrieben hat. */
+  unterschriftDatum: Date | null;
+  hasIban: boolean;
+  /** Wen dieser Zahler bezahlt (Namen; leer beim Selbstzahler). */
+  zahltFuer: string[];
+  plan: ReturnType<typeof planMandatNachtrag>;
+  mandatsNr?: string | null;
+};
+
+/**
+ * Zahler-zentrierte Kandidaten fürs Mandate-Nachtragen. Gemeinsame Quelle für
+ * Anzeige und Ausführung, damit beide identisch entscheiden: das Mandat muss
+ * beim aufgelösten Zahler liegen (Familie -> Vertreter -> selbst), niemals
+ * beim minderjährigen Mitglied. Minderjährige Selbstzahler sind ein
+ * Datenqualitätsbefund (skip), keine Mandatsanlage.
+ */
+async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
+  const billedMembers = await db
+    .select({
+      id: membersTable.id,
+      vorname: membersTable.vorname,
+      nachname: membersTable.nachname,
+      eintritt: membersTable.eintritt,
+      geburtsdatum: membersTable.geburtsdatum,
+    })
+    .from(membersTable)
+    .where(
+      sql`${membersTable.deletedAt} is null
+        and (${membersTable.austritt} is null or ${membersTable.austritt}::date > current_date)
+        and exists (
+          select 1 from contracts c
+          where c.member_id = ${membersTable.id} and c.is_direct_debit = true
+            and (c.vertrag_ende is null or c.vertrag_ende > now()) and c.betrag > 0
+        )`,
+    );
+  if (billedMembers.length === 0) return [];
+
+  const ctx = await loadZahlerContext(
+    db,
+    billedMembers.map((m) => m.id),
+  );
+  const now = new Date();
+  const byZahler = new Map<string, typeof billedMembers>();
+  const minorSelf: typeof billedMembers = [];
+  for (const m of billedMembers) {
+    const z = resolveZahler({
+      memberId: m.id,
+      familieZahlerId: ctx.familieZahlerByMember.get(m.id) ?? null,
+      vertreterId: ctx.vertreterByMember.get(m.id) ?? null,
+      minderjaehrig: isMinorAt(m.geburtsdatum, now),
+    });
+    if (z.quelle === "selbst" && isMinorAt(m.geburtsdatum, now)) {
+      minorSelf.push(m);
+      continue;
+    }
+    const list = byZahler.get(z.zahlerId) ?? [];
+    list.push(m);
+    byZahler.set(z.zahlerId, list);
+  }
+
+  const zahlerIds = [...new Set([...byZahler.keys(), ...minorSelf.map((m) => m.id)])];
+  if (zahlerIds.length === 0) return [];
+  const zahlerRows = await db
+    .select({
+      id: membersTable.id,
+      memberNo: membersTable.memberNo,
+      kontaktNo: membersTable.kontaktNo,
+      mitgliedsnummer: membersTable.mitgliedsnummer,
+      vorname: membersTable.vorname,
+      nachname: membersTable.nachname,
+      eintritt: membersTable.eintritt,
+      hasIban: sql<boolean>`${membersTable.iban1} is not null`,
+    })
+    .from(membersTable)
+    .where(inArray(membersTable.id, zahlerIds));
+  const zahlerById = new Map(zahlerRows.map((r) => [r.id, r]));
+
+  const mandateRows = await db
+    .select({
+      id: sepaMandatesTable.id,
+      memberId: sepaMandatesTable.memberId,
+      mandatsNr: sepaMandatesTable.mandatsNr,
+      isDeleted: sepaMandatesTable.isDeleted,
+      widerrufenAm: sepaMandatesTable.widerrufenAm,
+      status: sepaMandatesTable.status,
+      gultigBis: sepaMandatesTable.gultigBis,
+      angelegtAm: sepaMandatesTable.angelegtAm,
+    })
+    .from(sepaMandatesTable)
+    .where(inArray(sepaMandatesTable.memberId, zahlerIds));
+
+  const result: NachtragKandidat[] = [];
+  const name = (r: { nachname: string | null; vorname: string | null }) =>
+    [r.nachname, r.vorname].filter(Boolean).join(", ");
+  const ref = (r: {
+    memberNo: string | null;
+    kontaktNo: string | null;
+    mitgliedsnummer: string | null;
+  }) => r.memberNo ?? r.kontaktNo ?? r.mitgliedsnummer ?? "";
+
+  for (const [zahlerId, covered] of byZahler) {
+    const zahler = zahlerById.get(zahlerId);
+    if (!zahler) continue;
+    const mandate = mandateRows
+      .filter((r) => r.memberId === zahlerId)
+      .map((r) => ({ ...r, isDeleted: r.isDeleted ?? false }));
+    // Unterschrift = früheste Beitrittserklärung, die dieser Zahler trägt:
+    // eigener Eintritt (falls Mitglied) oder der des ältesten bezahlten Kindes.
+    const eintritte = [zahler.eintritt, ...covered.map((c) => c.eintritt)]
+      .filter((d): d is Date => d != null)
+      .sort((a, b) => a.getTime() - b.getTime());
+    const unterschriftDatum = eintritte[0] ?? null;
+    const plan = planMandatNachtrag({ eintritt: unterschriftDatum, mandate });
+    if (plan.kind === "skip" && plan.reason === "Aktives Mandat vorhanden") continue;
+    result.push({
+      zahlerMemberId: zahlerId,
+      reference: ref(zahler),
+      name: name(zahler),
+      unterschriftDatum,
+      hasIban: zahler.hasIban,
+      zahltFuer: covered.filter((c) => c.id !== zahlerId).map(name),
+      plan,
+      ...(plan.kind === "reactivate"
+        ? { mandatsNr: mandate.find((r) => r.id === plan.mandateId)?.mandatsNr ?? null }
+        : {}),
+    });
+  }
+
+  for (const m of minorSelf) {
+    const z = zahlerById.get(m.id);
+    if (!z) continue;
+    const mandate = mandateRows
+      .filter((r) => r.memberId === m.id)
+      .map((r) => ({ ...r, isDeleted: r.isDeleted ?? false }));
+    const usable = planMandatNachtrag({ eintritt: m.eintritt, mandate });
+    // Minderjährige mit (Linear-)Altmandat funktionieren weiter; nur die ohne
+    // jede Einzugsgrundlage erscheinen als Datenqualitätsfall.
+    if (usable.kind === "skip" && usable.reason === "Aktives Mandat vorhanden") continue;
+    result.push({
+      zahlerMemberId: m.id,
+      reference: ref(z),
+      name: name(z),
+      unterschriftDatum: null,
+      hasIban: z.hasIban,
+      zahltFuer: [],
+      plan: {
+        kind: "skip",
+        reason: "Minderjährig ohne Vertreter oder Familie. Erst Beziehung oder Familie pflegen.",
+      },
+    });
+  }
+
+  return result.sort((a, b) => a.name.localeCompare(b.name, "de"));
+}
 
 const UpdateInput = v.object({
   status: v.optional(v.nullable(v.string())),
@@ -244,123 +407,49 @@ export const sepaRouter = {
   }),
 
   /**
-   * Kandidaten für "Mandate nachtragen": lebende Mitglieder mit aktivem
-   * Lastschrift-Vertrag (Betrag > 0), aber ohne nutzbares SEPA-Mandat.
-   * Pro Mitglied steht der Plan dabei (nachtragen, reaktivieren oder
-   * überspringen mit Grund) -- siehe `planMandatNachtrag` für die Regeln.
+   * Kandidaten für "Mandate nachtragen", Zahler-zentriert: das Mandat muss
+   * beim Zahler liegen (Familien-Zahler, Vertreter bei Minderjährigen, sonst
+   * das Mitglied selbst), nie beim Kind. Minderjährige Selbstzahler ohne
+   * Vertreter oder Familie sind ein Datenqualitätsfall und werden nur
+   * angezeigt -- erst Beziehung mit Vertreter-Flag oder Familie pflegen.
    */
   nachtragKandidaten: vorstandProc.input(v.void()).handler(async ({ context }) => {
-    const members = await context.db
-      .select({
-        id: membersTable.id,
-        memberNo: membersTable.memberNo,
-        kontaktNo: membersTable.kontaktNo,
-        mitgliedsnummer: membersTable.mitgliedsnummer,
-        vorname: membersTable.vorname,
-        nachname: membersTable.nachname,
-        eintritt: membersTable.eintritt,
-        hasIban: sql<boolean>`${membersTable.iban1} is not null`,
-      })
-      .from(membersTable)
-      .where(
-        sql`${membersTable.deletedAt} is null
-          and (${membersTable.austritt} is null or ${membersTable.austritt}::date > current_date)
-          and exists (
-            select 1 from contracts c
-            where c.member_id = ${membersTable.id} and c.is_direct_debit = true
-              and (c.vertrag_ende is null or c.vertrag_ende > now()) and c.betrag > 0
-          )
-          and not exists (
-            select 1 from ${sepaMandatesTable} sm
-            where sm.member_id = ${membersTable.id}
-              and sm.is_deleted = false and sm.widerrufen_am is null
-              and (sm.status is null or btrim(sm.status) = '' or lower(sm.status) = 'aktiv')
-              and (sm.gultig_bis is null or sm.gultig_bis >= current_date)
-          )`,
-      )
-      .orderBy(membersTable.nachname, membersTable.vorname);
-
-    if (members.length === 0) return [];
-    const mandateRows = await context.db
-      .select({
-        id: sepaMandatesTable.id,
-        memberId: sepaMandatesTable.memberId,
-        mandatsNr: sepaMandatesTable.mandatsNr,
-        isDeleted: sepaMandatesTable.isDeleted,
-        widerrufenAm: sepaMandatesTable.widerrufenAm,
-        status: sepaMandatesTable.status,
-        gultigBis: sepaMandatesTable.gultigBis,
-        angelegtAm: sepaMandatesTable.angelegtAm,
-      })
-      .from(sepaMandatesTable)
-      .where(
-        inArray(
-          sepaMandatesTable.memberId,
-          members.map((m) => m.id),
-        ),
-      );
-
-    return members.map((m) => {
-      const mandate = mandateRows.filter((r) => r.memberId === m.id);
-      const plan = planMandatNachtrag({
-        eintritt: m.eintritt,
-        mandate: mandate.map((r) => ({ ...r, isDeleted: r.isDeleted ?? false })),
-      });
-      return {
-        memberId: m.id,
-        reference: m.memberNo ?? m.kontaktNo ?? m.mitgliedsnummer ?? "",
-        name: [m.nachname, m.vorname].filter(Boolean).join(", "),
-        eintritt: m.eintritt,
-        hasIban: m.hasIban,
-        plan,
-        ...(plan.kind === "reactivate"
-          ? { mandatsNr: mandate.find((r) => r.id === plan.mandateId)?.mandatsNr ?? null }
-          : {}),
-      };
-    });
+    return await loadNachtragKandidaten(context.db);
   }),
 
   /**
-   * Führt das Nachtragen für die übergebenen Mitglieder aus. Der Plan wird
-   * serverseitig neu berechnet (nie dem Client geglaubt): `create` legt ein
-   * Mandat mit Unterschriftsdatum = Eintrittsdatum an, `reactivate` leert das
-   * Gültig-bis des jüngsten nie widerrufenen Mandats. Alles auditiert plus
-   * Mitglieds-Snapshot, wie bei manueller Anlage.
+   * Führt das Nachtragen für die übergebenen ZAHLER aus. Der Plan kommt aus
+   * `loadNachtragKandidaten` und wird serverseitig neu berechnet (nie dem
+   * Client geglaubt): `create` legt das Mandat beim Zahler an, Unterschrift =
+   * früheste von ihm unterschriebene Beitrittserklärung; `reactivate` leert
+   * das Gültig-bis des jüngsten nie widerrufenen Mandats. Alles auditiert
+   * plus Mitglieds-Snapshot, wie bei manueller Anlage.
    */
   mandateNachtragen: vorstandProc
     .input(v.object({ memberIds: v.pipe(v.array(v.string()), v.minLength(1)) }))
     .handler(async ({ context, input }) => {
+      const kandidaten = await loadNachtragKandidaten(context.db);
+      const byId = new Map(kandidaten.map((k) => [k.zahlerMemberId, k]));
       const results: Array<{ memberId: string; action: string; detail?: string }> = [];
       for (const memberId of [...new Set(input.memberIds)]) {
+        const kandidat = byId.get(memberId);
+        if (!kandidat) {
+          results.push({ memberId, action: "skip", detail: "Kein offener Kandidat" });
+          continue;
+        }
         const result = await withUniqueRetry(() =>
           context.db.transaction(async (tx) => {
             const [member] = await tx
               .select({
                 id: membersTable.id,
                 adrNr: membersTable.adrNr,
-                eintritt: membersTable.eintritt,
               })
               .from(membersTable)
               .where(eq(membersTable.id, memberId))
               .limit(1);
             if (!member) return { action: "skip", detail: "Mitglied nicht gefunden" };
 
-            const mandate = await tx
-              .select({
-                id: sepaMandatesTable.id,
-                isDeleted: sepaMandatesTable.isDeleted,
-                widerrufenAm: sepaMandatesTable.widerrufenAm,
-                status: sepaMandatesTable.status,
-                gultigBis: sepaMandatesTable.gultigBis,
-                angelegtAm: sepaMandatesTable.angelegtAm,
-              })
-              .from(sepaMandatesTable)
-              .where(eq(sepaMandatesTable.memberId, memberId));
-            const plan = planMandatNachtrag({
-              eintritt: member.eintritt,
-              mandate: mandate.map((r) => ({ ...r, isDeleted: r.isDeleted ?? false })),
-            });
-
+            const plan = kandidat.plan;
             if (plan.kind === "skip") return { action: "skip", detail: plan.reason };
 
             if (plan.kind === "reactivate") {
@@ -390,7 +479,8 @@ export const sepaRouter = {
                   status: { before: existing.status, after: "Aktiv" },
                   nachtrag: {
                     before: null,
-                    after: "Reaktiviert: Gültig-bis war Import-Artefakt, Mandat durchgehend genutzt",
+                    after:
+                      "Reaktiviert: Gültig-bis war Import-Artefakt, Mandat durchgehend genutzt",
                   },
                 },
                 requestId: context.requestId ?? null,
@@ -412,14 +502,15 @@ export const sepaRouter = {
               .from(sepaMandatesTable)
               .where(eq(sepaMandatesTable.memberId, memberId));
             const mandatsNr = `M${(maxRow?.maxSeq ?? 0) + 1}`;
+            const unterschrift = kandidat.unterschriftDatum;
             const values = {
               memberId,
               adrNr: member.adrNr,
               mandatsNr,
               status: "Aktiv",
               angelegtAm: new Date(),
-              unterschriftDatum: member.eintritt,
-              gueltigAb: member.eintritt,
+              unterschriftDatum: unterschrift,
+              gueltigAb: unterschrift,
               gultigBis: null,
             };
             const [row] = await tx
@@ -438,7 +529,10 @@ export const sepaRouter = {
                 ...diff(null, values as Record<string, unknown>),
                 nachtrag: {
                   before: null,
-                  after: "Nachgetragen aus Beitrittserklärung (Unterschrift = Eintrittsdatum)",
+                  after:
+                    kandidat.zahltFuer.length > 0
+                      ? `Nachgetragen aus Beitrittserklärung als Zahler für: ${kandidat.zahltFuer.join(", ")}`
+                      : "Nachgetragen aus Beitrittserklärung (Unterschrift = Eintrittsdatum)",
                 },
               },
               requestId: context.requestId ?? null,

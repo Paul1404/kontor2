@@ -1,8 +1,16 @@
 # Zahler-Konzept
 
 Wie der Verein "wer zahlt für wen" abbildet. Decision Record, kein Tutorial.
-Status: **Vorschlag**. Vor Umsetzung mit dem Vorstand abstimmen, weil eine
-Migration der verschlüsselten Bankdaten nötig ist.
+Status: **Stufe 1 umgesetzt** (2026-06-12): Beitragslauf und Mandate-Nachtragen
+lösen den Zahler dynamisch auf, Familien-Zahler für aktive Kinder,
+Beziehungs-Vertreter für Minderjährige, sonst Selbstzahler
+(`src/server/domain/zahler.ts`, `src/server/sepa/zahler-context.ts`). Die
+Lastschrift läuft auf IBAN und Mandat des Zahlers; Mandate gehören nie dem
+Kind. Bewusst NICHT umgesetzt: `contracts.zahler_member_id` (Verträge werden
+beim Re-Import ersetzt, die Spalte würde stillschweigend geleert),
+Zahler-Auflösung in Mahnwesen und Wiedereinzug, und das Verschieben der
+Bankdaten auf den Zahler (unten). Der Rest dieses Dokuments beschreibt den
+ursprünglichen Vorschlag.
 
 ## Das Problem in einem Satz
 

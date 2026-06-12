@@ -167,21 +167,23 @@ export const feeRunsRouter = {
       });
     }
 
-    // Re-fetch member rows once to decrypt IBANs for XML generation.
-    const memberIds = Array.from(new Set(preview.candidates.map((c) => c.memberId)));
-    const members = await context.db
+    // Re-fetch payer rows once to decrypt IBANs for XML generation. The debit
+    // hits the Zahler's account (family payer / guardian / the member itself),
+    // so the lookup is keyed by zahlerMemberId, not the billed member.
+    const zahlerIds = Array.from(new Set(preview.candidates.map((c) => c.zahlerMemberId)));
+    const zahlerRows = await context.db
       .select({
         id: membersTable.id,
         iban1: membersTable.iban1,
         bic1: membersTable.bic1,
       })
       .from(membersTable)
-      .where(inArray(membersTable.id, memberIds));
+      .where(inArray(membersTable.id, zahlerIds));
     // `iban1` is transparently decrypted by the `encryptedText` Drizzle
     // custom type — it arrives here as a plain string already.
-    const ibanByMember = new Map<string, string>();
-    for (const m of members) {
-      if (m.iban1) ibanByMember.set(m.id, m.iban1);
+    const ibanByZahler = new Map<string, string>();
+    for (const m of zahlerRows) {
+      if (m.iban1) ibanByZahler.set(m.id, m.iban1);
     }
 
     const orgIban = org.vereinsIban;
@@ -327,7 +329,7 @@ export const feeRunsRouter = {
       const itemValues: Array<Record<string, unknown>> = [];
       const usedMandateIdSet = new Set<string>();
       for (const c of candidates) {
-        const iban = ibanByMember.get(c.memberId);
+        const iban = ibanByZahler.get(c.zahlerMemberId);
         if (!iban) continue; // Already excluded in preview, defensive.
         const mandate = mandateById.get(c.chosenMandateId);
         if (!mandate) continue;

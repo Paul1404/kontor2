@@ -9,7 +9,10 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import type { SepaMandate } from "~/server/db/schema/sepa";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { isMinorAt } from "~/server/domain/member";
+import { resolveZahler, type ZahlerQuelle } from "~/server/domain/zahler";
 import { selectMandate, sequenceTypeFor } from "~/server/sepa/select-mandate";
+import { loadZahlerContext } from "~/server/sepa/zahler-context";
 
 export type MandateSummary = {
   id: string;
@@ -41,6 +44,9 @@ export type PreviewCandidate = {
   debtorName: string;
   debtorIbanLast4: string;
   debtorBic: string | null;
+  /** Wessen Konto belastet wird: das Mitglied selbst oder ein Zahler. */
+  zahlerMemberId: string;
+  zahlerQuelle: ZahlerQuelle;
 };
 
 export type PreviewExclusion = {
@@ -135,15 +141,48 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
     return emptyResult();
   }
 
-  // Bulk-load mandates for all candidate members.
+  // Zahler-Aufloesung: wessen Konto und Mandat fuer jeden Vertrag gilt.
+  // Familien-Zahler fuer aktive Kinder, Vertreter fuer Minderjaehrige, sonst
+  // das Mitglied selbst (siehe resolveZahler).
   const memberIds = Array.from(new Set(rows.map((r) => r.member.id)));
+  const zahlerCtx = await loadZahlerContext(db, memberIds);
+  const now = new Date();
+  const zahlerByMember = new Map<string, ReturnType<typeof resolveZahler>>();
+  for (const { member } of rows) {
+    if (zahlerByMember.has(member.id)) continue;
+    zahlerByMember.set(
+      member.id,
+      resolveZahler({
+        memberId: member.id,
+        familieZahlerId: zahlerCtx.familieZahlerByMember.get(member.id) ?? null,
+        vertreterId: zahlerCtx.vertreterByMember.get(member.id) ?? null,
+        minderjaehrig: isMinorAt(member.geburtsdatum, now),
+      }),
+    );
+  }
+
+  // Zahler, die nicht selbst im Vertragsbestand stehen (z. B. Kontakte),
+  // muessen fuer IBAN/Name nachgeladen werden.
+  const zahlerIds = Array.from(new Set([...zahlerByMember.values()].map((z) => z.zahlerId)));
+  const knownMembers = new Map(rows.map((r) => [r.member.id, r.member]));
+  const missingZahlerIds = zahlerIds.filter((id) => !knownMembers.has(id));
+  if (missingZahlerIds.length > 0) {
+    const extra = await db
+      .select()
+      .from(membersTable)
+      .where(inArray(membersTable.id, missingZahlerIds));
+    for (const m of extra) knownMembers.set(m.id, m);
+  }
+
+  // Bulk-load mandates for all payers (the payer's mandate authorizes the
+  // debit, not the billed member's).
   const mandates =
-    memberIds.length === 0
+    zahlerIds.length === 0
       ? []
       : await db
           .select()
           .from(sepaMandatesTable)
-          .where(inArray(sepaMandatesTable.memberId, memberIds));
+          .where(inArray(sepaMandatesTable.memberId, zahlerIds));
   const mandatesByMember = new Map<string, SepaMandate[]>();
   for (const m of mandates) {
     const list = mandatesByMember.get(m.memberId) ?? [];
@@ -251,8 +290,38 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
       continue;
     }
 
-    const memberMandates = mandatesByMember.get(member.id) ?? [];
-    const sel = selectMandate(memberMandates, mandateOverrides[contract.id]);
+    const zahler = zahlerByMember.get(member.id) ?? {
+      zahlerId: member.id,
+      quelle: "selbst" as const,
+    };
+    const zahlerMember = knownMembers.get(zahler.zahlerId);
+    const zahlerLabel =
+      zahler.quelle === "selbst" || !zahlerMember ? null : `Zahler ${displayName(zahlerMember)}`;
+    if (!zahlerMember || zahlerMember.deletedAt != null) {
+      excluded.push({
+        memberId: member.id,
+        memberName,
+        contractId: contract.id,
+        vertragNr: contract.vertragNr,
+        artName: contract.artName,
+        reason: "Zahler nicht gefunden oder gelöscht",
+      });
+      continue;
+    }
+    if (zahler.quelle !== "selbst" && zahlerMember.directDebitBlocked) {
+      excluded.push({
+        memberId: member.id,
+        memberName,
+        contractId: contract.id,
+        vertragNr: contract.vertragNr,
+        artName: contract.artName,
+        reason: `${zahlerLabel}: Einzug ausgesetzt`,
+      });
+      continue;
+    }
+
+    const zahlerMandates = mandatesByMember.get(zahler.zahlerId) ?? [];
+    const sel = selectMandate(zahlerMandates, mandateOverrides[contract.id]);
     if (!sel.chosen) {
       excluded.push({
         memberId: member.id,
@@ -260,14 +329,17 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
         contractId: contract.id,
         vertragNr: contract.vertragNr,
         artName: contract.artName,
-        reason: "Kein aktives SEPA-Mandat",
+        reason: zahlerLabel
+          ? `${zahlerLabel}: kein aktives SEPA-Mandat`
+          : "Kein aktives SEPA-Mandat",
       });
       continue;
     }
 
     // `iban1` is transparently decrypted by the `encryptedText` Drizzle
-    // custom type — it arrives as a plain string already.
-    const iban = member.iban1;
+    // custom type — it arrives as a plain string already. The debit hits the
+    // payer's account, so the payer's IBAN is required.
+    const iban = zahlerMember.iban1;
     if (!iban) {
       excluded.push({
         memberId: member.id,
@@ -275,7 +347,7 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
         contractId: contract.id,
         vertragNr: contract.vertragNr,
         artName: contract.artName,
-        reason: "Keine IBAN hinterlegt",
+        reason: zahlerLabel ? `${zahlerLabel}: keine IBAN hinterlegt` : "Keine IBAN hinterlegt",
       });
       continue;
     }
@@ -329,9 +401,12 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
       sequenceType,
       conflict: sel.conflict,
       warnings,
-      debtorName: debtorNameFor(member, contract),
-      debtorIbanLast4: member.iban1Last4 ?? iban.slice(-4),
-      debtorBic: member.bic1 ?? null,
+      debtorName:
+        zahler.quelle === "selbst" ? debtorNameFor(member, contract) : displayName(zahlerMember),
+      debtorIbanLast4: zahlerMember.iban1Last4 ?? iban.slice(-4),
+      debtorBic: zahlerMember.bic1 ?? null,
+      zahlerMemberId: zahler.zahlerId,
+      zahlerQuelle: zahler.quelle,
     });
   }
 
