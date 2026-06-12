@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.69.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Befunde mit Betrag 0 lassen sich jetzt direkt aus der Datenqualität beheben. Über das Stift-Symbol öffnet sich je betroffenem Mitglied die Vertragsliste. Dort lässt sich der Betrag setzen oder ein beitragsfreier Vertrag als beitragsfrei kennzeichnen, sodass er nicht mehr als Lastschrift gilt.",
+      },
+    ],
+  },
+  {
     version: "0.68.0",
     date: "2026-06-12",
     changes: [

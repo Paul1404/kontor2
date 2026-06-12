@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { contractsTable } from "~/server/db/schema/contracts";
@@ -64,6 +64,26 @@ function buildPatch(input: v.InferOutput<typeof ContractInput>): Record<string, 
 }
 
 export const contractsRouter = {
+  /** Schlanke Vertragsliste eines Mitglieds für Inline-Korrekturen. */
+  listForMember: vorstandProc
+    .input(v.object({ memberId: v.string() }))
+    .handler(async ({ context, input }) => {
+      return await context.db
+        .select({
+          id: contractsTable.id,
+          vertragNr: contractsTable.vertragNr,
+          art: contractsTable.art,
+          artName: contractsTable.artName,
+          betrag: contractsTable.betrag,
+          isDirectDebit: contractsTable.isDirectDebit,
+          gekuendZum: contractsTable.gekuendZum,
+          vertragEnde: contractsTable.vertragEnde,
+        })
+        .from(contractsTable)
+        .where(eq(contractsTable.memberId, input.memberId))
+        .orderBy(desc(contractsTable.vertragBegin));
+    }),
+
   create: vorstandProc
     .input(v.object({ memberId: v.string(), patch: ContractInput }))
     .handler(async ({ context, input }) => {
@@ -265,6 +285,70 @@ export const contractsRouter = {
           auditId,
         });
         return { ok: true, zahlerMemberId: zahlerId };
+      });
+    }),
+
+  /**
+   * Punktuelle Korrektur eines Vertrags ohne das volle Bearbeiten-Formular:
+   * Betrag setzen und/oder die Lastschrift-Markierung umschalten. Gedacht für
+   * die Inline-Befunde der Datenqualität ("Betrag 0", beitragsfrei fälschlich
+   * als Lastschrift). Felder, die nicht übergeben werden, bleiben unverändert.
+   */
+  quickFix: vorstandProc
+    .input(
+      v.object({
+        id: v.string(),
+        betrag: v.optional(v.nullable(v.string())),
+        isDirectDebit: v.optional(v.boolean()),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      return await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(contractsTable)
+          .where(eq(contractsTable.id, input.id))
+          .limit(1);
+        if (!existing) {
+          throw new ORPCError("NOT_FOUND", { message: "Vertrag nicht gefunden." });
+        }
+
+        const patch: Record<string, unknown> = { updatedAt: new Date() };
+        const before: Record<string, unknown> = {};
+        const after: Record<string, unknown> = {};
+        if (input.betrag !== undefined) {
+          const betrag = validateBetragString(input.betrag, "Betrag");
+          patch.betrag = betrag;
+          before.betrag = existing.betrag;
+          after.betrag = betrag;
+        }
+        if (input.isDirectDebit !== undefined) {
+          patch.isDirectDebit = input.isDirectDebit;
+          before.isDirectDebit = existing.isDirectDebit;
+          after.isDirectDebit = input.isDirectDebit;
+        }
+        if (Object.keys(after).length === 0) {
+          return { ok: true };
+        }
+
+        await tx.update(contractsTable).set(patch).where(eq(contractsTable.id, input.id));
+        const auditId = await appendAudit(tx, {
+          entityType: "contract",
+          entityId: input.id,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: diff(before, after),
+          requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, existing.memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
+        });
+        return { ok: true };
       });
     }),
 };

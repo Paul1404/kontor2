@@ -7,6 +7,7 @@ import {
   GitMerge,
   ListChecks,
   Loader2,
+  PenLine,
   ShieldCheck,
   Undo2,
   Users,
@@ -642,6 +643,13 @@ function CategoryList({ id }: { id: CategoryId }) {
 type FindingItem = ListItem & { id: string; reference: string; name: string };
 
 /**
+ * Categories where an inline Vertrags-Korrektur helps directly: a Betrag-0
+ * finding is fixed by setting the Betrag or marking the contract beitragsfrei
+ * (Lastschrift-Markierung entfernen), without leaving the page.
+ */
+const INLINE_FIXABLE = new Set<CategoryId>(["vertrag_betrag_null"]);
+
+/**
  * One finding row: a link to the member plus a "Geprüft" action that opens an
  * inline reason field. Acknowledging moves the row into the "Geprüft" sublist
  * and drops it from the count.
@@ -656,6 +664,7 @@ function FindingRow({
   onChanged: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [fixing, setFixing] = useState(false);
   const [reason, setReason] = useState("");
   const ack = useMutation({
     mutationFn: () =>
@@ -687,6 +696,17 @@ function FindingRow({
             {detailFor(id, item)}
           </span>
         </Link>
+        {INLINE_FIXABLE.has(id) ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label="Verträge korrigieren"
+            title="Verträge korrigieren"
+            onClick={() => setFixing((v) => !v)}
+          >
+            <PenLine className="size-4" />
+          </Button>
+        ) : null}
         <Button
           size="sm"
           variant="ghost"
@@ -697,6 +717,7 @@ function FindingRow({
           <CheckCircle2 className="size-4" />
         </Button>
       </div>
+      {fixing ? <ContractFixList memberId={item.id} onChanged={onChanged} /> : null}
       {editing ? (
         <div className="flex flex-wrap items-center gap-2 border-t border-border bg-muted/30 px-4 py-2">
           <Input
@@ -796,6 +817,111 @@ function UnacknowledgeButton({
     >
       {un.isPending ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4" />}
     </Button>
+  );
+}
+
+/**
+ * Inline contract editor shown under a fixable finding. Lists the member's
+ * contracts with a Betrag field and a "Lastschrift" toggle, so the two common
+ * Betrag-0 causes (echter Betrag fehlt / beitragsfrei fälschlich als
+ * Lastschrift) lassen sich direkt aus dem Befund beheben.
+ */
+function ContractFixList({ memberId, onChanged }: { memberId: string; onChanged: () => void }) {
+  const qc = useQueryClient();
+  const contracts = useQuery({
+    queryKey: ["contracts.listForMember", memberId],
+    queryFn: () => orpc.contracts.listForMember({ memberId }),
+  });
+
+  const afterFix = () => {
+    qc.invalidateQueries({ queryKey: ["contracts.listForMember", memberId] });
+    onChanged();
+  };
+
+  if (contracts.isLoading) {
+    return (
+      <div className="flex items-center gap-2 border-t border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" /> Lade Verträge…
+      </div>
+    );
+  }
+  const rows = contracts.data ?? [];
+  if (rows.length === 0) {
+    return (
+      <div className="border-t border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+        Keine Verträge.
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2 border-t border-border bg-muted/30 px-4 py-3">
+      {rows.map((c) => (
+        <ContractFixRow key={c.id} contract={c} onFixed={afterFix} />
+      ))}
+    </div>
+  );
+}
+
+type FixContract = {
+  id: string;
+  vertragNr: string;
+  art: number;
+  artName: string | null;
+  betrag: string | null;
+  isDirectDebit: boolean;
+};
+
+function ContractFixRow({ contract, onFixed }: { contract: FixContract; onFixed: () => void }) {
+  const [betrag, setBetrag] = useState(contract.betrag ?? "");
+  const quickFix = useMutation({
+    mutationFn: (input: { betrag?: string | null; isDirectDebit?: boolean }) =>
+      orpc.contracts.quickFix({ id: contract.id, ...input }),
+    onSuccess: () => {
+      toast.success("Vertrag aktualisiert");
+      onFixed();
+    },
+    onError: (e: Error) => toast.error("Korrektur fehlgeschlagen", { description: e.message }),
+  });
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-card px-3 py-2 text-sm">
+      <span className="min-w-0 flex-1 truncate">
+        <span className="tabular-nums text-xs text-muted-foreground">{contract.vertragNr}</span>{" "}
+        <span className="font-medium">{contract.artName ?? `Art ${contract.art}`}</span>
+      </span>
+      <Input
+        inputMode="decimal"
+        value={betrag}
+        onChange={(e) => setBetrag(e.target.value)}
+        placeholder="Betrag"
+        aria-label={`Betrag für Vertrag ${contract.vertragNr}`}
+        className="h-9 w-28"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") quickFix.mutate({ betrag: betrag.trim() || null });
+        }}
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={quickFix.isPending || betrag.trim() === (contract.betrag ?? "")}
+        onClick={() => quickFix.mutate({ betrag: betrag.trim() || null })}
+      >
+        Betrag speichern
+      </Button>
+      {contract.isDirectDebit ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={quickFix.isPending}
+          onClick={() => quickFix.mutate({ isDirectDebit: false })}
+          title="Beitragsfrei: Lastschrift-Markierung entfernen"
+        >
+          Beitragsfrei
+        </Button>
+      ) : (
+        <span className="text-xs text-muted-foreground">keine Lastschrift</span>
+      )}
+    </div>
   );
 }
 
