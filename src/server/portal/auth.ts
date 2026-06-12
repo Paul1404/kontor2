@@ -4,7 +4,7 @@ import type { DB } from "~/server/db/client";
 import { membersTable } from "~/server/db/schema/members";
 import { portalSessionsTable, portalTokensTable } from "~/server/db/schema/portal";
 
-const PORTAL_COOKIE = "svuwv_portal";
+const PORTAL_COOKIE = "kontor2_portal";
 const SESSION_TTL_DAYS = 30;
 const DEFAULT_TOKEN_TTL_DAYS = 14;
 

@@ -32,8 +32,8 @@ const EnvSchema = v.object({
   AWS_ACCESS_KEY_ID: v.pipe(v.string(), v.minLength(1)),
   AWS_SECRET_ACCESS_KEY: v.pipe(v.string(), v.minLength(1)),
 
-  SVUWV_BOOTSTRAP_ADMIN_EMAIL: v.optional(v.string()),
-  SVUWV_BOOTSTRAP_ADMIN_PASSWORD: v.optional(v.string()),
+  BOOTSTRAP_ADMIN_EMAIL: v.optional(v.string()),
+  BOOTSTRAP_ADMIN_PASSWORD: v.optional(v.string()),
 
   // Disable the in-process nightly snapshot scheduler. Useful for local
   // dev or when triggering the run externally (e.g. via Railway Cron and
@@ -79,19 +79,28 @@ export function env(): Env {
   try {
     const parsed = v.parse(EnvSchema, process.env);
     const master = Buffer.from(parsed.APP_SECRET, "hex");
-    const dataEncryptionKey = derive(master, "svuwv:data-encryption-key:v1");
+    // KDF context labels are brand-namespaced (kontor2). During the migration
+    // off the old "svuwv:" data-key label we keep that label as a transitional
+    // read-only key in `previous`, so existing ciphertext stays decryptable
+    // until `reencryptData` has rewritten every row onto the kontor2 key. The
+    // old label is removed in a follow-up once assessKeyDropSafety is safe.
+    const dataEncryptionKey = derive(master, "kontor2:data-encryption-key:v1");
     const previousMasters = parsePreviousSecrets(parsed.APP_SECRET_PREV);
-    const previousDataKeys = previousMasters.map((m) => derive(m, "svuwv:data-encryption-key:v1"));
+    const previousDataKeys = [
+      derive(master, "svuwv:data-encryption-key:v1"),
+      ...previousMasters.map((m) => derive(m, "kontor2:data-encryption-key:v1")),
+      ...previousMasters.map((m) => derive(m, "svuwv:data-encryption-key:v1")),
+    ];
     const encryptionKeyring: Keyring = {
       current: makeKeyringEntry("current", dataEncryptionKey),
       previous: previousDataKeys.map((k, i) => makeKeyringEntry(`prev-${i}`, k)),
     };
     cached = {
       ...parsed,
-      betterAuthSecret: derive(master, "svuwv:better-auth-secret:v1").toString("hex"),
+      betterAuthSecret: derive(master, "kontor2:better-auth-secret:v1").toString("hex"),
       dataEncryptionKey,
       encryptionKeyring,
-      svumsPushSecret: derive(master, "svuwv:svums-push-secret:v1").toString("hex"),
+      svumsPushSecret: derive(master, "kontor2:svums-push-secret:v1").toString("hex"),
     };
     return cached;
   } catch (err) {

@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.80.0",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die internen Verschlüsselungs- und Sitzungsschlüssel laufen jetzt unter dem neuen Projektnamen, svuwv ist damit aus der Konfiguration verschwunden. Es bleibt der eine APP_SECRET als einziger zu pflegender Wert. Einmalig ist dafür eine neue Anmeldung nötig, bestehende Sitzungen werden beendet. Verschlüsselte Felder (IBANs, SMTP-Passwort) bleiben erhalten und werden verlustfrei auf den neuen Schlüssel überführt.",
+      },
+    ],
+  },
+  {
     version: "0.79.5",
     date: "2026-06-12",
     changes: [

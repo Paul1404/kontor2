@@ -9,8 +9,8 @@ let pending: Promise<void> | undefined;
 let done = false;
 
 /**
- * Creates a first admin user from `SVUWV_BOOTSTRAP_ADMIN_EMAIL` and
- * `SVUWV_BOOTSTRAP_ADMIN_PASSWORD` if the users table is empty. Runs at most
+ * Creates a first admin user from `BOOTSTRAP_ADMIN_EMAIL` and
+ * `BOOTSTRAP_ADMIN_PASSWORD` if the users table is empty. Runs at most
  * once per process; concurrent callers await the same in-flight promise.
  *
  * Uses the admin plugin's `createUser` endpoint rather than `signUpEmail` so
@@ -30,21 +30,21 @@ export async function ensureBootstrapAdmin(): Promise<void> {
 
 async function run(): Promise<void> {
   const e = env();
-  if (!e.SVUWV_BOOTSTRAP_ADMIN_EMAIL || !e.SVUWV_BOOTSTRAP_ADMIN_PASSWORD) return;
+  if (!e.BOOTSTRAP_ADMIN_EMAIL || !e.BOOTSTRAP_ADMIN_PASSWORD) return;
   try {
     const [row] = await db().select({ c: count() }).from(users);
     if ((row?.c ?? 0) > 0) return;
     const result = await auth().api.createUser({
       body: {
-        email: e.SVUWV_BOOTSTRAP_ADMIN_EMAIL,
-        password: e.SVUWV_BOOTSTRAP_ADMIN_PASSWORD,
+        email: e.BOOTSTRAP_ADMIN_EMAIL,
+        password: e.BOOTSTRAP_ADMIN_PASSWORD,
         name: "Admin",
         role: "admin",
       },
     });
     if (result?.user?.id) {
       await db().update(users).set({ emailVerified: true }).where(eq(users.id, result.user.id));
-      logger.info("bootstrap admin created", { email: e.SVUWV_BOOTSTRAP_ADMIN_EMAIL });
+      logger.info("bootstrap admin created", { email: e.BOOTSTRAP_ADMIN_EMAIL });
     }
   } catch (err) {
     logger.error("bootstrap failed", { error: err instanceof Error ? err.message : String(err) });

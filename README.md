@@ -380,8 +380,8 @@ bun run dev
 
 Open <http://localhost:3000>.
 
-The first user is created from `SVUWV_BOOTSTRAP_ADMIN_EMAIL` and
-`SVUWV_BOOTSTRAP_ADMIN_PASSWORD` if the user table is empty.
+The first user is created from `BOOTSTRAP_ADMIN_EMAIL` and
+`BOOTSTRAP_ADMIN_PASSWORD` if the user table is empty.
 
 ## Tests
 
@@ -418,7 +418,7 @@ Manually set:
   Rotation: set this to the current secret, generate a new `APP_SECRET`, deploy,
   run Einstellungen > Verschlüsselung > Re-encrypt, then unset.
 - `BETTER_AUTH_URL`. Public URL of the deployment.
-- `SVUWV_BOOTSTRAP_ADMIN_EMAIL`, `SVUWV_BOOTSTRAP_ADMIN_PASSWORD`. Optional, only
+- `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`. Optional, only
   used on the very first boot. If unset, the first request is redirected to
   `/setup` where a first admin can be created interactively.
 
