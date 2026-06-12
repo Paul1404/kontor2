@@ -193,7 +193,7 @@ function EhrungenPage() {
       {data.isLoading ? (
         <Card>
           <CardContent className="flex items-center justify-center gap-2 p-12 text-muted-foreground">
-            <Loader2 className="size-5 animate-spin" /> Lade...
+            <Loader2 className="size-5 animate-spin" /> Lade…
           </CardContent>
         </Card>
       ) : data.isError ? (

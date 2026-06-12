@@ -172,7 +172,13 @@ function Row({
                   Zurücksetzen
                 </Button>
               ) : null}
-              <Button size="sm" variant="ghost" onClick={() => setEditingAustritt(false)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setEditingAustritt(false)}
+                aria-label="Bearbeitung abbrechen"
+                title="Bearbeitung abbrechen"
+              >
                 <X className="size-4" />
               </Button>
             </>

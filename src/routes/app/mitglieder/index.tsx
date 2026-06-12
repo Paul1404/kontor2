@@ -1001,9 +1001,18 @@ function MembersListPage() {
                           <Link
                             to="/app/mitglieder/$mitgliedsnummer"
                             params={{ mitgliedsnummer: memberRef(m) }}
-                            className="font-medium text-primary hover:underline"
+                            className="text-primary hover:underline"
                           >
-                            {[m.nachname, m.vorname].filter(Boolean).join(", ")}
+                            {m.nachname ? (
+                              <>
+                                <span className="font-semibold">{m.nachname}</span>
+                                {m.vorname ? (
+                                  <span className="font-normal opacity-75"> {m.vorname}</span>
+                                ) : null}
+                              </>
+                            ) : (
+                              <span className="font-medium">{m.vorname || EMPTY_VALUE}</span>
+                            )}
                           </Link>
                           {isKontakt ? (
                             <Badge
