@@ -55,7 +55,7 @@ const UpdateInput = v.object({
   kontaktTelefon: v.optional(v.nullable(v.string()), null),
   datenschutzUrl: v.optional(v.nullable(v.string()), null),
   satzungUrl: v.optional(v.nullable(v.string()), null),
-  mandatsreferenzPrefix: v.optional(v.pipe(v.string(), v.minLength(1)), "SVUWV-"),
+  mandatsreferenzPrefix: v.optional(v.string(), ""),
   beitragsstaffel: v.optional(v.nullable(BeitragsstaffelInput), null),
   antragBenachrichtigungAktiv: v.optional(v.boolean(), true),
   antragVorstandEmail: v.optional(v.nullable(v.string()), null),

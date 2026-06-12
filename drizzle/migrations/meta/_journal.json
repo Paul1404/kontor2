@@ -393,6 +393,13 @@
       "when": 1781277086542,
       "tag": "0055_backfill_is_direct_debit_aufrechnung",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1781300255977,
+      "tag": "0056_clumsy_firelord",
+      "breakpoints": true
     }
   ]
 }

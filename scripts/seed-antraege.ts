@@ -123,7 +123,7 @@ async function main() {
   try {
     const [org] = await handle.select().from(organizationSettingsTable).limit(1);
     const staffel = org?.beitragsstaffel ?? DEFAULT_BEITRAGSSTAFFEL;
-    const prefix = org?.mandatsreferenzPrefix ?? "SVUWV-";
+    const prefix = org?.mandatsreferenzPrefix ?? "";
 
     const abteilungen = await handle
       .select({ id: abteilungenTable.id })

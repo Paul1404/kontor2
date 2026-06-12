@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.79.4",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Der Präfix der SEPA-Mandatsreferenz ist jetzt optional und wird nicht mehr von einem festen Wert überschrieben. Wer das Feld in den Vereinseinstellungen leer lässt, bekommt für neue Mandate eine Referenz nur aus Jahr und Nummer. Behoben ist außerdem ein Fehler, bei dem ein leer abgeschicktes Feld still einen festen Präfix gesetzt und damit den eingestellten Wert überschrieben hat. Bestehende Mandatsreferenzen bleiben unverändert.",
+      },
+    ],
+  },
+  {
     version: "0.79.3",
     date: "2026-06-12",
     changes: [
