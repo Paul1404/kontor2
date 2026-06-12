@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Download,
+  FileSpreadsheet,
   GitMerge,
   ListChecks,
   Loader2,
@@ -23,7 +24,7 @@ import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
 import { ABTEILUNG_NONE_FILTER } from "~/lib/abteilung-filter";
 import { cn } from "~/lib/cn";
-import { triggerDownload } from "~/lib/download";
+import { triggerDownload, triggerDownloadBase64 } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -93,7 +94,10 @@ function DatenqualitaetPage() {
             oder Versand auffallen. Jeder Eintrag verlinkt direkt zum Mitglied.
           </p>
         </div>
-        <ExportCsvButton />
+        <div className="flex items-center gap-2">
+          <ExportXlsxButton />
+          <ExportCsvButton />
+        </div>
       </div>
 
       {summary.isLoading ? (
@@ -214,6 +218,31 @@ function ExportCsvButton() {
         <Download className="size-4" />
       )}
       Als CSV
+    </Button>
+  );
+}
+
+function ExportXlsxButton() {
+  const exportXlsx = useMutation({
+    mutationFn: () => orpc.dataQuality.exportXlsx(),
+    onSuccess: (res) => {
+      triggerDownloadBase64(
+        res.filename,
+        res.base64,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      toast.success(`${res.count} Befunde exportiert`);
+    },
+    onError: (e: Error) => toast.error("Export fehlgeschlagen", { description: e.message }),
+  });
+  return (
+    <Button onClick={() => exportXlsx.mutate()} disabled={exportXlsx.isPending}>
+      {exportXlsx.isPending ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <FileSpreadsheet className="size-4" />
+      )}
+      Als Excel
     </Button>
   );
 }

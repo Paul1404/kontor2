@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.75.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Datenqualität lässt sich jetzt auch als Excel-Datei exportieren. Sie enthält ein Blatt Übersicht mit der Zählung je Prüfung und ein Blatt Befunde mit allen Treffern. Kopfzeile in der Vereinsfarbe, Schweregrad farbig hinterlegt, mit Filter und fixierter Kopfzeile.",
+      },
+    ],
+  },
+  {
     version: "0.74.0",
     date: "2026-06-12",
     changes: [
