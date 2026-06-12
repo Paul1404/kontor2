@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Coins, Download, Loader2, Plus, RotateCcw } from "lucide-react";
+import { MandateNachtragCard } from "~/components/sepa/MandateNachtragCard";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
@@ -90,6 +91,8 @@ function FeeRunsListPage() {
           ebenfalls storniert und im Audit-Log protokolliert.
         </p>
       </InfoBox>
+
+      {canRun ? <MandateNachtragCard canEdit={canRun} /> : null}
 
       <Card>
         <CardContent className="p-0">
