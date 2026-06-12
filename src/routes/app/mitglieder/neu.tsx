@@ -26,6 +26,8 @@ type Step = "stamm" | "verein";
 function NewMemberPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [kind, setKind] = useState<"member" | "kontakt">("member");
+  const isKontakt = kind === "kontakt";
   const [step, setStep] = useState<Step>("stamm");
   const [stamm, setStamm] = useState<StammdatenValues>(EMPTY_STAMM);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -55,6 +57,7 @@ function NewMemberPage() {
           ? (feeTypes.data?.find((f) => f.art === beitragArt)?.bezeichnung ?? null)
           : null;
       return orpc.members.onboard({
+        kind,
         patch: buildPatch(stamm, "") as never,
         abteilungen: selectedAbt.map((id) => ({ abteilungId: id, eintrittsdatum: eintritt })),
         contract:
@@ -71,7 +74,7 @@ function NewMemberPage() {
     },
     onSuccess: async (result) => {
       await qc.invalidateQueries({ queryKey: ["members.list"] });
-      toast.success("Mitglied angelegt.");
+      toast.success(isKontakt ? "Kontakt angelegt." : "Mitglied angelegt.");
       navigate({
         to: "/app/mitglieder/$mitgliedsnummer",
         params: { mitgliedsnummer: result.ref },
@@ -96,11 +99,40 @@ function NewMemberPage() {
         >
           <ArrowLeft className="size-4" /> Zurück zur Liste
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Neues Mitglied</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {isKontakt ? "Neuer Kontakt" : "Neues Mitglied"}
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Die Mitgliedsnummer wird automatisch vergeben.
+          {isKontakt
+            ? "Ein Kontakt ist kein Mitglied (z. B. ein Zahler). Die Kontaktnummer wird automatisch vergeben."
+            : "Die Mitgliedsnummer wird automatisch vergeben."}
         </p>
       </div>
+
+      {step === "stamm" ? (
+        <div className="flex items-center gap-1 self-start rounded-lg border border-border bg-card p-0.5 text-sm">
+          {(
+            [
+              ["member", "Mitglied"],
+              ["kontakt", "Kontakt"],
+            ] as const
+          ).map(([val, lbl]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setKind(val)}
+              className={cn(
+                "rounded-md px-3 py-1.5 font-medium transition-colors",
+                kind === val
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {lbl}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <StepIndicator step={step} />
 
@@ -233,7 +265,7 @@ function NewMemberPage() {
               disabled={mut.isPending}
             >
               {mut.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-              Mitglied anlegen
+              {isKontakt ? "Kontakt anlegen" : "Mitglied anlegen"}
             </Button>
           </div>
         </div>

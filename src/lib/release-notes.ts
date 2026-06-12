@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.72.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Im Formular Neues Mitglied lässt sich jetzt zwischen Mitglied und Kontakt umschalten. Ein Kontakt ist kein Mitglied, sondern zum Beispiel ein Zahler, und bekommt eine eigene Kontaktnummer.",
+      },
+    ],
+  },
+  {
     version: "0.71.0",
     date: "2026-06-12",
     changes: [
