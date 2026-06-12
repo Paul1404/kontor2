@@ -41,6 +41,22 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.62.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Datenqualitäts-Seite kann alle Befunde als CSV exportieren. Eine Zeile je Prüfung und Mitglied, ohne Seitenlimit, für die Abarbeitung außerhalb der App.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Copyright-Hinweis auf Anmeldung, Setup und in den Versionshinweisen. Die Lizenzangabe im Projekt verweist jetzt auf die LICENSE-Datei.",
+      },
+    ],
+  },
+  {
     version: "0.61.0",
     date: "2026-06-12",
     title: "Zahler-Konzept, Stufe 1",
@@ -1909,6 +1925,12 @@ export const RELEASES: Release[] = [
 ];
 
 export const CURRENT_VERSION: string = RELEASES[0]?.version ?? "0.0.0";
+
+/**
+ * Copyright-Hinweis, einheitlich für Login, Setup und Versionshinweise.
+ * Muss zur LICENSE-Datei im Repo passen (proprietär, alle Rechte vorbehalten).
+ */
+export const COPYRIGHT = "© 2026 Paul Dresch. Alle Rechte vorbehalten.";
 
 export const CATEGORY_LABELS: Record<ReleaseCategory, string> = {
   feature: "Neu",

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ChevronRight,
+  Download,
   GitMerge,
   ListChecks,
   Loader2,
@@ -18,6 +19,7 @@ import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
 import { ABTEILUNG_NONE_FILTER } from "~/lib/abteilung-filter";
 import { cn } from "~/lib/cn";
+import { triggerDownload } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -77,14 +79,17 @@ function DatenqualitaetPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <ListChecks className="size-6 text-brand" /> Datenqualität
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Findet Lücken und Ungereimtheiten im Bestand, bevor sie beim Beitragslauf, Mahnwesen oder
-          Versand auffallen. Jeder Eintrag verlinkt direkt zum Mitglied.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <ListChecks className="size-6 text-brand" /> Datenqualität
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Findet Lücken und Ungereimtheiten im Bestand, bevor sie beim Beitragslauf, Mahnwesen
+            oder Versand auffallen. Jeder Eintrag verlinkt direkt zum Mitglied.
+          </p>
+        </div>
+        <ExportCsvButton />
       </div>
 
       {summary.isLoading ? (
@@ -188,6 +193,27 @@ function DatenqualitaetPage() {
  * everything that pointed at the source and then delete it, so they are gated
  * behind a confirm dialog and the admin role.
  */
+function ExportCsvButton() {
+  const exportCsv = useMutation({
+    mutationFn: () => orpc.dataQuality.exportCsv(),
+    onSuccess: (res) => {
+      triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
+      toast.success(`${res.count} Befunde exportiert`);
+    },
+    onError: (e: Error) => toast.error("Export fehlgeschlagen", { description: e.message }),
+  });
+  return (
+    <Button variant="outline" onClick={() => exportCsv.mutate()} disabled={exportCsv.isPending}>
+      {exportCsv.isPending ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <Download className="size-4" />
+      )}
+      Als CSV
+    </Button>
+  );
+}
+
 function DatenpflegeSection() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => orpc.auth.me(), retry: false });
   if (me.data?.role !== "admin") return null;
