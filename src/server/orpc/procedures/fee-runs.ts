@@ -232,7 +232,10 @@ export const feeRunsRouter = {
       // for the year. The preview was built before the lock, so a concurrent
       // (or just-finished) run for the same year may have billed some of them
       // since; re-billing would double-collect. Drop those defensively.
-      const previewContractIds = preview.candidates.map((c) => c.contractId);
+      const previewContractIds = [
+        ...preview.candidates.map((c) => c.contractId),
+        ...preview.invoices.map((i) => i.contractId),
+      ];
       const liveSoll =
         previewContractIds.length === 0
           ? []
@@ -248,7 +251,8 @@ export const feeRunsRouter = {
               );
       const liveSet = new Set(liveSoll.map((s) => s.contractId));
       const candidates = preview.candidates.filter((c) => !liveSet.has(c.contractId));
-      if (candidates.length === 0) {
+      const invoiceItems = preview.invoices.filter((i) => !liveSet.has(i.contractId));
+      if (candidates.length === 0 && invoiceItems.length === 0) {
         throw new ORPCError("CONFLICT", {
           message: `Alle Posten für ${input.billingYear} wurden zwischenzeitlich bereits abgerechnet.`,
         });
@@ -321,6 +325,38 @@ export const feeRunsRouter = {
         for (const s of insertedSoll) sollByContract.set(s.contractId, s.id);
       }
 
+      // 2b. Rechnungszahler: offene Sollstellung (status "open"), keine
+      //     pain.008-Zeile, kein Mandat. Sie erscheint sofort in Offenen Posten
+      //     und ist mahnbar, sobald sie überfällig ist. Idempotent über den
+      //     (contract, year)-Unique-Index.
+      if (invoiceItems.length > 0) {
+        await tx
+          .insert(sollStellungenTable)
+          .values(
+            invoiceItems.map((i) => ({
+              memberId: i.memberId,
+              contractId: i.contractId,
+              billingYear: input.billingYear,
+              falligkeitsdatum: input.falligkeitsdatum,
+              amount: i.amount,
+              paidAmount: "0",
+              openAmount: i.amount,
+              status: "open" as const,
+            })) as never,
+          )
+          .onConflictDoUpdate({
+            target: [sollStellungenTable.contractId, sollStellungenTable.billingYear],
+            set: {
+              amount: sql`excluded.amount`,
+              openAmount: sql`excluded.amount`,
+              paidAmount: "0",
+              status: "open",
+              falligkeitsdatum: input.falligkeitsdatum,
+              updatedAt: new Date(),
+            },
+          });
+      }
+
       // 3. Build fee_run_items in memory, then bulk-insert. Also collect
       //    pain.008 inputs and the set of mandates actually used so the
       //    XML body and the mandate-timestamp bump can happen outside the
@@ -390,35 +426,41 @@ export const feeRunsRouter = {
           .where(inArray(sepaMandatesTable.id, [...usedMandateIdSet]));
       }
 
-      // 5. Generate XML, persist on the run.
-      const msgId = buildMsgId(input.billingYear, run.id);
-      const now = new Date();
-      const filename = buildXmlFilename(now);
-      const xml = buildPain008({
-        creditor: {
-          name: org.vereinsname,
-          iban: orgIban,
-          bic: org.vereinsBic,
-          glaeubigerId: org.glaeubigerId,
-        },
-        falligkeitsdatum: input.falligkeitsdatum,
-        msgId,
-        pmtInfIdPrefix: msgId,
-        createdAtIso: now.toISOString(),
-        items: pain008Items,
-      });
+      // 5. Generate the pain.008 XML and persist it on the run -- only when
+      //    there are direct-debit items. An invoice-only run (alle Zahler auf
+      //    Rechnung) hat keine SEPA-Datei.
+      let xmlFilename: string | null = null;
+      if (pain008Items.length > 0) {
+        const msgId = buildMsgId(input.billingYear, run.id);
+        const now = new Date();
+        const filename = buildXmlFilename(now);
+        const xml = buildPain008({
+          creditor: {
+            name: org.vereinsname,
+            iban: orgIban,
+            bic: org.vereinsBic,
+            glaeubigerId: org.glaeubigerId,
+          },
+          falligkeitsdatum: input.falligkeitsdatum,
+          msgId,
+          pmtInfIdPrefix: msgId,
+          createdAtIso: now.toISOString(),
+          items: pain008Items,
+        });
 
-      await tx
-        .update(feeRunsTable)
-        .set({
-          xmlMessageId: msgId,
-          xmlPaymentInfoIdFrst: `${msgId}-FRST`,
-          xmlPaymentInfoIdRcur: `${msgId}-RCUR`,
-          xmlGeneratedAt: now,
-          xmlFilename: filename,
-          xmlContent: xml,
-        })
-        .where(eq(feeRunsTable.id, run.id));
+        await tx
+          .update(feeRunsTable)
+          .set({
+            xmlMessageId: msgId,
+            xmlPaymentInfoIdFrst: `${msgId}-FRST`,
+            xmlPaymentInfoIdRcur: `${msgId}-RCUR`,
+            xmlGeneratedAt: now,
+            xmlFilename: filename,
+            xmlContent: xml,
+          })
+          .where(eq(feeRunsTable.id, run.id));
+        xmlFilename = filename;
+      }
 
       await appendAudit(tx, {
         entityType: "fee_run",
@@ -440,7 +482,8 @@ export const feeRunsRouter = {
         feeRunId: run.id,
         itemCount: runItemCount,
         totalAmount: runTotalAmount,
-        xmlFilename: filename,
+        xmlFilename,
+        invoiceCount: invoiceItems.length,
       };
     });
 
