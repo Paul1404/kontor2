@@ -46,7 +46,8 @@ function NewFeeRunPage() {
     feeRunId: string;
     itemCount: number;
     totalAmount: string;
-    xmlFilename: string;
+    xmlFilename: string | null;
+    invoiceCount: number;
   } | null>(null);
 
   const previewQuery = useQuery({
@@ -384,7 +385,7 @@ function PreviewStep(props: {
     return (
       <Card>
         <CardContent className="flex items-center justify-center gap-2 p-12 text-muted-foreground">
-          <Loader2 className="size-5 animate-spin" /> Berechne Vorschau...
+          <Loader2 className="size-5 animate-spin" /> Berechne Vorschau…
         </CardContent>
       </Card>
     );
@@ -396,9 +397,15 @@ function PreviewStep(props: {
   return (
     <>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <SummaryTile label="Posten" value={p.totals.count.toString()} />
+        <SummaryTile label="Lastschriften" value={p.totals.count.toString()} />
         <SummaryTile label="Summe" value={formatCurrency(p.totals.grandTotal)} highlight />
         <SummaryTile label="Ausgeschlossen" value={p.excluded.length.toString()} />
+        {p.totals.invoiceCount > 0 ? (
+          <SummaryTile
+            label="Rechnungen offen"
+            value={`${p.totals.invoiceCount} · ${formatCurrency(p.totals.invoiceTotal)}`}
+          />
+        ) : null}
       </div>
 
       <SimulationSection
@@ -646,7 +653,13 @@ function IncludedTable(props: { candidates: PreviewData["candidates"] }) {
 function DoneStep({
   result,
 }: {
-  result: { feeRunId: string; itemCount: number; totalAmount: string; xmlFilename: string };
+  result: {
+    feeRunId: string;
+    itemCount: number;
+    totalAmount: string;
+    xmlFilename: string | null;
+    invoiceCount: number;
+  };
 }) {
   return (
     <Card>
@@ -655,18 +668,25 @@ function DoneStep({
         <div>
           <div className="text-lg font-semibold">Beitragslauf erzeugt</div>
           <div className="text-sm text-muted-foreground">
-            {result.itemCount} Posten · {formatCurrency(result.totalAmount)}
+            {result.itemCount} Lastschriften · {formatCurrency(result.totalAmount)}
+            {result.invoiceCount > 0 ? ` · ${result.invoiceCount} Rechnungen offen` : ""}
           </div>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button
-            onClick={async () => {
-              const res = await orpc.feeRuns.downloadXml({ id: result.feeRunId });
-              triggerDownload(res.filename ?? result.xmlFilename, res.content, "application/xml");
-            }}
-          >
-            <Download className="size-4" /> pain.008 herunterladen
-          </Button>
+          {result.xmlFilename ? (
+            <Button
+              onClick={async () => {
+                const res = await orpc.feeRuns.downloadXml({ id: result.feeRunId });
+                triggerDownload(
+                  res.filename ?? result.xmlFilename ?? "lastschrift.xml",
+                  res.content,
+                  "application/xml",
+                );
+              }}
+            >
+              <Download className="size-4" /> pain.008 herunterladen
+            </Button>
+          ) : null}
           <Link to="/app/beitrag/$id" params={{ id: result.feeRunId }}>
             <Button variant="outline">Zum Lauf</Button>
           </Link>

@@ -58,14 +58,40 @@ export type PreviewExclusion = {
   reason: string;
 };
 
+/**
+ * Ein Rechnungszahler: zahlt nicht per Lastschrift (`is_direct_debit = false`),
+ * bekommt aber denselben (anteiligen) Beitrag. Statt einer pain.008-Zeile
+ * entsteht beim Commit eine offene Sollstellung, die per Rechnung beglichen
+ * wird und sofort in Offenen Posten und im Mahnwesen auftaucht.
+ */
+export type PreviewInvoice = {
+  memberId: string;
+  memberName: string;
+  contractId: string;
+  vertragNr: string;
+  art: number;
+  artName: string | null;
+  baseAmount: string;
+  aufnahmegeb: string;
+  amount: string;
+  includesAufnahmegebuhr: boolean;
+  prorationFactor: number;
+  prorationLabel: string | null;
+  /** Wer die Rechnung bekommt: das Mitglied selbst oder ein Zahler. */
+  zahlerMemberId: string;
+};
+
 export type Preview = {
   candidates: PreviewCandidate[];
   excluded: PreviewExclusion[];
+  invoices: PreviewInvoice[];
   conflicts: { memberId: string; contractId: string; options: MandateSummary[] }[];
   totals: {
     grandTotal: string;
     count: number;
     byCategory: Record<string, { count: number; amount: string }>;
+    invoiceTotal: string;
+    invoiceCount: number;
   };
   issues: { level: "error" | "warning"; message: string }[];
 };
@@ -111,6 +137,7 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
 
   const candidates: PreviewCandidate[] = [];
   const excluded: PreviewExclusion[] = [];
+  const invoices: PreviewInvoice[] = [];
   const conflicts: Preview["conflicts"] = [];
   const issues: Preview["issues"] = [];
 
@@ -280,13 +307,42 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
     }
 
     if (!contract.isDirectDebit) {
-      excluded.push({
+      // Rechnungszahler: keine Lastschrift, aber derselbe (anteilige) Beitrag.
+      // Beim Commit wird daraus eine offene Sollstellung (Rechnung).
+      const aufnRawInv = parseAmount(contract.aufnahmegeb);
+      const includeAufnInv = aufnRawInv > 0 && !aufnGesehen.has(contract.id);
+      const prorationInv = computeProration({
+        start: contract.vertragBegin ?? member.eintritt ?? null,
+        end:
+          contract.vertragEnde ??
+          contract.gekuendZum ??
+          member.austritt ??
+          member.verstorbenAm ??
+          null,
+        year: billingYear,
+        modus,
+        einheit,
+      });
+      const baseCentsInv = applyFactor(toCents(baseAmount), prorationInv.factor);
+      const totalCentsInv = baseCentsInv + (includeAufnInv ? toCents(aufnRawInv) : 0n);
+      const zahlerInv = zahlerByContract.get(contract.id) ?? {
+        zahlerId: member.id,
+        quelle: "selbst" as const,
+      };
+      invoices.push({
         memberId: member.id,
         memberName,
         contractId: contract.id,
         vertragNr: contract.vertragNr,
+        art: contract.art,
         artName: contract.artName,
-        reason: "Lastschrift nicht aktiv",
+        baseAmount: centsToAmount(baseCentsInv),
+        aufnahmegeb: includeAufnInv ? centsToAmount(toCents(aufnRawInv)) : "0.00",
+        amount: centsToAmount(totalCentsInv),
+        includesAufnahmegebuhr: includeAufnInv,
+        prorationFactor: prorationInv.factor,
+        prorationLabel: prorationInv.label,
+        zahlerMemberId: zahlerInv.zahlerId,
       });
       continue;
     }
@@ -424,13 +480,17 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
     byCategory[key] = cat;
   }
 
-  if (candidates.length === 0) {
+  let invoiceCents = 0n;
+  for (const inv of invoices) invoiceCents += amountStrToCents(inv.amount);
+
+  if (candidates.length === 0 && invoices.length === 0) {
     issues.push({ level: "warning", message: "Keine berechtigten Mitglieder gefunden." });
   }
 
   return {
     candidates,
     excluded,
+    invoices,
     conflicts,
     totals: {
       grandTotal: centsToAmount(grandCents),
@@ -441,6 +501,8 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
           { count: v.count, amount: centsToAmount(v.cents) },
         ]),
       ),
+      invoiceTotal: centsToAmount(invoiceCents),
+      invoiceCount: invoices.length,
     },
     issues,
   };
@@ -450,8 +512,9 @@ function emptyResult(): Preview {
   return {
     candidates: [],
     excluded: [],
+    invoices: [],
     conflicts: [],
-    totals: { grandTotal: "0.00", count: 0, byCategory: {} },
+    totals: { grandTotal: "0.00", count: 0, byCategory: {}, invoiceTotal: "0.00", invoiceCount: 0 },
     issues: [{ level: "warning", message: "Keine Verträge im Abrechnungsjahr gefunden." }],
   };
 }

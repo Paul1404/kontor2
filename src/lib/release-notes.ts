@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.78.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Der Beitragslauf berücksichtigt jetzt auch Rechnungszahler. Statt sie zu überspringen, legt er für sie eine offene Sollstellung an (ohne SEPA-Datei). Diese erscheint sofort in den Offenen Posten und im Mahnwesen. Die Vorschau und das Ergebnis zeigen die Zahl der offenen Rechnungen getrennt von den Lastschriften.",
+      },
+    ],
+  },
+  {
     version: "0.77.0",
     date: "2026-06-12",
     changes: [
