@@ -50,7 +50,7 @@ describe("portal cookie helpers", () => {
   });
 
   it("parses cookie from header line", () => {
-    const headers = new Headers({ cookie: "other=1; svuwv_portal=abc.def; foo=bar" });
+    const headers = new Headers({ cookie: "other=1; kontor2_portal=abc.def; foo=bar" });
     expect(getPortalCookieFromHeaders(headers)).toBe("abc.def");
   });
 

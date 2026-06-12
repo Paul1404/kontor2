@@ -11,7 +11,7 @@ import { logger } from "~/server/lib/logger";
  * always returns `false` — no further setup is possible without an admin.
  *
  * Counterpart to the env-driven `ensureBootstrapAdmin`: when an operator
- * forgets to set SVUWV_BOOTSTRAP_ADMIN_* before first deploy, this is the
+ * forgets to set BOOTSTRAP_ADMIN_* before first deploy, this is the
  * recovery path that avoids the catch-22 of "first user must be an admin,
  * but you need an admin to create users."
  */

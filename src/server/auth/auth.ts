@@ -139,7 +139,7 @@ function buildAuth() {
       // Retry-After. See issues #77 and #82.
       apiKey({
         apiKeyHeaders: "x-api-key",
-        defaultPrefix: "svuwv_",
+        defaultPrefix: "kontor2_",
         enableMetadata: true,
         rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 1_000_000 },
       }),

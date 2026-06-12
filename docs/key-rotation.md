@@ -42,10 +42,11 @@ das Schema nach jeder `encryptedText`-Spalte scannt.
    `inspectEncryptedData`) zeigt, wie viele Zeilen auf welchem Schlüssel liegen.
 
 3. **Umschlüsseln.** Admin-Aktion `settings.reencryptData` (ruft
-   `reencryptAllData`). Idempotent: Zeilen, die schon auf `current` liegen,
-   werden übersprungen; fehlgeschlagene werden gemeldet und unangetastet
-   gelassen (dann fehlenden Schlüssel zu `APP_SECRET_PREV` geben und erneut
-   laufen lassen).
+   `reencryptAllData`), oder per CLI mit injizierter Prod-Env:
+   `railway run bun run db:reencrypt`. Idempotent: Zeilen, die schon auf
+   `current` liegen, werden übersprungen; fehlgeschlagene werden gemeldet und
+   unangetastet gelassen (dann fehlenden Schlüssel zu `APP_SECRET_PREV` geben
+   und erneut laufen lassen).
 
 4. **Schranke prüfen.** `assessKeyDropSafety(db)` ist erst dann `safe: true`,
    wenn **keine** Zeile mehr auf einem `previous`-Schlüssel, einem Legacy-v1-Blob

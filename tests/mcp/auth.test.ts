@@ -50,21 +50,21 @@ describe("resolveApiKeyContext", () => {
 
   it("returns null when the key owner no longer exists", async () => {
     verifyApiKey.mockResolvedValue({ valid: true, error: null, key: validKey });
-    const result = await resolveApiKeyContext(baseContext([]), "svuwv_x");
+    const result = await resolveApiKeyContext(baseContext([]), "kontor2_x");
     expect(result).toBeNull();
   });
 
   it("returns null for a banned owner", async () => {
     verifyApiKey.mockResolvedValue({ valid: true, error: null, key: validKey });
     const user = { id: "user-1", email: "x@y.de", role: "vorstand", banned: true };
-    const result = await resolveApiKeyContext(baseContext([user]), "svuwv_x");
+    const result = await resolveApiKeyContext(baseContext([user]), "kontor2_x");
     expect(result).toBeNull();
   });
 
   it("synthesizes a session carrying the owner's user row and the key id", async () => {
     verifyApiKey.mockResolvedValue({ valid: true, error: null, key: validKey });
     const user = { id: "user-1", email: "x@y.de", role: "vorstand", banned: false };
-    const result = await resolveApiKeyContext(baseContext([user]), "svuwv_x");
+    const result = await resolveApiKeyContext(baseContext([user]), "kontor2_x");
     expect(result).not.toBeNull();
     expect(result?.session?.user).toMatchObject({ id: "user-1", role: "vorstand" });
     expect(result?.session?.session.id).toBe("apikey:key-1");
