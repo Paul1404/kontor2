@@ -2,7 +2,7 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import type { ReactNode } from "react";
 import { ErrorPanel, NotFoundPanel } from "~/components/layout/ErrorPanel";
 import { Toaster } from "~/components/ui/toaster";
-import { type Branding, BrandingProvider } from "~/lib/branding";
+import { type Branding, BrandingProvider, brandingIconUrl } from "~/lib/branding";
 import { brandColorCss } from "~/lib/branding-color";
 import { orpc } from "~/lib/orpc";
 import { ThemeProvider, themeInitScript } from "~/lib/theme";
@@ -27,15 +27,9 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "color-scheme", content: "light dark" },
     ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
-      { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32.png" },
-      { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16.png" },
-      { rel: "shortcut icon", href: "/favicon.ico" },
-      { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
-      { rel: "manifest", href: "/manifest.webmanifest" },
-    ],
+    // Icons + manifest werden in RootDocument aus dem Branding gesetzt (dynamisch
+    // oder gebündelter Standard), damit ein eigenes Logo das Favicon ersetzt.
+    links: [{ rel: "stylesheet", href: appCss }],
   }),
   component: RootRoute,
   // Last-resort safety net: any uncaught throw inside a route lands here
@@ -73,6 +67,7 @@ function RootDocument({
   const title = `${branding?.anzeigename?.trim() || "Vereinsverwaltung"} – Vereinsverwaltung`;
   const themeColor = branding?.primaryColor || "#dc2626";
   const brandCss = brandColorCss(branding?.primaryColor);
+  const iconUrl = branding ? brandingIconUrl(branding) : null;
   return (
     <html lang="de" className="h-full">
       <head>
@@ -80,6 +75,21 @@ function RootDocument({
         {/* Branding wird serverseitig gesetzt -> kein Aufblitzen der Standardmarke. */}
         <title>{title}</title>
         <meta name="theme-color" content={themeColor} />
+        {iconUrl ? (
+          <>
+            <link rel="icon" href={iconUrl} />
+            <link rel="apple-touch-icon" href={iconUrl} />
+          </>
+        ) : (
+          <>
+            <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+            <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+            <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+            <link rel="shortcut icon" href="/favicon.ico" />
+            <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+          </>
+        )}
+        <link rel="manifest" href="/api/branding/manifest" />
         {brandCss ? (
           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted, server-built from a validated hex
           <style dangerouslySetInnerHTML={{ __html: brandCss }} />

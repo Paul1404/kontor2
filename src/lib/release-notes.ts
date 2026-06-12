@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.65.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Das eigene Logo erscheint jetzt auch als Browser-Symbol (Favicon) und beim Installieren als App. Name und Farbe der installierten App ziehen mit. Ohne eigenes Logo bleibt das Standardsymbol.",
+      },
+    ],
+  },
+  {
     version: "0.64.0",
     date: "2026-06-12",
     changes: [

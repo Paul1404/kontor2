@@ -72,6 +72,8 @@ import { Route as ApiPortalLogoutRouteImport } from './api/portal.logout'
 import { Route as ApiIngestSvumsRouteImport } from './api/ingest.svums'
 import { Route as ApiFilesIdRouteImport } from './api/files.$id'
 import { Route as ApiCronSnapshotsRouteImport } from './api/cron.snapshots'
+import { Route as ApiBrandingManifestRouteImport } from './api/branding.manifest'
+import { Route as ApiBrandingIconRouteImport } from './api/branding.icon'
 import { Route as ApiAuthSplatRouteImport } from './api/auth.$'
 import { Route as AntragUploadTokenRouteImport } from './antrag/upload.$token'
 import { Route as AppForderungenMahnungenIndexRouteImport } from './app/forderungen/mahnungen/index'
@@ -406,6 +408,16 @@ const ApiCronSnapshotsRoute = ApiCronSnapshotsRouteImport.update({
   path: '/api/cron/snapshots',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBrandingManifestRoute = ApiBrandingManifestRouteImport.update({
+  id: '/api/branding/manifest',
+  path: '/api/branding/manifest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBrandingIconRoute = ApiBrandingIconRouteImport.update({
+  id: '/api/branding/icon',
+  path: '/api/branding/icon',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -483,6 +495,8 @@ export interface FileRoutesByFullPath {
   '/portal/': typeof PortalIndexRoute
   '/antrag/upload/$token': typeof AntragUploadTokenRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/branding/icon': typeof ApiBrandingIconRoute
+  '/api/branding/manifest': typeof ApiBrandingManifestRoute
   '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/ingest/svums': typeof ApiIngestSvumsRoute
@@ -553,6 +567,8 @@ export interface FileRoutesByTo {
   '/portal': typeof PortalIndexRoute
   '/antrag/upload/$token': typeof AntragUploadTokenRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/branding/icon': typeof ApiBrandingIconRoute
+  '/api/branding/manifest': typeof ApiBrandingManifestRoute
   '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/ingest/svums': typeof ApiIngestSvumsRoute
@@ -627,6 +643,8 @@ export interface FileRoutesById {
   '/portal/': typeof PortalIndexRoute
   '/antrag/upload/$token': typeof AntragUploadTokenRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/branding/icon': typeof ApiBrandingIconRoute
+  '/api/branding/manifest': typeof ApiBrandingManifestRoute
   '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/ingest/svums': typeof ApiIngestSvumsRoute
@@ -702,6 +720,8 @@ export interface FileRouteTypes {
     | '/portal/'
     | '/antrag/upload/$token'
     | '/api/auth/$'
+    | '/api/branding/icon'
+    | '/api/branding/manifest'
     | '/api/cron/snapshots'
     | '/api/files/$id'
     | '/api/ingest/svums'
@@ -772,6 +792,8 @@ export interface FileRouteTypes {
     | '/portal'
     | '/antrag/upload/$token'
     | '/api/auth/$'
+    | '/api/branding/icon'
+    | '/api/branding/manifest'
     | '/api/cron/snapshots'
     | '/api/files/$id'
     | '/api/ingest/svums'
@@ -845,6 +867,8 @@ export interface FileRouteTypes {
     | '/portal/'
     | '/antrag/upload/$token'
     | '/api/auth/$'
+    | '/api/branding/icon'
+    | '/api/branding/manifest'
     | '/api/cron/snapshots'
     | '/api/files/$id'
     | '/api/ingest/svums'
@@ -901,6 +925,8 @@ export interface RootRouteChildren {
   ApiMcpRoute: typeof ApiMcpRoute
   InviteTokenRoute: typeof InviteTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiBrandingIconRoute: typeof ApiBrandingIconRoute
+  ApiBrandingManifestRoute: typeof ApiBrandingManifestRoute
   ApiCronSnapshotsRoute: typeof ApiCronSnapshotsRoute
   ApiFilesIdRoute: typeof ApiFilesIdRoute
   ApiIngestSvumsRoute: typeof ApiIngestSvumsRoute
@@ -1352,6 +1378,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCronSnapshotsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/branding/manifest': {
+      id: '/api/branding/manifest'
+      path: '/api/branding/manifest'
+      fullPath: '/api/branding/manifest'
+      preLoaderRoute: typeof ApiBrandingManifestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/branding/icon': {
+      id: '/api/branding/icon'
+      path: '/api/branding/icon'
+      fullPath: '/api/branding/icon'
+      preLoaderRoute: typeof ApiBrandingIconRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -1561,6 +1601,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMcpRoute: ApiMcpRoute,
   InviteTokenRoute: InviteTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiBrandingIconRoute: ApiBrandingIconRoute,
+  ApiBrandingManifestRoute: ApiBrandingManifestRoute,
   ApiCronSnapshotsRoute: ApiCronSnapshotsRoute,
   ApiFilesIdRoute: ApiFilesIdRoute,
   ApiIngestSvumsRoute: ApiIngestSvumsRoute,
