@@ -1,4 +1,4 @@
-# SVUWV
+# Kontor2
 
 Self-hosted Vereinsverwaltung for SV 1945 Untereuerheim e.V. It replaces
 Linear's commercial "Online Vereinsverwaltung" -- a per-seat cloud subscription
