@@ -1,7 +1,7 @@
 # CLAUDE.md (repo)
 
 Orientation for working in this repo. The full stack and style guide lives in
-the user-level `CLAUDE.md`; this file is the svuwv-specific layer plus the few
+the user-level `CLAUDE.md`; this file is the Kontor2-specific layer plus the few
 things that are easy to miss. Read it before you start.
 
 ## What this is

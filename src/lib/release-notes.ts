@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.79.2",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Interne Umbenennung des Projekts von svuwv auf Kontor2 (Repo, Paketname, Doku). Kein Effekt auf den laufenden Betrieb. Verschlüsselung, Konfiguration und Daten bleiben unverändert.",
+      },
+    ],
+  },
+  {
     version: "0.79.1",
     date: "2026-06-12",
     changes: [
