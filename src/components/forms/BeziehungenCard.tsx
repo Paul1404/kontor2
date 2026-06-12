@@ -458,7 +458,14 @@ function AddRelationshipForm({
               </span>{" "}
               <span className="text-muted-foreground">{selected.mitgliedsnummer}</span>
             </span>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setSelected(null)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelected(null)}
+              aria-label="Auswahl aufheben"
+              title="Auswahl aufheben"
+            >
               <X className="size-3.5" />
             </Button>
           </div>

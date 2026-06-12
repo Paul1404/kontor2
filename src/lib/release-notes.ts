@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.75.1",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Kleinere optische Verbesserungen: In der Mitgliederliste steht der Nachname hervorgehoben vor dem helleren Vornamen, ohne Komma. Auf der Mitgliedsseite bleibt der Titel nie leer. Dazu ein paar barrierefreie Beschriftungen und einheitliche Auslassungspunkte.",
+      },
+    ],
+  },
+  {
     version: "0.75.0",
     date: "2026-06-12",
     changes: [

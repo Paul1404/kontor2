@@ -133,7 +133,8 @@ function MemberDetailPage() {
   const memberDisplayName = useMemo(() => {
     const m = detail.data?.member;
     if (!m) return "";
-    return [m.titel1, m.vorname, m.nachname].filter(Boolean).join(" ");
+    // Never render a blank title: fall back to the company name, else a label.
+    return [m.titel1, m.vorname, m.nachname].filter(Boolean).join(" ") || m.firma1 || "Unbenannt";
   }, [detail.data?.member]);
 
   useEffect(() => {
@@ -208,7 +209,7 @@ function MemberDetailPage() {
             <ArrowLeft className="size-4" /> Zurück zur Liste
           </Link>
           <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-            {[member.titel1, member.vorname, member.nachname].filter(Boolean).join(" ")}
+            {memberDisplayName}
             <MemberStatusBadge member={member} hatAktiveAbteilung={hatAktiveAbteilung} />
             {!member.memberNo ? (
               <Tooltip content="Zahlt für ein Mitglied, ist aber selbst keines">

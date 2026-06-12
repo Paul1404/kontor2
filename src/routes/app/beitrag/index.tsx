@@ -98,7 +98,7 @@ function FeeRunsListPage() {
         <CardContent className="p-0">
           {list.isLoading ? (
             <div className="flex items-center justify-center gap-2 p-12 text-muted-foreground">
-              <Loader2 className="size-5 animate-spin" /> Lade...
+              <Loader2 className="size-5 animate-spin" /> Lade…
             </div>
           ) : !list.data || list.data.rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 p-12 text-center text-muted-foreground">
