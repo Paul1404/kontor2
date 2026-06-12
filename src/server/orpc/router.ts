@@ -18,6 +18,7 @@ import { familienRouter } from "~/server/orpc/procedures/familien";
 import { feeRunsRouter } from "~/server/orpc/procedures/fee-runs";
 import { feeTypesRouter } from "~/server/orpc/procedures/fee-types";
 import { importRouter } from "~/server/orpc/procedures/import";
+import { invoicesRouter } from "~/server/orpc/procedures/invoices";
 import { kulanzRouter } from "~/server/orpc/procedures/kulanz";
 import { logsRouter } from "~/server/orpc/procedures/logs";
 import { membersRouter } from "~/server/orpc/procedures/members";
@@ -62,6 +63,7 @@ export const appRouter = {
   settings: settingsRouter,
   organization: organizationSettingsRouter,
   feeRuns: feeRunsRouter,
+  invoices: invoicesRouter,
   payments: paymentsRouter,
   import: importRouter,
   reports: reportsRouter,

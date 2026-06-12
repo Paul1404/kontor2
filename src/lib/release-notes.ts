@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.79.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Für Rechnungszahler lässt sich jetzt eine Rechnung als PDF erzeugen. Auf der Mitgliedsseite erscheint bei offenen Posten ein Knopf Rechnung. Das PDF führt die offenen Beiträge mit Rechnungsnummer, Gesamtbetrag, Zahlungsziel und der Vereins-Bankverbindung zum Überweisen.",
+      },
+    ],
+  },
+  {
     version: "0.78.0",
     date: "2026-06-12",
     changes: [

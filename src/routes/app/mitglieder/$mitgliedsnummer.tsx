@@ -45,7 +45,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { isKeineAbteilung } from "~/lib/abteilung-filter";
 import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/audit-labels";
 import { formatLand } from "~/lib/country";
-import { triggerDownload } from "~/lib/download";
+import { triggerDownload, triggerDownloadBase64 } from "~/lib/download";
 import { EMPTY_VALUE, formatCurrency, formatDate, formatDateTime, formatPhone } from "~/lib/format";
 import { memberStatusView } from "~/lib/member-status";
 import { orpc } from "~/lib/orpc";
@@ -565,6 +565,7 @@ function MemberDetailPage() {
 
           <SollstellungenCard
             rows={sollstellungen as never}
+            memberId={member.id}
             mitgliedsnummer={mitgliedsnummer}
             canEdit={canEdit}
           />
@@ -818,14 +819,25 @@ type SollstellungRow = {
 
 function SollstellungenCard({
   rows,
+  memberId,
   mitgliedsnummer,
   canEdit,
 }: {
   rows: SollstellungRow[];
+  memberId: string;
   mitgliedsnummer: string;
   canEdit: boolean;
 }) {
   const qc = useQueryClient();
+  const hasOpen = rows.some((r) => r.status === "open");
+  const rechnung = useMutation({
+    mutationFn: () => orpc.invoices.renderForMember({ memberId }),
+    onSuccess: (res) => {
+      triggerDownloadBase64(res.filename, res.base64, "application/pdf");
+      toast.success(`Rechnung ${res.docRef} erzeugt`);
+    },
+    onError: (e: Error) => toast.error("Rechnung fehlgeschlagen", { description: e.message }),
+  });
   const [target, setTarget] = useState<SollstellungRow | null>(null);
   const [stornoTarget, setStornoTarget] = useState<SollstellungRow | null>(null);
 
@@ -882,8 +894,24 @@ function SollstellungenCard({
   const showActions = canEdit && rows.some((r) => r.status === "eingezogen" || r.status === "open");
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle>Sollstellung</CardTitle>
+        {canEdit && hasOpen ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => rechnung.mutate()}
+            disabled={rechnung.isPending}
+            title="Rechnung über die offenen Posten erzeugen"
+          >
+            {rechnung.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <FileText className="size-4" />
+            )}
+            Rechnung
+          </Button>
+        ) : null}
       </CardHeader>
       <CardContent className="overflow-x-auto p-0">
         <table className="w-full text-sm">
