@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.80.1",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Abschluss der Schlüsselumstellung: nachdem alle verschlüsselten Felder auf den neuen Schlüssel überführt waren, ist der alte Übergangsschlüssel entfernt. svuwv ist damit vollständig aus der Anwendung verschwunden. Keine Auswirkung im Betrieb.",
+      },
+    ],
+  },
+  {
     version: "0.80.0",
     date: "2026-06-13",
     changes: [
