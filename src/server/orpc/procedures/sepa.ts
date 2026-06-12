@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
@@ -10,6 +10,7 @@ import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { planMandatNachtrag } from "~/server/domain/mandat-nachtrag";
 import { isMinorAt } from "~/server/domain/member";
+import { onboardMember } from "~/server/domain/member/onboard";
 import { resolveZahler } from "~/server/domain/zahler";
 import { vorstandProc } from "~/server/orpc/base";
 import { loadZahlerContext } from "~/server/sepa/zahler-context";
@@ -61,11 +62,56 @@ type NachtragKandidat = {
     reference: string;
     strong: boolean;
   };
+  /**
+   * Schadenbegrenzung für minderjährige Selbstzahler ganz ohne Beziehung: aus
+   * dem Kontoinhaber-Namen lässt sich ein Zahler-Kontakt ableiten und als
+   * Vertreter verknüpfen. Nur gesetzt, wenn es keinen Beziehungs-Vorschlag gibt.
+   */
+  payerContactSuggestion?: {
+    /** Anzeigename "Nachname, Vorname". */
+    name: string;
+    vorname: string;
+    nachname: string;
+  };
 };
 
 /** Normalisiert Namen für den groben Kontoinhaber-Abgleich. */
 function normalizeName(s: string | null | undefined): string {
   return (s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Zerlegt einen Kontoinhaber-String in Vor- und Nachname. Anker ist der
+ * Nachname des Kindes: er steht (in diesem Datenbestand immer) im
+ * Kontoinhaber, egal in welcher Reihenfolge. Alles außer dem Nachnamen wird
+ * Vorname. Robust gegen "Vorname Nachname" wie "Nachname Vorname" und
+ * führende Anreden. Fällt auf "letztes Token = Nachname" zurück.
+ */
+export function parsePayerName(
+  kontoinhaber: string,
+  childNachname: string | null | undefined,
+): { vorname: string; nachname: string } {
+  const clean = kontoinhaber
+    .replace(/\b(herr|frau|fam\.?|familie)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const surname = (childNachname ?? "").trim();
+  if (surname) {
+    const re = new RegExp(`\\b${escapeRegex(surname)}\\b`, "i");
+    if (re.test(clean)) {
+      const vorname = clean.replace(re, " ").replace(/\s+/g, " ").trim();
+      if (vorname) return { vorname, nachname: surname };
+    }
+  }
+  const parts = clean.split(" ").filter(Boolean);
+  if (parts.length >= 2) {
+    return { vorname: parts.slice(0, -1).join(" "), nachname: parts[parts.length - 1] as string };
+  }
+  return { vorname: "", nachname: clean };
 }
 
 /**
@@ -83,7 +129,11 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
       nachname: membersTable.nachname,
       eintritt: membersTable.eintritt,
       geburtsdatum: membersTable.geburtsdatum,
-      abwKontoInh: membersTable.abwKontoInh,
+      // Kontoinhaber-Name aus Mitglied bzw. Vertrag (Lastschrift). Quelle für
+      // den Vertreter-/Kontakt-Vorschlag bei minderjährigen Selbstzahlern.
+      kontoinhaber: sql<
+        string | null
+      >`coalesce(nullif(btrim(${membersTable.abwKontoInh}), ''), (select nullif(btrim(c.abw_konto_inh), '') from contracts c where c.member_id = ${membersTable.id} and nullif(btrim(c.abw_konto_inh), '') is not null limit 1), (select nullif(btrim(c.kto_inh_v), '') from contracts c where c.member_id = ${membersTable.id} and nullif(btrim(c.kto_inh_v), '') is not null limit 1))`,
     })
     .from(membersTable)
     .where(
@@ -255,7 +305,7 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
 
     // Besten Vertreter-Vorschlag wählen: ein Treffer auf den Kontoinhaber-Namen
     // gewinnt (sehr wahrscheinlich der echte Zahler), sonst die erste Beziehung.
-    const konto = normalizeName(m.abwKontoInh);
+    const konto = normalizeName(m.kontoinhaber);
     const candidates = candidatesByMinor.get(m.id) ?? [];
     const scored = candidates.map((c) => {
       const nn = normalizeName(c.nachname);
@@ -265,6 +315,21 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
     });
     scored.sort((a, b) => (a.strong === b.strong ? 0 : a.strong ? -1 : 1));
     const best = scored[0];
+
+    // Keine Beziehung, aber ein Kontoinhaber-Name: daraus lässt sich ein
+    // Zahler-Kontakt ableiten (Schadenbegrenzung).
+    const payerContactSuggestion =
+      !best && m.kontoinhaber
+        ? (() => {
+            const parsed = parsePayerName(m.kontoinhaber, m.nachname);
+            if (!parsed.nachname && !parsed.vorname) return undefined;
+            return {
+              name: [parsed.nachname, parsed.vorname].filter(Boolean).join(", "),
+              vorname: parsed.vorname,
+              nachname: parsed.nachname,
+            };
+          })()
+        : undefined;
 
     result.push({
       zahlerMemberId: m.id,
@@ -288,6 +353,7 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
             },
           }
         : {}),
+      ...(payerContactSuggestion ? { payerContactSuggestion } : {}),
     });
   }
 
@@ -516,6 +582,162 @@ export const sepaRouter = {
   nachtragKandidaten: vorstandProc.input(v.void()).handler(async ({ context }) => {
     return await loadNachtragKandidaten(context.db);
   }),
+
+  /**
+   * Schadenbegrenzung für minderjährige Selbstzahler ganz ohne Beziehung:
+   * leitet aus dem Kontoinhaber-Namen einen Zahler ab. Gibt es den Namen schon
+   * als Mitglied/Kontakt, wird verknüpft; sonst wird ein Kontakt (K-Nummer)
+   * angelegt und die Bankverbindung des Kindes übernommen, damit der Einzug
+   * funktioniert. In beiden Fällen entsteht eine Vertreter-Beziehung, sodass
+   * der Zahler sich danach auflöst und das Mandat nachtragbar wird. Der
+   * Kontoinhaber wird serverseitig neu aufgelöst (nie dem Client geglaubt).
+   */
+  resolveMinorViaKontoinhaber: vorstandProc
+    .input(v.object({ minorMemberId: v.string() }))
+    .handler(async ({ context, input }) => {
+      const actorId = context.session!.user.id;
+      const actorEmail = context.session!.user.email;
+      return await withUniqueRetry(() =>
+        context.db.transaction(async (tx) => {
+          const [minor] = await tx
+            .select({
+              id: membersTable.id,
+              adrNr: membersTable.adrNr,
+              nachname: membersTable.nachname,
+              land: membersTable.land,
+              iban1: membersTable.iban1,
+              iban1Last4: membersTable.iban1Last4,
+              bic1: membersTable.bic1,
+              kontoinhaber: sql<
+                string | null
+              >`coalesce(nullif(btrim(${membersTable.abwKontoInh}), ''), (select nullif(btrim(c.abw_konto_inh), '') from contracts c where c.member_id = ${membersTable.id} and nullif(btrim(c.abw_konto_inh), '') is not null limit 1), (select nullif(btrim(c.kto_inh_v), '') from contracts c where c.member_id = ${membersTable.id} and nullif(btrim(c.kto_inh_v), '') is not null limit 1))`,
+            })
+            .from(membersTable)
+            .where(eq(membersTable.id, input.minorMemberId))
+            .limit(1);
+          if (!minor) {
+            throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+          }
+          if (!minor.kontoinhaber) {
+            throw new ORPCError("VALIDATION_FAILED", {
+              message: "Kein Kontoinhaber-Name hinterlegt.",
+            });
+          }
+          const parsed = parsePayerName(minor.kontoinhaber, minor.nachname);
+          if (!parsed.nachname) {
+            throw new ORPCError("VALIDATION_FAILED", {
+              message: "Kontoinhaber-Name nicht auswertbar.",
+            });
+          }
+
+          // Dedup: gibt es den Namen schon (Mitglied oder Kontakt)? Dann
+          // verknüpfen statt eine Dublette anzulegen.
+          const firstVor = parsed.vorname.split(" ")[0] ?? "";
+          const [existing] = await tx
+            .select({
+              id: membersTable.id,
+              memberNo: membersTable.memberNo,
+              kontaktNo: membersTable.kontaktNo,
+              mitgliedsnummer: membersTable.mitgliedsnummer,
+              adrNr: membersTable.adrNr,
+            })
+            .from(membersTable)
+            .where(
+              and(
+                sql`${membersTable.deletedAt} is null`,
+                ne(membersTable.id, minor.id),
+                ilike(membersTable.nachname, parsed.nachname),
+                firstVor ? ilike(membersTable.vorname, `${firstVor}%`) : undefined,
+              ),
+            )
+            .limit(1);
+
+          let zahlerId: string;
+          let zahlerAdrNr: number;
+          let reference: string;
+          let action: "linked" | "created";
+          if (existing) {
+            zahlerId = existing.id;
+            zahlerAdrNr = existing.adrNr;
+            reference = existing.memberNo ?? existing.kontaktNo ?? existing.mitgliedsnummer ?? "";
+            action = "linked";
+          } else {
+            const created = await onboardMember(tx, {
+              patch: {
+                nachname: parsed.nachname,
+                vorname: parsed.vorname || null,
+                land: minor.land ?? null,
+                // Bankverbindung des Kindes übernehmen, damit der Kontakt
+                // einzugsfähig ist (iban1 wird beim Schreiben verschlüsselt).
+                iban1: minor.iban1 ?? null,
+                iban1Last4: minor.iban1Last4 ?? null,
+                bic1: minor.bic1 ?? null,
+              },
+              isKontakt: true,
+              status: "aktiv",
+              abteilungen: [],
+              fallbackEintritt: new Date().toISOString().slice(0, 10),
+              contract: null,
+              sepa: null,
+              actorId,
+              actorEmail,
+              requestId: context.requestId ?? null,
+            });
+            zahlerId = created.id;
+            zahlerAdrNr = created.adrNr;
+            reference = created.ref;
+            action = "created";
+          }
+
+          // Vertreter-Beziehung Kind -> Zahler. Etwaige andere Vertreter-Flags
+          // des Kindes vorher abräumen (höchstens einer pro Mitglied).
+          await tx
+            .update(relationshipsTable)
+            .set({ istVertreter: false, updatedAt: new Date() })
+            .where(
+              and(
+                eq(relationshipsTable.fromMemberId, minor.id),
+                eq(relationshipsTable.istVertreter, true),
+              ),
+            );
+          const [rel] = await tx
+            .insert(relationshipsTable)
+            .values({
+              fromMemberId: minor.id,
+              toMemberId: zahlerId,
+              fromAdrNr: minor.adrNr,
+              toAdrNr: zahlerAdrNr,
+              beziehung: "Zahler",
+              istVertreter: true,
+            })
+            .returning({ id: relationshipsTable.id });
+
+          const auditId = await appendAudit(tx, {
+            entityType: "relationship",
+            entityId: rel?.id ?? minor.id,
+            action: "create",
+            source: "ui",
+            actorId,
+            actorEmail,
+            changes: diff(null, {
+              fromMemberId: minor.id,
+              toMemberId: zahlerId,
+              istVertreter: true,
+              quelle: "kontoinhaber",
+            }),
+            requestId: context.requestId ?? null,
+          });
+          await takeMemberSnapshot(tx, minor.id, {
+            trigger: "mutation",
+            actorId,
+            actorEmail,
+            auditId,
+          });
+
+          return { action, reference, zahlerMemberId: zahlerId };
+        }),
+      );
+    }),
 
   /**
    * Führt das Nachtragen für die übergebenen ZAHLER aus. Der Plan kommt aus

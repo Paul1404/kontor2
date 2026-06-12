@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.71.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Bei Mandate nachtragen lässt sich für ein minderjähriges Mitglied ohne Beziehung jetzt aus dem hinterlegten Kontoinhaber ein Zahler-Kontakt ableiten. Gibt es den Namen schon, wird verknüpft, sonst wird ein Kontakt angelegt und die Bankverbindung des Kindes übernommen. Danach lässt sich das Mandat nachtragen.",
+      },
+    ],
+  },
+  {
     version: "0.70.0",
     date: "2026-06-12",
     changes: [

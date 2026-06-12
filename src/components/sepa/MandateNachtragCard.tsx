@@ -29,6 +29,11 @@ type Kandidat = {
     reference: string;
     strong: boolean;
   };
+  payerContactSuggestion?: {
+    name: string;
+    vorname: string;
+    nachname: string;
+  };
 };
 
 /**
@@ -135,6 +140,13 @@ export function MandateNachtragCard({ canEdit }: { canEdit: boolean }) {
                       canEdit={canEdit}
                       onDone={() => qc.invalidateQueries({ queryKey: ["sepa.nachtragKandidaten"] })}
                     />
+                  ) : r.payerContactSuggestion ? (
+                    <ResolveViaKontoinhaberButton
+                      minorMemberId={r.zahlerMemberId}
+                      suggestion={r.payerContactSuggestion}
+                      canEdit={canEdit}
+                      onDone={() => qc.invalidateQueries({ queryKey: ["sepa.nachtragKandidaten"] })}
+                    />
                   ) : (
                     <Badge variant="warning">{r.plan.reason}</Badge>
                   )}
@@ -205,6 +217,55 @@ function AssignVertreterButton({
       {candidate.strong ? (
         <span className="text-xs text-muted-foreground">passt zum Kontoinhaber</span>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Schadenbegrenzung ohne Beziehung: aus dem Kontoinhaber-Namen einen
+ * Zahler-Kontakt ableiten (oder einen bestehenden verknüpfen) und als Vertreter
+ * setzen. Die Bankverbindung des Kindes wandert auf den neuen Kontakt.
+ */
+function ResolveViaKontoinhaberButton({
+  minorMemberId,
+  suggestion,
+  canEdit,
+  onDone,
+}: {
+  minorMemberId: string;
+  suggestion: NonNullable<Kandidat["payerContactSuggestion"]>;
+  canEdit: boolean;
+  onDone: () => void | Promise<void>;
+}) {
+  const resolve = useMutation({
+    mutationFn: () => orpc.sepa.resolveMinorViaKontoinhaber({ minorMemberId }),
+    onSuccess: async (r) => {
+      toast.success(
+        r.action === "linked"
+          ? `Mit ${suggestion.name} verknüpft`
+          : `Kontakt ${suggestion.name} angelegt`,
+      );
+      await onDone();
+    },
+    onError: (e: Error) => toast.error("Anlegen fehlgeschlagen", { description: e.message }),
+  });
+
+  if (!canEdit) {
+    return <Badge variant="warning">Minderjährig: Kontoinhaber vorhanden, kein Zahler</Badge>;
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => resolve.mutate()}
+        disabled={resolve.isPending}
+        title={`Kontakt-Zahler ${suggestion.name} aus dem Kontoinhaber anlegen`}
+      >
+        {resolve.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+        Kontakt {suggestion.name} anlegen
+      </Button>
+      <span className="text-xs text-muted-foreground">aus Kontoinhaber</span>
     </div>
   );
 }
