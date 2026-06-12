@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { toast } from "~/components/ui/toaster";
+import { cn } from "~/lib/cn";
 import { formatCurrency, formatDate, toDateInput } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -136,6 +138,9 @@ export function ContractsCard({
                           {v.zahlerRef ? ` (${v.zahlerRef})` : ""}
                         </div>
                       ) : null}
+                      <div className="mt-1">
+                        <ZahlartControl contract={v} canEdit={canEdit} onChanged={refresh} />
+                      </div>
                     </td>
                     <td className="py-1 pr-3 text-right tabular-nums">
                       {formatCurrency(v.betrag)}
@@ -371,6 +376,56 @@ function AddContractForm({
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Zahlart eines Vertrags: Lastschrift (Standard) oder Rechnung. Klick schaltet
+ * um (setzt contracts.is_direct_debit). Rechnungszahler bekommen im
+ * Beitragslauf eine offene Sollstellung statt einer Lastschrift.
+ */
+function ZahlartControl({
+  contract,
+  canEdit,
+  onChanged,
+}: {
+  contract: Contract;
+  canEdit: boolean;
+  onChanged: () => void | Promise<void>;
+}) {
+  // Default ist Lastschrift (so hat Linear den Normalfall gespeichert).
+  const istLastschrift = contract.isDirectDebit !== false;
+  const toggle = useMutation({
+    mutationFn: () => orpc.contracts.quickFix({ id: contract.id, isDirectDebit: !istLastschrift }),
+    onSuccess: async () => {
+      toast.success(istLastschrift ? "Auf Rechnung umgestellt" : "Auf Lastschrift umgestellt");
+      await onChanged();
+    },
+    onError: (e: Error) => toast.error("Umstellen fehlgeschlagen", { description: e.message }),
+  });
+
+  const label = istLastschrift ? "Lastschrift" : "Rechnung";
+  const pill = cn(
+    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+    istLastschrift
+      ? "bg-muted text-muted-foreground"
+      : "bg-warning/15 text-warning dark:text-amber-400",
+  );
+
+  if (!canEdit) {
+    return <span className={pill}>{label}</span>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => toggle.mutate()}
+      disabled={toggle.isPending}
+      title={`Zahlart umschalten (aktuell ${label})`}
+      className={cn(pill, "transition-colors hover:ring-1 hover:ring-ring/40 disabled:opacity-60")}
+    >
+      {toggle.isPending ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
+      {label}
+    </button>
   );
 }
 
