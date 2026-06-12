@@ -10,7 +10,7 @@ import { memberDisplayName } from "~/server/domain/member";
 import { resolveEhrungJahr, resolveEhrungTitel } from "~/server/ehrungen/ehrung";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { buildEhrungsurkundeModel } from "~/server/pdf/ehrungsurkunde-model";
-import { clubLogoDataUri } from "~/server/pdf/logo";
+import { resolveClubLogo } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { EhrungsurkundeDocument } from "~/server/pdf/templates/ehrungsurkunde";
 import { presignDownload, putObject } from "~/server/s3/client";
@@ -233,7 +233,7 @@ export const ehrungenRouter = {
     const model = buildEhrungsurkundeModel({
       vereinsname: org.vereinsname,
       ort: org.anschriftOrt,
-      logoDataUri: clubLogoDataUri(),
+      logoDataUri: resolveClubLogo(org.logo),
       empfaengerName,
       mitgliedsnummer: member.mitgliedsnummer,
       kind: ehrung.kind,

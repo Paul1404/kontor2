@@ -1,6 +1,27 @@
 import nodemailer, { type Transporter } from "nodemailer";
 import { db } from "~/server/db/client";
+import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { smtpConfigTable } from "~/server/db/schema/settings";
+
+/**
+ * Vereinsname für E-Mail-Betreff und -Text: Anzeigename, sonst voller
+ * Vereinsname, sonst neutral. Resilient -- ein Mailversand soll nie an der
+ * Marke scheitern.
+ */
+async function brandName(): Promise<string> {
+  try {
+    const [org] = await db()
+      .select({
+        anzeigename: organizationSettingsTable.anzeigename,
+        vereinsname: organizationSettingsTable.vereinsname,
+      })
+      .from(organizationSettingsTable)
+      .limit(1);
+    return org?.anzeigename?.trim() || org?.vereinsname?.trim() || "Vereinsverwaltung";
+  } catch {
+    return "Vereinsverwaltung";
+  }
+}
 
 let cachedTransport: { signature: string; transporter: Transporter } | undefined;
 
@@ -97,16 +118,17 @@ export async function sendInviteEmail(opts: {
   const cfg = await loadSmtpConfig();
   if (!cfg) return { ok: false, reason: "smtp_not_configured" };
   const t = transporterFor(cfg);
+  const name = await brandName();
   const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
   try {
     await t.sendMail({
       from,
       to: opts.to,
-      subject: "Einladung zur SVUWV Vereinsverwaltung",
+      subject: `Einladung zur Vereinsverwaltung – ${name}`,
       text: [
         `Hallo,`,
         ``,
-        `${opts.invitedByName} lädt Sie zur SVUWV Vereinsverwaltung ein.`,
+        `${opts.invitedByName} lädt Sie zur Vereinsverwaltung von ${name} ein.`,
         `Rolle: ${opts.role}`,
         ``,
         `Bitte folgen Sie dem Link und legen Sie ein Passwort fest:`,
@@ -128,6 +150,7 @@ export async function sendPasswordResetEmail(opts: {
   const cfg = await loadSmtpConfig();
   if (!cfg) return { ok: false, reason: "smtp_not_configured" };
   const t = transporterFor(cfg);
+  const name = await brandName();
   const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
   try {
     await t.sendMail({
@@ -137,7 +160,7 @@ export async function sendPasswordResetEmail(opts: {
       text: [
         `Hallo,`,
         ``,
-        `für Ihr Konto in der SVUWV Vereinsverwaltung wurde das Zurücksetzen des`,
+        `für Ihr Konto in der Vereinsverwaltung von ${name} wurde das Zurücksetzen des`,
         `Passworts angefordert. Folgen Sie dem Link und vergeben Sie ein neues Passwort:`,
         opts.resetUrl,
         ``,
@@ -170,7 +193,7 @@ export async function sendTestMail(opts: {
     await t.sendMail({
       from,
       to: opts.to,
-      subject: "SVUWV: Test-E-Mail",
+      subject: `${await brandName()}: Test-E-Mail`,
       text: "Diese Nachricht bestätigt, dass die SMTP-Konfiguration funktioniert.",
     });
     return { ok: true };

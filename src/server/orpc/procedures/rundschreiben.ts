@@ -17,7 +17,7 @@ import { organizationSettingsTable } from "~/server/db/schema/organization-setti
 import { rundschreibenRecipientsTable, rundschreibenTable } from "~/server/db/schema/rundschreiben";
 import { altMitgliedsnummer, memberDisplayName, memberRef } from "~/server/domain/member";
 import { vorstandProc } from "~/server/orpc/base";
-import { clubLogoDataUri } from "~/server/pdf/logo";
+import { resolveClubLogo } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { SerienbriefDocument } from "~/server/pdf/templates/serienbrief";
 
@@ -198,7 +198,7 @@ export const rundschreibenRouter = {
 
       const { base64 } = await renderPdfBase64(
         SerienbriefDocument({
-          club: { vereinsname, senderLine, logoDataUri: clubLogoDataUri() },
+          club: { vereinsname, senderLine, logoDataUri: resolveClubLogo(org?.logo) },
           letters,
         }),
       );

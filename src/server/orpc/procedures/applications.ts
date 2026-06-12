@@ -60,7 +60,7 @@ import {
 } from "~/server/mail/send-application-mail";
 import { adminProc, errorLogFields, publicProc, vorstandProc } from "~/server/orpc/base";
 import { buildBeitrittModel } from "~/server/pdf/beitrittserklaerung-model";
-import { clubLogoDataUri } from "~/server/pdf/logo";
+import { resolveClubLogo } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { BeitrittserklaerungDocument } from "~/server/pdf/templates/beitrittserklaerung";
 import { rateLimit } from "~/server/redis/client";
@@ -255,7 +255,7 @@ async function buildApprovedPdf(
       glaeubigerId: org.glaeubigerId,
       datenschutzUrl: org.datenschutzUrl,
       satzungUrl: org.satzungUrl,
-      logoDataUri: clubLogoDataUri(),
+      logoDataUri: resolveClubLogo(org.logo),
     },
   });
 
@@ -897,7 +897,7 @@ export const applicationsRouter = {
           glaeubigerId: org.glaeubigerId,
           datenschutzUrl: org.datenschutzUrl,
           satzungUrl: org.satzungUrl,
-          logoDataUri: clubLogoDataUri(),
+          logoDataUri: resolveClubLogo(org.logo),
         },
       });
       const { base64 } = await renderPdfBase64(BeitrittserklaerungDocument({ model }));
