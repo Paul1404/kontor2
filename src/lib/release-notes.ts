@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.79.1",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Backup- und Restore-Skripte je Mandant (pg_dump/pg_restore, lokal oder nach S3) plus eine Mandanten-Liste als Grundlage für spätere Mehr-Vereine-Fähigkeit. Kein sichtbarer Effekt im laufenden Betrieb.",
+      },
+    ],
+  },
+  {
     version: "0.79.0",
     date: "2026-06-12",
     changes: [
