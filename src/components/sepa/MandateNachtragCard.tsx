@@ -136,6 +136,7 @@ export function MandateNachtragCard({ canEdit }: { canEdit: boolean }) {
                     </Badge>
                   ) : r.vertreterCandidate ? (
                     <AssignVertreterButton
+                      minorMemberId={r.zahlerMemberId}
                       candidate={r.vertreterCandidate}
                       canEdit={canEdit}
                       onDone={() => qc.invalidateQueries({ queryKey: ["sepa.nachtragKandidaten"] })}
@@ -178,22 +179,25 @@ export function MandateNachtragCard({ canEdit }: { canEdit: boolean }) {
  * sich auf und das Mandat wird nachtrag- bzw. reaktivierbar.
  */
 function AssignVertreterButton({
+  minorMemberId,
   candidate,
   canEdit,
   onDone,
 }: {
+  minorMemberId: string;
   candidate: NonNullable<Kandidat["vertreterCandidate"]>;
   canEdit: boolean;
   onDone: () => void | Promise<void>;
 }) {
   const assign = useMutation({
     mutationFn: () =>
-      orpc.relationships.update({
-        id: candidate.relationshipId,
-        patch: { istVertreter: true },
-      }),
-    onSuccess: async () => {
-      toast.success(`${candidate.name} als Vertreter übernommen`);
+      orpc.sepa.assignVertreter({ minorMemberId, relationshipId: candidate.relationshipId }),
+    onSuccess: async (r) => {
+      toast.success(
+        r.ibanMoved
+          ? `${candidate.name} als Vertreter übernommen, Bankverbindung übertragen`
+          : `${candidate.name} als Vertreter übernommen`,
+      );
       await onDone();
     },
     onError: (e: Error) => toast.error("Übernehmen fehlgeschlagen", { description: e.message }),

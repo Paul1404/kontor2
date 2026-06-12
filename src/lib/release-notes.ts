@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.74.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Beim Übernehmen einer Beziehung als Vertreter wird die Bankverbindung des Kindes jetzt mitgezogen, wenn der Name zum Kontoinhaber passt und der Vertreter noch keine eigene IBAN hat. Damit ist der Zahler mit einem Klick einzugsfähig. Ein vorhandenes Konto des Vertreters bleibt unangetastet.",
+      },
+    ],
+  },
+  {
     version: "0.73.1",
     date: "2026-06-12",
     changes: [
