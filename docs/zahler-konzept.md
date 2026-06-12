@@ -6,11 +6,22 @@ lösen den Zahler dynamisch auf, Familien-Zahler für aktive Kinder,
 Beziehungs-Vertreter für Minderjährige, sonst Selbstzahler
 (`src/server/domain/zahler.ts`, `src/server/sepa/zahler-context.ts`). Die
 Lastschrift läuft auf IBAN und Mandat des Zahlers; Mandate gehören nie dem
-Kind. Bewusst NICHT umgesetzt: `contracts.zahler_member_id` (Verträge werden
-beim Re-Import ersetzt, die Spalte würde stillschweigend geleert),
-Zahler-Auflösung in Mahnwesen und Wiedereinzug, und das Verschieben der
-Bankdaten auf den Zahler (unten). Der Rest dieses Dokuments beschreibt den
-ursprünglichen Vorschlag.
+Kind.
+
+Status: **Stufe 2 umgesetzt** (2026-06-12): expliziter Zahler pro Vertrag über
+`contracts.zahler_member_id` (Migration 0053). Hat Vorrang vor der automatischen
+Auflösung (`resolveZahler`, Quelle `"vertrag"`), greift im Beitragslauf
+(per-Vertrag) und in den Datenqualitäts-Prüfungen für Mandat und IBAN. Pflege
+über das Geldbeutel-Symbol am Vertrag (`ContractsCard`, `contracts.setZahler`).
+Für Fälle, die sich nicht aus Familie oder Vertretung ableiten lassen, etwa ein
+Erwachsener, dessen Beitrag jemand anderes zahlt. **Offene Kante**: der
+Vertrags-Importer kennt die Spalte noch nicht, ein Re-Import der Verträge leert
+sie still. Vor dem nächsten Linear-Import muss der Importer den Override
+erhalten oder ihn vor dem Lauf sichern.
+
+Bewusst NICHT umgesetzt: Zahler-Auflösung in Mahnwesen und Wiedereinzug, und das
+Verschieben der Bankdaten auf den Zahler (unten). Der Rest dieses Dokuments
+beschreibt den ursprünglichen Vorschlag.
 
 ## Das Problem in einem Satz
 

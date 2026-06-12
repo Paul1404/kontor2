@@ -372,6 +372,13 @@
       "when": 1781246123087,
       "tag": "0052_nifty_amazoness",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1781251076698,
+      "tag": "0053_violet_amazoness",
+      "breakpoints": true
     }
   ]
 }

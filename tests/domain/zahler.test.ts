@@ -2,6 +2,30 @@ import { describe, expect, it } from "vitest";
 import { resolveZahler } from "~/server/domain/zahler";
 
 describe("resolveZahler", () => {
+  it("Expliziter Vertrags-Zahler gewinnt vor allem", () => {
+    expect(
+      resolveZahler({
+        memberId: "erwachsen",
+        explicitZahlerId: "partner",
+        familieZahlerId: "papa",
+        vertreterId: "betreuer",
+        minderjaehrig: true,
+      }),
+    ).toEqual({ zahlerId: "partner", quelle: "vertrag" });
+  });
+
+  it("ignoriert expliziten Zahler, der das Mitglied selbst ist", () => {
+    expect(
+      resolveZahler({
+        memberId: "m",
+        explicitZahlerId: "m",
+        familieZahlerId: null,
+        vertreterId: null,
+        minderjaehrig: false,
+      }),
+    ).toEqual({ zahlerId: "m", quelle: "selbst" });
+  });
+
   it("Familien-Zahler gewinnt fuer aktive Kinder", () => {
     expect(
       resolveZahler({

@@ -200,4 +200,71 @@ export const contractsRouter = {
     });
     return { ok: true };
   }),
+
+  /**
+   * Expliziten Zahler eines Vertrags setzen oder entfernen (Zahler-Konzept
+   * Stufe 2). `zahlerMemberId = null` löscht den Override, die automatische
+   * Auflösung (Familie -> Vertreter -> selbst) greift dann wieder. Ein Zahler,
+   * der das Mitglied selbst ist, wird als "kein Override" gespeichert.
+   */
+  setZahler: vorstandProc
+    .input(
+      v.object({
+        contractId: v.string(),
+        zahlerMemberId: v.nullable(v.string()),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      return await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(contractsTable)
+          .where(eq(contractsTable.id, input.contractId))
+          .limit(1);
+        if (!existing) {
+          throw new ORPCError("NOT_FOUND", { message: "Vertrag nicht gefunden." });
+        }
+
+        let zahlerId = input.zahlerMemberId;
+        if (zahlerId === existing.memberId) {
+          // Selbstzahler ist der Standard, kein Override nötig.
+          zahlerId = null;
+        }
+        if (zahlerId) {
+          const [zahler] = await tx
+            .select({ id: membersTable.id })
+            .from(membersTable)
+            .where(eq(membersTable.id, zahlerId))
+            .limit(1);
+          if (!zahler) {
+            throw new ORPCError("NOT_FOUND", { message: "Zahler nicht gefunden." });
+          }
+        }
+
+        const before = { zahlerMemberId: existing.zahlerMemberId };
+        const after = { zahlerMemberId: zahlerId };
+        await tx
+          .update(contractsTable)
+          .set({ zahlerMemberId: zahlerId, updatedAt: new Date() })
+          .where(eq(contractsTable.id, input.contractId));
+
+        const auditId = await appendAudit(tx, {
+          entityType: "contract",
+          entityId: input.contractId,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: diff(before, after),
+          requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, existing.memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
+        });
+        return { ok: true, zahlerMemberId: zahlerId };
+      });
+    }),
 };

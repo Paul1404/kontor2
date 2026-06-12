@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.67.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Pro Vertrag lässt sich jetzt ein expliziter Zahler festlegen, wenn jemand anderes den Beitrag zahlt und sich das nicht aus Familie oder Vertretung ergibt. Der gewählte Zahler hat Vorrang: sein Konto wird belastet und sein SEPA-Mandat geprüft. Zu finden über das Geldbeutel-Symbol beim Vertrag.",
+      },
+    ],
+  },
+  {
     version: "0.66.0",
     date: "2026-06-12",
     changes: [

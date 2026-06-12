@@ -141,19 +141,20 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
     return emptyResult();
   }
 
-  // Zahler-Aufloesung: wessen Konto und Mandat fuer jeden Vertrag gilt.
-  // Familien-Zahler fuer aktive Kinder, Vertreter fuer Minderjaehrige, sonst
-  // das Mitglied selbst (siehe resolveZahler).
+  // Zahler-Aufloesung PRO VERTRAG: expliziter Vertrags-Zahler -> Familien-Zahler
+  // (aktives Kind) -> Vertreter (Minderjaehrige) -> das Mitglied selbst (siehe
+  // resolveZahler). Pro Vertrag, weil ein Mitglied mehrere Vertraege mit
+  // unterschiedlichen Zahlern haben kann.
   const memberIds = Array.from(new Set(rows.map((r) => r.member.id)));
   const zahlerCtx = await loadZahlerContext(db, memberIds);
   const now = new Date();
-  const zahlerByMember = new Map<string, ReturnType<typeof resolveZahler>>();
-  for (const { member } of rows) {
-    if (zahlerByMember.has(member.id)) continue;
-    zahlerByMember.set(
-      member.id,
+  const zahlerByContract = new Map<string, ReturnType<typeof resolveZahler>>();
+  for (const { contract, member } of rows) {
+    zahlerByContract.set(
+      contract.id,
       resolveZahler({
         memberId: member.id,
+        explicitZahlerId: contract.zahlerMemberId ?? null,
         familieZahlerId: zahlerCtx.familieZahlerByMember.get(member.id) ?? null,
         vertreterId: zahlerCtx.vertreterByMember.get(member.id) ?? null,
         minderjaehrig: isMinorAt(member.geburtsdatum, now),
@@ -163,7 +164,7 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
 
   // Zahler, die nicht selbst im Vertragsbestand stehen (z. B. Kontakte),
   // muessen fuer IBAN/Name nachgeladen werden.
-  const zahlerIds = Array.from(new Set([...zahlerByMember.values()].map((z) => z.zahlerId)));
+  const zahlerIds = Array.from(new Set([...zahlerByContract.values()].map((z) => z.zahlerId)));
   const knownMembers = new Map(rows.map((r) => [r.member.id, r.member]));
   const missingZahlerIds = zahlerIds.filter((id) => !knownMembers.has(id));
   if (missingZahlerIds.length > 0) {
@@ -290,7 +291,7 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
       continue;
     }
 
-    const zahler = zahlerByMember.get(member.id) ?? {
+    const zahler = zahlerByContract.get(contract.id) ?? {
       zahlerId: member.id,
       quelle: "selbst" as const,
     };
