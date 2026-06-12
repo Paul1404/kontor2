@@ -1,4 +1,4 @@
-import { eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { isKeineAbteilung, KEINE_ABTEILUNG_NAME } from "~/lib/abteilung-filter";
 import { appendAudit, diff } from "~/server/audit/log";
 import type { DB } from "~/server/db/client";
@@ -485,6 +485,36 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
   const contractBase = processed;
   let contractsWritten = 0;
   if ((input.contracts?.length ?? 0) > 0 && allReferencedAdrNrs.length > 0) {
+    // The explicit Zahler-Override (Zahler-Konzept Stufe 2) lives only in the
+    // app, not in Linear, so the wholesale delete+insert below would wipe it.
+    // Snapshot the overrides for the touched AdrNrs and carry them back onto
+    // the freshly inserted rows by their stable Linear key (AdrNr, VertragNr,
+    // Art). Member ids survive a re-import (members are upserted), so the
+    // carried target stays valid; a contract that vanished from the dump just
+    // loses its override, which is correct.
+    const zahlerKey = (adrNr: number, vertragNr: string, art: number) =>
+      `${adrNr} ${vertragNr} ${art}`;
+    const carriedZahler = new Map<string, string>();
+    const priorOverrides = await db
+      .select({
+        adrNr: contractsTable.adrNr,
+        vertragNr: contractsTable.vertragNr,
+        art: contractsTable.art,
+        zahlerMemberId: contractsTable.zahlerMemberId,
+      })
+      .from(contractsTable)
+      .where(
+        and(
+          inArray(contractsTable.adrNr, allReferencedAdrNrs),
+          isNotNull(contractsTable.zahlerMemberId),
+        ),
+      );
+    for (const o of priorOverrides) {
+      if (o.zahlerMemberId) {
+        carriedZahler.set(zahlerKey(o.adrNr, o.vertragNr, o.art), o.zahlerMemberId);
+      }
+    }
+
     await db.delete(contractsTable).where(inArray(contractsTable.adrNr, allReferencedAdrNrs));
     const contractValues: Record<string, unknown>[] = [];
     for (const raw of input.contracts ?? []) {
@@ -493,7 +523,17 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
         if (!row) continue;
         const memberId = adrNrToMemberId.get(row.adrNr as number);
         if (!memberId) continue;
-        contractValues.push({ ...row, memberId, importBatchId: batch.id, updatedAt: new Date() });
+        const zahlerMemberId =
+          carriedZahler.get(
+            zahlerKey(row.adrNr as number, row.vertragNr as string, row.art as number),
+          ) ?? null;
+        contractValues.push({
+          ...row,
+          memberId,
+          zahlerMemberId,
+          importBatchId: batch.id,
+          updatedAt: new Date(),
+        });
       } catch (e) {
         errors.push({ table: "mgvert", message: (e as Error).message });
       }

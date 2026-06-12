@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.67.1",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Ein am Vertrag gesetzter Zahler bleibt jetzt auch nach einem erneuten Linear-Import erhalten. Vorher hat der Import den Zahler still entfernt.",
+      },
+    ],
+  },
+  {
     version: "0.67.0",
     date: "2026-06-12",
     changes: [
