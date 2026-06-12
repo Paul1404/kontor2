@@ -19,11 +19,18 @@ export type EncryptedTarget = {
   idColumn: string;
 };
 
-/** Every column persisted via the `encryptedText` Drizzle custom type. */
+/**
+ * Every column persisted via the `encryptedText` Drizzle custom type. This list
+ * MUST stay complete: a column that is missing here is silently skipped by a
+ * key rotation and its rows orphan when the old key is dropped. The coverage
+ * test in `tests/crypto/encrypted-targets-coverage.test.ts` scans the schema
+ * and fails if any `encryptedText` column is absent from this list.
+ */
 export const ENCRYPTED_TARGETS: EncryptedTarget[] = [
   { table: "members", column: "iban1", idColumn: "id" },
   { table: "organization_settings", column: "vereins_iban", idColumn: "id" },
   { table: "smtp_config", column: "password_encrypted", idColumn: "id" },
+  { table: "membership_applications", column: "iban", idColumn: "id" },
 ];
 
 /**
@@ -37,9 +44,12 @@ export const ENCRYPTED_TARGETS: EncryptedTarget[] = [
  * would auto-decrypt on read and throw on legacy ciphertexts whose key is
  * not the current one.
  */
-export async function reencryptAllData(db: DB): Promise<ReencryptReport[]> {
+export async function reencryptAllData(
+  db: DB,
+  targets: EncryptedTarget[] = ENCRYPTED_TARGETS,
+): Promise<ReencryptReport[]> {
   const reports: ReencryptReport[] = [];
-  for (const target of ENCRYPTED_TARGETS) {
+  for (const target of targets) {
     reports.push(await reencryptBlobColumn(db, target));
   }
   return reports;
@@ -102,13 +112,16 @@ export type InspectReport = {
 };
 
 /** Dry-run summary: counts rows per key fingerprint without rewriting anything. */
-export async function inspectEncryptedData(db: DB): Promise<InspectReport[]> {
+export async function inspectEncryptedData(
+  db: DB,
+  targets: EncryptedTarget[] = ENCRYPTED_TARGETS,
+): Promise<InspectReport[]> {
   const ring = env().encryptionKeyring;
   const currentFp = ring.current.fingerprint;
   const prevFps = ring.previous.map((k) => k.fingerprint);
 
   const results: InspectReport[] = [];
-  for (const target of ENCRYPTED_TARGETS) {
+  for (const target of targets) {
     const tableRef = sql.identifier(target.table);
     const colRef = sql.identifier(target.column);
     const rows = (await db.execute(
@@ -145,4 +158,31 @@ export async function inspectEncryptedData(db: DB): Promise<InspectReport[]> {
     });
   }
   return results;
+}
+
+export type KeyDropSafety = {
+  /** `true` when every encrypted row is on the current key. */
+  safe: boolean;
+  /** Rows still on a previous key, on a legacy v1 blob, or unreadable. */
+  rowsNotOnCurrentKey: number;
+  reports: InspectReport[];
+};
+
+/**
+ * Decides whether the previous key(s) can be dropped from the keyring without
+ * losing data. Safe only when NO row sits on a previous key, a legacy v1 blob,
+ * or an unknown fingerprint -- i.e. `reencryptAllData` has fully migrated every
+ * target. Use this as the gate before removing `APP_SECRET_PREV` (or the old
+ * derivation) so a rotation can never strand a row.
+ */
+export async function assessKeyDropSafety(
+  db: DB,
+  targets: EncryptedTarget[] = ENCRYPTED_TARGETS,
+): Promise<KeyDropSafety> {
+  const reports = await inspectEncryptedData(db, targets);
+  const rowsNotOnCurrentKey = reports.reduce(
+    (acc, r) => acc + r.onPreviousKey + r.legacyV1 + r.unknown,
+    0,
+  );
+  return { safe: rowsNotOnCurrentKey === 0, rowsNotOnCurrentKey, reports };
 }
