@@ -1,10 +1,12 @@
 import { ORPCError } from "@orpc/server";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import type { DB } from "~/server/db/client";
 import { withUniqueRetry } from "~/server/db/retry";
 import { membersTable } from "~/server/db/schema/members";
+import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { planMandatNachtrag } from "~/server/domain/mandat-nachtrag";
 import { isMinorAt } from "~/server/domain/member";
@@ -46,7 +48,25 @@ type NachtragKandidat = {
   zahltFuer: string[];
   plan: ReturnType<typeof planMandatNachtrag>;
   mandatsNr?: string | null;
+  /**
+   * Vorschlag, wer als Vertreter/Zahler übernommen werden kann, wenn ein
+   * minderjähriges Mitglied keinen gepflegten Vertreter hat, aber eine
+   * Beziehung zu einem Erwachsenen. `strong` = der Name passt zum hinterlegten
+   * Kontoinhaber, also sehr wahrscheinlich der echte Zahler.
+   */
+  vertreterCandidate?: {
+    relationshipId: string;
+    toMemberId: string;
+    name: string;
+    reference: string;
+    strong: boolean;
+  };
 };
+
+/** Normalisiert Namen für den groben Kontoinhaber-Abgleich. */
+function normalizeName(s: string | null | undefined): string {
+  return (s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+}
 
 /**
  * Zahler-zentrierte Kandidaten fürs Mandate-Nachtragen. Gemeinsame Quelle für
@@ -63,6 +83,7 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
       nachname: membersTable.nachname,
       eintritt: membersTable.eintritt,
       geburtsdatum: membersTable.geburtsdatum,
+      abwKontoInh: membersTable.abwKontoInh,
     })
     .from(membersTable)
     .where(
@@ -167,6 +188,60 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
     });
   }
 
+  // Für die minderjährigen Selbstzahler: vorhandene Beziehung zu einem
+  // Erwachsenen als Vertreter-Vorschlag laden. Genau dieses Signal verschenkt
+  // die Logik sonst (Linear hat das Vertreter-Flag nie gesetzt). Ein Klick in
+  // der UI macht daraus den gepflegten Vertreter.
+  const candidatesByMinor = new Map<
+    string,
+    Array<{
+      relationshipId: string;
+      toMemberId: string;
+      nachname: string | null;
+      vorname: string | null;
+      reference: string;
+    }>
+  >();
+  const minorIds = minorSelf.map((m) => m.id);
+  if (minorIds.length > 0) {
+    const target = alias(membersTable, "vertreter_target");
+    const candRows = await db
+      .select({
+        relationshipId: relationshipsTable.id,
+        fromMemberId: relationshipsTable.fromMemberId,
+        toMemberId: relationshipsTable.toMemberId,
+        nachname: target.nachname,
+        vorname: target.vorname,
+        memberNo: target.memberNo,
+        kontaktNo: target.kontaktNo,
+        mitgliedsnummer: target.mitgliedsnummer,
+      })
+      .from(relationshipsTable)
+      .innerJoin(target, eq(target.id, relationshipsTable.toMemberId))
+      .where(
+        and(
+          inArray(relationshipsTable.fromMemberId, minorIds),
+          sql`${target.deletedAt} is null`,
+          // Erwachsene Gegenseite (oder Kontakt ohne Geburtsdatum, typisch für Eltern).
+          sql`(${target.geburtsdatum} is null or ${target.geburtsdatum} <= now() - interval '18 years')`,
+          // Nur aktive Verknüpfungen.
+          or(sql`${relationshipsTable.datBis} is null`, sql`${relationshipsTable.datBis} > now()`),
+        ),
+      );
+    for (const r of candRows) {
+      if (!r.toMemberId) continue;
+      const list = candidatesByMinor.get(r.fromMemberId) ?? [];
+      list.push({
+        relationshipId: r.relationshipId,
+        toMemberId: r.toMemberId,
+        nachname: r.nachname,
+        vorname: r.vorname,
+        reference: ref(r),
+      });
+      candidatesByMinor.set(r.fromMemberId, list);
+    }
+  }
+
   for (const m of minorSelf) {
     const z = zahlerById.get(m.id);
     if (!z) continue;
@@ -177,6 +252,20 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
     // Minderjährige mit (Linear-)Altmandat funktionieren weiter; nur die ohne
     // jede Einzugsgrundlage erscheinen als Datenqualitätsfall.
     if (usable.kind === "skip" && usable.reason === "Aktives Mandat vorhanden") continue;
+
+    // Besten Vertreter-Vorschlag wählen: ein Treffer auf den Kontoinhaber-Namen
+    // gewinnt (sehr wahrscheinlich der echte Zahler), sonst die erste Beziehung.
+    const konto = normalizeName(m.abwKontoInh);
+    const candidates = candidatesByMinor.get(m.id) ?? [];
+    const scored = candidates.map((c) => {
+      const nn = normalizeName(c.nachname);
+      const vn = normalizeName(c.vorname);
+      const strong = !!konto && !!nn && konto.includes(nn) && (vn ? konto.includes(vn) : true);
+      return { c, strong };
+    });
+    scored.sort((a, b) => (a.strong === b.strong ? 0 : a.strong ? -1 : 1));
+    const best = scored[0];
+
     result.push({
       zahlerMemberId: m.id,
       reference: ref(z),
@@ -188,6 +277,17 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
         kind: "skip",
         reason: "Minderjährig ohne Vertreter oder Familie. Erst Beziehung oder Familie pflegen.",
       },
+      ...(best
+        ? {
+            vertreterCandidate: {
+              relationshipId: best.c.relationshipId,
+              toMemberId: best.c.toMemberId,
+              name: [best.c.nachname, best.c.vorname].filter(Boolean).join(", "),
+              reference: best.c.reference,
+              strong: best.strong,
+            },
+          }
+        : {}),
     });
   }
 
