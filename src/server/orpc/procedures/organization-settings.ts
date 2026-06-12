@@ -1,9 +1,10 @@
 import { ORPCError } from "@orpc/server";
 import * as v from "valibot";
+import { normalizeHex } from "~/lib/branding-color";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
-import { adminProc, authedProc } from "~/server/orpc/base";
+import { adminProc, authedProc, publicProc } from "~/server/orpc/base";
 import { normalizeIban, validateIban } from "~/server/sepa/iban";
 
 const MoneyString = v.pipe(v.string(), v.regex(/^-?\d+(\.\d{1,2})?$/));
@@ -165,4 +166,104 @@ export const organizationSettingsRouter = {
 
     return { ok: true };
   }),
+
+  /**
+   * White-Label-Branding für die gesamte Oberfläche. PUBLIC, weil Login und
+   * Setup vor der Anmeldung Name, Logo und Farbe brauchen. Nichts Sensibles:
+   * nur Anzeigename, Logo und Markenfarbe. Resilient -- bei fehlender Zeile
+   * oder DB-Problem liefert es Defaults, damit die App nie an der Marke hängt.
+   */
+  branding: publicProc.handler(async ({ context }) => {
+    try {
+      const [row] = await context.db
+        .select({
+          vereinsname: organizationSettingsTable.vereinsname,
+          anzeigename: organizationSettingsTable.anzeigename,
+          logo: organizationSettingsTable.logo,
+          primaryColor: organizationSettingsTable.primaryColor,
+        })
+        .from(organizationSettingsTable)
+        .limit(1);
+      return {
+        anzeigename: row?.anzeigename?.trim() || row?.vereinsname?.trim() || null,
+        logo: row?.logo || null,
+        primaryColor: normalizeHex(row?.primaryColor),
+      };
+    } catch {
+      return { anzeigename: null, logo: null, primaryColor: null };
+    }
+  }),
+
+  /**
+   * Admin-only: setzt die Branding-Felder, ohne die SEPA-Pflichtfelder zu
+   * verlangen. Setzt eine vorhandene Zeile voraus (zuerst Vereinsdaten
+   * speichern). Logo als data-URI, Farbe als Hex.
+   */
+  updateBranding: adminProc
+    .input(
+      v.object({
+        anzeigename: v.optional(v.nullable(v.string())),
+        logo: v.optional(
+          v.nullable(
+            v.pipe(
+              v.string(),
+              v.startsWith("data:image/", "Logo muss ein Bild sein."),
+              v.maxLength(700_000, "Logo zu groß (max. ca. 500 KB)."),
+            ),
+          ),
+        ),
+        primaryColor: v.optional(v.nullable(v.string())),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const existing = (await context.db.select().from(organizationSettingsTable).limit(1))[0];
+      if (!existing) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Bitte zuerst die Vereinsdaten speichern, dann das Branding anpassen.",
+        });
+      }
+      const color =
+        input.primaryColor === undefined
+          ? existing.primaryColor
+          : input.primaryColor === null || input.primaryColor.trim() === ""
+            ? null
+            : (normalizeHex(input.primaryColor) ??
+              (() => {
+                throw new ORPCError("BAD_REQUEST", {
+                  message: "Farbe muss ein Hex sein, z. B. #1d4ed8.",
+                });
+              })());
+
+      const next = {
+        anzeigename:
+          input.anzeigename === undefined
+            ? existing.anzeigename
+            : input.anzeigename?.trim() || null,
+        logo: input.logo === undefined ? existing.logo : (input.logo ?? null),
+        primaryColor: color,
+        updatedAt: new Date(),
+        updatedBy: context.session!.user.id,
+      };
+      await context.db.update(organizationSettingsTable).set(next as never);
+
+      const mask = (v: string | null | undefined) => (v ? "[gesetzt]" : null);
+      await appendAudit(context.db, {
+        entityType: "organization_settings",
+        entityId: "1",
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: diff(
+          {
+            anzeigename: existing.anzeigename,
+            logo: mask(existing.logo),
+            primaryColor: existing.primaryColor,
+          },
+          { anzeigename: next.anzeigename, logo: mask(next.logo), primaryColor: next.primaryColor },
+        ),
+        requestId: context.requestId ?? null,
+      });
+      return { ok: true };
+    }),
 };

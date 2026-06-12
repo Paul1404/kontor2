@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { VersionChip } from "~/components/ui/version-chip";
+import { useBranding } from "~/lib/branding";
 import { cn } from "~/lib/cn";
 import { orpc } from "~/lib/orpc";
 import { useRecentMembers } from "~/lib/use-recent-members";
@@ -211,6 +212,7 @@ function SidebarBody({
 }) {
   const { location } = useRouterState();
   const { recent } = useRecentMembers();
+  const branding = useBranding();
   // Open data-quality issues drive a badge on the nav item. Vorstand+ only;
   // kept warm for 5 minutes so navigation does not re-run the check.
   const canSeeDq = role === "vorstand" || role === "admin";
@@ -234,10 +236,10 @@ function SidebarBody({
     <>
       <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
         <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-soft ring-1 ring-sidebar-border">
-          <img src="/logo.png" alt="SV Untereuerheim" className="size-9 object-contain" />
+          <img src={branding.logoSrc} alt={branding.name} className="size-9 object-contain" />
         </div>
         <div className="flex flex-col leading-tight">
-          <span className="text-[15px] font-semibold tracking-tight">SV Untereuerheim</span>
+          <span className="text-[15px] font-semibold tracking-tight">{branding.name}</span>
           <span className="text-[11px] uppercase tracking-wider text-sidebar-muted">
             Vereinsverwaltung
           </span>

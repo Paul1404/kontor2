@@ -7,12 +7,14 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { authClient } from "~/lib/auth-client";
+import { useBranding } from "~/lib/branding";
 
 export const Route = createFileRoute("/passwort-vergessen")({
   component: ForgotPasswordPage,
 });
 
 function ForgotPasswordPage() {
+  const branding = useBranding();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   // Always land on the same confirmation regardless of whether the address
@@ -40,7 +42,7 @@ function ForgotPasswordPage() {
       <Card className="relative w-full max-w-sm shadow-elevated">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-border shadow-card">
-            <img src="/logo.png" alt="SV Untereuerheim" className="size-14 object-contain" />
+            <img src={branding.logoSrc} alt={branding.name} className="size-14 object-contain" />
           </div>
           <CardTitle className="text-xl">Passwort vergessen</CardTitle>
           <CardDescription>

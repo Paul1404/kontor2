@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { Building2, CheckCircle2, Loader2, Save, Trash2, XCircle } from "lucide-react";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { Building2, CheckCircle2, Loader2, Palette, Save, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { QueryError } from "~/components/ui/query-error";
+import { toast } from "~/components/ui/toaster";
+import { useBranding } from "~/lib/branding";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/einstellungen/verein")({
@@ -200,6 +202,8 @@ function VereinsdatenPage() {
       </div>
 
       {msg ? <Banner msg={msg} onDismiss={() => setMsg(null)} /> : null}
+
+      <BrandingCard />
 
       <Card>
         <CardHeader>
@@ -704,6 +708,179 @@ function VereinsdatenPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+const DEFAULT_BRAND = "#dc2626";
+
+/**
+ * White-Label: Anzeigename, Logo und Markenfarbe für die ganze Oberfläche.
+ * Eigene Karte und eigener Speicherpfad (updateBranding), unabhängig von den
+ * SEPA-Pflichtfeldern. Nach dem Speichern wird der Router neu validiert, damit
+ * Farbe, Logo und Name sofort greifen, ohne Reload.
+ */
+function BrandingCard() {
+  const router = useRouter();
+  const qc = useQueryClient();
+  const live = useBranding();
+  const cfg = useQuery({
+    queryKey: ["organization.getForEdit"],
+    queryFn: () => orpc.organization.getForEdit(),
+  });
+
+  const [anzeigename, setAnzeigename] = useState<string | null>(null);
+  const [logo, setLogo] = useState<string | null>(null);
+  const [color, setColor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!cfg.data) return;
+    setAnzeigename(cfg.data.anzeigename ?? "");
+    setLogo(cfg.data.logo ?? "");
+    setColor(cfg.data.primaryColor ?? "");
+  }, [cfg.data]);
+
+  const save = useMutation({
+    mutationFn: () =>
+      orpc.organization.updateBranding({
+        anzeigename: anzeigename?.trim() || null,
+        logo: logo || null,
+        primaryColor: color || null,
+      }),
+    onSuccess: async () => {
+      toast.success("Branding gespeichert");
+      await qc.invalidateQueries({ queryKey: ["organization.getForEdit"] });
+      await router.invalidate(); // re-runs the root loader -> color/logo/name apply now
+    },
+    onError: (e: Error) => toast.error("Speichern fehlgeschlagen", { description: e.message }),
+  });
+
+  if (cfg.isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" /> Wird geladen…
+        </CardContent>
+      </Card>
+    );
+  }
+  if (!cfg.data) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-sm text-muted-foreground">
+          Bitte zuerst die Stammdaten unten speichern, dann lässt sich das Branding anpassen.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const previewLogo = logo || live.logoSrc;
+  const previewColor = color || DEFAULT_BRAND;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Palette className="size-5 text-brand" /> Erscheinungsbild
+        </CardTitle>
+        <CardDescription>
+          Anzeigename, Logo und Markenfarbe für die gesamte Oberfläche, Anmeldung und das
+          Mitgliederportal. Leer lassen für das Standard-Aussehen.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <Field label="Anzeigename" hint="Kurzer Name in Kopfzeile, Anmeldung und Browser-Tab.">
+            <Input
+              value={anzeigename ?? ""}
+              onChange={(e) => setAnzeigename(e.target.value)}
+              placeholder="z. B. SV Untereuerheim"
+            />
+          </Field>
+
+          <Field label="Markenfarbe" hint="Färbt Schaltflächen und Akzente. Leer = Standardrot.">
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                aria-label="Markenfarbe wählen"
+                value={/^#[0-9a-fA-F]{6}$/.test(color ?? "") ? (color as string) : DEFAULT_BRAND}
+                onChange={(e) => setColor(e.target.value)}
+                className="h-10 w-12 cursor-pointer rounded-lg border border-input bg-card"
+              />
+              <Input
+                value={color ?? ""}
+                onChange={(e) => setColor(e.target.value)}
+                placeholder={DEFAULT_BRAND}
+                className="font-mono"
+              />
+              {color ? (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setColor("")}>
+                  Zurücksetzen
+                </Button>
+              ) : null}
+            </div>
+          </Field>
+
+          <Field
+            label="Logo (PNG, SVG oder JPEG, max. 500 KB)"
+            hint="Erscheint überall in der App. Am besten freigestellt auf transparentem Grund."
+          >
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <div className="flex size-12 items-center justify-center overflow-hidden rounded-lg border border-border bg-white">
+                  <img src={previewLogo} alt="Logo-Vorschau" className="size-10 object-contain" />
+                </div>
+                {logo ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setLogo("")}>
+                    <Trash2 className="size-4" /> Entfernen
+                  </Button>
+                ) : null}
+              </div>
+              <input
+                type="file"
+                accept="image/png,image/svg+xml,image/jpeg"
+                className="text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-card file:px-3 file:py-1.5 file:text-sm"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 500_000) {
+                    toast.error("Logo zu groß (max. 500 KB).");
+                    e.target.value = "";
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => setLogo(String(reader.result));
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </div>
+          </Field>
+
+          <Field label="Vorschau">
+            <div
+              className="flex items-center gap-3 rounded-lg border border-border p-3"
+              style={{ backgroundColor: previewColor }}
+            >
+              <div className="flex size-9 items-center justify-center overflow-hidden rounded-lg bg-white">
+                <img src={previewLogo} alt="" className="size-7 object-contain" />
+              </div>
+              <span className="text-sm font-semibold text-white">
+                {anzeigename?.trim() || "Vereinsverwaltung"}
+              </span>
+            </div>
+          </Field>
+        </div>
+
+        <div className="mt-5 flex justify-end border-t border-border pt-5">
+          <Button type="button" onClick={() => save.mutate()} disabled={save.isPending}>
+            {save.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Save className="size-4" />
+            )}
+            Erscheinungsbild speichern
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
