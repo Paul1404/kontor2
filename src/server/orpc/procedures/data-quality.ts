@@ -3,8 +3,10 @@ import * as v from "valibot";
 import type { DB } from "~/server/db/client";
 import { dataQualityExceptionsTable } from "~/server/db/schema/data-quality-exceptions";
 import { membersTable } from "~/server/db/schema/members";
+import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { memberDisplayName, memberRef } from "~/server/domain/member";
 import { type CsvColumn, toCsv } from "~/server/lib/csv";
+import { buildDataQualityWorkbook } from "~/server/lib/xlsx-data-quality";
 import { vorstandProc } from "~/server/orpc/base";
 
 /**
@@ -430,6 +432,49 @@ export async function dataQualityCounts(db: DB): Promise<Array<CategoryMeta & { 
   return CATEGORIES.map((c) => ({ ...c, count: Number(counts[c.id] ?? 0) }));
 }
 
+const SEVERITY_LABEL = { error: "Fehler", warn: "Warnung", info: "Hinweis" } as const;
+
+type FindingExportRow = {
+  pruefung: string;
+  severity: CategoryMeta["severity"];
+  schweregradLabel: string;
+  reference: string;
+  name: string;
+  ort: string | null;
+  email: string | null;
+};
+
+/**
+ * Eine Zeile pro (Prüfung, betroffenem Mitglied), über alle Kategorien, ohne
+ * Seitenlimit. Geteilte Quelle für den CSV- und den XLSX-Export, damit beide
+ * identische Befunde liefern. Acknowledged (geprüft) ist bereits ausgefiltert.
+ */
+async function collectFindings(db: DB): Promise<FindingExportRow[]> {
+  const rows: FindingExportRow[] = [];
+  for (const meta of CATEGORIES) {
+    const affected = (await db.execute(
+      sql.raw(
+        `select id, member_no, kontakt_no, mitgliedsnummer, adr_nr, vorname, nachname, kurzname, firma1, ort, email, geburtsdatum, austritt ` +
+          `from members where ${activeWhere(meta.id)} ` +
+          `order by nachname nulls last, vorname nulls last, id`,
+      ),
+    )) as unknown as MemberRow[];
+    for (const r of affected) {
+      const item = toItem(r);
+      rows.push({
+        pruefung: meta.label,
+        severity: meta.severity,
+        schweregradLabel: SEVERITY_LABEL[meta.severity],
+        reference: item.reference,
+        name: item.name,
+        ort: item.ort,
+        email: item.email,
+      });
+    }
+  }
+  return rows;
+}
+
 export const dataQualityRouter = {
   summary: vorstandProc.input(v.void()).handler(async ({ context }) => {
     const categories = await dataQualityCounts(context.db);
@@ -483,46 +528,47 @@ export const dataQualityRouter = {
    * entsprechend mehrfach. Für die Offline-Abarbeitung im Vorstand.
    */
   exportCsv: vorstandProc.input(v.void()).handler(async ({ context }) => {
-    type ExportRow = {
-      pruefung: string;
-      schweregrad: string;
-      reference: string;
-      name: string;
-      ort: string | null;
-      email: string | null;
-    };
-    const severityLabel = { error: "Fehler", warn: "Warnung", info: "Hinweis" } as const;
-    const rows: ExportRow[] = [];
-    for (const meta of CATEGORIES) {
-      const affected = (await context.db.execute(
-        sql.raw(
-          `select id, member_no, kontakt_no, mitgliedsnummer, adr_nr, vorname, nachname, kurzname, firma1, ort, email, geburtsdatum, austritt ` +
-            `from members where ${activeWhere(meta.id)} ` +
-            `order by nachname nulls last, vorname nulls last, id`,
-        ),
-      )) as unknown as MemberRow[];
-      for (const r of affected) {
-        const item = toItem(r);
-        rows.push({
-          pruefung: meta.label,
-          schweregrad: severityLabel[meta.severity],
-          reference: item.reference,
-          name: item.name,
-          ort: item.ort,
-          email: item.email,
-        });
-      }
-    }
+    const rows = await collectFindings(context.db);
     const content = toCsv(rows, [
       { key: "pruefung", label: "Prüfung" },
-      { key: "schweregrad", label: "Schweregrad" },
+      { key: "schweregradLabel", label: "Schweregrad" },
       { key: "reference", label: "Mitgliedsnummer" },
       { key: "name", label: "Name" },
       { key: "ort", label: "Ort" },
       { key: "email", label: "E-Mail" },
-    ] satisfies CsvColumn<ExportRow>[]);
+    ] satisfies CsvColumn<FindingExportRow>[]);
     const stamp = new Date().toISOString().slice(0, 10);
     return { filename: `datenqualitaet-${stamp}.csv`, content, count: rows.length };
+  }),
+
+  /**
+   * Wie `exportCsv`, aber als formatierte XLSX: Blatt "Übersicht" (Zählung je
+   * Prüfung, nach Schweregrad) und Blatt "Befunde" (eine Zeile je Treffer).
+   * Kopfzeile in der Markenfarbe, Schweregrad farbig, Autofilter, fixierte
+   * Kopfzeile. exceljs wird nur hier (server-seitig) geladen.
+   */
+  exportXlsx: vorstandProc.input(v.void()).handler(async ({ context }) => {
+    const [rows, counts] = await Promise.all([
+      collectFindings(context.db),
+      dataQualityCounts(context.db),
+    ]);
+    const [org] = await context.db
+      .select({
+        vereinsname: organizationSettingsTable.vereinsname,
+        anzeigename: organizationSettingsTable.anzeigename,
+        primaryColor: organizationSettingsTable.primaryColor,
+      })
+      .from(organizationSettingsTable)
+      .limit(1);
+    const base64 = await buildDataQualityWorkbook({
+      rows,
+      counts,
+      title: org?.anzeigename?.trim() || org?.vereinsname || "Verein",
+      primaryColor: org?.primaryColor ?? null,
+      generatedAt: new Date(),
+    });
+    const stamp = new Date().toISOString().slice(0, 10);
+    return { filename: `datenqualitaet-${stamp}.xlsx`, base64, count: rows.length };
   }),
 
   /**
