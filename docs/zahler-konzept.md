@@ -14,10 +14,12 @@ Auflösung (`resolveZahler`, Quelle `"vertrag"`), greift im Beitragslauf
 (per-Vertrag) und in den Datenqualitäts-Prüfungen für Mandat und IBAN. Pflege
 über das Geldbeutel-Symbol am Vertrag (`ContractsCard`, `contracts.setZahler`).
 Für Fälle, die sich nicht aus Familie oder Vertretung ableiten lassen, etwa ein
-Erwachsener, dessen Beitrag jemand anderes zahlt. **Offene Kante**: der
-Vertrags-Importer kennt die Spalte noch nicht, ein Re-Import der Verträge leert
-sie still. Vor dem nächsten Linear-Import muss der Importer den Override
-erhalten oder ihn vor dem Lauf sichern.
+Erwachsener, dessen Beitrag jemand anderes zahlt. **Re-Import-fest**: der
+Importer (`ingest-pipeline.ts`) sichert den Override vor dem Ersetzen der
+Verträge und trägt ihn über den Linear-Schlüssel (AdrNr, VertragNr, Art) wieder
+auf die neu eingefügte Zeile. Mitglieder-Ids überleben den Re-Import (Upsert),
+also bleibt das Ziel gültig. Verschwindet ein Vertrag aus dem Dump, verliert er
+seinen Override, was korrekt ist.
 
 Bewusst NICHT umgesetzt: Zahler-Auflösung in Mahnwesen und Wiedereinzug, und das
 Verschieben der Bankdaten auf den Zahler (unten). Der Rest dieses Dokuments
