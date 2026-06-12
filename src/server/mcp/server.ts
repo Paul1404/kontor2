@@ -44,7 +44,7 @@ export function buildMcpServer(context: AppContext, role: Role): Server {
   const byName = new Map<string, McpTool>(tools.map((tool) => [tool.name, tool]));
 
   const server = new Server(
-    { name: "svuwv-vereinsverwaltung", version: CURRENT_VERSION },
+    { name: "kontor2-vereinsverwaltung", version: CURRENT_VERSION },
     { capabilities: { tools: {} } },
   );
 

@@ -236,7 +236,7 @@ The parts that took real engineering, not just CRUD:
   dashboard, reports, dunning status); Vorstand keys additionally get curated
   mutations (members, tasks, mark postings paid). Beitrags-/Mahnläufe, SEPA,
   imports, settings and the danger zone are not exposed.
-- Connect: `claude mcp add --transport http svuwv https://<host>/api/mcp
+- Connect: `claude mcp add --transport http kontor2 https://<host>/api/mcp
   --header "x-api-key: <KEY>"` (Claude Desktop goes through `mcp-remote`; the
   settings page shows ready-to-copy snippets).
 
@@ -371,7 +371,7 @@ lock keeps multiple replicas from running it at once. Set
 bun install
 cp .env.example .env
 openssl rand -hex 32   # paste into APP_SECRET
-docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=svuwv postgres:16
+docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=kontor2 postgres:16
 docker run -d --name redis -p 6379:6379 redis:7
 bun run db:generate
 bun run db:migrate

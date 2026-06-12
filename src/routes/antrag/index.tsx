@@ -86,7 +86,7 @@ function useMagnetic() {
 // sessionStorage (cleared when the tab closes), matching svums and keeping the
 // applicant's data off the device long-term. The signature is intentionally
 // excluded; it is re-drawn on the summary step.
-const DRAFT_KEY = "svuwv-antrag-draft-v1";
+const DRAFT_KEY = "kontor2-antrag-draft-v1";
 
 type Draft = {
   step: number;

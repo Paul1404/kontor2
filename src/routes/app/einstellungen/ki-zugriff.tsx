@@ -84,10 +84,10 @@ function ApiKeysPage() {
   });
 
   const mcpUrl = `${origin}/api/mcp`;
-  const claudeCodeCommand = `claude mcp add --transport http svuwv ${mcpUrl} --header "x-api-key: <SCHLÜSSEL>"`;
+  const claudeCodeCommand = `claude mcp add --transport http kontor2 ${mcpUrl} --header "x-api-key: <SCHLÜSSEL>"`;
   const desktopConfig = `{
   "mcpServers": {
-    "svuwv": {
+    "kontor2": {
       "command": "npx",
       "args": [
         "mcp-remote@latest",

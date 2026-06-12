@@ -1,7 +1,7 @@
 import { index, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 /**
- * App-wide mail log. One row per outbound mail svuwv tries to send -- antrag
+ * App-wide mail log. One row per outbound mail Kontor2 tries to send -- antrag
  * confirmations, the club notification, approvals/declines, Mahnungen, user
  * invites, portal invites, and SMTP test mails. Records whether the send
  * succeeded, was skipped (no SMTP configured, no recipient), or failed, so the

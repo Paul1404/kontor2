@@ -128,7 +128,7 @@ log.info("listening", { url: String(s.url) });
 // — see scripts/shutdown.ts), then exit.
 const shutdown = createShutdownHandler({
   stopServer: (force) => s.stop(force),
-  closeResources: () => globalThis.__svuwvCloseResources?.(),
+  closeResources: () => globalThis.__kontor2CloseResources?.(),
   log,
   exit: (code) => process.exit(code),
   drainTimeoutMs: Number(process.env.SHUTDOWN_TIMEOUT_MS ?? 15_000),

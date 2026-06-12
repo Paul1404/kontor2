@@ -172,7 +172,7 @@ function VersandprotokollPage() {
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">Versandprotokoll</h1>
           <p className="text-sm text-muted-foreground">
-            Alle von svuwv versendeten E-Mails an einer Stelle: Antragsbestätigungen, Mahnungen,
+            Alle von Kontor2 versendeten E-Mails an einer Stelle: Antragsbestätigungen, Mahnungen,
             Einladungen und Portalzugänge. Zeigt, ob eine Nachricht versendet, übersprungen oder
             fehlgeschlagen ist.
           </p>

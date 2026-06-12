@@ -3,7 +3,7 @@
  *
  * This endpoint accepted a signed batch push from the standalone "svums" app,
  * back when svums owned the public membership application and fed new members
- * into svuwv. svuwv now hosts the Beitrittserklärung natively at `/antrag`:
+ * into Kontor2. Kontor2 now hosts the Beitrittserklärung natively at `/antrag`:
  * an applicant submits, the Vorstand reviews under `/app/antraege`, and
  * approval onboards the member directly. The svums round-trip is no longer the
  * intended path for new members.

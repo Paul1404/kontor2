@@ -6,8 +6,8 @@ export type RecentMember = {
   visitedAt: number;
 };
 
-const STORAGE_KEY = "svuwv.recentMembers";
-const STORAGE_EVENT = "svuwv:recentMembers";
+const STORAGE_KEY = "kontor2.recentMembers";
+const STORAGE_EVENT = "kontor2:recentMembers";
 const MAX_RECENT = 6;
 
 function readFromStorage(): RecentMember[] {

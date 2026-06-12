@@ -12,7 +12,7 @@ type Toast = {
   durationMs: number;
 };
 
-const TOAST_EVENT = "svuwv:toast";
+const TOAST_EVENT = "kontor2:toast";
 const DEFAULT_DURATION = 4_000;
 
 type ToastDetail = Omit<Toast, "id" | "kind"> & { kind: ToastKind };

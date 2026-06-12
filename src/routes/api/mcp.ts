@@ -8,7 +8,7 @@ import { createFileRoute } from "@tanstack/react-router";
  * NOT accepted here, and API keys are not accepted anywhere else.
  *
  * Client setup:
- *   claude mcp add --transport http svuwv https://<host>/api/mcp \
+ *   claude mcp add --transport http kontor2 https://<host>/api/mcp \
  *     --header "x-api-key: <KEY>"
  */
 function unauthorized(): Response {
