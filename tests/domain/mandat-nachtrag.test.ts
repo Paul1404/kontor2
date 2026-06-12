@@ -21,9 +21,9 @@ describe("planMandatNachtrag", () => {
   });
 
   it("legt auch an, wenn nur geloeschte Mandate existieren", () => {
-    expect(
-      planMandatNachtrag({ eintritt, mandate: [mandat({ isDeleted: true })] }),
-    ).toEqual({ kind: "create" });
+    expect(planMandatNachtrag({ eintritt, mandate: [mandat({ isDeleted: true })] })).toEqual({
+      kind: "create",
+    });
   });
 
   it("reaktiviert ein nur abgelaufenes Mandat statt ein zweites anzulegen", () => {
@@ -38,8 +38,16 @@ describe("planMandatNachtrag", () => {
     const plan = planMandatNachtrag({
       eintritt,
       mandate: [
-        mandat({ id: "alt", gultigBis: new Date("2020-01-01"), angelegtAm: new Date("2017-01-01") }),
-        mandat({ id: "neu", gultigBis: new Date("2023-01-01"), angelegtAm: new Date("2021-01-01") }),
+        mandat({
+          id: "alt",
+          gultigBis: new Date("2020-01-01"),
+          angelegtAm: new Date("2017-01-01"),
+        }),
+        mandat({
+          id: "neu",
+          gultigBis: new Date("2023-01-01"),
+          angelegtAm: new Date("2021-01-01"),
+        }),
       ],
     });
     expect(plan).toEqual({ kind: "reactivate", mandateId: "neu" });
@@ -53,7 +61,9 @@ describe("planMandatNachtrag", () => {
   it("fasst widerrufene Mandate niemals an", () => {
     const plan = planMandatNachtrag({
       eintritt,
-      mandate: [mandat({ widerrufenAm: new Date("2024-01-01"), gultigBis: new Date("2023-01-01") })],
+      mandate: [
+        mandat({ widerrufenAm: new Date("2024-01-01"), gultigBis: new Date("2023-01-01") }),
+      ],
     });
     expect(plan.kind).toBe("skip");
     expect((plan as { reason: string }).reason).toContain("widerrufen");

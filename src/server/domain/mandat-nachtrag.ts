@@ -59,10 +59,7 @@ export function planMandatNachtrag(opts: {
   // reaktivieren statt ein zweites, widersprüchliches Mandat anzulegen.
   const expired = live
     .slice()
-    .sort(
-      (a, b) =>
-        new Date(b.angelegtAm ?? 0).getTime() - new Date(a.angelegtAm ?? 0).getTime(),
-    );
+    .sort((a, b) => new Date(b.angelegtAm ?? 0).getTime() - new Date(a.angelegtAm ?? 0).getTime());
   if (expired.length > 0) {
     return { kind: "reactivate", mandateId: expired[0]!.id };
   }

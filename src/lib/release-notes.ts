@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.61.0",
+    date: "2026-06-12",
+    title: "Zahler-Konzept, Stufe 1",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Der Beitragslauf belastet jetzt das Konto des Zahlers statt immer das des Mitglieds. Für aktive Kinder einer Familie zahlt der Familien-Zahler, für Minderjährige der in den Beziehungen hinterlegte Vertreter, sonst das Mitglied selbst. Mandat und IBAN werden beim Zahler geprüft, Ausschlussgründe nennen den Zahler.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Mandate nachtragen arbeitet jetzt Zahler-bezogen. Mandate werden nie beim minderjährigen Mitglied angelegt, sondern beim Zahler, mit Unterschriftsdatum der frühesten Beitrittserklärung. Minderjährige ohne Vertreter oder Familie erscheinen als Datenqualitätsfall ohne Aktion.",
+      },
+    ],
+  },
+  {
     version: "0.60.0",
     date: "2026-06-12",
     changes: [
