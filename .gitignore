@@ -37,3 +37,6 @@ tsconfig.tsbuildinfo
 /reference/linear/datesicherung.sql
 /reference/linear/*.dump
 /reference/linear/*.backup
+
+# Mandanten-Dumps (scripts/backup.ts) enthalten PII -- niemals committen.
+/backups/
