@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.77.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Zahlart lässt sich jetzt je Vertrag umschalten: Lastschrift oder Rechnung. Auf der Mitgliedsseite genügt ein Klick auf die Zahlart beim Vertrag. Erster Schritt für die Rechnungs-Abwicklung.",
+      },
+    ],
+  },
+  {
     version: "0.76.0",
     date: "2026-06-12",
     changes: [
