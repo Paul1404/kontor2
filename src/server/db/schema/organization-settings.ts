@@ -40,6 +40,17 @@ export const DEFAULT_BEITRAGSSTAFFEL: Beitragsstaffel = {
 export const organizationSettingsTable = pgTable("organization_settings", {
   id: integer("id").primaryKey().notNull().default(1),
   vereinsname: text("vereinsname").notNull(),
+  /**
+   * White-Label: kurzer Anzeigename für die Oberfläche (Kopfzeile, Login,
+   * Browser-Tab), z. B. "SV Untereuerheim". `vereinsname` bleibt der volle
+   * rechtliche Name für SEPA und Briefe. Leer: es wird auf `vereinsname`
+   * zurückgegriffen.
+   */
+  anzeigename: text("anzeigename"),
+  /** Logo als data-URI (PNG/SVG), zeigt überall in der App. Leer: gebündeltes Standard-Logo. */
+  logo: text("logo"),
+  /** Markenfarbe als Hex (#rrggbb). Färbt Primär-/Brand-Elemente. Leer: Standardrot. */
+  primaryColor: text("primary_color"),
   anschriftStrasse: text("anschrift_strasse"),
   anschriftPlz: text("anschrift_plz"),
   anschriftOrt: text("anschrift_ort"),

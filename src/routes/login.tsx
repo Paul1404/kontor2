@@ -9,6 +9,7 @@ import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { VersionChip } from "~/components/ui/version-chip";
 import { signIn } from "~/lib/auth-client";
+import { useBranding } from "~/lib/branding";
 import { orpc } from "~/lib/orpc";
 import { COPYRIGHT } from "~/lib/release-notes";
 
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const branding = useBranding();
   const { expired, redirect } = Route.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -82,9 +84,9 @@ function LoginPage() {
       <Card className="relative w-full max-w-sm shadow-elevated">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-border shadow-card">
-            <img src="/logo.png" alt="SV Untereuerheim" className="size-14 object-contain" />
+            <img src={branding.logoSrc} alt={branding.name} className="size-14 object-contain" />
           </div>
-          <CardTitle className="text-xl">SV Untereuerheim</CardTitle>
+          <CardTitle className="text-xl">{branding.name}</CardTitle>
           <CardDescription>Vereinsverwaltung. Bitte anmelden.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -139,7 +141,7 @@ function LoginPage() {
 
       <div className="absolute bottom-4 flex flex-col items-center gap-1 text-xs text-muted-foreground">
         <div className="flex items-center gap-3">
-          <span>SV Untereuerheim 1945 e.V.</span>
+          <span>{branding.name}</span>
           <span aria-hidden className="text-muted-foreground/40">
             |
           </span>

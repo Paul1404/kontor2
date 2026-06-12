@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.63.0",
+    date: "2026-06-12",
+    title: "Eigenes Erscheinungsbild",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die App lässt sich an den eigenen Verein anpassen: Anzeigename, Logo und Markenfarbe werden unter Vereinsdaten gesetzt und gelten überall, auch auf der Anmeldung, im Setup und im Mitgliederportal. Browser-Tab-Titel und Akzentfarbe ziehen mit. Ohne Anpassung bleibt das bisherige Aussehen.",
+      },
+    ],
+  },
+  {
     version: "0.62.0",
     date: "2026-06-12",
     changes: [

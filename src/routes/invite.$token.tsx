@@ -8,6 +8,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { signIn } from "~/lib/auth-client";
+import { useBranding } from "~/lib/branding";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/invite/$token")({
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/invite/$token")({
 });
 
 function InvitePage() {
+  const branding = useBranding();
   const { token } = Route.useParams();
   const navigate = useNavigate();
 
@@ -60,10 +62,10 @@ function InvitePage() {
       <Card className="relative w-full max-w-sm shadow-elevated">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-border shadow-card">
-            <img src="/logo.png" alt="SV Untereuerheim" className="size-14 object-contain" />
+            <img src={branding.logoSrc} alt={branding.name} className="size-14 object-contain" />
           </div>
           <CardTitle className="text-xl">Einladung einlösen</CardTitle>
-          <CardDescription>SV Untereuerheim Vereinsverwaltung</CardDescription>
+          <CardDescription>{branding.name} Vereinsverwaltung</CardDescription>
         </CardHeader>
         <CardContent>
           {invite.isLoading ? (
@@ -156,7 +158,7 @@ function InvitePage() {
         </CardContent>
       </Card>
 
-      <p className="absolute bottom-4 text-xs text-muted-foreground">SV Untereuerheim 1945 e.V.</p>
+      <p className="absolute bottom-4 text-xs text-muted-foreground">{branding.name}</p>
     </div>
   );
 }

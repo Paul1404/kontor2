@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import { useBranding } from "~/lib/branding";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/portal")({
@@ -9,6 +10,7 @@ export const Route = createFileRoute("/portal")({
 });
 
 function PortalLayout() {
+  const branding = useBranding();
   const me = useQuery({
     queryKey: ["portal.me"],
     queryFn: () => orpc.portal.me(),
@@ -21,7 +23,7 @@ function PortalLayout() {
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4">
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-white shadow-soft ring-1 ring-border">
-              <img src="/logo.png" alt="" className="size-8 object-contain" />
+              <img src={branding.logoSrc} alt="" className="size-8 object-contain" />
             </div>
             <div>
               <div className="text-sm font-semibold tracking-tight">

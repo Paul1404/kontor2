@@ -365,6 +365,13 @@
       "when": 1781158517852,
       "tag": "0051_secret_greymalkin",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1781246123087,
+      "tag": "0052_nifty_amazoness",
+      "breakpoints": true
     }
   ]
 }

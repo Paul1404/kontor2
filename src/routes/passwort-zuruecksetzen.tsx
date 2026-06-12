@@ -8,6 +8,7 @@ import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { toast } from "~/components/ui/toaster";
 import { authClient } from "~/lib/auth-client";
+import { useBranding } from "~/lib/branding";
 
 export const Route = createFileRoute("/passwort-zuruecksetzen")({
   validateSearch: (search: Record<string, unknown>): { token?: string } => ({
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/passwort-zuruecksetzen")({
 });
 
 function ResetPasswordPage() {
+  const branding = useBranding();
   const navigate = useNavigate();
   const { token } = Route.useSearch();
   const [password, setPassword] = useState("");
@@ -65,7 +67,7 @@ function ResetPasswordPage() {
       <Card className="relative w-full max-w-sm shadow-elevated">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-border shadow-card">
-            <img src="/logo.png" alt="SV Untereuerheim" className="size-14 object-contain" />
+            <img src={branding.logoSrc} alt={branding.name} className="size-14 object-contain" />
           </div>
           <CardTitle className="text-xl">Neues Passwort</CardTitle>
           <CardDescription>Vergeben Sie ein neues Passwort für Ihr Konto.</CardDescription>

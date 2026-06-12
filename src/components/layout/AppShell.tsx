@@ -7,6 +7,7 @@ import { CommandPalette } from "~/components/ui/command-palette";
 import { KeyboardCheatsheet } from "~/components/ui/keyboard-cheatsheet";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { signOut } from "~/lib/auth-client";
+import { useBranding } from "~/lib/branding";
 import { useGlobalShortcuts } from "~/lib/use-global-shortcuts";
 
 export function AppShell({
@@ -18,6 +19,7 @@ export function AppShell({
   userEmail: string;
   children?: ReactNode;
 }) {
+  const branding = useBranding();
   const { cheatsheetOpen, setCheatsheetOpen } = useGlobalShortcuts({ role });
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -45,10 +47,10 @@ export function AppShell({
               <Menu className="size-5" />
             </button>
             <div className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-border">
-              <img src="/logo.png" alt="SV Untereuerheim" className="size-7 object-contain" />
+              <img src={branding.logoSrc} alt={branding.name} className="size-7 object-contain" />
             </div>
             <Link to="/app" className="text-sm font-semibold tracking-tight">
-              SVUWV
+              {branding.name}
             </Link>
           </div>
           <div className="flex flex-1 justify-end items-center gap-2 sm:gap-3">

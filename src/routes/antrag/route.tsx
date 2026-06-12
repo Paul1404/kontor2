@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { Mail, Phone, ShieldCheck } from "lucide-react";
+import { useBranding } from "~/lib/branding";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/antrag")({
@@ -8,6 +9,7 @@ export const Route = createFileRoute("/antrag")({
 });
 
 function AntragLayout() {
+  const branding = useBranding();
   const settings = useQuery({
     queryKey: ["applications.publicSettings"],
     queryFn: () => orpc.applications.publicSettings(),
@@ -29,7 +31,7 @@ function AntragLayout() {
         <div className="relative mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-5">
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-white shadow-soft ring-1 ring-white/30">
-              <img src="/logo.png" alt="" className="size-8 object-contain" />
+              <img src={branding.logoSrc} alt="" className="size-8 object-contain" />
             </div>
             <div>
               <div className="text-sm font-semibold tracking-tight">{vereinsname}</div>

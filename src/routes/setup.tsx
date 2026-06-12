@@ -9,6 +9,7 @@ import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { VersionChip } from "~/components/ui/version-chip";
 import { signIn } from "~/lib/auth-client";
+import { useBranding } from "~/lib/branding";
 import { orpc } from "~/lib/orpc";
 import { COPYRIGHT } from "~/lib/release-notes";
 
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/setup")({
 
 function SetupPage() {
   const navigate = useNavigate();
+  const branding = useBranding();
 
   const status = useQuery({
     queryKey: ["auth.setupStatus"],
@@ -60,10 +62,10 @@ function SetupPage() {
       <Card className="relative w-full max-w-sm shadow-elevated">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-border shadow-card">
-            <img src="/logo.png" alt="SV Untereuerheim" className="size-14 object-contain" />
+            <img src={branding.logoSrc} alt={branding.name} className="size-14 object-contain" />
           </div>
           <CardTitle className="text-xl">Erstes Admin-Konto anlegen</CardTitle>
-          <CardDescription>SV Untereuerheim Vereinsverwaltung</CardDescription>
+          <CardDescription>{branding.name} Vereinsverwaltung</CardDescription>
         </CardHeader>
         <CardContent>
           {status.isLoading ? (
@@ -174,7 +176,7 @@ function SetupPage() {
 
       <div className="absolute bottom-4 flex flex-col items-center gap-1 text-xs text-muted-foreground">
         <div className="flex items-center gap-3">
-          <span>SV Untereuerheim 1945 e.V.</span>
+          <span>{branding.name}</span>
           <span aria-hidden className="text-muted-foreground/40">
             |
           </span>
