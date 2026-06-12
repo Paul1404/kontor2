@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.73.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Wird ein Kind-Antrag genehmigt, entsteht der Erziehungsberechtigte jetzt als Kontakt mit Bankverbindung und Mandat, und das Kind wird als Vertreter mit ihm verknüpft. Die Bankverbindung liegt nicht mehr beim Kind. Bei einem Familienantrag wird eine Familie angelegt, in der der Antragsteller zahlt. So ist der Zahler von Anfang an sauber hinterlegt.",
+      },
+    ],
+  },
+  {
     version: "0.72.0",
     date: "2026-06-12",
     changes: [

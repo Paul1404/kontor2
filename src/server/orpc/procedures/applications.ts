@@ -18,6 +18,7 @@ import { escapeLike } from "~/server/db/like";
 import { withUniqueRetry } from "~/server/db/retry";
 import { abteilungenTable } from "~/server/db/schema/abteilungen";
 import { emailLogTable } from "~/server/db/schema/email-log";
+import { familienMitgliederTable, familienTable } from "~/server/db/schema/familien";
 import { membersTable } from "~/server/db/schema/members";
 import {
   type AntragKind,
@@ -30,6 +31,7 @@ import {
   type OrganizationSettings,
   organizationSettingsTable,
 } from "~/server/db/schema/organization-settings";
+import { relationshipsTable } from "~/server/db/schema/relationships";
 import {
   type Antragstyp,
   detectAntragstyp,
@@ -59,6 +61,7 @@ import {
   sendApplicationMails,
 } from "~/server/mail/send-application-mail";
 import { adminProc, errorLogFields, publicProc, vorstandProc } from "~/server/orpc/base";
+import { parsePayerName } from "~/server/orpc/procedures/sepa";
 import { buildBeitrittModel } from "~/server/pdf/beitrittserklaerung-model";
 import { resolveClubLogo } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
@@ -1534,7 +1537,10 @@ export const applicationsRouter = {
         primaryPatch.vertreterPlz = app.plz;
         primaryPatch.vertreterOrt = app.ort;
       }
-      if (ibanPlain) {
+      // Bei Minderjährigen liegt die Bankverbindung beim Erziehungsberechtigten
+      // (Zahler), nicht beim Kind. Sonst (Einzel/Familie) zahlt der
+      // Antragsteller selbst.
+      if (ibanPlain && !isMinor) {
         primaryPatch.iban1 = ibanPlain;
         primaryPatch.iban1Last4 = app.ibanLast4 ?? lastFour(ibanPlain);
         primaryPatch.bic1 = app.bic;
@@ -1559,6 +1565,16 @@ export const applicationsRouter = {
           }
         : null;
 
+      // Name des Erziehungsberechtigten: explizite Felder zuerst, sonst aus dem
+      // Kontoinhaber abgeleitet (Nachname des Kindes als Anker).
+      const guardianName = (() => {
+        const vor = app.erziehungsberechtigterVorname?.trim() || "";
+        const nach = app.erziehungsberechtigterNachname?.trim() || "";
+        if (nach || vor) return { vorname: vor, nachname: nach };
+        if (app.kontoinhaber) return parsePayerName(app.kontoinhaber, app.nachname);
+        return { vorname: "", nachname: "" };
+      })();
+
       const result = await withUniqueRetry(() =>
         context.db.transaction(async (tx) => {
           const primary = await onboardMember(tx, {
@@ -1568,14 +1584,58 @@ export const applicationsRouter = {
             abteilungen: (app.abteilungen ?? []).map((id) => ({ abteilungId: id })),
             fallbackEintritt,
             contract,
-            sepa,
+            // Das Mandat eines Kindes liegt beim Vertreter (unten), nicht beim Kind.
+            sepa: isMinor ? null : sepa,
             actorId,
             actorEmail,
             requestId: context.requestId ?? null,
           });
           const refs = [primary.ref];
 
+          // Minderjährig: Erziehungsberechtigten als Zahler-Kontakt anlegen,
+          // Bankverbindung und Mandat dort, als Vertreter verknüpfen. Damit löst
+          // sich der Zahler von Anfang an sauber auf, ohne späteres Nachräumen.
+          if (isMinor && (guardianName.nachname || guardianName.vorname)) {
+            const guardian = await onboardMember(tx, {
+              patch: {
+                vorname: guardianName.vorname || null,
+                nachname: guardianName.nachname || null,
+                strasse: app.strasse,
+                hausnummer: app.hausnummer,
+                plz: app.plz,
+                ort: app.ort,
+                ...(ibanPlain
+                  ? {
+                      iban1: ibanPlain,
+                      iban1Last4: app.ibanLast4 ?? lastFour(ibanPlain),
+                      bic1: app.bic,
+                      abwKontoInh: app.kontoinhaber ?? null,
+                    }
+                  : {}),
+              },
+              isKontakt: true,
+              status: "aktiv",
+              abteilungen: [],
+              fallbackEintritt,
+              contract: null,
+              sepa,
+              actorId,
+              actorEmail,
+              requestId: context.requestId ?? null,
+            });
+            refs.push(guardian.ref);
+            await tx.insert(relationshipsTable).values({
+              fromMemberId: primary.id,
+              toMemberId: guardian.id,
+              fromAdrNr: primary.adrNr,
+              toAdrNr: guardian.adrNr,
+              beziehung: "Erziehungsberechtigt",
+              istVertreter: true,
+            });
+          }
+
           if (app.antragstyp === "familie") {
+            let partnerId: string | null = null;
             if (app.partnerVorname && app.partnerNachname) {
               const p = await onboardMember(tx, {
                 patch: {
@@ -1598,8 +1658,10 @@ export const applicationsRouter = {
                 actorEmail,
                 requestId: context.requestId ?? null,
               });
+              partnerId = p.id;
               refs.push(p.ref);
             }
+            const childIds: string[] = [];
             for (const k of app.kinder ?? []) {
               const c = await onboardMember(tx, {
                 patch: {
@@ -1622,7 +1684,38 @@ export const applicationsRouter = {
                 actorEmail,
                 requestId: context.requestId ?? null,
               });
+              childIds.push(c.id);
               refs.push(c.ref);
+            }
+
+            // Familie explizit anlegen: der primäre Antragsteller zahlt, Partner
+            // und Kinder als Familienmitglieder. So ist der Zahler der Kinder
+            // sauber gemodellt (statt nur über Adresse/Verknüpfung).
+            const today = new Date().toISOString().slice(0, 10);
+            const [fam] = await tx
+              .insert(familienTable)
+              .values({ name: `Familie ${app.nachname}`, zahlerMemberId: primary.id })
+              .returning({ id: familienTable.id });
+            if (fam) {
+              await tx.insert(familienMitgliederTable).values([
+                { familieId: fam.id, memberId: primary.id, rolle: "zahler", von: today },
+                ...(partnerId
+                  ? [
+                      {
+                        familieId: fam.id,
+                        memberId: partnerId,
+                        rolle: "partner" as const,
+                        von: today,
+                      },
+                    ]
+                  : []),
+                ...childIds.map((id) => ({
+                  familieId: fam.id,
+                  memberId: id,
+                  rolle: "kind" as const,
+                  von: today,
+                })),
+              ]);
             }
           }
 
