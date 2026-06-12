@@ -11,9 +11,25 @@ export type Branding = {
   anzeigename: string | null;
   logo: string | null;
   primaryColor: string | null;
+  /** Cache-Buster-Hash des Logos für die Favicon-URL; null ohne Logo. */
+  logoVersion: string | null;
 };
 
-const DEFAULT_BRANDING: Branding = { anzeigename: null, logo: null, primaryColor: null };
+const DEFAULT_BRANDING: Branding = {
+  anzeigename: null,
+  logo: null,
+  primaryColor: null,
+  logoVersion: null,
+};
+
+/**
+ * URL des konfigurierten Logos als Favicon/App-Icon (vom Server skaliert), oder
+ * null, wenn kein Logo gesetzt ist -- dann gilt das gebündelte Standard-Favicon.
+ */
+export function brandingIconUrl(b: Pick<Branding, "logo" | "logoVersion">): string | null {
+  if (!b.logo) return null;
+  return `/api/branding/icon?v=${b.logoVersion ?? "1"}`;
+}
 
 const BrandingContext = createContext<Branding>(DEFAULT_BRANDING);
 

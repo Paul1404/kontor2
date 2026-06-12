@@ -9,6 +9,13 @@ import { normalizeIban, validateIban } from "~/server/sepa/iban";
 
 const MoneyString = v.pipe(v.string(), v.regex(/^-?\d+(\.\d{1,2})?$/));
 
+/** Kurzer, stabiler Hash (djb2) für Cache-Busting des Logo-Icons. */
+function shortHash(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
 const BeitragsstaffelInput = v.object({
   familie: MoneyString,
   kind: MoneyString,
@@ -188,9 +195,12 @@ export const organizationSettingsRouter = {
         anzeigename: row?.anzeigename?.trim() || row?.vereinsname?.trim() || null,
         logo: row?.logo || null,
         primaryColor: normalizeHex(row?.primaryColor),
+        // Kurzer Hash des Logos als Cache-Buster für /api/branding/icon. Ändert
+        // sich, sobald ein neues Logo gesetzt wird; null ohne Logo.
+        logoVersion: row?.logo ? shortHash(row.logo) : null,
       };
     } catch {
-      return { anzeigename: null, logo: null, primaryColor: null };
+      return { anzeigename: null, logo: null, primaryColor: null, logoVersion: null };
     }
   }),
 
