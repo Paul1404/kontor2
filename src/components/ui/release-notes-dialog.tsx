@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
+  COPYRIGHT,
   RELEASES,
   type Release,
   type ReleaseCategory,
@@ -84,9 +85,13 @@ export function ReleaseNotesDialog({
           ))}
         </div>
 
-        <div className="border-t border-border px-6 py-3 text-[11px] text-muted-foreground">
-          Hinweise leben in{" "}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono">src/lib/release-notes.ts</code>.
+        <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-3 text-[11px] text-muted-foreground">
+          <span>
+            Hinweise leben in{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono">src/lib/release-notes.ts</code>
+            .
+          </span>
+          <span className="shrink-0">{COPYRIGHT}</span>
         </div>
       </div>
     </div>

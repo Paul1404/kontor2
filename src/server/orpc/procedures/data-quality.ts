@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import * as v from "valibot";
 import type { DB } from "~/server/db/client";
 import { memberDisplayName, memberRef } from "~/server/domain/member";
+import { type CsvColumn, toCsv } from "~/server/lib/csv";
 import { vorstandProc } from "~/server/orpc/base";
 
 /**
@@ -428,4 +429,53 @@ export const dataQualityRouter = {
         nextCursor: capped ? String(offset + rows.length) : null,
       };
     }),
+
+  /**
+   * Vollexport aller Befunde als CSV: jede Prüfung, jede betroffene Zeile,
+   * ohne das 500er-Seitenlimit der Drill-down-Liste. Eine Zeile pro
+   * (Prüfung, Mitglied); Mitglieder mit mehreren Befunden erscheinen
+   * entsprechend mehrfach. Für die Offline-Abarbeitung im Vorstand.
+   */
+  exportCsv: vorstandProc.input(v.void()).handler(async ({ context }) => {
+    type ExportRow = {
+      pruefung: string;
+      schweregrad: string;
+      reference: string;
+      name: string;
+      ort: string | null;
+      email: string | null;
+    };
+    const severityLabel = { error: "Fehler", warn: "Warnung", info: "Hinweis" } as const;
+    const rows: ExportRow[] = [];
+    for (const meta of CATEGORIES) {
+      const affected = (await context.db.execute(
+        sql.raw(
+          `select id, member_no, kontakt_no, mitgliedsnummer, adr_nr, vorname, nachname, kurzname, firma1, ort, email, geburtsdatum, austritt ` +
+            `from members where ${WHERE[meta.id]} ` +
+            `order by nachname nulls last, vorname nulls last, id`,
+        ),
+      )) as unknown as MemberRow[];
+      for (const r of affected) {
+        const item = toItem(r);
+        rows.push({
+          pruefung: meta.label,
+          schweregrad: severityLabel[meta.severity],
+          reference: item.reference,
+          name: item.name,
+          ort: item.ort,
+          email: item.email,
+        });
+      }
+    }
+    const content = toCsv(rows, [
+      { key: "pruefung", label: "Prüfung" },
+      { key: "schweregrad", label: "Schweregrad" },
+      { key: "reference", label: "Mitgliedsnummer" },
+      { key: "name", label: "Name" },
+      { key: "ort", label: "Ort" },
+      { key: "email", label: "E-Mail" },
+    ] satisfies CsvColumn<ExportRow>[]);
+    const stamp = new Date().toISOString().slice(0, 10);
+    return { filename: `datenqualitaet-${stamp}.csv`, content, count: rows.length };
+  }),
 };

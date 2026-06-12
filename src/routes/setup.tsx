@@ -10,6 +10,7 @@ import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { VersionChip } from "~/components/ui/version-chip";
 import { signIn } from "~/lib/auth-client";
 import { orpc } from "~/lib/orpc";
+import { COPYRIGHT } from "~/lib/release-notes";
 
 export const Route = createFileRoute("/setup")({
   component: SetupPage,
@@ -171,12 +172,15 @@ function SetupPage() {
         </CardContent>
       </Card>
 
-      <div className="absolute bottom-4 flex items-center gap-3 text-xs text-muted-foreground">
-        <span>SV Untereuerheim 1945 e.V.</span>
-        <span aria-hidden className="text-muted-foreground/40">
-          |
-        </span>
-        <VersionChip variant="muted" />
+      <div className="absolute bottom-4 flex flex-col items-center gap-1 text-xs text-muted-foreground">
+        <div className="flex items-center gap-3">
+          <span>SV Untereuerheim 1945 e.V.</span>
+          <span aria-hidden className="text-muted-foreground/40">
+            |
+          </span>
+          <VersionChip variant="muted" />
+        </div>
+        <span className="text-[11px] text-muted-foreground/70">{COPYRIGHT}</span>
       </div>
     </div>
   );
