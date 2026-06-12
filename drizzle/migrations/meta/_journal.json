@@ -379,6 +379,13 @@
       "when": 1781251076698,
       "tag": "0053_violet_amazoness",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1781261335112,
+      "tag": "0054_faulty_bastion",
+      "breakpoints": true
     }
   ]
 }

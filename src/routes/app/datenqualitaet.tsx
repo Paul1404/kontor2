@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  CheckCircle2,
   ChevronRight,
   Download,
   GitMerge,
   ListChecks,
   Loader2,
   ShieldCheck,
+  Undo2,
   Users,
   Wrench,
 } from "lucide-react";
@@ -15,6 +17,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
 import { ABTEILUNG_NONE_FILTER } from "~/lib/abteilung-filter";
@@ -590,10 +593,19 @@ function CategorySection({
 }
 
 function CategoryList({ id }: { id: CategoryId }) {
+  const qc = useQueryClient();
   const list = useQuery({
     queryKey: ["dataQuality.list", id],
     queryFn: () => orpc.dataQuality.list({ category: id }),
   });
+
+  // After acknowledging / re-opening a finding, refresh this category's list,
+  // its "Geprüft" sublist, and the headline counts in one go.
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["dataQuality.list", id] });
+    qc.invalidateQueries({ queryKey: ["dataQuality.acknowledged", id] });
+    qc.invalidateQueries({ queryKey: ["dataQuality.summary"] });
+  };
 
   if (list.isLoading) {
     return (
@@ -614,20 +626,7 @@ function CategoryList({ id }: { id: CategoryId }) {
     <div className="border-t border-border">
       <ul className="divide-y divide-border text-sm">
         {items.map((m) => (
-          <li key={m.id}>
-            <Link
-              to="/app/mitglieder/$mitgliedsnummer"
-              params={{ mitgliedsnummer: m.reference }}
-              className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/40"
-            >
-              <span className="tabular-nums text-xs text-muted-foreground">{m.reference}</span>
-              <span className="flex-1 truncate font-medium">{m.name}</span>
-              <span className="hidden truncate text-xs text-muted-foreground sm:block">
-                {detailFor(id, m)}
-              </span>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-            </Link>
-          </li>
+          <FindingRow key={m.id} id={id} item={m} onChanged={refresh} />
         ))}
       </ul>
       {list.data?.capped ? (
@@ -635,7 +634,168 @@ function CategoryList({ id }: { id: CategoryId }) {
           Nur die ersten {items.length} Einträge werden angezeigt.
         </div>
       ) : null}
+      <AcknowledgedSection id={id} onChanged={refresh} />
     </div>
+  );
+}
+
+type FindingItem = ListItem & { id: string; reference: string; name: string };
+
+/**
+ * One finding row: a link to the member plus a "Geprüft" action that opens an
+ * inline reason field. Acknowledging moves the row into the "Geprüft" sublist
+ * and drops it from the count.
+ */
+function FindingRow({
+  id,
+  item,
+  onChanged,
+}: {
+  id: CategoryId;
+  item: FindingItem;
+  onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [reason, setReason] = useState("");
+  const ack = useMutation({
+    mutationFn: () =>
+      orpc.dataQuality.acknowledge({
+        category: id,
+        memberId: item.id,
+        reason: reason.trim() || null,
+      }),
+    onSuccess: () => {
+      setEditing(false);
+      setReason("");
+      toast.success("Als geprüft markiert");
+      onChanged();
+    },
+    onError: (e: Error) => toast.error("Konnte nicht markieren", { description: e.message }),
+  });
+
+  return (
+    <li>
+      <div className="flex items-center gap-1 pr-2">
+        <Link
+          to="/app/mitglieder/$mitgliedsnummer"
+          params={{ mitgliedsnummer: item.reference }}
+          className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/40"
+        >
+          <span className="tabular-nums text-xs text-muted-foreground">{item.reference}</span>
+          <span className="flex-1 truncate font-medium">{item.name}</span>
+          <span className="hidden truncate text-xs text-muted-foreground sm:block">
+            {detailFor(id, item)}
+          </span>
+        </Link>
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label="Als geprüft markieren"
+          title="Als geprüft markieren"
+          onClick={() => setEditing((v) => !v)}
+        >
+          <CheckCircle2 className="size-4" />
+        </Button>
+      </div>
+      {editing ? (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-muted/30 px-4 py-2">
+          <Input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Grund (optional), z. B. zahlt über Familie"
+            aria-label="Grund"
+            className="h-9 min-w-0 flex-1"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") ack.mutate();
+            }}
+          />
+          <Button size="sm" onClick={() => ack.mutate()} disabled={ack.isPending}>
+            {ack.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+            Geprüft
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
+            Abbrechen
+          </Button>
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+/** Collapsible list of findings already marked "geprüft" for this category. */
+function AcknowledgedSection({ id, onChanged }: { id: CategoryId; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ack = useQuery({
+    queryKey: ["dataQuality.acknowledged", id],
+    queryFn: () => orpc.dataQuality.acknowledged({ category: id }),
+  });
+  const items = ack.data?.items ?? [];
+  if (!ack.isLoading && items.length === 0) return null;
+
+  return (
+    <div className="border-t border-border bg-muted/20">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} />
+        Geprüft ({items.length})
+      </button>
+      {open ? (
+        <ul className="divide-y divide-border/60 text-sm">
+          {items.map((m) => (
+            <li key={m.id} className="flex items-center gap-3 px-4 py-2">
+              <Link
+                to="/app/mitglieder/$mitgliedsnummer"
+                params={{ mitgliedsnummer: m.reference }}
+                className="flex min-w-0 flex-1 items-center gap-3 hover:underline"
+              >
+                <span className="tabular-nums text-xs text-muted-foreground">{m.reference}</span>
+                <span className="truncate">{m.name}</span>
+              </Link>
+              {m.reason ? (
+                <span className="hidden max-w-[40%] truncate text-xs text-muted-foreground sm:block">
+                  {m.reason}
+                </span>
+              ) : null}
+              <UnacknowledgeButton id={id} memberId={m.id} onChanged={onChanged} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function UnacknowledgeButton({
+  id,
+  memberId,
+  onChanged,
+}: {
+  id: CategoryId;
+  memberId: string;
+  onChanged: () => void;
+}) {
+  const un = useMutation({
+    mutationFn: () => orpc.dataQuality.unacknowledge({ category: id, memberId }),
+    onSuccess: () => {
+      toast.success("Wieder aufgenommen");
+      onChanged();
+    },
+    onError: (e: Error) => toast.error("Konnte nicht zurücknehmen", { description: e.message }),
+  });
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      aria-label="Wieder aufnehmen"
+      title="Wieder aufnehmen"
+      onClick={() => un.mutate()}
+      disabled={un.isPending}
+    >
+      {un.isPending ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4" />}
+    </Button>
   );
 }
 

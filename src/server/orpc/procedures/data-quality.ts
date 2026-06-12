@@ -1,6 +1,8 @@
-import { sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
 import type { DB } from "~/server/db/client";
+import { dataQualityExceptionsTable } from "~/server/db/schema/data-quality-exceptions";
+import { membersTable } from "~/server/db/schema/members";
 import { memberDisplayName, memberRef } from "~/server/domain/member";
 import { type CsvColumn, toCsv } from "~/server/lib/csv";
 import { vorstandProc } from "~/server/orpc/base";
@@ -354,6 +356,21 @@ export const WHERE: Record<CategoryId, string> = {
     "deleted_at is null and nachname is not null and btrim(nachname) <> '' and exists (select 1 from members m2 where m2.deleted_at is null and m2.id <> members.id and lower(m2.nachname) = lower(members.nachname) and lower(coalesce(m2.vorname, '')) = lower(coalesce(members.vorname, '')) and (m2.geburtsdatum is null or members.geburtsdatum is null))",
 };
 
+/**
+ * The WHERE clause for a category, but excluding findings a Vorstand has marked
+ * as "geprüft" (Ausnahme, `data_quality_exceptions`). Every consumer of the
+ * rules -- count, drill-down, CSV export, the nightly snapshot/Aufgaben -- goes
+ * through here so an acknowledged finding disappears from all of them at once.
+ * `category` is a fixed CategoryId (no user input), safe to interpolate.
+ */
+export function activeWhere(category: CategoryId): string {
+  return (
+    `(${WHERE[category]}) and not exists (` +
+    `select 1 from data_quality_exceptions e ` +
+    `where e.member_id = members.id and e.category = '${category}')`
+  );
+}
+
 /** Cap the drill-down so a pathological dataset cannot return everything. */
 const LIST_LIMIT = 500;
 
@@ -404,7 +421,7 @@ function toItem(r: MemberRow) {
  */
 export async function dataQualityCounts(db: DB): Promise<Array<CategoryMeta & { count: number }>> {
   const selects = CATEGORY_IDS.map(
-    (id) => `(select count(*)::int from members where ${WHERE[id]}) as "${id}"`,
+    (id) => `(select count(*)::int from members where ${activeWhere(id)}) as "${id}"`,
   ).join(", ");
   const rows = (await db.execute(sql.raw(`select ${selects}`))) as unknown as Array<
     Record<CategoryId, number>
@@ -441,7 +458,7 @@ export const dataQualityRouter = {
       const rows = (await context.db.execute(
         sql.raw(
           `select id, member_no, kontakt_no, mitgliedsnummer, adr_nr, vorname, nachname, kurzname, firma1, ort, email, geburtsdatum, austritt ` +
-            `from members where ${WHERE[input.category]} ` +
+            `from members where ${activeWhere(input.category)} ` +
             `order by nachname nulls last, vorname nulls last, id ` +
             `limit ${LIST_LIMIT} offset ${offset}`,
         ),
@@ -480,7 +497,7 @@ export const dataQualityRouter = {
       const affected = (await context.db.execute(
         sql.raw(
           `select id, member_no, kontakt_no, mitgliedsnummer, adr_nr, vorname, nachname, kurzname, firma1, ort, email, geburtsdatum, austritt ` +
-            `from members where ${WHERE[meta.id]} ` +
+            `from members where ${activeWhere(meta.id)} ` +
             `order by nachname nulls last, vorname nulls last, id`,
         ),
       )) as unknown as MemberRow[];
@@ -507,4 +524,90 @@ export const dataQualityRouter = {
     const stamp = new Date().toISOString().slice(0, 10);
     return { filename: `datenqualitaet-${stamp}.csv`, content, count: rows.length };
   }),
+
+  /**
+   * Einen Befund (Prüfung + Mitglied) als geprüft markieren. Der Treffer
+   * verschwindet aus Zählung, Liste, Export und Aufgaben, bleibt aber als
+   * Ausnahme nachvollziehbar. Erneutes Markieren aktualisiert nur den Grund.
+   */
+  acknowledge: vorstandProc
+    .input(
+      v.object({
+        category: v.picklist(CATEGORY_IDS),
+        memberId: v.string(),
+        reason: v.optional(v.nullable(v.string()), null),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const reason = input.reason?.trim() ? input.reason.trim() : null;
+      await context.db
+        .insert(dataQualityExceptionsTable)
+        .values({
+          category: input.category,
+          memberId: input.memberId,
+          reason,
+          createdBy: context.session!.user.id,
+          createdByEmail: context.session!.user.email,
+        })
+        .onConflictDoUpdate({
+          target: [dataQualityExceptionsTable.category, dataQualityExceptionsTable.memberId],
+          set: {
+            reason,
+            createdBy: context.session!.user.id,
+            createdByEmail: context.session!.user.email,
+            createdAt: new Date(),
+          },
+        });
+      return { ok: true };
+    }),
+
+  /** Eine Ausnahme zurücknehmen: der Befund taucht wieder in der Liste auf. */
+  unacknowledge: vorstandProc
+    .input(v.object({ category: v.picklist(CATEGORY_IDS), memberId: v.string() }))
+    .handler(async ({ context, input }) => {
+      await context.db
+        .delete(dataQualityExceptionsTable)
+        .where(
+          and(
+            eq(dataQualityExceptionsTable.category, input.category),
+            eq(dataQualityExceptionsTable.memberId, input.memberId),
+          ),
+        );
+      return { ok: true };
+    }),
+
+  /** Die als geprüft markierten Mitglieder einer Prüfung, für die "Geprüft"-Liste. */
+  acknowledged: vorstandProc
+    .input(v.object({ category: v.picklist(CATEGORY_IDS) }))
+    .handler(async ({ context, input }) => {
+      const rows = await context.db
+        .select({
+          memberId: dataQualityExceptionsTable.memberId,
+          reason: dataQualityExceptionsTable.reason,
+          createdByEmail: dataQualityExceptionsTable.createdByEmail,
+          createdAt: dataQualityExceptionsTable.createdAt,
+          memberNo: membersTable.memberNo,
+          kontaktNo: membersTable.kontaktNo,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
+          adrNr: membersTable.adrNr,
+          vorname: membersTable.vorname,
+          nachname: membersTable.nachname,
+          kurzname: membersTable.kurzname,
+          firma1: membersTable.firma1,
+        })
+        .from(dataQualityExceptionsTable)
+        .innerJoin(membersTable, eq(membersTable.id, dataQualityExceptionsTable.memberId))
+        .where(eq(dataQualityExceptionsTable.category, input.category))
+        .orderBy(desc(dataQualityExceptionsTable.createdAt));
+      return {
+        items: rows.map((r) => ({
+          id: r.memberId,
+          reference: memberRef(r),
+          name: memberDisplayName(r),
+          reason: r.reason,
+          createdByEmail: r.createdByEmail,
+          createdAt: r.createdAt,
+        })),
+      };
+    }),
 };

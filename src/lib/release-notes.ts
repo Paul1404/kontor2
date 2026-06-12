@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.68.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Einen Datenqualitäts-Befund lässt sich jetzt als geprüft markieren, wenn er bewusst in Ordnung ist (zum Beispiel zahlt über die Familie oder beitragsfrei). Der Befund verschwindet dann aus der Liste, der Zählung und dem Export und löst keine Aufgabe mehr aus. Ein optionaler Grund lässt sich hinterlegen. Geprüfte Befunde stehen je Prüfung unter Geprüft und lassen sich wieder aufnehmen.",
+      },
+    ],
+  },
+  {
     version: "0.67.1",
     date: "2026-06-12",
     changes: [
