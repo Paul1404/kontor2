@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.70.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Bei Mandate nachtragen lässt sich für ein minderjähriges Mitglied ohne gepflegten Vertreter die vorhandene Beziehung zu einem Erwachsenen mit einem Klick als Vertreter übernehmen. Passt der Name zum hinterlegten Kontoinhaber, wird das als starker Treffer gekennzeichnet. Danach lässt sich das Mandat wie üblich nachtragen oder reaktivieren.",
+      },
+    ],
+  },
+  {
     version: "0.69.0",
     date: "2026-06-12",
     changes: [

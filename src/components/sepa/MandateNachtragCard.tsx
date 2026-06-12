@@ -22,6 +22,13 @@ type Kandidat = {
     | { kind: "reactivate"; mandateId: string }
     | { kind: "skip"; reason: string };
   mandatsNr?: string | null;
+  vertreterCandidate?: {
+    relationshipId: string;
+    toMemberId: string;
+    name: string;
+    reference: string;
+    strong: boolean;
+  };
 };
 
 /**
@@ -122,6 +129,12 @@ export function MandateNachtragCard({ canEdit }: { canEdit: boolean }) {
                     <Badge variant="success">
                       Reaktivieren{r.mandatsNr ? ` (${r.mandatsNr})` : ""}
                     </Badge>
+                  ) : r.vertreterCandidate ? (
+                    <AssignVertreterButton
+                      candidate={r.vertreterCandidate}
+                      canEdit={canEdit}
+                      onDone={() => qc.invalidateQueries({ queryKey: ["sepa.nachtragKandidaten"] })}
+                    />
                   ) : (
                     <Badge variant="warning">{r.plan.reason}</Badge>
                   )}
@@ -144,5 +157,54 @@ export function MandateNachtragCard({ canEdit }: { canEdit: boolean }) {
         onConfirm={() => nachtragen.mutate()}
       />
     </Card>
+  );
+}
+
+/**
+ * Macht aus dem Sackgassen-Badge "ohne Vertreter" eine Aktion: die vorhandene
+ * Beziehung zum Erwachsenen als Vertreter übernehmen. Danach löst der Zahler
+ * sich auf und das Mandat wird nachtrag- bzw. reaktivierbar.
+ */
+function AssignVertreterButton({
+  candidate,
+  canEdit,
+  onDone,
+}: {
+  candidate: NonNullable<Kandidat["vertreterCandidate"]>;
+  canEdit: boolean;
+  onDone: () => void | Promise<void>;
+}) {
+  const assign = useMutation({
+    mutationFn: () =>
+      orpc.relationships.update({
+        id: candidate.relationshipId,
+        patch: { istVertreter: true },
+      }),
+    onSuccess: async () => {
+      toast.success(`${candidate.name} als Vertreter übernommen`);
+      await onDone();
+    },
+    onError: (e: Error) => toast.error("Übernehmen fehlgeschlagen", { description: e.message }),
+  });
+
+  if (!canEdit) {
+    return <Badge variant="warning">Minderjährig: Vertreter vorhanden, nicht gepflegt</Badge>;
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => assign.mutate()}
+        disabled={assign.isPending}
+        title={`Beziehung zu ${candidate.name} als Vertreter übernehmen`}
+      >
+        {assign.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+        {candidate.name} als Vertreter
+      </Button>
+      {candidate.strong ? (
+        <span className="text-xs text-muted-foreground">passt zum Kontoinhaber</span>
+      ) : null}
+    </div>
   );
 }
