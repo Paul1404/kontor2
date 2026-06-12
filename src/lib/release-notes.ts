@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.79.5",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Die Schlüsselrotation für verschlüsselte Felder ist jetzt verlustfrei abgesichert. Eine verschlüsselte Spalte (IBAN aus Online-Anträgen) fehlte in der Umschlüsselungs-Liste und wäre bei einer Rotation verwaist. Die Liste ist ergänzt, ein Test erzwingt ihre Vollständigkeit, ein weiterer beweist den vollen Rotations-Zyklus, und eine Schranke verhindert das Entfernen eines Schlüssels, solange noch Daten darauf liegen. Doku unter docs/key-rotation.md.",
+      },
+    ],
+  },
+  {
     version: "0.79.4",
     date: "2026-06-12",
     changes: [
