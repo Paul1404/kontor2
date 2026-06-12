@@ -68,14 +68,14 @@ export const CATEGORIES: CategoryMeta[] = [
     id: "lastschrift_ohne_mandat",
     label: "Lastschrift ohne SEPA-Mandat",
     description:
-      "Mitglieder mit aktivem Lastschrift-Vertrag, aber ohne gültiges SEPA-Mandat. Ein Einzug ist so nicht möglich.",
+      "Beitragspflichtiger Lastschrift-Vertrag (über 0 €), aber weder das Mitglied noch sein Zahler (Familie oder Vertreter) hat ein SEPA-Mandat. Ein Einzug ist so nicht möglich.",
     severity: "warn",
   },
   {
     id: "fehlende_iban",
     label: "Lastschrift ohne IBAN",
     description:
-      "Mitglieder mit aktivem Lastschrift-Vertrag, aber ohne hinterlegte IBAN. Der Beitrag kann nicht eingezogen werden.",
+      "Beitragspflichtiger Lastschrift-Vertrag (über 0 €), aber weder das Mitglied noch sein Zahler hat eine IBAN hinterlegt. Der Beitrag kann nicht eingezogen werden.",
     severity: "warn",
   },
   {
@@ -252,6 +252,31 @@ const ACTIVE_DD =
   "exists (select 1 from contracts c where c.member_id = members.id and c.is_direct_debit = true " +
   "and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date))";
 
+/**
+ * Active direct-debit contract with something to actually collect (betrag > 0).
+ * A 0-Euro or beitragsfrei contract flagged as direct debit is noise -- there is
+ * nothing to debit, so it must not raise a "missing mandate / IBAN" flag.
+ */
+const ACTIVE_DD_POS =
+  "exists (select 1 from contracts c where c.member_id = members.id and c.is_direct_debit = true " +
+  "and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date) and c.betrag > 0)";
+
+/**
+ * Resolved payer (Zahler) of a member, as a scalar member id: the active
+ * family payer (kind role) -> the Vertreter (minors only) -> the member itself.
+ * Mirrors `resolveZahler` so the mandate/IBAN checks follow who actually pays
+ * instead of flagging a child whose parent or family holds the mandate.
+ * (The per-contract `zahler_member_id` override of Zahler-Konzept Stufe 2 is
+ * not folded in here yet; prepend it once it exists.)
+ */
+const PAYER =
+  "coalesce(" +
+  "(select fam.zahler_member_id from familien_mitglieder fm join familien fam on fam.id = fm.familie_id " +
+  "where fm.member_id = members.id and fm.bis is null and fm.rolle = 'kind' limit 1), " +
+  "(select r.to_member_id from relationships r where r.from_member_id = members.id and r.ist_vertreter = true " +
+  "and members.geburtsdatum is not null and members.geburtsdatum > current_date - interval '18 years' limit 1), " +
+  "members.id)";
+
 /** Any contract that is currently in force (not cancelled, not expired). */
 const ACTIVE_CONTRACT =
   "exists (select 1 from contracts c where c.member_id = members.id " +
@@ -271,8 +296,8 @@ const ANREDE_HAS_GENDER =
  * clauses for counts and for the error-rule drill-down.
  */
 export const WHERE: Record<CategoryId, string> = {
-  lastschrift_ohne_mandat: `${ACTIVE} and ${ACTIVE_DD} and not exists (select 1 from sepa_mandates s where s.member_id = members.id and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null)`,
-  fehlende_iban: `${ACTIVE} and ${ACTIVE_DD} and (iban1_last4 is null or btrim(iban1_last4) = '')`,
+  lastschrift_ohne_mandat: `${ACTIVE} and ${ACTIVE_DD_POS} and not exists (select 1 from sepa_mandates s where s.member_id = (${PAYER}) and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null)`,
+  fehlende_iban: `${ACTIVE} and ${ACTIVE_DD_POS} and not exists (select 1 from members p where p.id = (${PAYER}) and p.iban1_last4 is not null and btrim(p.iban1_last4) <> '')`,
   fehlende_adresse: `${ACTIVE} and (strasse is null or btrim(strasse) = '' or plz is null or btrim(plz) = '' or ort is null or btrim(ort) = '')`,
   name_fehlt: `${ACTIVE} and coalesce(btrim(nachname), '') = '' and coalesce(btrim(firma1), '') = '' and coalesce(btrim(kurzname), '') = ''`,
   aktiv_ohne_vertrag: `${ACTIVE} and member_no is not null and not ${ACTIVE_CONTRACT}`,
@@ -300,9 +325,9 @@ export const WHERE: Record<CategoryId, string> = {
   telefon_nur_vorwahl: `${ACTIVE} and telefon1 is not null and btrim(telefon1) <> '' and char_length(regexp_replace(telefon1, '[^0-9]', '', 'g')) between 1 and 5`,
   // Active mandate whose validity has already lapsed while a Lastschrift
   // contract still runs: the next Einzug would be unauthorized.
-  mandat_abgelaufen: `${ACTIVE} and ${ACTIVE_DD} and exists (select 1 from sepa_mandates s where s.member_id = members.id and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null and lower(btrim(coalesce(s.status, ''))) = 'aktiv' and s.gultig_bis is not null and s.gultig_bis::date < current_date)`,
+  mandat_abgelaufen: `${ACTIVE} and ${ACTIVE_DD_POS} and exists (select 1 from sepa_mandates s where s.member_id = members.id and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null and lower(btrim(coalesce(s.status, ''))) = 'aktiv' and s.gultig_bis is not null and s.gultig_bis::date < current_date)`,
   // Same, but the mandate still has up to 90 days left: a heads-up to renew.
-  mandat_laeuft_bald_ab: `${ACTIVE} and ${ACTIVE_DD} and exists (select 1 from sepa_mandates s where s.member_id = members.id and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null and lower(btrim(coalesce(s.status, ''))) = 'aktiv' and s.gultig_bis is not null and s.gultig_bis::date >= current_date and s.gultig_bis::date < current_date + interval '90 days')`,
+  mandat_laeuft_bald_ab: `${ACTIVE} and ${ACTIVE_DD_POS} and exists (select 1 from sepa_mandates s where s.member_id = members.id and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null and lower(btrim(coalesce(s.status, ''))) = 'aktiv' and s.gultig_bis is not null and s.gultig_bis::date >= current_date and s.gultig_bis::date < current_date + interval '90 days')`,
   // Same Mitgliedsnummer on more than one non-deleted record (see migration
   // 0048, which also adds a DB-level partial unique index).
   mitgliedsnummer_kollision:

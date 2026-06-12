@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.66.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Datenqualitäts-Prüfungen für SEPA-Mandat und IBAN folgen jetzt dem Zahler: bei Kindern und Minderjährigen wird das Mandat des Familien-Zahlers oder Vertreters geprüft, nicht das des Kindes. Verträge mit 0 € lösen keinen Treffer mehr aus. Beitragsfreie Verträge, die fälschlich als Lastschrift markiert waren, wurden bereinigt.",
+      },
+    ],
+  },
+  {
     version: "0.65.0",
     date: "2026-06-12",
     changes: [
