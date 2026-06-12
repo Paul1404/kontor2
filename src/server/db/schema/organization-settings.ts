@@ -108,7 +108,7 @@ export const organizationSettingsTable = pgTable("organization_settings", {
    * Präfix der SEPA-Mandatsreferenz, die beim Genehmigen eines Online-Antrags
    * vergeben wird (z. B. "SVU1945-"). Daraus wird `<prefix><jahr>-<nr>` gebaut.
    */
-  mandatsreferenzPrefix: text("mandatsreferenz_prefix").notNull().default("SVUWV-"),
+  mandatsreferenzPrefix: text("mandatsreferenz_prefix").notNull().default(""),
   /** Altersabhängige Jahresbeiträge für den Online-Aufnahmeantrag. */
   beitragsstaffel: jsonb("beitragsstaffel").$type<Beitragsstaffel>(),
   /** Bei neuem Online-Antrag eine Benachrichtigung an den Verein senden? */

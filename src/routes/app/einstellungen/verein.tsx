@@ -72,7 +72,7 @@ function VereinsdatenPage() {
     kontaktTelefon: "",
     datenschutzUrl: "",
     satzungUrl: "",
-    mandatsreferenzPrefix: "SVUWV-",
+    mandatsreferenzPrefix: "",
     beitragsstaffel: DEFAULT_STAFFEL,
     antragBenachrichtigungAktiv: true,
     antragVorstandEmail: "",
@@ -109,7 +109,7 @@ function VereinsdatenPage() {
         kontaktTelefon: cfg.data.kontaktTelefon ?? "",
         datenschutzUrl: cfg.data.datenschutzUrl ?? "",
         satzungUrl: cfg.data.satzungUrl ?? "",
-        mandatsreferenzPrefix: cfg.data.mandatsreferenzPrefix ?? "SVUWV-",
+        mandatsreferenzPrefix: cfg.data.mandatsreferenzPrefix ?? "",
         beitragsstaffel: cfg.data.beitragsstaffel ?? DEFAULT_STAFFEL,
         antragBenachrichtigungAktiv: cfg.data.antragBenachrichtigungAktiv ?? true,
         antragVorstandEmail: cfg.data.antragVorstandEmail ?? "",
@@ -147,7 +147,7 @@ function VereinsdatenPage() {
         kontaktTelefon: form.kontaktTelefon || null,
         datenschutzUrl: form.datenschutzUrl || null,
         satzungUrl: form.satzungUrl || null,
-        mandatsreferenzPrefix: form.mandatsreferenzPrefix || "SVUWV-",
+        mandatsreferenzPrefix: form.mandatsreferenzPrefix.trim(),
         beitragsstaffel: {
           familie: normalizeMoney(form.beitragsstaffel.familie),
           kind: normalizeMoney(form.beitragsstaffel.kind),
@@ -519,7 +519,7 @@ function VereinsdatenPage() {
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <Field
                   label="Mandatsreferenz-Präfix"
-                  hint="Daraus wird die Mandatsreferenz gebaut, z. B. SVU1945-"
+                  hint="Optional. Vorsilbe der neuen Mandatsreferenz, z. B. SVU1945-. Leer lassen für nur Jahr und Nummer."
                 >
                   <Input
                     value={form.mandatsreferenzPrefix}
