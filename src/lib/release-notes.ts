@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.76.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die Zahlart wird wieder korrekt erkannt. Verträge mit dem Linear-Kürzel L (für Lastschrift) galten fälschlich als Rechnung, obwohl der Verein keine Rechnung anbietet. Jetzt zählt nur noch ein echtes Rechnungs-Kennzeichen, der Rest ist Lastschrift. Der Bestand wurde entsprechend korrigiert.",
+      },
+    ],
+  },
+  {
     version: "0.75.1",
     date: "2026-06-12",
     changes: [

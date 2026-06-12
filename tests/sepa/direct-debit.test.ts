@@ -9,22 +9,26 @@ describe("paysByDirectDebit", () => {
     expect(paysByDirectDebit(undefined, undefined)).toBe(true);
   });
 
-  it("treats lastschrift = 'J' (any case) as direct debit", () => {
+  it("treats Linear's Lastschrift codes ('J', 'L', 'B', any case) as direct debit", () => {
     expect(paysByDirectDebit("J", null)).toBe(true);
     expect(paysByDirectDebit("j", null)).toBe(true);
-    expect(paysByDirectDebit(" J ", null)).toBe(true);
+    expect(paysByDirectDebit("L", null)).toBe(true);
+    expect(paysByDirectDebit("l", null)).toBe(true);
+    expect(paysByDirectDebit("B", null)).toBe(true);
+    expect(paysByDirectDebit(" L ", null)).toBe(true);
   });
 
-  it("excludes an explicit non-J lastschrift", () => {
-    expect(paysByDirectDebit("N", null)).toBe(false);
-    expect(paysByDirectDebit("n", null)).toBe(false);
-    expect(paysByDirectDebit("X", null)).toBe(false);
+  it("ignores the lastschrift value: only aufRechnung decides", () => {
+    // lastschrift never marks an invoice payer; Linear used it for direct-debit
+    // variants, not for invoicing.
+    expect(paysByDirectDebit("N", null)).toBe(true);
+    expect(paysByDirectDebit("X", null)).toBe(true);
   });
 
   it("excludes invoice payers (aufRechnung = 'J') regardless of lastschrift", () => {
     expect(paysByDirectDebit(null, "J")).toBe(false);
     expect(paysByDirectDebit("J", "J")).toBe(false);
-    expect(paysByDirectDebit("J", "j")).toBe(false);
+    expect(paysByDirectDebit("L", "j")).toBe(false);
     expect(paysByDirectDebit("", " J ")).toBe(false);
   });
 
