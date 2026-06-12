@@ -21,15 +21,18 @@ describe("mapContractRow / mapSepaRow", () => {
   it("normalizes is_direct_debit at the edge from Linear's lastschrift/aufRechnung", () => {
     // Blank lastschrift = direct debit (Linear's default for the common case).
     expect(mapContractRow({ AdrNr: 1, VertragNr: "V1", Art: 5 })?.isDirectDebit).toBe(true);
-    // Explicit "J" = direct debit.
+    // Linear's Lastschrift codes ("J", "L", "B") all mean direct debit.
     expect(
       mapContractRow({ AdrNr: 1, VertragNr: "V1", Art: 5, Lastschrift: "J" })?.isDirectDebit,
     ).toBe(true);
-    // Explicit non-"J" = not direct debit.
+    expect(
+      mapContractRow({ AdrNr: 1, VertragNr: "V1", Art: 5, Lastschrift: "L" })?.isDirectDebit,
+    ).toBe(true);
+    // lastschrift never marks an invoice payer; only aufRechnung does.
     expect(
       mapContractRow({ AdrNr: 1, VertragNr: "V1", Art: 5, Lastschrift: "N" })?.isDirectDebit,
-    ).toBe(false);
-    // Invoice payer (aufRechnung = "J") is never direct debit, blank lastschrift or not.
+    ).toBe(true);
+    // Invoice payer (aufRechnung = "J") is never direct debit, whatever lastschrift says.
     expect(
       mapContractRow({ AdrNr: 1, VertragNr: "V1", Art: 5, AufRechnung: "J" })?.isDirectDebit,
     ).toBe(false);
