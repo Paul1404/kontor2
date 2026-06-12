@@ -82,7 +82,7 @@ const MEMBER_FIELD_LABELS: Array<[string, string]> = [
 export function AuskunftDocument({ pkg, docRef }: { pkg: AuskunftsPackage; docRef: string }) {
   const member = pkg.member;
   return (
-    <Document title={`DSGVO-Auskunft ${docRef}`} author="SVUWV">
+    <Document title={`DSGVO-Auskunft ${docRef}`} author="Vereinsverwaltung">
       <Page size="A4" style={styles.page} wrap>
         <Text style={styles.h1}>Auskunft nach Art. 15 DSGVO</Text>
         <Text style={styles.meta}>

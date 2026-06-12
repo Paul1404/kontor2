@@ -81,7 +81,7 @@ export function BestandserhebungDocument({
   // is exported.
   const docRef = `BE-${data.stichtag}`;
   return (
-    <Document title={`Bestandserhebung ${docRef} · ${vereinsname}`} author="SVUWV">
+    <Document title={`Bestandserhebung ${docRef} · ${vereinsname}`} author={vereinsname}>
       <Page size="A4" style={styles.page} wrap>
         <Text style={styles.h1}>Bestandserhebung</Text>
         <Text style={styles.meta}>

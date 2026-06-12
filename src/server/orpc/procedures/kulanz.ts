@@ -21,7 +21,7 @@ import {
   buildKulanzLetterModel,
   type KulanzLetterModel,
 } from "~/server/pdf/kulanz-model";
-import { clubLogoDataUri } from "~/server/pdf/logo";
+import { resolveClubLogo } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { KulanzSonderkuendigungDocument } from "~/server/pdf/templates/kulanz-sonderkuendigung";
 import { deleteObject, presignDownload, putObject } from "~/server/s3/client";
@@ -183,7 +183,7 @@ export const kulanzRouter = {
         vereinsBic: org.vereinsBic,
         vereinsBankname: org.vereinsBankname,
         glaeubigerId: org.glaeubigerId,
-        logoDataUri: clubLogoDataUri(),
+        logoDataUri: resolveClubLogo(org.logo),
       });
 
       const runDateStr = toDateString(runDate);

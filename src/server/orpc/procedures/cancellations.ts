@@ -10,7 +10,7 @@ import { organizationSettingsTable } from "~/server/db/schema/organization-setti
 import { memberRef } from "~/server/domain/member";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { buildCancellationModel } from "~/server/pdf/cancellation-model";
-import { clubLogoDataUri } from "~/server/pdf/logo";
+import { resolveClubLogo } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { AustrittsbestaetigungDocument } from "~/server/pdf/templates/austrittsbestaetigung";
 import { deleteObject, presignDownload, putObject } from "~/server/s3/client";
@@ -103,7 +103,7 @@ export const cancellationsRouter = {
         kontaktTelefon: org.kontaktTelefon,
         datenschutzUrl: org.datenschutzUrl,
         satzungUrl: org.satzungUrl,
-        logoDataUri: clubLogoDataUri(),
+        logoDataUri: resolveClubLogo(org.logo),
       },
     });
 

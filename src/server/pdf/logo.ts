@@ -31,3 +31,14 @@ export function clubLogoDataUri(): string | null {
   cached = null;
   return cached;
 }
+
+/**
+ * Logo fürs PDF: bevorzugt das in den Vereinsdaten konfigurierte Logo, fällt
+ * sonst auf das gebündelte Standardlogo zurück. Nur Raster-Logos (PNG/JPEG)
+ * werden eingebettet -- @react-pdf's `<Image>` kann kein SVG, ein als SVG
+ * hochgeladenes Logo würde das PDF sprengen; in dem Fall gilt das Standardlogo.
+ */
+export function resolveClubLogo(configured: string | null | undefined): string | null {
+  if (configured && /^data:image\/(png|jpe?g);/i.test(configured)) return configured;
+  return clubLogoDataUri();
+}

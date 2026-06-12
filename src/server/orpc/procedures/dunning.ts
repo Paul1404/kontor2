@@ -33,7 +33,7 @@ import {
 } from "~/server/dunning/send-dunning-email";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
-import { clubLogoDataUri } from "~/server/pdf/logo";
+import { resolveClubLogo } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { MahnungDocument, type MahnungInput } from "~/server/pdf/templates/mahnung";
 
@@ -359,7 +359,7 @@ export const dunningRouter = {
       // Resolve the addressee (member or guardian) per member, and read the
       // club logo once for the whole run.
       const recipients = await resolveRecipients(context.db, eligible, runDate);
-      const logoDataUri = clubLogoDataUri();
+      const logoDataUri = resolveClubLogo(org.logo);
 
       const result = await context.db.transaction(async (tx) => {
         // Serialize commits at the same level. Eligibility (and the PDFs
