@@ -17,7 +17,7 @@ export type ImportProgress = {
   updatedAt: number;
 };
 
-const KEY = (token: string) => `svuwv:import:progress:${token}`;
+const KEY = (token: string) => `kontor2:import:progress:${token}`;
 const TTL_SECONDS = 3600;
 /** Don't hammer Redis on every row; coalesce writes to this cadence. */
 const FLUSH_INTERVAL_MS = 250;

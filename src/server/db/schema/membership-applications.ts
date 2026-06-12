@@ -16,7 +16,7 @@ import { encryptedText } from "~/server/db/types";
 
 /**
  * Online membership application (Beitrittserklärung). This is the native
- * svuwv replacement for the standalone "svums" app: an applicant fills out a
+ * Kontor2 replacement for the standalone "svums" app: an applicant fills out a
  * public form at `/antrag`, optionally signs digitally, and the Vorstand
  * reviews and approves the row -- at which point `members.onboard` turns it
  * into a real member. Until approval there is no `members` row, so this table

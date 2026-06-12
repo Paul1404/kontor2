@@ -316,7 +316,7 @@ async function runSvumsImport(opts: {
   const abteilungIdByName = new Map(abts.map((a) => [a.name.trim().toLowerCase(), a.id]));
 
   // Existing rows: dedupe keys for idempotency plus the set of taken
-  // Antragsnummern (svums and svuwv mint the same ANT-YYYY-NNNN format,
+  // Antragsnummern (svums and Kontor2 mint the same ANT-YYYY-NNNN format,
   // so collisions are possible and trigger a re-mint).
   const existing = await opts.db
     .select({

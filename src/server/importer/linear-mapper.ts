@@ -1,5 +1,5 @@
 /**
- * Linear → SVUWV row mapping. Reads raw values out of a Linear `adresse`,
+ * Linear → Kontor2 row mapping. Reads raw values out of a Linear `adresse`,
  * `mgart`, `mgvert`, or `adrsepa` row (already coerced into JS primitives
  * by `sql-tokenizer.ts`) and produces typed objects ready for Drizzle insert.
  *

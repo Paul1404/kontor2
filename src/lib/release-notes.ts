@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.79.3",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Weitere interne svuwv-Reste auf Kontor2 umgestellt: Animationsnamen, Cache-Schlüssel, MCP-Servername, der Geocoding-Kontakt und diverse Kommentare. Die Hell/Dunkel-Wahl und der Was-ist-neu-Hinweis bleiben erhalten, weil der alte Speicher einmalig mitgelesen wird. Verschlüsselung, Mandatsreferenzen, Konfiguration und Daten bleiben unverändert.",
+      },
+    ],
+  },
+  {
     version: "0.79.2",
     date: "2026-06-12",
     changes: [
@@ -2196,7 +2207,10 @@ export const CATEGORY_ORDER: ReleaseCategory[] = [
   "internal",
 ];
 
-const LAST_SEEN_KEY = "svuwv:release-notes:last-seen-version";
+const LAST_SEEN_KEY = "kontor2:release-notes:last-seen-version";
+// Vorgaenger-Key: mitlesen, damit nach der Umbenennung nicht bei allen
+// faelschlich der "Was ist neu"-Hinweis aufpoppt.
+const LEGACY_LAST_SEEN_KEY = "svuwv:release-notes:last-seen-version";
 
 /**
  * Persists the version the user has acknowledged. Used by the sidebar
@@ -2206,7 +2220,10 @@ const LAST_SEEN_KEY = "svuwv:release-notes:last-seen-version";
 export function readLastSeenVersion(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return window.localStorage.getItem(LAST_SEEN_KEY);
+    return (
+      window.localStorage.getItem(LAST_SEEN_KEY) ??
+      window.localStorage.getItem(LEGACY_LAST_SEEN_KEY)
+    );
   } catch {
     return null;
   }

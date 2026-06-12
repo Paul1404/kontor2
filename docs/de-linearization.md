@@ -16,7 +16,7 @@ about Linear?* The closer to "yes", the better the boundary.
 ## Where we are
 
 We are in a **parallel run / shadow phase**. Linear is still the system of
-record. svuwv shadows it and is re-imported repeatedly while we dogfood. That is
+record. Kontor2 shadows it and is re-imported repeatedly while we dogfood. That is
 a deliberate, correct migration pattern, not a smell.
 
 Two structural facts about the importer that you must respect:
@@ -27,7 +27,7 @@ Two structural facts about the importer that you must respect:
    with `ON DELETE CASCADE`, so **a re-import cascade-deletes every posting
    hanging off those contracts** and rebuilds only what Linear's `mgsolln`
    contains. Consequence: any fee run, posting, or SEPA action generated *in
-   svuwv* is destroyed on the next import. During the shadow phase, svuwv's
+   Kontor2* is destroyed on the next import. During the shadow phase, Kontor2's
    financial state is structurally disposable. This is fine now (it lets us
    iterate fearlessly), but it is a hard gate on cutover (below).
 
@@ -40,8 +40,8 @@ Two structural facts about the importer that you must respect:
 ## The cutover gate
 
 The shadow phase ends with a **one-shot cutover**: a final import, then Linear
-goes dark and svuwv becomes the system of record. Because of fact (1) above,
-**the day you start trusting svuwv's financial state is the day you must stop
+goes dark and Kontor2 becomes the system of record. Because of fact (1) above,
+**the day you start trusting Kontor2's financial state is the day you must stop
 running the importer.** Re-importing after that point will cascade-delete
 app-authored postings. Before cutover, retire or gate the importer's refresh
 role so it cannot run by accident.
@@ -87,7 +87,7 @@ into money totals). Fold it into `deleted_at` at import time.
 
 Subtlety: import-managed deletion and app-managed deletion must stay
 distinguishable, or a re-import will fight the UI (e.g. a member un-deleted in
-Linear should not silently revive one an admin removed in svuwv). This needs a
+Linear should not silently revive one an admin removed in Kontor2). This needs a
 two-source delete model, not a blind assignment. Do not ship this as a one-line
 change.
 

@@ -6,7 +6,7 @@
  * em/en dashes per the house style.
  *
  * Ported from the svums Jinja template `kuendigungsbestaetigung.html`, adapted
- * to svuwv's data and stack.
+ * to Kontor2's data and stack.
  */
 
 import { altMitgliedsnummer } from "~/lib/member-ref";

@@ -11,7 +11,11 @@ import {
 export type Theme = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 
-const STORAGE_KEY = "svuwv.theme";
+const STORAGE_KEY = "kontor2.theme";
+// Vorgaenger-Key: einmalig mitlesen, damit niemand seine Hell/Dunkel-Wahl
+// durch die Umbenennung verliert. Kann entfernt werden, sobald sich die
+// Browser durchgewechselt haben.
+const LEGACY_STORAGE_KEY = "svuwv.theme";
 
 type ThemeContextValue = {
   theme: Theme;
@@ -23,7 +27,8 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function readStored(): Theme {
   if (typeof window === "undefined") return "system";
-  const raw = window.localStorage.getItem(STORAGE_KEY);
+  const raw =
+    window.localStorage.getItem(STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY);
   if (raw === "light" || raw === "dark" || raw === "system") return raw;
   return "system";
 }

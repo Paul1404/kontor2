@@ -4,7 +4,7 @@
  * The runtime entrypoint (`scripts/serve.ts`) ships in the slim production
  * container and can't import `~/server/*`, so it can't close the DB pool, the
  * Redis client, or drain the buffered log sink directly. Instead the server
- * bundle installs `closeResources` on `globalThis.__svuwvCloseResources` (see
+ * bundle installs `closeResources` on `globalThis.__kontor2CloseResources` (see
  * `src/server/orpc/context.ts`), and `serve.ts` calls it across the bundle
  * boundary after it has drained in-flight HTTP requests.
  */
@@ -54,5 +54,5 @@ export function closeResources(): Promise<void> {
  * after boot (the warmup self-request guarantees `createContext` executes).
  */
 export function installShutdownBridge(): void {
-  globalThis.__svuwvCloseResources = closeResources;
+  globalThis.__kontor2CloseResources = closeResources;
 }

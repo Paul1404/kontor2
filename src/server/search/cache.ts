@@ -4,11 +4,11 @@ import { redis } from "~/server/redis/client";
 // Cache key namespaces. Each is a prefix so a whole group can be invalidated
 // with a SCAN+DEL. Keep them disjoint so invalidating one never clobbers
 // another.
-const SEARCH_PREFIX = "svuwv:members:search:";
+const SEARCH_PREFIX = "kontor2:members:search:";
 export const CACHE_NS = {
-  dashboard: "svuwv:cache:dashboard:",
-  abteilungen: "svuwv:cache:abteilungen:",
-  feeTypes: "svuwv:cache:feetypes:",
+  dashboard: "kontor2:cache:dashboard:",
+  abteilungen: "kontor2:cache:abteilungen:",
+  feeTypes: "kontor2:cache:feetypes:",
 } as const;
 
 const DEFAULT_TTL_SECONDS = 300;

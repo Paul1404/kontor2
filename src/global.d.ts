@@ -9,7 +9,7 @@
 // Installed by the server bundle (src/server/lib/lifecycle.ts) so the slim
 // runtime entrypoint (scripts/serve.ts), which can't import `~/server/*`, can
 // release the DB pool, Redis client, and buffered log sink on shutdown.
-declare var __svuwvCloseResources: (() => Promise<void>) | undefined;
+declare var __kontor2CloseResources: (() => Promise<void>) | undefined;
 
 declare module "*.css?url" {
   const url: string;
