@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.60.0",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neue Funktion Mandate nachtragen auf der Beitragslauf-Seite. Lastschrift-Mitglieder ohne nutzbares SEPA-Mandat werden aufgelistet. Fehlende Mandate werden mit Unterschriftsdatum gleich Eintrittsdatum nachgetragen, da die Beitrittserklärung das Mandat enthält. Nur scheinbar abgelaufene Mandate aus dem Linear-Import werden reaktiviert. Widerrufene Mandate bleiben unangetastet. Alles wird auditiert.",
+      },
+    ],
+  },
+  {
     version: "0.59.0",
     date: "2026-06-11",
     changes: [
