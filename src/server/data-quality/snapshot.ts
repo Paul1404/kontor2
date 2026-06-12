@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { DB } from "~/server/db/client";
 import { dataQualitySnapshotsTable } from "~/server/db/schema/data-quality-snapshots";
-import { dataQualityCounts, WHERE } from "~/server/orpc/procedures/data-quality";
+import { activeWhere, dataQualityCounts } from "~/server/orpc/procedures/data-quality";
 
 /**
  * Nightly data-quality snapshot (issue #81).
@@ -56,12 +56,13 @@ export async function runDataQualitySnapshot(
       const notes = c.description;
       // `members` is intentionally NOT aliased: the rule WHERE clauses reference
       // `members.id`/bare columns, which would break under an alias. The clause
-      // carries no user input (composed from the fixed registry).
+      // carries no user input (composed from the fixed registry). `activeWhere`
+      // also drops members whose finding was marked "geprüft".
       const res = await db.execute(sql`
         insert into member_tasks (member_id, title, notes, created_by_email)
         select members.id, ${title}, ${notes}, ${TASK_ACTOR_EMAIL}
         from members
-        where ${sql.raw(WHERE[c.id])}
+        where ${sql.raw(activeWhere(c.id))}
           and not exists (
             select 1 from member_tasks t
             where t.member_id = members.id and t.title = ${title} and t.status = 'open'

@@ -6,6 +6,7 @@ export * from "./auth";
 export * from "./bestandserhebungen";
 export * from "./cancellations";
 export * from "./contracts";
+export * from "./data-quality-exceptions";
 export * from "./data-quality-snapshots";
 export * from "./document-sequences";
 export * from "./dsgvo";
