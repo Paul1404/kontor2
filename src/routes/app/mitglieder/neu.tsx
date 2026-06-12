@@ -85,6 +85,30 @@ function NewMemberPage() {
     },
   });
 
+  // Ein Kontakt hat keine Vereinsdaten (kein Beitrag, keine Abteilung). Er wird
+  // direkt aus den Stammdaten angelegt, ohne zweiten Schritt.
+  const kontaktMut = useMutation({
+    mutationFn: (values: StammdatenValues) =>
+      orpc.members.onboard({
+        kind: "kontakt",
+        patch: buildPatch(values, "") as never,
+        abteilungen: [],
+        contract: null,
+        sepa: null,
+      }),
+    onSuccess: async (result) => {
+      await qc.invalidateQueries({ queryKey: ["members.list"] });
+      toast.success("Kontakt angelegt.");
+      navigate({
+        to: "/app/mitglieder/$mitgliedsnummer",
+        params: { mitgliedsnummer: result.ref },
+      });
+    },
+    onError: (e: unknown) => {
+      setErrorMessage(e instanceof Error ? e.message : "Anlage fehlgeschlagen.");
+    },
+  });
+
   function toggleAbt(id: string) {
     setSelectedAbt((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
@@ -134,17 +158,24 @@ function NewMemberPage() {
         </div>
       ) : null}
 
-      <StepIndicator step={step} />
+      {isKontakt ? null : <StepIndicator step={step} />}
 
       {step === "stamm" ? (
         <MemberStammdatenForm
           initial={stamm}
-          submitting={false}
-          submitLabel="Weiter"
+          variant={kind}
+          submitting={isKontakt ? kontaktMut.isPending : false}
+          submitLabel={isKontakt ? "Kontakt anlegen" : "Weiter"}
+          errorMessage={isKontakt ? errorMessage : null}
           onCancel={() => navigate({ to: "/app/mitglieder", search: () => ({}) as never })}
           onSubmit={(values) => {
             setStamm(values);
-            setStep("verein");
+            if (isKontakt) {
+              setErrorMessage(null);
+              kontaktMut.mutate(values);
+            } else {
+              setStep("verein");
+            }
           }}
         />
       ) : (

@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.73.1",
+    date: "2026-06-12",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Beim Anlegen eines Kontakts werden die mitgliedschaftlichen Felder ausgeblendet (Funktion, Spender, Eintritt, Austritt, Beitragsstatus) und der zweite Schritt mit Beitrag und Abteilung entfällt. Ein Kontakt braucht nur Name, Anschrift und Bankverbindung.",
+      },
+    ],
+  },
+  {
     version: "0.73.0",
     date: "2026-06-12",
     changes: [

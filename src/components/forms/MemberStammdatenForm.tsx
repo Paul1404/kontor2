@@ -205,6 +205,13 @@ type Props = {
   errorMessage?: string | null;
   submitLabel?: string;
   mitglnrInput?: { value: string; onChange: (next: string) => void };
+  /**
+   * "kontakt" blendet die rein mitgliedschaftlichen Felder aus (Funktion,
+   * Spender, Eintritt, Austritt, Beitragsstatus). Ein Kontakt ist kein
+   * Mitglied, sondern z. B. ein Zahler: Name, Anschrift und Bankverbindung
+   * reichen.
+   */
+  variant?: "member" | "kontakt";
 };
 
 export function MemberStammdatenForm({
@@ -215,7 +222,9 @@ export function MemberStammdatenForm({
   errorMessage,
   submitLabel = "Speichern",
   mitglnrInput,
+  variant = "member",
 }: Props) {
+  const isMember = variant === "member";
   // Seed once from `initial`. The form deliberately does NOT re-sync to later
   // `initial` changes: the parent re-renders while the user types (e.g. the
   // IBAN lookup query below resolving, or a background members.get refetch),
@@ -360,58 +369,62 @@ export function MemberStammdatenForm({
                 placeholder="https://"
               />
             </FormField>
-            <FormField label="Funktion">
-              <Input
-                value={values.funktion}
-                onChange={(e) => update("funktion", e.target.value)}
-                placeholder="z. B. Vorstand, Jugendwart"
-              />
-            </FormField>
-            <FormField label="Spender">
-              <select
-                value={values.spender}
-                onChange={(e) => update("spender", e.target.value)}
-                className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-              >
-                <option value="">Nein</option>
-                <option value="J">Ja</option>
-              </select>
-            </FormField>
-            <FormField label="Eintritt">
-              <Input
-                type="date"
-                value={values.eintritt}
-                onChange={(e) => update("eintritt", e.target.value)}
-              />
-            </FormField>
-            <FormField label="Austritt">
-              <Input
-                type="date"
-                value={values.austritt}
-                onChange={(e) => update("austritt", e.target.value)}
-              />
-            </FormField>
-            <FormField label="Beitrag">
-              <select
-                value={values.beitragsbefreit ? "befreit" : values.ruhend ? "ruhend" : "normal"}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  update("ruhend", val === "ruhend");
-                  update("beitragsbefreit", val === "befreit");
-                }}
-                className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-              >
-                <option value="normal">Beitragspflichtig</option>
-                <option value="ruhend">Ruhend</option>
-                <option value="befreit">Beitragsbefreit</option>
-              </select>
-            </FormField>
-            {values.ruhend || values.beitragsbefreit ? (
-              <p className="text-xs text-muted-foreground sm:col-span-2">
-                Der Beitragslauf überspringt dieses Mitglied
-                {values.beitragsbefreit ? " (beitragsbefreit)" : " (ruhend)"}. Die Mitgliedschaft
-                bleibt bestehen und zählt weiterhin im Bestand.
-              </p>
+            {isMember ? (
+              <>
+                <FormField label="Funktion">
+                  <Input
+                    value={values.funktion}
+                    onChange={(e) => update("funktion", e.target.value)}
+                    placeholder="z. B. Vorstand, Jugendwart"
+                  />
+                </FormField>
+                <FormField label="Spender">
+                  <select
+                    value={values.spender}
+                    onChange={(e) => update("spender", e.target.value)}
+                    className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                  >
+                    <option value="">Nein</option>
+                    <option value="J">Ja</option>
+                  </select>
+                </FormField>
+                <FormField label="Eintritt">
+                  <Input
+                    type="date"
+                    value={values.eintritt}
+                    onChange={(e) => update("eintritt", e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Austritt">
+                  <Input
+                    type="date"
+                    value={values.austritt}
+                    onChange={(e) => update("austritt", e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Beitrag">
+                  <select
+                    value={values.beitragsbefreit ? "befreit" : values.ruhend ? "ruhend" : "normal"}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      update("ruhend", val === "ruhend");
+                      update("beitragsbefreit", val === "befreit");
+                    }}
+                    className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                  >
+                    <option value="normal">Beitragspflichtig</option>
+                    <option value="ruhend">Ruhend</option>
+                    <option value="befreit">Beitragsbefreit</option>
+                  </select>
+                </FormField>
+                {values.ruhend || values.beitragsbefreit ? (
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    Der Beitragslauf überspringt dieses Mitglied
+                    {values.beitragsbefreit ? " (beitragsbefreit)" : " (ruhend)"}. Die
+                    Mitgliedschaft bleibt bestehen und zählt weiterhin im Bestand.
+                  </p>
+                ) : null}
+              </>
             ) : null}
             <FormField label="Notizen" full>
               <Textarea
