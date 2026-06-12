@@ -584,6 +584,129 @@ export const sepaRouter = {
   }),
 
   /**
+   * Eine vorhandene Beziehung als Vertreter übernehmen. Setzt `ist_vertreter`
+   * (höchstens einer pro Mitglied, andere werden abgeräumt). Passt der Name des
+   * Vertreters zum Kontoinhaber des Kindes und hat der Vertreter selbst noch
+   * keine IBAN, wandert die Bankverbindung des Kindes mit, damit der Einzug
+   * direkt funktioniert. Hat der Vertreter schon ein eigenes Konto, bleibt es
+   * unangetastet (er könnte ein anderes Konto nutzen). Der Treffer wird
+   * serverseitig neu geprüft, nie dem Client geglaubt.
+   */
+  assignVertreter: vorstandProc
+    .input(v.object({ minorMemberId: v.string(), relationshipId: v.string() }))
+    .handler(async ({ context, input }) => {
+      const actorId = context.session!.user.id;
+      const actorEmail = context.session!.user.email;
+      return await context.db.transaction(async (tx) => {
+        const [rel] = await tx
+          .select({
+            id: relationshipsTable.id,
+            fromMemberId: relationshipsTable.fromMemberId,
+            toMemberId: relationshipsTable.toMemberId,
+            istVertreter: relationshipsTable.istVertreter,
+          })
+          .from(relationshipsTable)
+          .where(eq(relationshipsTable.id, input.relationshipId))
+          .limit(1);
+        if (!rel || rel.fromMemberId !== input.minorMemberId || !rel.toMemberId) {
+          throw new ORPCError("NOT_FOUND", { message: "Beziehung nicht gefunden." });
+        }
+
+        // Höchstens ein Vertreter pro Mitglied: andere Flags abräumen.
+        await tx
+          .update(relationshipsTable)
+          .set({ istVertreter: false, updatedAt: new Date() })
+          .where(
+            and(
+              eq(relationshipsTable.fromMemberId, input.minorMemberId),
+              ne(relationshipsTable.id, input.relationshipId),
+              eq(relationshipsTable.istVertreter, true),
+            ),
+          );
+        await tx
+          .update(relationshipsTable)
+          .set({ istVertreter: true, updatedAt: new Date() })
+          .where(eq(relationshipsTable.id, input.relationshipId));
+        await appendAudit(tx, {
+          entityType: "relationship",
+          entityId: input.relationshipId,
+          action: "update",
+          source: "ui",
+          actorId,
+          actorEmail,
+          changes: diff({ istVertreter: String(rel.istVertreter) }, { istVertreter: "true" }),
+          requestId: context.requestId ?? null,
+        });
+
+        // Bankverbindung mitziehen, wenn der Vertreter zum Kontoinhaber passt
+        // und selbst noch keine IBAN hat.
+        const [child] = await tx
+          .select({
+            iban1: membersTable.iban1,
+            bic1: membersTable.bic1,
+            iban1Last4: membersTable.iban1Last4,
+            kontoinhaber: sql<
+              string | null
+            >`coalesce(nullif(btrim(${membersTable.abwKontoInh}), ''), (select nullif(btrim(c.abw_konto_inh), '') from contracts c where c.member_id = ${membersTable.id} and nullif(btrim(c.abw_konto_inh), '') is not null limit 1), (select nullif(btrim(c.kto_inh_v), '') from contracts c where c.member_id = ${membersTable.id} and nullif(btrim(c.kto_inh_v), '') is not null limit 1))`,
+          })
+          .from(membersTable)
+          .where(eq(membersTable.id, input.minorMemberId))
+          .limit(1);
+        const [vertreter] = await tx
+          .select({
+            id: membersTable.id,
+            iban1: membersTable.iban1,
+            nachname: membersTable.nachname,
+            vorname: membersTable.vorname,
+          })
+          .from(membersTable)
+          .where(eq(membersTable.id, rel.toMemberId))
+          .limit(1);
+
+        let ibanMoved = false;
+        if (child && vertreter) {
+          const konto = normalizeName(child.kontoinhaber);
+          const nn = normalizeName(vertreter.nachname);
+          const vn = normalizeName(vertreter.vorname);
+          const strong = !!konto && !!nn && konto.includes(nn) && (vn ? konto.includes(vn) : true);
+          if (strong && vertreter.iban1 == null && child.iban1) {
+            await tx
+              .update(membersTable)
+              .set({
+                iban1: child.iban1,
+                bic1: child.bic1,
+                iban1Last4: child.iban1Last4,
+                updatedAt: new Date(),
+              })
+              .where(eq(membersTable.id, vertreter.id));
+            const auditId = await appendAudit(tx, {
+              entityType: "member",
+              entityId: vertreter.id,
+              action: "update",
+              source: "ui",
+              actorId,
+              actorEmail,
+              changes: diff(
+                { iban1Last4: null },
+                { iban1Last4: child.iban1Last4, quelle: "vertreter-uebernahme" },
+              ),
+              requestId: context.requestId ?? null,
+            });
+            await takeMemberSnapshot(tx, vertreter.id, {
+              trigger: "mutation",
+              actorId,
+              actorEmail,
+              auditId,
+            });
+            ibanMoved = true;
+          }
+        }
+
+        return { ok: true, ibanMoved };
+      });
+    }),
+
+  /**
    * Schadenbegrenzung für minderjährige Selbstzahler ganz ohne Beziehung:
    * leitet aus dem Kontoinhaber-Namen einen Zahler ab. Gibt es den Namen schon
    * als Mitglied/Kontakt, wird verknüpft; sonst wird ein Kontakt (K-Nummer)
