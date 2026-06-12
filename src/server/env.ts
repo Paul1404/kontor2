@@ -79,18 +79,16 @@ export function env(): Env {
   try {
     const parsed = v.parse(EnvSchema, process.env);
     const master = Buffer.from(parsed.APP_SECRET, "hex");
-    // KDF context labels are brand-namespaced (kontor2). During the migration
-    // off the old "svuwv:" data-key label we keep that label as a transitional
-    // read-only key in `previous`, so existing ciphertext stays decryptable
-    // until `reencryptData` has rewritten every row onto the kontor2 key. The
-    // old label is removed in a follow-up once assessKeyDropSafety is safe.
+    // KDF context labels are brand-namespaced (kontor2) and must stay stable:
+    // changing one requires a re-encryption pass over the affected data (see
+    // docs/key-rotation.md). `previous` holds the keys derived from any rotated
+    // -out masters in APP_SECRET_PREV, so their ciphertext stays readable until
+    // re-encrypted.
     const dataEncryptionKey = derive(master, "kontor2:data-encryption-key:v1");
     const previousMasters = parsePreviousSecrets(parsed.APP_SECRET_PREV);
-    const previousDataKeys = [
-      derive(master, "svuwv:data-encryption-key:v1"),
-      ...previousMasters.map((m) => derive(m, "kontor2:data-encryption-key:v1")),
-      ...previousMasters.map((m) => derive(m, "svuwv:data-encryption-key:v1")),
-    ];
+    const previousDataKeys = previousMasters.map((m) =>
+      derive(m, "kontor2:data-encryption-key:v1"),
+    );
     const encryptionKeyring: Keyring = {
       current: makeKeyringEntry("current", dataEncryptionKey),
       previous: previousDataKeys.map((k, i) => makeKeyringEntry(`prev-${i}`, k)),
