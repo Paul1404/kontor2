@@ -66,7 +66,7 @@ function down(): number {
 
 function migrate(): number {
   console.log("[test-db] applying migrations…");
-  return run("bun", ["scripts/migrate.prod.ts"], TEST_ENV);
+  return run("bun", ["scripts/migrate-all.ts"], TEST_ENV);
 }
 
 function main() {
