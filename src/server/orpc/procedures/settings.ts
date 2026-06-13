@@ -176,7 +176,7 @@ export const settingsRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      const result = await sendTestMail({ to: input.to, inline: input.inline ?? null });
+      const result = await sendTestMail(context.db, { to: input.to, inline: input.inline ?? null });
       await recordEmail(
         {
           kind: EMAIL_KIND.testMail,

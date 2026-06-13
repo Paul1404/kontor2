@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.83.3",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Einladungs-, Passwort-zurücksetzen- und Test-Mails sowie die Einladungs- und Portal-Links nutzen jetzt die Daten (SMTP, Name, Adresse) des jeweiligen Vereins. Für den bestehenden Verein unverändert. Weitere Mail-Wege (Mahnungen, Rundschreiben, Anträge) folgen pro Verein in einem nächsten Schritt.",
+      },
+    ],
+  },
+  {
     version: "0.83.2",
     date: "2026-06-13",
     changes: [

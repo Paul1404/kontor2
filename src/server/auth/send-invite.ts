@@ -1,15 +1,15 @@
 import nodemailer, { type Transporter } from "nodemailer";
 import { orgDisplayName } from "~/server/branding/org-name";
-import { db } from "~/server/db/client";
+import { type DB, db as primaryDb } from "~/server/db/client";
 import { smtpConfigTable } from "~/server/db/schema/settings";
 
 /**
  * Vereinsname für E-Mail-Betreff und -Text: Anzeigename, sonst voller
- * Vereinsname, sonst neutral. Resilient -- ein Mailversand soll nie an der
- * Marke scheitern.
+ * Vereinsname, sonst neutral. Aus der DB des jeweiligen Vereins. Resilient --
+ * ein Mailversand soll nie an der Marke scheitern.
  */
-async function brandName(): Promise<string> {
-  return orgDisplayName(db());
+async function brandName(db: DB): Promise<string> {
+  return orgDisplayName(db);
 }
 
 let cachedTransport: { signature: string; transporter: Transporter } | undefined;
@@ -26,8 +26,12 @@ export type SmtpDispatchConfig = {
   fromName: string | null;
 };
 
-export async function loadSmtpConfig(): Promise<SmtpDispatchConfig | null> {
-  const rows = await db().select().from(smtpConfigTable).limit(1);
+// `db` defaults to the primary Verein. Callers on a tenant-specific path (the
+// auth mails below) pass that Verein's db so the SMTP config comes from there.
+// Broader mail callers (dunning, Rundschreiben, fee-runs, applications) still
+// use the primary for now -- making those per-Verein is a follow-up.
+export async function loadSmtpConfig(db: DB = primaryDb()): Promise<SmtpDispatchConfig | null> {
+  const rows = await db.select().from(smtpConfigTable).limit(1);
   const row = rows[0];
   if (!row) return null;
   return {
@@ -82,11 +86,11 @@ function transporterFor(cfg: SmtpDispatchConfig): Transporter {
  * transporter and the configured From. Returns null when SMTP is unconfigured
  * so callers can surface a friendly precondition error.
  */
-export async function getMailer(): Promise<{
+export async function getMailer(db: DB = primaryDb()): Promise<{
   send: (opts: { to: string; subject: string; text: string }) => Promise<void>;
   from: string;
 } | null> {
-  const cfg = await loadSmtpConfig();
+  const cfg = await loadSmtpConfig(db);
   if (!cfg) return null;
   const t = transporterFor(cfg);
   const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
@@ -98,15 +102,18 @@ export async function getMailer(): Promise<{
   };
 }
 
-export async function sendInviteEmail(opts: {
-  to: string;
-  acceptUrl: string;
-  invitedByName: string;
-  role: string;
-}): Promise<{ ok: true; subject: string } | { ok: false; reason: string; subject: string }> {
-  const name = await brandName();
+export async function sendInviteEmail(
+  db: DB,
+  opts: {
+    to: string;
+    acceptUrl: string;
+    invitedByName: string;
+    role: string;
+  },
+): Promise<{ ok: true; subject: string } | { ok: false; reason: string; subject: string }> {
+  const name = await brandName(db);
   const subject = `Einladung zur Vereinsverwaltung – ${name}`;
-  const cfg = await loadSmtpConfig();
+  const cfg = await loadSmtpConfig(db);
   if (!cfg) return { ok: false, reason: "smtp_not_configured", subject };
   const t = transporterFor(cfg);
   const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
@@ -133,14 +140,17 @@ export async function sendInviteEmail(opts: {
   }
 }
 
-export async function sendPasswordResetEmail(opts: {
-  to: string;
-  resetUrl: string;
-}): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const cfg = await loadSmtpConfig();
+export async function sendPasswordResetEmail(
+  db: DB,
+  opts: {
+    to: string;
+    resetUrl: string;
+  },
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const cfg = await loadSmtpConfig(db);
   if (!cfg) return { ok: false, reason: "smtp_not_configured" };
   const t = transporterFor(cfg);
-  const name = await brandName();
+  const name = await brandName(db);
   const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
   try {
     await t.sendMail({
@@ -169,12 +179,15 @@ export async function sendPasswordResetEmail(opts: {
  * and a one-shot transporter is built from the supplied values. Lets admins
  * validate a draft config before persisting it.
  */
-export async function sendTestMail(opts: {
-  to: string;
-  inline?: SmtpDispatchConfig | null;
-}): Promise<{ ok: true; subject: string } | { ok: false; reason: string; subject: string }> {
-  const subject = `${await brandName()}: Test-E-Mail`;
-  const cfg = opts.inline ?? (await loadSmtpConfig());
+export async function sendTestMail(
+  db: DB,
+  opts: {
+    to: string;
+    inline?: SmtpDispatchConfig | null;
+  },
+): Promise<{ ok: true; subject: string } | { ok: false; reason: string; subject: string }> {
+  const subject = `${await brandName(db)}: Test-E-Mail`;
+  const cfg = opts.inline ?? (await loadSmtpConfig(db));
   if (!cfg) return { ok: false, reason: "smtp_not_configured", subject };
   // Inline configs skip the transporter cache: the signature would match a
   // saved config and we'd accidentally reuse the wrong transport.
