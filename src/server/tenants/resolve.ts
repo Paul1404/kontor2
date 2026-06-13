@@ -49,29 +49,52 @@ export function primaryTenant(): Tenant {
   return { key: process.env.PRIMARY_TENANT_KEY ?? "svu", databaseUrl };
 }
 
+/** Host der konfigurierten Auth-/Alt-Domain (BETTER_AUTH_URL), z. B. die alte
+ * Vereins-Domain. Dieser Host bedient weiterhin den Default-Verein. */
+function authDomainHost(): string | null {
+  const raw = process.env.BETTER_AUTH_URL;
+  if (!raw) return null;
+  try {
+    return new URL(raw).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Bildet den eingehenden Request-Host auf einen Mandanten ab.
- * `<key>.kontor2.com` löst auf den Mandanten mit diesem Schlüssel auf; alles
- * andere (Apex, www, die alte Verein-Domain, eine unbekannte Subdomain) fällt
- * auf den primären Mandanten zurück. Die Auflösung zusätzlicher Vereine läuft
- * über `findTenantByKey` (Tabellen-Cache + `TENANTS_JSON`-Fallback) und wirft
- * nie -- ein kaputtes `TENANTS_JSON` degradiert nur Extra-Vereine, der primäre
- * bleibt unberührt.
+ *
+ * - `<console>.kontor2.com` und alles Unbekannte (apex, www, eine NICHT
+ *   registrierte Subdomain, fremde Hosts) -> Betreiber-Realm (Control-DB). Eine
+ *   vertippte Subdomain bekommt also die Console-Anmeldung, NICHT mehr still die
+ *   Daten des Default-Vereins.
+ * - `<key>.kontor2.com` einer registrierten Verein-Subdomain -> dieser Verein
+ *   (über `findTenantByKey`, Tabellen-Cache).
+ * - Die Auth-/Alt-Domain (BETTER_AUTH_URL-Host) und die Subdomain des
+ *   Default-Vereins -> Default-Verein; bei kaltem Cache fällt das synchron auf
+ *   `primaryTenant()` (DATABASE_URL) zurück, damit der Default immer auflösbar bleibt.
  */
 export function resolveTenantFromHost(host: string | null | undefined): Tenant {
   const primary = primaryTenant();
+  // Kein Host (interne/Health-Requests): konservativ der Default-Verein.
   if (!host) return primary;
   const h = (host.split(":")[0] ?? host).trim().toLowerCase();
+
+  // Auth-/Alt-Domain -> Default-Verein (Cold-Start-sicher über primaryTenant).
+  if (h === authDomainHost()) return findTenantByKey(primary.key) ?? primary;
+
   const suffix = `.${productDomain()}`;
   if (h.endsWith(suffix)) {
     // Linkestes Label ist der Mandanten-Schlüssel; tiefere Verschachtelung egal.
     const key = h.slice(0, -suffix.length).split(".")[0];
-    // Console-Subdomain -> Operator-Realm (Control-DB), kein Verein.
     if (key === consoleSubdomain()) return operatorTenant();
-    if (key && key !== primary.key) {
+    if (key) {
       const match = findTenantByKey(key);
       if (match) return match;
+      // Default-Verein-Subdomain bei kaltem Cache: synchroner Anker.
+      if (key === primary.key) return primary;
     }
   }
-  return primary;
+  // Unbekannte Subdomain / apex / fremder Host -> Betreiber-Realm, nicht der Default-Verein.
+  return operatorTenant();
 }

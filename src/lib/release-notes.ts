@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.89.0",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Unbekannte Adressen (eine vertippte oder nicht vergebene Subdomain) zeigen jetzt den Betreiber-Bereich statt versehentlich die Daten eines bestimmten Vereins. Die gewohnten Adressen der bestehenden Vereine funktionieren unverändert.",
+      },
+    ],
+  },
+  {
     version: "0.88.1",
     date: "2026-06-14",
     changes: [
