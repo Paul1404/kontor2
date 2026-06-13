@@ -6,19 +6,12 @@ import { createFileRoute } from "@tanstack/react-router";
 // (nodemailer touches the Node-only `Buffer`) into the browser bundle and
 // break hydration. See the note in `api/rpc.$.ts`.
 const handle = async ({ request }: { request: Request }) => {
-  const [
-    { auth },
-    { ensureBootstrapAdmin },
-    { guardAdminPluginRequest },
-    { ensureSessionConfigLoaded },
-  ] = await Promise.all([
+  const [{ auth }, { guardAdminPluginRequest }, { ensureSessionConfigLoaded }] = await Promise.all([
     import("~/server/auth/auth"),
-    import("~/server/auth/bootstrap"),
     import("~/server/auth/last-admin-guard"),
     import("~/server/auth/session-config"),
   ]);
   await ensureSessionConfigLoaded();
-  await ensureBootstrapAdmin();
   // Block last-admin-locking POSTs to the better-auth admin plugin
   // endpoints (set-user-banned / remove-user / set-role) before they reach
   // the plugin's handler. This is the catch-all for the catch-22 where an

@@ -10,10 +10,10 @@ import { logger } from "~/server/lib/logger";
  * `completeSetup` call creates the first admin. Once any user exists this
  * always returns `false` — no further setup is possible without an admin.
  *
- * Counterpart to the env-driven `ensureBootstrapAdmin`: when an operator
- * forgets to set BOOTSTRAP_ADMIN_* before first deploy, this is the
- * recovery path that avoids the catch-22 of "first user must be an admin,
- * but you need an admin to create users."
+ * This is the sole path to the first admin. It avoids the catch-22 of "the
+ * first user must be an admin, but you need an admin to create users": on a
+ * fresh instance you visit /setup once and create it in the browser. No
+ * secret in the environment.
  */
 export async function isInSetupMode(): Promise<boolean> {
   const [row] = await db().select({ c: count() }).from(users);

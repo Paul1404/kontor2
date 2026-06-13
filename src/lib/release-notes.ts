@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.80.2",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Der env-gesteuerte Bootstrap-Admin ist entfernt. Das erste Admin-Konto entsteht ausschließlich über die /setup-Seite, solange noch kein Nutzer existiert. Damit liegt kein Admin-Passwort mehr in der Konfiguration.",
+      },
+    ],
+  },
+  {
     version: "0.80.1",
     date: "2026-06-13",
     changes: [

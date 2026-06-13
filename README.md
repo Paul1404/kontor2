@@ -215,8 +215,8 @@ The parts that took real engineering, not just CRUD:
   be retried instead of permanently blocking the address.
 - Three roles: Admin, Vorstand, Readonly. Every protected oRPC procedure checks
   role server-side.
-- First-run bootstrap admin from env, or an interactive `/setup` form when the
-  user table is empty and no env is set.
+- First admin created interactively at `/setup`, reachable without auth only
+  while the user table is empty.
 - Last-admin guard. The better-auth admin endpoints (`set-user-banned`,
   `remove-user`, `set-role`) are intercepted before they can leave the instance
   with zero active admins.
@@ -380,8 +380,8 @@ bun run dev
 
 Open <http://localhost:3000>.
 
-The first user is created from `BOOTSTRAP_ADMIN_EMAIL` and
-`BOOTSTRAP_ADMIN_PASSWORD` if the user table is empty.
+The first user is created interactively at `/setup`, which is reachable
+without auth only while the user table is empty.
 
 ## Tests
 
@@ -418,9 +418,6 @@ Manually set:
   Rotation: set this to the current secret, generate a new `APP_SECRET`, deploy,
   run Einstellungen > Verschlüsselung > Re-encrypt, then unset.
 - `BETTER_AUTH_URL`. Public URL of the deployment.
-- `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`. Optional, only
-  used on the very first boot. If unset, the first request is redirected to
-  `/setup` where a first admin can be created interactively.
 
 `railway.toml` runs `bun run db:migrate:prod` before each deploy and points the
 healthcheck at `/api/health`. Migrations are applied with a runtime-only
