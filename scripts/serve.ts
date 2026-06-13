@@ -61,6 +61,19 @@ const DEFAULT_CSP = [
 
 const CSP = process.env.CONTENT_SECURITY_POLICY ?? DEFAULT_CSP;
 
+// Host canonicalization. The app's canonical home is `svu.kontor2.com`; requests
+// arriving on a legacy Verein domain are 301-redirected so old bookmarks and
+// in-flight magic links keep working. Both are overridable via env so a future
+// tenant can set its own. `/api/health` is exempt so a health probe succeeds on
+// any host.
+const CANONICAL_HOST = process.env.CANONICAL_HOST ?? "svu.kontor2.com";
+const LEGACY_HOSTS = new Set(
+  (process.env.LEGACY_HOSTS ?? "svuwv.sv-untereuerheim.de")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean),
+);
+
 function withSecurityHeaders(res: Response): Response {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
     if (!res.headers.has(key)) res.headers.set(key, value);
@@ -105,6 +118,13 @@ function tryStaticFile(pathname: string): { path: string; mime: string } | null 
 
 async function handle(request: Request): Promise<Response> {
   const url = new URL(request.url);
+  const host = (request.headers.get("host") ?? "").split(":")[0];
+  if (host && LEGACY_HOSTS.has(host) && url.pathname !== "/api/health") {
+    return new Response(null, {
+      status: 301,
+      headers: { location: `https://${CANONICAL_HOST}${url.pathname}${url.search}` },
+    });
+  }
   const hit = tryStaticFile(url.pathname);
   if (hit) {
     const file = Bun.file(hit.path);
