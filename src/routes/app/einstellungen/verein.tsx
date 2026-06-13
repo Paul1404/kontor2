@@ -169,9 +169,11 @@ function VereinsdatenPage() {
     onError: (err) => setMsg({ kind: "error", text: (err as Error).message }),
   });
 
-  // Don't render the form until the saved config has loaded. Otherwise the
-  // fields show their empty defaults and an early submit would overwrite the
-  // real Gläubiger-ID / IBAN / BIC with blanks.
+  // Spinner only while the saved config is genuinely loading. A loaded-but-empty
+  // result (cfg.data === null) is a fresh Verein with no settings row yet: render
+  // the form with its defaults so the admin can fill it in. The original concern
+  // -- overwriting a real Gläubiger-ID / IBAN / BIC with blanks -- doesn't apply
+  // when there is no row to overwrite; the first save creates it. Errors above.
   if (cfg.isError) {
     return (
       <QueryError
@@ -181,7 +183,7 @@ function VereinsdatenPage() {
       />
     );
   }
-  if (cfg.isLoading || !cfg.data) {
+  if (cfg.isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
         <Loader2 className="size-5 animate-spin" />
