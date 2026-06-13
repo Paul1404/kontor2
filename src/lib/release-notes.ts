@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.88.0",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Eigenständiger Betreiber-Bereich mit eigenem Login und eigener Datenbank, getrennt von allen Vereinen. Dort lassen sich Vereine anlegen, sperren und entfernen. Für die Vereine selbst ändert sich nichts.",
+      },
+    ],
+  },
+  {
     version: "0.87.2",
     date: "2026-06-14",
     changes: [

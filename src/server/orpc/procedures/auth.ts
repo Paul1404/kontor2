@@ -15,6 +15,7 @@ import { logger } from "~/server/lib/logger";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { adminProc, authedProc, publicProc } from "~/server/orpc/base";
 import { rateLimit } from "~/server/redis/client";
+import { isOperatorTenant } from "~/server/tenants/resolve";
 
 /**
  * Throttle an unauthenticated, token-bearing endpoint by client IP. These
@@ -88,6 +89,9 @@ export const authRouter = {
     email: context.session!.user.email,
     name: context.session!.user.name,
     role: (context.session!.user.role as string) ?? "readonly",
+    // Verein-Schlüssel des Requests + ob es der Betreiber-/Console-Realm ist.
+    // Steuert das Routing: Operatoren gehören in die Console, nicht in die App.
+    tenant: { key: context.tenant.key, isOperator: isOperatorTenant(context.tenant) },
   })),
 
   listUsers: adminProc.input(v.void()).handler(async ({ context }) => {
