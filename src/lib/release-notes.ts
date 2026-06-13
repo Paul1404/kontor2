@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.87.0",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neuer Bereich Vereine für den Hauptverein: weitere Vereine anlegen, sperren oder entfernen. Beim Anlegen werden Datenbank, Aktualisierungen und ein eigener Schlüssel automatisch eingerichtet. Nur für Admins des Hauptvereins sichtbar.",
+      },
+    ],
+  },
+  {
     version: "0.86.0",
     date: "2026-06-13",
     changes: [
