@@ -1,6 +1,6 @@
 import nodemailer, { type Transporter } from "nodemailer";
+import { orgDisplayName } from "~/server/branding/org-name";
 import { db } from "~/server/db/client";
-import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { smtpConfigTable } from "~/server/db/schema/settings";
 
 /**
@@ -9,18 +9,7 @@ import { smtpConfigTable } from "~/server/db/schema/settings";
  * Marke scheitern.
  */
 async function brandName(): Promise<string> {
-  try {
-    const [org] = await db()
-      .select({
-        anzeigename: organizationSettingsTable.anzeigename,
-        vereinsname: organizationSettingsTable.vereinsname,
-      })
-      .from(organizationSettingsTable)
-      .limit(1);
-    return org?.anzeigename?.trim() || org?.vereinsname?.trim() || "Vereinsverwaltung";
-  } catch {
-    return "Vereinsverwaltung";
-  }
+  return orgDisplayName(db());
 }
 
 let cachedTransport: { signature: string; transporter: Transporter } | undefined;
@@ -114,17 +103,18 @@ export async function sendInviteEmail(opts: {
   acceptUrl: string;
   invitedByName: string;
   role: string;
-}): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const cfg = await loadSmtpConfig();
-  if (!cfg) return { ok: false, reason: "smtp_not_configured" };
-  const t = transporterFor(cfg);
+}): Promise<{ ok: true; subject: string } | { ok: false; reason: string; subject: string }> {
   const name = await brandName();
+  const subject = `Einladung zur Vereinsverwaltung – ${name}`;
+  const cfg = await loadSmtpConfig();
+  if (!cfg) return { ok: false, reason: "smtp_not_configured", subject };
+  const t = transporterFor(cfg);
   const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
   try {
     await t.sendMail({
       from,
       to: opts.to,
-      subject: `Einladung zur Vereinsverwaltung – ${name}`,
+      subject,
       text: [
         `Hallo,`,
         ``,
@@ -137,9 +127,9 @@ export async function sendInviteEmail(opts: {
         `Der Link ist 7 Tage gültig.`,
       ].join("\n"),
     });
-    return { ok: true };
+    return { ok: true, subject };
   } catch (err) {
-    return { ok: false, reason: (err as Error).message };
+    return { ok: false, reason: (err as Error).message, subject };
   }
 }
 
@@ -182,9 +172,10 @@ export async function sendPasswordResetEmail(opts: {
 export async function sendTestMail(opts: {
   to: string;
   inline?: SmtpDispatchConfig | null;
-}): Promise<{ ok: true } | { ok: false; reason: string }> {
+}): Promise<{ ok: true; subject: string } | { ok: false; reason: string; subject: string }> {
+  const subject = `${await brandName()}: Test-E-Mail`;
   const cfg = opts.inline ?? (await loadSmtpConfig());
-  if (!cfg) return { ok: false, reason: "smtp_not_configured" };
+  if (!cfg) return { ok: false, reason: "smtp_not_configured", subject };
   // Inline configs skip the transporter cache: the signature would match a
   // saved config and we'd accidentally reuse the wrong transport.
   const t = opts.inline ? buildTransporter(cfg) : transporterFor(cfg);
@@ -193,11 +184,11 @@ export async function sendTestMail(opts: {
     await t.sendMail({
       from,
       to: opts.to,
-      subject: `${await brandName()}: Test-E-Mail`,
+      subject,
       text: "Diese Nachricht bestätigt, dass die SMTP-Konfiguration funktioniert.",
     });
-    return { ok: true };
+    return { ok: true, subject };
   } catch (err) {
-    return { ok: false, reason: (err as Error).message };
+    return { ok: false, reason: (err as Error).message, subject };
   }
 }

@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import { orgDisplayName } from "~/server/branding/org-name";
 import { allocateDocRef } from "~/server/db/doc-ref";
 import {
   consentTypeEnum,
@@ -184,7 +185,8 @@ export const dsgvoRouter = {
       const { pkg, sha256, byteSize } = await buildAuskunftsPackage(context.db, input.memberId);
       const now = new Date();
       const docRef = await allocateDocRef(context.db, "DS", now.getUTCFullYear());
-      const pdf = await renderPdfBase64(AuskunftDocument({ pkg, docRef }));
+      const brandName = await orgDisplayName(context.db);
+      const pdf = await renderPdfBase64(AuskunftDocument({ pkg, docRef, brandName }));
 
       const actor = context.session?.user;
       // Request record + audit entry are written atomically so an export is

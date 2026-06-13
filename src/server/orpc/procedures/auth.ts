@@ -461,7 +461,7 @@ export const authRouter = {
           kind: EMAIL_KIND.invite,
           ...statusFromSend(result),
           recipient: input.email,
-          subject: "Einladung zur SVUWV Vereinsverwaltung",
+          subject: result.subject,
           entityType: "invitation",
           entityId: inv!.id,
           actorEmail: context.session!.user.email,
