@@ -33,7 +33,13 @@ function authedContext(): AppContext {
     session: { id: "test", userId: "test" },
     user: { id: "test", email: "test@test.local", role: "vorstand" },
   } as unknown as Session;
-  return { db: db(), session, headers: new Headers(), requestId: "dq-snap-test" };
+  return {
+    db: db(),
+    session,
+    headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
+    requestId: "dq-snap-test",
+  };
 }
 
 describe.skipIf(!onTestDb)("data-quality nightly snapshot (integration)", () => {

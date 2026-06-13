@@ -20,6 +20,7 @@ function stubContext(): AppContext {
     // UNAUTHORIZED before the handler touches the stub db.
     session: null,
     headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
     requestId: "test",
   };
 }

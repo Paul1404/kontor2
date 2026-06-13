@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.82.0",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Fundament für Mehr-Vereine-Fähigkeit: Anfragen werden anhand der Subdomain einem Verein zugeordnet, jeder Verein bekommt seinen eigenen Datenbank-Pool. Bei aktuell einem Verein landet jeder Aufruf wie bisher bei diesem, kein sichtbarer Unterschied im Betrieb.",
+      },
+    ],
+  },
+  {
     version: "0.81.0",
     date: "2026-06-13",
     changes: [

@@ -24,7 +24,13 @@ function ctx(role: string): AppContext {
     session: { id: "test", userId: "test" },
     user: { id: "test", email: "test@test.local", role },
   } as unknown as Session;
-  return { db: db(), session, headers: new Headers(), requestId: "mcp-hard-test" };
+  return {
+    db: db(),
+    session,
+    headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
+    requestId: "mcp-hard-test",
+  };
 }
 
 describe.skipIf(!onTestDb)("mcp idempotency (integration)", () => {
@@ -126,7 +132,13 @@ describe.skipIf(!onTestDb)("api key readonly default (integration)", () => {
       session: { id: adminId, userId: adminId },
       user: { id: adminId, email: "admin@test.local", role: "admin" },
     } as unknown as Session;
-    return { db: db(), session, headers: new Headers(), requestId: "mcp-hard-admin" };
+    return {
+      db: db(),
+      session,
+      headers: new Headers(),
+      tenant: { key: "svu", databaseUrl: "" },
+      requestId: "mcp-hard-admin",
+    };
   }
 
   beforeAll(async () => {

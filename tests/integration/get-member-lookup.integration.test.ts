@@ -23,7 +23,13 @@ function vorstandContext(): AppContext {
     session: { id: "test", userId: "test" },
     user: { id: "test", email: "test@test.local", role: "vorstand" },
   } as unknown as Session;
-  return { db: db(), session, headers: new Headers(), requestId: "get-lookup-test" };
+  return {
+    db: db(),
+    session,
+    headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
+    requestId: "get-lookup-test",
+  };
 }
 
 describe.skipIf(!onTestDb)("members.get lookup (integration)", () => {

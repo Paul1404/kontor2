@@ -3,40 +3,59 @@ import postgres from "postgres";
 import * as schema from "~/server/db/schema";
 import { env } from "~/server/env";
 
-let sqlInstance: postgres.Sql | undefined;
-let dbInstance: ReturnType<typeof drizzle<typeof schema>> | undefined;
+type Pool = { sql: postgres.Sql; db: ReturnType<typeof drizzle<typeof schema>> };
 
-export function sql(): postgres.Sql {
-  if (!sqlInstance) {
-    sqlInstance = postgres(env().DATABASE_URL, {
+// One connection pool per database URL, so each Verein (tenant) gets its own
+// pool, lazily opened on first use and reused afterwards. With a single tenant
+// every lookup resolves to the same URL, so this behaves exactly like the old
+// single-instance client.
+const pools = new Map<string, Pool>();
+
+function poolFor(databaseUrl: string): Pool {
+  let pool = pools.get(databaseUrl);
+  if (!pool) {
+    const s = postgres(databaseUrl, {
       max: env().NODE_ENV === "production" ? 10 : 4,
       // Suppress harmless NOTICEs (table exists, etc.) from startup logs.
       onnotice: () => {},
       prepare: false,
     });
+    pool = { sql: s, db: drizzle(s, { schema, casing: "snake_case" }) };
+    pools.set(databaseUrl, pool);
   }
-  return sqlInstance;
+  return pool;
 }
 
+/** Drizzle handle for a specific tenant database. */
+export function dbForTenant(databaseUrl: string): Pool["db"] {
+  return poolFor(databaseUrl).db;
+}
+
+/** Raw postgres handle for a specific tenant database. */
+export function sqlForTenant(databaseUrl: string): postgres.Sql {
+  return poolFor(databaseUrl).sql;
+}
+
+/** Primary tenant handle (from `DATABASE_URL`). Use for background jobs and
+ * scripts; request-scoped code should use the per-request `context.db`. */
 export function db() {
-  if (!dbInstance) {
-    dbInstance = drizzle(sql(), { schema, casing: "snake_case" });
-  }
-  return dbInstance;
+  return dbForTenant(env().DATABASE_URL);
+}
+
+export function sql(): postgres.Sql {
+  return sqlForTenant(env().DATABASE_URL);
 }
 
 /**
- * Close the Postgres pool if one was opened. No-op when the lazy `sql()` was
- * never called (e.g. SIGTERM before the first request). Resets the memoized
- * handles so a later `db()` would reconnect. Called from the graceful-shutdown
- * path so connections drain instead of being reset under the server.
+ * Close every open Postgres pool. No-op when nothing was opened (e.g. SIGTERM
+ * before the first request). Resets the cache so a later `db()` reconnects.
+ * Called from the graceful-shutdown path so connections drain instead of being
+ * reset under the server.
  */
 export async function closeDb(): Promise<void> {
-  if (!sqlInstance) return;
-  const instance = sqlInstance;
-  sqlInstance = undefined;
-  dbInstance = undefined;
-  await instance.end({ timeout: 5 });
+  const open = [...pools.values()];
+  pools.clear();
+  await Promise.all(open.map((p) => p.sql.end({ timeout: 5 })));
 }
 
 export type DB = ReturnType<typeof db>;

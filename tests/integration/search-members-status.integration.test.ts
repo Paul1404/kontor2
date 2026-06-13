@@ -31,6 +31,7 @@ function vorstandContext(): AppContext {
     db: db(),
     session,
     headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
     requestId: "search-status-test",
   };
 }

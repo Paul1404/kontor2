@@ -27,7 +27,13 @@ function authedContext(): AppContext {
     session: { id: "test", userId: ACTOR_ID },
     user: { id: ACTOR_ID, email: "kih-actor@test.local", role: "vorstand" },
   } as unknown as Session;
-  return { db: db(), session, headers: new Headers(), requestId: "kih-test" };
+  return {
+    db: db(),
+    session,
+    headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
+    requestId: "kih-test",
+  };
 }
 
 describe.skipIf(!onTestDb)("Mandate-Nachtrag Kontoinhaber-Kontakt (integration)", () => {

@@ -26,7 +26,13 @@ function authedContext(): AppContext {
     session: { id: "test", userId: ACTOR_ID },
     user: { id: ACTOR_ID, email: "quickfix-actor@test.local", role: "vorstand" },
   } as unknown as Session;
-  return { db: db(), session, headers: new Headers(), requestId: "quickfix-test" };
+  return {
+    db: db(),
+    session,
+    headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
+    requestId: "quickfix-test",
+  };
 }
 
 describe.skipIf(!onTestDb)("contracts.quickFix (integration)", () => {
