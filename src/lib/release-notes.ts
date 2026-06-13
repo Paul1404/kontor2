@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.80.3",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Member-facing Texte zeigen jetzt durchgängig den eingestellten Vereinsnamen statt eines festen Werts: der Footer der DSGVO-Auskunft (PDF) und die Betreffzeilen von Einladungs- und Test-E-Mail im Versandprotokoll. Die geloggte Betreffzeile entspricht jetzt auch exakt der tatsächlich versendeten. Das App-Manifest war bereits dynamisch; der gebündelte Fallback ist jetzt neutral statt vereinsgebunden.",
+      },
+    ],
+  },
+  {
     version: "0.80.2",
     date: "2026-06-13",
     changes: [

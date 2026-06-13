@@ -182,7 +182,7 @@ export const settingsRouter = {
           kind: EMAIL_KIND.testMail,
           ...statusFromSend(result),
           recipient: input.to,
-          subject: "SVUWV: Test-E-Mail",
+          subject: result.subject,
           actorEmail: context.session!.user.email,
           requestId: context.requestId ?? null,
         },
