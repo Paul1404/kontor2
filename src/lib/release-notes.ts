@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.83.0",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Anmeldung und Sitzungen laufen jetzt pro Verein getrennt: jeder Verein hat seine eigene Anmeldung, seine eigenen Konten und seine eigene Erstinstallation unter seiner Subdomain. Für den bestehenden Verein ändert sich nichts (gleiche Adresse, gleiche Sitzungen). Grundlage für weitere Vereine auf eigenen Subdomains.",
+      },
+    ],
+  },
+  {
     version: "0.82.1",
     date: "2026-06-13",
     changes: [

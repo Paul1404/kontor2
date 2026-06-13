@@ -49,8 +49,8 @@ export const authRouter = {
    * whether to show the first-admin form or redirect to /login. Always
    * returns `false` once any user exists.
    */
-  setupStatus: publicProc.input(v.void()).handler(async () => {
-    return { needsSetup: await isInSetupMode() };
+  setupStatus: publicProc.input(v.void()).handler(async ({ context }) => {
+    return { needsSetup: await isInSetupMode(context.tenant) };
   }),
 
   /**
@@ -69,7 +69,7 @@ export const authRouter = {
     )
     .handler(async ({ context, input }) => {
       await throttle(context.headers, "setup", 10);
-      const result = await completeSetup(input);
+      const result = await completeSetup(context.tenant, input);
       if (!result.ok) {
         if (result.reason === "already_initialized") {
           throw new ORPCError("CONFLICT", {
