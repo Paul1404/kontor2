@@ -68,12 +68,17 @@ function tenantsFromJson(): TenantTarget[] {
   return out;
 }
 
+/** Control-Plane-DB (Registry + Operatoren); Fallback = Primär. */
+function controlUrl(primaryUrl: string): string {
+  return process.env.CONTROL_DATABASE_URL || primaryUrl;
+}
+
 /**
- * Extra-Vereine aus der `tenants`-Tabelle des Primärs -- nur über den Klartext
- * `database_name`. Läuft NACH der Primär-Migration, die Tabelle ist also aktuell.
+ * Extra-Vereine aus der `tenants`-Tabelle der Control-DB -- nur über den Klartext
+ * `database_name`. Läuft NACH deren Migration, die Tabelle ist also aktuell.
  */
-async function tenantsFromTable(primaryUrl: string): Promise<TenantTarget[]> {
-  const sql = postgres(primaryUrl, { max: 1, onnotice: () => {} });
+async function tenantsFromTable(controlDbUrl: string): Promise<TenantTarget[]> {
+  const sql = postgres(controlDbUrl, { max: 1, onnotice: () => {} });
   try {
     const rows = (await sql`
       select key, database_name
@@ -119,12 +124,24 @@ async function main() {
     process.exit(1);
   }
 
-  // 2. Weitere Vereine einsammeln (Tabelle gewinnt über TENANTS_JSON; Primär raus).
+  // 2. Control-Plane-DB (Registry + Operatoren), falls eigenständig. Kritisch ->
+  //    harter Abbruch bei Fehler.
+  const control = controlUrl(primaryUrl);
+  if (control !== primaryUrl) {
+    try {
+      await migrateOne({ key: "control", databaseUrl: control });
+    } catch (err) {
+      console.error("[migrate] CONTROL-DB fehlgeschlagen:", (err as Error).message);
+      process.exit(1);
+    }
+  }
+
+  // 3. Weitere Vereine einsammeln (Tabelle gewinnt über TENANTS_JSON; Primär raus).
   const secondaries = new Map<string, string>();
   for (const t of tenantsFromJson()) {
     if (t.key !== primaryKey()) secondaries.set(t.key, t.databaseUrl);
   }
-  for (const t of await tenantsFromTable(primaryUrl)) {
+  for (const t of await tenantsFromTable(control)) {
     secondaries.set(t.key, t.databaseUrl);
   }
   const keys = [...secondaries.keys()];

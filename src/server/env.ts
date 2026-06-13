@@ -9,6 +9,13 @@ const EnvSchema = v.object({
   PORT: v.optional(v.pipe(v.string(), v.transform(Number), v.number()), "3000"),
 
   DATABASE_URL: v.pipe(v.string(), v.minLength(1)),
+  /**
+   * Control-Plane-Datenbank (Betreiber-Console): hält die `tenants`-Registry und
+   * (künftig) die Operator-Accounts, getrennt von allen Vereins-Daten. Wenn nicht
+   * gesetzt, fällt alles auf `DATABASE_URL` zurück -- dann verhält sich die
+   * Registry exakt wie bisher (Übergangs-Default).
+   */
+  CONTROL_DATABASE_URL: v.optional(v.string()),
   REDIS_URL: v.pipe(v.string(), v.minLength(1)),
 
   BETTER_AUTH_URL: v.pipe(v.string(), v.url()),

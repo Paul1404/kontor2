@@ -10,7 +10,7 @@
  */
 
 import { eq } from "drizzle-orm";
-import { db } from "~/server/db/client";
+import { controlDb } from "~/server/db/client";
 import { tenantsTable } from "~/server/db/schema/tenants";
 import {
   listTenants,
@@ -23,7 +23,7 @@ import { tenantUrlFromName } from "~/server/tenants/url";
 
 async function loadFromControlDb(): Promise<Tenant[]> {
   const primary = primaryTenant();
-  const rows = await db()
+  const rows = await controlDb()
     .select({
       key: tenantsTable.key,
       databaseName: tenantsTable.databaseName,
