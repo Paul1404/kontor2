@@ -10,6 +10,7 @@ import {
   peekUploadToken,
 } from "~/server/application/upload-token";
 import { appendAudit } from "~/server/audit/log";
+import { authBaseUrl } from "~/server/auth/auth";
 import { getMailer } from "~/server/auth/send-invite";
 import { lastFour } from "~/server/crypto/encrypt";
 import type { DB, DBOrTx } from "~/server/db/client";
@@ -51,7 +52,6 @@ import {
   svumsDedupeKey,
 } from "~/server/domain/application/svums-import";
 import { onboardMember } from "~/server/domain/member/onboard";
-import { env } from "~/server/env";
 import { lookupBankByIban } from "~/server/lib/blz";
 import { toCsv } from "~/server/lib/csv";
 import { logger } from "~/server/lib/logger";
@@ -70,6 +70,7 @@ import { rateLimit } from "~/server/redis/client";
 import { getObject, presignDownload, putObject } from "~/server/s3/client";
 import { invalidateMemberCaches } from "~/server/search/cache";
 import { formatIbanGrouped, normalizeIban, validateIban } from "~/server/sepa/iban";
+import type { Tenant } from "~/server/tenants/registry";
 
 const ANRede = v.picklist(["Herr", "Frau", "keine Angabe"]);
 const ISODate = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
@@ -123,12 +124,12 @@ function clientIp(headers: Headers): string {
   return headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "ip";
 }
 
-function baseUrl(): string {
-  return env().BETTER_AUTH_URL.replace(/\/+$/, "");
+function baseUrl(tenant: Tenant): string {
+  return authBaseUrl(tenant).replace(/\/+$/, "");
 }
 
-function statusUrlFor(antragsnummer: string): string {
-  return `${baseUrl()}/antrag/status?nr=${encodeURIComponent(antragsnummer)}`;
+function statusUrlFor(tenant: Tenant, antragsnummer: string): string {
+  return `${baseUrl(tenant)}/antrag/status?nr=${encodeURIComponent(antragsnummer)}`;
 }
 
 /** Numeric suffix of an ANT-YYYY-NNNN reference, for the Mandatsreferenz. */
@@ -937,11 +938,11 @@ export const applicationsRouter = {
       // Paper path (no inline signature): hand out a 30-day upload link.
       if (!hasSignature) {
         const token = await issueUploadToken(context.db, { applicationId: inserted.id });
-        uploadUrl = buildUploadUrl(baseUrl(), token.rawToken);
+        uploadUrl = buildUploadUrl(baseUrl(context.tenant), token.rawToken);
       }
 
       const clubEmail = org.antragVorstandEmail ?? org.mitgliedschaftEmail ?? org.kontaktEmail;
-      const mailRes = await sendApplicationMails({
+      const mailRes = await sendApplicationMails(context.db, {
         vereinsname: org.vereinsname,
         applicantEmail: input.email,
         applicantName:
@@ -951,7 +952,7 @@ export const applicationsRouter = {
         clubEmail,
         notifyClub: org.antragBenachrichtigungAktiv,
         antragsnummer: inserted.antragsnummer,
-        statusUrl: statusUrlFor(inserted.antragsnummer),
+        statusUrl: statusUrlFor(context.tenant, inserted.antragsnummer),
         uploadUrl,
         pdf: {
           filename: `Beitrittserklaerung-${inserted.antragsnummer}.pdf`,
@@ -983,7 +984,7 @@ export const applicationsRouter = {
 
     return {
       antragsnummer: inserted.antragsnummer,
-      statusUrl: statusUrlFor(inserted.antragsnummer),
+      statusUrl: statusUrlFor(context.tenant, inserted.antragsnummer),
     };
   }),
 
@@ -1171,7 +1172,7 @@ export const applicationsRouter = {
         const records: EmailLogEntry[] = [];
         if (input.email) {
           const subject = `Ihr Papier-Antrag bei ${org.vereinsname}`;
-          const res = await sendApplicationDocumentMail({
+          const res = await sendApplicationDocumentMail(context.db, {
             to: input.email,
             subject,
             text: [
@@ -1180,7 +1181,7 @@ export const applicationsRouter = {
               `vielen Dank. Ihr Papier-Antrag beim ${org.vereinsname} ist bei uns eingegangen.`,
               `Ihre Vorgangsnummer lautet ${inserted.antragsnummer}.`,
               "",
-              `Den aktuellen Stand sehen Sie hier: ${statusUrlFor(inserted.antragsnummer)}`,
+              `Den aktuellen Stand sehen Sie hier: ${statusUrlFor(context.tenant, inserted.antragsnummer)}`,
               "",
               "Bitte achten Sie darauf, dass auf dem Scan Ihre Kontaktdaten gut lesbar sind.",
             ].join("\n"),
@@ -1196,7 +1197,7 @@ export const applicationsRouter = {
         const clubEmail = org.antragVorstandEmail ?? org.mitgliedschaftEmail ?? org.kontaktEmail;
         if (org.antragBenachrichtigungAktiv && clubEmail) {
           const subject = `Neuer Papier-Antrag: ${inserted.antragsnummer}`;
-          const res = await sendApplicationDocumentMail({
+          const res = await sendApplicationDocumentMail(context.db, {
             to: clubEmail,
             subject,
             text: [
@@ -1447,7 +1448,7 @@ export const applicationsRouter = {
       } satisfies Partial<EmailLogEntry>;
       let record: EmailLogEntry;
       if (app.email) {
-        const mailer = await getMailer();
+        const mailer = await getMailer(context.db);
         const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
         if (!mailer) {
           record = {
@@ -1768,7 +1769,7 @@ export const applicationsRouter = {
       }
 
       if (app.email) {
-        const sent = await sendApplicationDocumentMail({
+        const sent = await sendApplicationDocumentMail(context.db, {
           to: app.email,
           subject: `Willkommen beim ${org?.vereinsname ?? "Verein"}`,
           text: [

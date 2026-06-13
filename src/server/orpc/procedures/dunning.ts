@@ -787,7 +787,7 @@ export const dunningRouter = {
         throw new ORPCError("PRECONDITION_FAILED", { message: "Keine PDF-Datei hinterlegt." });
       }
 
-      const sent = await sendDunningEmail({ content, pdfBase64: row.pdfBase64 });
+      const sent = await sendDunningEmail(context.db, { content, pdfBase64: row.pdfBase64 });
       await recordEmail(
         {
           kind: EMAIL_KIND.dunning,

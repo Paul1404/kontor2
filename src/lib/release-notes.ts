@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.84.1",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Auch Mahnungen, Rundschreiben, Beitragslauf-Benachrichtigungen und Antrags-Mails nutzen jetzt die SMTP-Konfiguration des jeweiligen Vereins, und der Antrags-Statuslink zeigt auf dessen Subdomain. Das App-Symbol (PWA) eines Vereins ohne eigenes Logo ist jetzt das Kontor2-Logo statt eines fremden Wappens. Für den bestehenden Verein unverändert.",
+      },
+    ],
+  },
+  {
     version: "0.84.0",
     date: "2026-06-13",
     changes: [

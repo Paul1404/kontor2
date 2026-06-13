@@ -1189,7 +1189,7 @@ export const feeRunsRouter = {
         });
       }
       const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
-      const mailer = await getMailer();
+      const mailer = await getMailer(context.db);
       if (!mailer) {
         throw new ORPCError("PRECONDITION_FAILED", {
           message: "SMTP ist nicht konfiguriert. Bitte unter Einstellungen > SMTP einrichten.",

@@ -8,6 +8,7 @@
 
 import nodemailer from "nodemailer";
 import { loadSmtpConfig } from "~/server/auth/send-invite";
+import type { DB } from "~/server/db/client";
 import { logger } from "~/server/lib/logger";
 import { EMAIL_KIND, type EmailLogEntry } from "~/server/mail/email-log";
 
@@ -15,13 +16,16 @@ export type MailAttachment = { filename: string; content: Buffer; contentType?: 
 
 type SendResult = { ok: true } | { ok: false; reason: string };
 
-async function sendRaw(opts: {
-  to: string;
-  subject: string;
-  text: string;
-  attachments?: MailAttachment[];
-}): Promise<SendResult> {
-  const cfg = await loadSmtpConfig();
+async function sendRaw(
+  db: DB,
+  opts: {
+    to: string;
+    subject: string;
+    text: string;
+    attachments?: MailAttachment[];
+  },
+): Promise<SendResult> {
+  const cfg = await loadSmtpConfig(db);
   if (!cfg) return { ok: false, reason: "smtp_not_configured" };
   const transporter = nodemailer.createTransport({
     host: cfg.host,
@@ -55,13 +59,16 @@ async function sendRaw(opts: {
  * countersigned Beitrittserklärung attached) and map the outcome onto the
  * email-log vocabulary. Never throws.
  */
-export async function sendApplicationDocumentMail(opts: {
-  to: string;
-  subject: string;
-  text: string;
-  pdf?: MailAttachment | null;
-}): Promise<{ status: "sent" | "failed" | "skipped"; detail: string | null }> {
-  const res = await sendRaw({
+export async function sendApplicationDocumentMail(
+  db: DB,
+  opts: {
+    to: string;
+    subject: string;
+    text: string;
+    pdf?: MailAttachment | null;
+  },
+): Promise<{ status: "sent" | "failed" | "skipped"; detail: string | null }> {
+  const res = await sendRaw(db, {
     to: opts.to,
     subject: opts.subject,
     text: opts.text,
@@ -79,17 +86,20 @@ export async function sendApplicationDocumentMail(opts: {
  * a failure on either is logged and reported via the return value, never
  * thrown, so a submission is never lost to an SMTP hiccup.
  */
-export async function sendApplicationMails(opts: {
-  vereinsname: string;
-  applicantEmail: string | null;
-  applicantName: string;
-  clubEmail: string | null;
-  notifyClub: boolean;
-  antragsnummer: string;
-  statusUrl: string;
-  uploadUrl?: string | null;
-  pdf: MailAttachment;
-}): Promise<{ applicantSent: boolean; clubSent: boolean; records: EmailLogEntry[] }> {
+export async function sendApplicationMails(
+  db: DB,
+  opts: {
+    vereinsname: string;
+    applicantEmail: string | null;
+    applicantName: string;
+    clubEmail: string | null;
+    notifyClub: boolean;
+    antragsnummer: string;
+    statusUrl: string;
+    uploadUrl?: string | null;
+    pdf: MailAttachment;
+  },
+): Promise<{ applicantSent: boolean; clubSent: boolean; records: EmailLogEntry[] }> {
   let applicantSent = false;
   let clubSent = false;
   const records: EmailLogEntry[] = [];
@@ -113,7 +123,7 @@ export async function sendApplicationMails(opts: {
       "",
       "Die ausgefüllte Beitrittserklärung finden Sie im Anhang.",
     ];
-    const res = await sendRaw({
+    const res = await sendRaw(db, {
       to: opts.applicantEmail,
       subject: applicantSubject,
       text: lines.join("\n"),
@@ -142,7 +152,7 @@ export async function sendApplicationMails(opts: {
   if (opts.notifyClub) {
     const clubSubject = `Neuer Aufnahmeantrag: ${opts.applicantName} (${opts.antragsnummer})`;
     if (opts.clubEmail) {
-      const res = await sendRaw({
+      const res = await sendRaw(db, {
         to: opts.clubEmail,
         subject: clubSubject,
         text: [
