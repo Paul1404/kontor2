@@ -10,16 +10,19 @@ import { createFileRoute } from "@tanstack/react-router";
 // inside the handler so nothing server-only is statically reachable from the
 // client.
 async function handle({ request }: { request: Request }): Promise<Response> {
-  const [{ RPCHandler }, { createContext }, { appRouter }] = await Promise.all([
-    import("@orpc/server/fetch"),
-    import("~/server/orpc/context"),
-    import("~/server/orpc/router"),
-  ]);
+  const [{ RPCHandler }, { createContext }, { appRouter }, { runWithTenantKeyring }] =
+    await Promise.all([
+      import("@orpc/server/fetch"),
+      import("~/server/orpc/context"),
+      import("~/server/orpc/router"),
+      import("~/server/crypto/tenant-crypto"),
+    ]);
   const context = await createContext(request);
-  const { response } = await new RPCHandler(appRouter).handle(request, {
-    prefix: "/api/rpc",
-    context,
-  });
+  // Alle Prozeduren laufen im Per-Verein-Keyring dieses Requests, damit
+  // verschlüsselte Felder mit dem richtigen Schlüssel ver-/entschlüsselt werden.
+  const { response } = await runWithTenantKeyring(context.tenant.key, () =>
+    new RPCHandler(appRouter).handle(request, { prefix: "/api/rpc", context }),
+  );
   return response ?? new Response("Not found", { status: 404 });
 }
 

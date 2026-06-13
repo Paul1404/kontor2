@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.86.0",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Jeder Verein verschlüsselt seine sensiblen Daten (z. B. IBANs) jetzt mit einem eigenen Schlüssel, getrennt von den anderen Vereinen. Für den bestehenden Verein bleibt der Schlüssel unverändert, es ist keine Aktion nötig.",
+      },
+    ],
+  },
+  {
     version: "0.85.0",
     date: "2026-06-13",
     changes: [

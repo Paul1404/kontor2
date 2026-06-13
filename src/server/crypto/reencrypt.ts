@@ -1,7 +1,19 @@
 import { sql } from "drizzle-orm";
+import { activeKeyring } from "~/server/crypto/active-keyring";
 import { decryptWithRing, encryptWithRing, inspectCiphertext } from "~/server/crypto/encrypt";
 import type { DB } from "~/server/db/client";
 import { env } from "~/server/env";
+
+/**
+ * Der Keyring für den Re-Key-Lauf: der per AsyncLocalStorage gesetzte
+ * Per-Verein-Keyring, sonst der primäre. So kann ein Tenant-Re-Key (Daten vom
+ * Primär-Schlüssel auf den Verein-Schlüssel umschlüsseln) über
+ * `runWithKeyring(tenantRing, () => reencryptAllData(...))` laufen; ohne ALS
+ * bleibt es exakt der bisherige Primär-Rotation-Lauf.
+ */
+function rekeyRing() {
+  return activeKeyring() ?? env().encryptionKeyring;
+}
 
 export type ReencryptReport = {
   table: string;
@@ -57,7 +69,7 @@ export async function reencryptAllData(
 }
 
 async function reencryptBlobColumn(db: DB, target: EncryptedTarget): Promise<ReencryptReport> {
-  const ring = env().encryptionKeyring;
+  const ring = rekeyRing();
   const currentFp = ring.current.fingerprint;
   const report: ReencryptReport = {
     table: target.table,
@@ -117,7 +129,7 @@ export async function inspectEncryptedData(
   db: DB,
   targets: EncryptedTarget[] = ENCRYPTED_TARGETS,
 ): Promise<InspectReport[]> {
-  const ring = env().encryptionKeyring;
+  const ring = rekeyRing();
   const currentFp = ring.current.fingerprint;
   const prevFps = ring.previous.map((k) => k.fingerprint);
 
