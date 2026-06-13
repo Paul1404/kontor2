@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.81.0",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neue Admin-Seite Einstellungen > Verschlüsselung. Sie zeigt je verschlüsselter Spalte (IBANs, SMTP-Passwort), wie viele Felder auf dem aktuellen und wie viele noch auf einem alten Schlüssel liegen, und erlaubt das Umschlüsseln auf den aktuellen Schlüssel per Knopf. Ein Statusbanner sagt, ob ein alter Schlüssel gefahrlos entfernt werden kann.",
+      },
+    ],
+  },
+  {
     version: "0.80.3",
     date: "2026-06-13",
     changes: [
