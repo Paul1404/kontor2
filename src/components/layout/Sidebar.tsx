@@ -41,6 +41,8 @@ type NavItem = {
   icon: ReactNode;
   adminOnly?: boolean;
   vorstandOnly?: boolean;
+  /** Nur für Super-Admins (Admin des Hauptvereins): Vereinsverwaltung. */
+  superAdminOnly?: boolean;
 };
 
 type NavSection = {
@@ -202,6 +204,12 @@ const SECTIONS: NavSection[] = [
         icon: <AlertTriangle className="size-[18px]" />,
         adminOnly: true,
       },
+      {
+        to: "/app/admin/vereine",
+        label: "Vereine",
+        icon: <Building2 className="size-[18px]" />,
+        superAdminOnly: true,
+      },
     ],
   },
 ];
@@ -239,6 +247,14 @@ function SidebarBody({
   });
   const taskOpen = tasks.data?.open ?? 0;
   const taskOverdue = tasks.data?.overdue ?? 0;
+  // Vereinsverwaltung nur für Admins des Hauptvereins (Server entscheidet).
+  const canManageTenants =
+    useQuery({
+      queryKey: ["tenants.canManage"],
+      queryFn: () => orpc.tenants.canManage(),
+      enabled: role === "admin",
+      staleTime: 5 * 60 * 1000,
+    }).data ?? false;
   return (
     <>
       <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
@@ -267,6 +283,7 @@ function SidebarBody({
           const items = sect.items.filter((n) => {
             if (n.adminOnly && role !== "admin") return false;
             if (n.vorstandOnly && role !== "admin" && role !== "vorstand") return false;
+            if (n.superAdminOnly && !canManageTenants) return false;
             return true;
           });
           if (items.length === 0) return null;
