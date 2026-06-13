@@ -5,7 +5,7 @@ import { admin } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { sendPasswordResetEmail } from "~/server/auth/send-invite";
 import { getSessionConfig } from "~/server/auth/session-config";
-import { dbForTenant } from "~/server/db/client";
+import { db, dbForTenant } from "~/server/db/client";
 import * as schema from "~/server/db/schema";
 import { env } from "~/server/env";
 import { logger } from "~/server/lib/logger";
@@ -28,9 +28,13 @@ export function authBaseUrl(tenant: Tenant): string {
 function buildAuth(tenant: Tenant) {
   const sessionConfig = getSessionConfig();
   const baseURL = authBaseUrl(tenant);
-  // Redis session namespace: the primary keeps the historical `auth:` prefix so
-  // existing SVU sessions stay valid; every other Verein gets its own namespace.
-  const keyPrefix = tenant.key === primaryTenant().key ? "auth:" : `auth:${tenant.key}:`;
+  const isPrimary = tenant.key === primaryTenant().key;
+  // The primary Verein's database is always the process DATABASE_URL pool
+  // (db()), independent of the tenant object's url field; every other Verein
+  // gets its own pool. Redis session namespace likewise: the primary keeps the
+  // historical `auth:` prefix so existing SVU sessions stay valid.
+  const tenantDb = isPrimary ? db() : dbForTenant(tenant.databaseUrl);
+  const keyPrefix = isPrimary ? "auth:" : `auth:${tenant.key}:`;
   return betterAuth({
     baseURL,
     secret: env().betterAuthSecret,
@@ -52,7 +56,7 @@ function buildAuth(tenant: Tenant) {
       }
       return trusted;
     },
-    database: drizzleAdapter(dbForTenant(tenant.databaseUrl), {
+    database: drizzleAdapter(tenantDb, {
       provider: "pg",
       usePlural: true,
       schema: {

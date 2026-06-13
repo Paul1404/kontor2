@@ -1,9 +1,16 @@
 import { count, eq } from "drizzle-orm";
 import { auth } from "~/server/auth/auth";
-import { dbForTenant } from "~/server/db/client";
+import { dbForTenant, db as primaryDb } from "~/server/db/client";
 import { users } from "~/server/db/schema/auth";
 import { logger } from "~/server/lib/logger";
 import type { Tenant } from "~/server/tenants/registry";
+import { primaryTenant } from "~/server/tenants/resolve";
+
+/** The Verein's database: the primary uses the process DATABASE_URL pool;
+ * other Vereine use their own. */
+function tenantDb(tenant: Tenant) {
+  return tenant.key === primaryTenant().key ? primaryDb() : dbForTenant(tenant.databaseUrl);
+}
 
 /**
  * Setup-mode check for a Verein. The Verein is "in setup mode" while its users
@@ -17,7 +24,7 @@ import type { Tenant } from "~/server/tenants/registry";
  * the environment. Operates on the Verein's own database.
  */
 export async function isInSetupMode(tenant: Tenant): Promise<boolean> {
-  const [row] = await dbForTenant(tenant.databaseUrl).select({ c: count() }).from(users);
+  const [row] = await tenantDb(tenant).select({ c: count() }).from(users);
   return (row?.c ?? 0) === 0;
 }
 
@@ -33,7 +40,7 @@ export async function completeSetup(
     name: string;
   },
 ): Promise<SetupResult> {
-  const db = dbForTenant(tenant.databaseUrl);
+  const db = tenantDb(tenant);
   // Re-check inside the same transaction so two parallel POSTs can't both
   // win the race and create two "first" admins.
   return await db.transaction(async (tx) => {
