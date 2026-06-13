@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
+import { authBaseUrl } from "~/server/auth/auth";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { portalChangeRequestsTable, portalTokensTable } from "~/server/db/schema/portal";
@@ -203,7 +204,7 @@ export const portalRouter = {
         createdBy: context.session!.user.id,
       });
 
-      const baseUrl = env().BETTER_AUTH_URL ?? "http://localhost:3000";
+      const baseUrl = authBaseUrl(context.tenant);
       const portalUrl = buildPortalUrl(baseUrl, rawToken);
 
       let mailResult: { ok: true } | { ok: false; reason: string } = {

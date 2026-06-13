@@ -3,7 +3,7 @@ import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq, ne, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
-import { auth } from "~/server/auth/auth";
+import { auth, authBaseUrl } from "~/server/auth/auth";
 import { invitationStatus } from "~/server/auth/invitation-status";
 import { wouldRemoveLastAdmin } from "~/server/auth/last-admin-guard";
 import { sendInviteEmail } from "~/server/auth/send-invite";
@@ -449,8 +449,8 @@ export const authRouter = {
           expiresAt: expires,
         })
         .returning();
-      const url = `${env().BETTER_AUTH_URL}/invite/${token}`;
-      const result = await sendInviteEmail({
+      const url = `${authBaseUrl(context.tenant)}/invite/${token}`;
+      const result = await sendInviteEmail(context.db, {
         to: input.email,
         acceptUrl: url,
         invitedByName: context.session!.user.name ?? context.session!.user.email,

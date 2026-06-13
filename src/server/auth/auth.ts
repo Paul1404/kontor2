@@ -80,7 +80,7 @@ function buildAuth(tenant: Tenant) {
       // existing vs. missing user). Every attempt is recorded in the mail log.
       sendResetPassword: async ({ user, token }) => {
         const resetUrl = `${baseURL}/passwort-zuruecksetzen?token=${token}`;
-        const result = await sendPasswordResetEmail({ to: user.email, resetUrl });
+        const result = await sendPasswordResetEmail(tenantDb, { to: user.email, resetUrl });
         if (!result.ok && result.reason !== "smtp_not_configured") {
           logger.warn("auth.password-reset.send-failed", { reason: result.reason });
         }
