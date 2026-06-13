@@ -14,10 +14,12 @@ import { Route as PasswortZuruecksetzenRouteImport } from './passwort-zurueckset
 import { Route as PasswortVergessenRouteImport } from './passwort-vergessen'
 import { Route as LoginRouteImport } from './login'
 import { Route as PortalRouteRouteImport } from './portal/route'
+import { Route as ConsoleRouteRouteImport } from './console/route'
 import { Route as AppRouteRouteImport } from './app/route'
 import { Route as AntragRouteRouteImport } from './antrag/route'
 import { Route as IndexRouteImport } from './index'
 import { Route as PortalIndexRouteImport } from './portal/index'
+import { Route as ConsoleIndexRouteImport } from './console/index'
 import { Route as AppIndexRouteImport } from './app/index'
 import { Route as AntragIndexRouteImport } from './antrag/index'
 import { Route as PortalProfilRouteImport } from './portal/profil'
@@ -109,6 +111,11 @@ const PortalRouteRoute = PortalRouteRouteImport.update({
   path: '/portal',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConsoleRouteRoute = ConsoleRouteRouteImport.update({
+  id: '/console',
+  path: '/console',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRouteRoute = AppRouteRouteImport.update({
   id: '/app',
   path: '/app',
@@ -128,6 +135,11 @@ const PortalIndexRoute = PortalIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => PortalRouteRoute,
+} as any)
+const ConsoleIndexRoute = ConsoleIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ConsoleRouteRoute,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
@@ -475,6 +487,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/antrag': typeof AntragRouteRouteWithChildren
   '/app': typeof AppRouteRouteWithChildren
+  '/console': typeof ConsoleRouteRouteWithChildren
   '/portal': typeof PortalRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/passwort-vergessen': typeof PasswortVergessenRoute
@@ -499,6 +512,7 @@ export interface FileRoutesByFullPath {
   '/portal/profil': typeof PortalProfilRoute
   '/antrag/': typeof AntragIndexRoute
   '/app/': typeof AppIndexRoute
+  '/console/': typeof ConsoleIndexRoute
   '/portal/': typeof PortalIndexRoute
   '/antrag/upload/$token': typeof AntragUploadTokenRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -572,6 +586,7 @@ export interface FileRoutesByTo {
   '/portal/profil': typeof PortalProfilRoute
   '/antrag': typeof AntragIndexRoute
   '/app': typeof AppIndexRoute
+  '/console': typeof ConsoleIndexRoute
   '/portal': typeof PortalIndexRoute
   '/antrag/upload/$token': typeof AntragUploadTokenRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -625,6 +640,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/antrag': typeof AntragRouteRouteWithChildren
   '/app': typeof AppRouteRouteWithChildren
+  '/console': typeof ConsoleRouteRouteWithChildren
   '/portal': typeof PortalRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/passwort-vergessen': typeof PasswortVergessenRoute
@@ -649,6 +665,7 @@ export interface FileRoutesById {
   '/portal/profil': typeof PortalProfilRoute
   '/antrag/': typeof AntragIndexRoute
   '/app/': typeof AppIndexRoute
+  '/console/': typeof ConsoleIndexRoute
   '/portal/': typeof PortalIndexRoute
   '/antrag/upload/$token': typeof AntragUploadTokenRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -703,6 +720,7 @@ export interface FileRouteTypes {
     | '/'
     | '/antrag'
     | '/app'
+    | '/console'
     | '/portal'
     | '/login'
     | '/passwort-vergessen'
@@ -727,6 +745,7 @@ export interface FileRouteTypes {
     | '/portal/profil'
     | '/antrag/'
     | '/app/'
+    | '/console/'
     | '/portal/'
     | '/antrag/upload/$token'
     | '/api/auth/$'
@@ -800,6 +819,7 @@ export interface FileRouteTypes {
     | '/portal/profil'
     | '/antrag'
     | '/app'
+    | '/console'
     | '/portal'
     | '/antrag/upload/$token'
     | '/api/auth/$'
@@ -852,6 +872,7 @@ export interface FileRouteTypes {
     | '/'
     | '/antrag'
     | '/app'
+    | '/console'
     | '/portal'
     | '/login'
     | '/passwort-vergessen'
@@ -876,6 +897,7 @@ export interface FileRouteTypes {
     | '/portal/profil'
     | '/antrag/'
     | '/app/'
+    | '/console/'
     | '/portal/'
     | '/antrag/upload/$token'
     | '/api/auth/$'
@@ -929,6 +951,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AntragRouteRoute: typeof AntragRouteRouteWithChildren
   AppRouteRoute: typeof AppRouteRouteWithChildren
+  ConsoleRouteRoute: typeof ConsoleRouteRouteWithChildren
   PortalRouteRoute: typeof PortalRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
   PasswortVergessenRoute: typeof PasswortVergessenRoute
@@ -985,6 +1008,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/console': {
+      id: '/console'
+      path: '/console'
+      fullPath: '/console'
+      preLoaderRoute: typeof ConsoleRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app': {
       id: '/app'
       path: '/app'
@@ -1012,6 +1042,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/portal/'
       preLoaderRoute: typeof PortalIndexRouteImport
       parentRoute: typeof PortalRouteRoute
+    }
+    '/console/': {
+      id: '/console/'
+      path: '/'
+      fullPath: '/console/'
+      preLoaderRoute: typeof ConsoleIndexRouteImport
+      parentRoute: typeof ConsoleRouteRoute
     }
     '/app/': {
       id: '/app/'
@@ -1592,6 +1629,18 @@ const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
   AppRouteRouteChildren,
 )
 
+interface ConsoleRouteRouteChildren {
+  ConsoleIndexRoute: typeof ConsoleIndexRoute
+}
+
+const ConsoleRouteRouteChildren: ConsoleRouteRouteChildren = {
+  ConsoleIndexRoute: ConsoleIndexRoute,
+}
+
+const ConsoleRouteRouteWithChildren = ConsoleRouteRoute._addFileChildren(
+  ConsoleRouteRouteChildren,
+)
+
 interface PortalRouteRouteChildren {
   PortalAbgelaufenRoute: typeof PortalAbgelaufenRoute
   PortalAbgemeldetRoute: typeof PortalAbgemeldetRoute
@@ -1614,6 +1663,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AntragRouteRoute: AntragRouteRouteWithChildren,
   AppRouteRoute: AppRouteRouteWithChildren,
+  ConsoleRouteRoute: ConsoleRouteRouteWithChildren,
   PortalRouteRoute: PortalRouteRouteWithChildren,
   LoginRoute: LoginRoute,
   PasswortVergessenRoute: PasswortVergessenRoute,

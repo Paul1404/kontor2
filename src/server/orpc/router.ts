@@ -6,6 +6,7 @@ import { auditRouter } from "~/server/orpc/procedures/audit";
 import { authRouter } from "~/server/orpc/procedures/auth";
 import { banksRouter } from "~/server/orpc/procedures/banks";
 import { cancellationsRouter } from "~/server/orpc/procedures/cancellations";
+import { consoleRouter } from "~/server/orpc/procedures/console";
 import { contractsRouter } from "~/server/orpc/procedures/contracts";
 import { dangerZoneRouter } from "~/server/orpc/procedures/danger-zone";
 import { dashboardRouter } from "~/server/orpc/procedures/dashboard";
@@ -76,6 +77,7 @@ export const appRouter = {
   verbandsmeldung: verbandsmeldungRouter,
   portal: portalRouter,
   dangerZone: dangerZoneRouter,
+  console: consoleRouter,
 };
 
 export type AppRouter = typeof appRouter;

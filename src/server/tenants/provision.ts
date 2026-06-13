@@ -29,6 +29,12 @@ export type ProvisionInput = {
   databaseName?: string;
   /** Primär-Schlüssel (zum Schutz vor Selbst-Provisionierung). Default "svu". */
   primaryKey?: string;
+  /**
+   * Verbindung zur Control-DB, in die die `tenants`-Zeile geschrieben wird. Die
+   * Registry liest von dort. Default: `adminUrl` (für Skript/Tests, wo Registry
+   * und Instanz in derselben DB liegen). Die Console übergibt `controlDbUrl()`.
+   */
+  controlUrl?: string;
 };
 
 function validate(key: string, dbName: string, primaryKey: string): void {
@@ -69,8 +75,9 @@ export async function provisionTenant(adminUrl: string, input: ProvisionInput): 
     await target.end();
   }
 
-  // 3. tenants-Zeile (Klartext database_name, keine verschlüsselte URL).
-  const control = postgres(adminUrl, { max: 1, onnotice: () => {} });
+  // 3. tenants-Zeile (Klartext database_name, keine verschlüsselte URL) in die
+  //    Control-DB, aus der die Registry liest.
+  const control = postgres(input.controlUrl ?? adminUrl, { max: 1, onnotice: () => {} });
   try {
     await control`
       insert into tenants (key, database_name, display_name, status)
@@ -86,16 +93,16 @@ export async function provisionTenant(adminUrl: string, input: ProvisionInput): 
   }
 }
 
-/** Entfernt die tenants-Zeile und droppt die DB (für Aufräumen/Tests). */
+/** Entfernt die tenants-Zeile (aus der Control-DB) und droppt die DB. */
 export async function deprovisionTenant(
   adminUrl: string,
-  input: { key: string; databaseName?: string },
+  input: { key: string; databaseName?: string; controlUrl?: string },
 ): Promise<void> {
   const dbName = input.databaseName ?? input.key;
   if (!DB_NAME_RE.test(dbName)) throw new Error(`Ungültiger DB-Name "${dbName}".`);
 
   // tenants-Zeile zuerst, damit der Resolver nicht auf eine gleich gelöschte DB zeigt.
-  const control = postgres(adminUrl, { max: 1, onnotice: () => {} });
+  const control = postgres(input.controlUrl ?? adminUrl, { max: 1, onnotice: () => {} });
   try {
     await control`delete from tenants where key = ${input.key}`;
   } finally {

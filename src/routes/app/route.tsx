@@ -16,14 +16,18 @@ export const Route = createFileRoute("/app")({
   // Gate auth at the router layer so unauth'd users never even start
   // rendering the shell. SPA redirect — no full page reload.
   beforeLoad: async ({ location }) => {
+    let me: Awaited<ReturnType<typeof orpc.auth.me>>;
     try {
-      const me = await orpc.auth.me();
-      return { me };
+      me = await orpc.auth.me();
     } catch {
       // No valid session: send them to login with a note and a way back to
       // the page they were trying to reach.
       throw redirect({ to: "/login", search: { expired: true, redirect: location.href } });
     }
+    // Operatoren des Betreiber-Realms gehören in die Console, nicht in die
+    // Vereins-App (die hier auf der Control-DB ohnehin keine sinnvollen Daten hätte).
+    if (me.tenant?.isOperator) throw redirect({ to: "/console" });
+    return { me };
   },
   component: AppLayout,
   errorComponent: ({ error, reset }) => (

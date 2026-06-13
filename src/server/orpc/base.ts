@@ -2,6 +2,7 @@ import { ORPCError, os } from "@orpc/server";
 import type { Role } from "~/server/db/schema/auth";
 import { logger } from "~/server/lib/logger";
 import type { AppContext } from "~/server/orpc/context";
+import { isOperatorTenant } from "~/server/tenants/resolve";
 
 export const base = os.$context<AppContext>();
 
@@ -89,7 +90,21 @@ export function requireAuth(min: Role = "readonly") {
   });
 }
 
+/**
+ * Betreiber-Console-Gate: nur Accounts des Operator-Realms (Control-DB, Host
+ * `admin.<domain>`) mit Admin-Rolle. Vereins-Admins können hier NICHTS -- die
+ * Console ist eine eigene Welt, getrennt von jedem Verein. Ein Verein hat keine
+ * Macht über andere.
+ */
+export const requireOperator = base.middleware(async ({ context, next }) => {
+  if (!isOperatorTenant(context.tenant)) {
+    throw new ORPCError("FORBIDDEN", { message: "Nur im Betreiber-Bereich verfügbar." });
+  }
+  return next();
+});
+
 export const publicProc = base.use(observability);
 export const authedProc = base.use(observability).use(requireAuth("readonly"));
 export const vorstandProc = base.use(observability).use(requireAuth("vorstand"));
 export const adminProc = base.use(observability).use(requireAuth("admin"));
+export const operatorProc = base.use(observability).use(requireAuth("admin")).use(requireOperator);
