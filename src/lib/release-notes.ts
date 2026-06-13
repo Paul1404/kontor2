@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.87.1",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Die Vereinsverwaltung wird aus der Vereins-App herausgelöst und zieht in einen eigenständigen Betreiber-Bereich um (eigener Login, eigene Datenbank). Bis dieser bereitsteht ist die Vereinsverwaltung kurzzeitig nicht in der App. Für den laufenden Betrieb ändert sich nichts.",
+      },
+    ],
+  },
+  {
     version: "0.87.0",
     date: "2026-06-13",
     changes: [

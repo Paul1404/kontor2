@@ -2,7 +2,6 @@ import { ORPCError, os } from "@orpc/server";
 import type { Role } from "~/server/db/schema/auth";
 import { logger } from "~/server/lib/logger";
 import type { AppContext } from "~/server/orpc/context";
-import { primaryTenant } from "~/server/tenants/resolve";
 
 export const base = os.$context<AppContext>();
 
@@ -90,26 +89,7 @@ export function requireAuth(min: Role = "readonly") {
   });
 }
 
-/**
- * Control-Plane-Gate: nur Admins des PRIMÄR-Vereins (Hauptverein, auf dessen
- * Host) dürfen Vereine verwalten. Ein Admin eines Unter-Vereins (z. B. verein2)
- * ist hier bewusst gesperrt -- die `tenants`-Tabelle lebt in der Control-DB des
- * Primärs, und nur dort hat Vereinsverwaltung etwas zu suchen.
- */
-export const requireSuperAdmin = base.middleware(async ({ context, next }) => {
-  if (context.tenant.key !== primaryTenant().key) {
-    throw new ORPCError("FORBIDDEN", {
-      message: "Vereinsverwaltung ist nur im Hauptverein verfügbar.",
-    });
-  }
-  return next();
-});
-
 export const publicProc = base.use(observability);
 export const authedProc = base.use(observability).use(requireAuth("readonly"));
 export const vorstandProc = base.use(observability).use(requireAuth("vorstand"));
 export const adminProc = base.use(observability).use(requireAuth("admin"));
-export const superAdminProc = base
-  .use(observability)
-  .use(requireAuth("admin"))
-  .use(requireSuperAdmin);
