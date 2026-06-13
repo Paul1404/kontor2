@@ -1,5 +1,4 @@
-import { logger } from "~/server/lib/logger";
-import { listTenants, type Tenant } from "~/server/tenants/registry";
+import { findTenantByKey, type Tenant } from "~/server/tenants/registry";
 
 /** Produkt-Domain, unter der Vereine als Subdomain wohnen (`<key>.kontor2.com`).
  * Zur Aufrufzeit gelesen, damit sie ohne Rebuild konfigurierbar bleibt. */
@@ -24,8 +23,10 @@ export function primaryTenant(): Tenant {
  * Bildet den eingehenden Request-Host auf einen Mandanten ab.
  * `<key>.kontor2.com` löst auf den Mandanten mit diesem Schlüssel auf; alles
  * andere (Apex, www, die alte Verein-Domain, eine unbekannte Subdomain) fällt
- * auf den primären Mandanten zurück. Ein kaputtes `TENANTS_JSON` betrifft nur
- * die Auflösung zusätzlicher Vereine -- der primäre bleibt unberührt.
+ * auf den primären Mandanten zurück. Die Auflösung zusätzlicher Vereine läuft
+ * über `findTenantByKey` (Tabellen-Cache + `TENANTS_JSON`-Fallback) und wirft
+ * nie -- ein kaputtes `TENANTS_JSON` degradiert nur Extra-Vereine, der primäre
+ * bleibt unberührt.
  */
 export function resolveTenantFromHost(host: string | null | undefined): Tenant {
   const primary = primaryTenant();
@@ -36,15 +37,8 @@ export function resolveTenantFromHost(host: string | null | undefined): Tenant {
     // Linkestes Label ist der Mandanten-Schlüssel; tiefere Verschachtelung egal.
     const key = h.slice(0, -suffix.length).split(".")[0];
     if (key && key !== primary.key) {
-      try {
-        const match = listTenants().find((t) => t.key === key);
-        if (match) return match;
-      } catch (err) {
-        // Kaputtes TENANTS_JSON darf den primären Mandanten nicht ausknocken.
-        logger.warn("tenant resolution fell back to primary", {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
+      const match = findTenantByKey(key);
+      if (match) return match;
     }
   }
   return primary;

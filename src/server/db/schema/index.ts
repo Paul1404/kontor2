@@ -33,3 +33,4 @@ export * from "./sepa";
 export * from "./settings";
 export * from "./snapshots";
 export * from "./tasks";
+export * from "./tenants";

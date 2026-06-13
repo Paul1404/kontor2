@@ -19,6 +19,7 @@
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { loadTenants } from "~/server/tenants/load";
 import { listTenants } from "~/server/tenants/registry";
 
 function arg(name: string): string | undefined {
@@ -60,6 +61,8 @@ async function main() {
     console.error("[restore] --from=<datei|s3:key> und --to=<mandant|url> erforderlich.");
     process.exit(1);
   }
+  // Control-Plane-Vereine laden, damit `--to=<schlüssel>` auch Tabellen-Vereine trifft.
+  await loadTenants();
   const targetUrl = resolveTargetUrl(to);
   const file = await fetchSource(from);
 
