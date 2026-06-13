@@ -3,7 +3,7 @@ import { listTenants, type Tenant } from "~/server/tenants/registry";
 
 /** Produkt-Domain, unter der Vereine als Subdomain wohnen (`<key>.kontor2.com`).
  * Zur Aufrufzeit gelesen, damit sie ohne Rebuild konfigurierbar bleibt. */
-function productDomain(): string {
+export function productDomain(): string {
   return process.env.PRODUCT_DOMAIN ?? "kontor2.com";
 }
 

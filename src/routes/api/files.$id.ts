@@ -4,12 +4,17 @@ import { createFileRoute } from "@tanstack/react-router";
 // static `import { auth }` / s3 import would pull the server graph into the
 // client bundle and break hydration.
 async function handle({ request, params }: { request: Request; params: { id: string } }) {
-  const [{ auth }, { loadDownloadableAttachment }, { presignDownload }] = await Promise.all([
-    import("~/server/auth/auth"),
-    import("~/server/orpc/procedures/attachments"),
-    import("~/server/s3/client"),
-  ]);
-  const session = await auth().api.getSession({ headers: request.headers });
+  const [{ auth }, { resolveTenantFromHost }, { loadDownloadableAttachment }, { presignDownload }] =
+    await Promise.all([
+      import("~/server/auth/auth"),
+      import("~/server/tenants/resolve"),
+      import("~/server/orpc/procedures/attachments"),
+      import("~/server/s3/client"),
+    ]);
+  const tenant = resolveTenantFromHost(
+    request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
+  );
+  const session = await auth(tenant).api.getSession({ headers: request.headers });
   if (!session?.user) return new Response("Unauthorized", { status: 401 });
   const att = await loadDownloadableAttachment(params.id);
   if (!att) return new Response("Not found", { status: 404 });

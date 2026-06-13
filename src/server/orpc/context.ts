@@ -56,7 +56,7 @@ export async function createContext(request: Request): Promise<AppContext> {
   const tenant = resolveTenantFromHost(
     request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
   );
-  const session = await auth().api.getSession({ headers: request.headers });
+  const session = await auth(tenant).api.getSession({ headers: request.headers });
   return {
     db: dbForTenant(tenant.databaseUrl),
     tenant,

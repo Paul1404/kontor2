@@ -5,19 +5,54 @@ import { admin } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { sendPasswordResetEmail } from "~/server/auth/send-invite";
 import { getSessionConfig } from "~/server/auth/session-config";
-import { db } from "~/server/db/client";
+import { dbForTenant } from "~/server/db/client";
 import * as schema from "~/server/db/schema";
 import { env } from "~/server/env";
 import { logger } from "~/server/lib/logger";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { redis } from "~/server/redis/client";
+import type { Tenant } from "~/server/tenants/registry";
+import { primaryTenant, productDomain } from "~/server/tenants/resolve";
 
-function buildAuth() {
+/**
+ * The auth-facing base URL for a Verein: the primary keeps its configured
+ * BETTER_AUTH_URL (unchanged for SVU); every other Verein lives at
+ * `https://<key>.<product-domain>`. Used for links the app builds itself.
+ */
+export function authBaseUrl(tenant: Tenant): string {
+  return tenant.key === primaryTenant().key
+    ? env().BETTER_AUTH_URL
+    : `https://${tenant.key}.${productDomain()}`;
+}
+
+function buildAuth(tenant: Tenant) {
   const sessionConfig = getSessionConfig();
+  const baseURL = authBaseUrl(tenant);
+  // Redis session namespace: the primary keeps the historical `auth:` prefix so
+  // existing SVU sessions stay valid; every other Verein gets its own namespace.
+  const keyPrefix = tenant.key === primaryTenant().key ? "auth:" : `auth:${tenant.key}:`;
   return betterAuth({
-    baseURL: env().BETTER_AUTH_URL,
+    baseURL,
     secret: env().betterAuthSecret,
-    database: drizzleAdapter(db(), {
+    // Always trust the primary's configured URL (keeps SVU valid regardless of
+    // the tenant logic), plus this tenant's base, plus any same-product-domain
+    // subdomain origin (so each Verein's own subdomain is accepted).
+    trustedOrigins: (request) => {
+      const trusted = [env().BETTER_AUTH_URL, baseURL];
+      const origin = request?.headers.get("origin");
+      if (origin) {
+        try {
+          const host = new URL(origin).hostname;
+          if (host === productDomain() || host.endsWith(`.${productDomain()}`)) {
+            trusted.push(origin);
+          }
+        } catch {
+          /* ignore malformed Origin header */
+        }
+      }
+      return trusted;
+    },
+    database: drizzleAdapter(dbForTenant(tenant.databaseUrl), {
       provider: "pg",
       usePlural: true,
       schema: {
@@ -40,7 +75,7 @@ function buildAuth() {
       // into an email-enumeration oracle (configured vs. unconfigured SMTP,
       // existing vs. missing user). Every attempt is recorded in the mail log.
       sendResetPassword: async ({ user, token }) => {
-        const resetUrl = `${env().BETTER_AUTH_URL}/passwort-zuruecksetzen?token=${token}`;
+        const resetUrl = `${baseURL}/passwort-zuruecksetzen?token=${token}`;
         const result = await sendPasswordResetEmail({ to: user.email, resetUrl });
         if (!result.ok && result.reason !== "smtp_not_configured") {
           logger.warn("auth.password-reset.send-failed", { reason: result.reason });
@@ -98,13 +133,13 @@ function buildAuth() {
       },
     },
     secondaryStorage: {
-      get: async (key) => (await redis().get(`auth:${key}`)) ?? null,
+      get: async (key) => (await redis().get(`${keyPrefix}${key}`)) ?? null,
       set: async (key, value, ttl) => {
-        if (ttl) await redis().set(`auth:${key}`, value, "EX", ttl);
-        else await redis().set(`auth:${key}`, value);
+        if (ttl) await redis().set(`${keyPrefix}${key}`, value, "EX", ttl);
+        else await redis().set(`${keyPrefix}${key}`, value);
       },
       delete: async (key) => {
-        await redis().del(`auth:${key}`);
+        await redis().del(`${keyPrefix}${key}`);
       },
     },
     session: {
@@ -149,20 +184,26 @@ function buildAuth() {
   });
 }
 
-let authInstance: ReturnType<typeof buildAuth> | undefined;
+// One memoized better-auth instance per Verein (keyed by tenant key); each binds
+// that Verein's database, base URL and Redis namespace.
+const instances = new Map<string, ReturnType<typeof buildAuth>>();
 
-export function auth(): ReturnType<typeof buildAuth> {
-  if (!authInstance) authInstance = buildAuth();
-  return authInstance;
+export function auth(tenant: Tenant = primaryTenant()): ReturnType<typeof buildAuth> {
+  let instance = instances.get(tenant.key);
+  if (!instance) {
+    instance = buildAuth(tenant);
+    instances.set(tenant.key, instance);
+  }
+  return instance;
 }
 
 /**
- * Drop the memoized instance so the next `auth()` call rebuilds better-auth.
+ * Drop all memoized instances so the next `auth()` call rebuilds better-auth.
  * Used after the session window changes (see session-config.ts) to apply the
  * new lifetime without a redeploy.
  */
 export function invalidateAuth(): void {
-  authInstance = undefined;
+  instances.clear();
 }
 
 export type Session = NonNullable<
