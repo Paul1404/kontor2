@@ -52,4 +52,13 @@ describe("resolveTenantFromHost", () => {
   it("primaryTenant ist der DATABASE_URL-Mandant", () => {
     expect(primaryTenant().key).toBe("svu");
   });
+
+  it("kaputtes TENANTS_JSON wirft nicht und faellt auf den Primaer zurueck", () => {
+    process.env.TENANTS_JSON = "{ kein json";
+    // primaryTenant und die Primaer-Subdomain umgehen das Parsing komplett
+    expect(primaryTenant().key).toBe("svu");
+    expect(resolveTenantFromHost("svu.kontor2.com").key).toBe("svu");
+    // eine fremde Subdomain wuerde parsen muessen -> faengt den Fehler ab
+    expect(resolveTenantFromHost("verein2.kontor2.com").key).toBe("svu");
+  });
 });
