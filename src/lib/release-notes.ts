@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.82.1",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Härtung der Mandanten-Auflösung: der primäre Verein wird direkt aus der Konfiguration aufgelöst, ohne die optionale Mehr-Vereine-Liste zu parsen. Ein fehlerhafter Eintrag in dieser Liste betrifft damit nur zusätzliche Vereine und kann den laufenden Betrieb nicht mehr stören.",
+      },
+    ],
+  },
+  {
     version: "0.82.0",
     date: "2026-06-13",
     changes: [
