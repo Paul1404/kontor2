@@ -1,5 +1,5 @@
 import { and, count, eq, ne } from "drizzle-orm";
-import { db } from "~/server/db/client";
+import type { DB } from "~/server/db/client";
 import { users } from "~/server/db/schema/auth";
 
 /**
@@ -14,10 +14,11 @@ import { users } from "~/server/db/schema/auth";
 export type LastAdminAction = "ban" | "demote" | "delete";
 
 export async function wouldRemoveLastAdmin(
+  db: DB,
   targetUserId: string,
   action: LastAdminAction,
 ): Promise<boolean> {
-  const [target] = await db()
+  const [target] = await db
     .select({ role: users.role, banned: users.banned })
     .from(users)
     .where(eq(users.id, targetUserId))
@@ -26,7 +27,7 @@ export async function wouldRemoveLastAdmin(
   if (target.role !== "admin") return false;
   if (action !== "delete" && target.banned === true) return false;
 
-  const [row] = await db()
+  const [row] = await db
     .select({ c: count() })
     .from(users)
     .where(
@@ -60,7 +61,7 @@ function matchAdminRoute(url: URL): RouteMatch | null {
  * the last active admin, returns an error response without forwarding to the
  * handler. Returns `null` when the request should be forwarded as-is.
  */
-export async function guardAdminPluginRequest(request: Request): Promise<Response | null> {
+export async function guardAdminPluginRequest(db: DB, request: Request): Promise<Response | null> {
   if (request.method !== "POST") return null;
   const url = new URL(request.url);
   const match = matchAdminRoute(url);
@@ -89,7 +90,7 @@ export async function guardAdminPluginRequest(request: Request): Promise<Respons
     if (body.banned !== true) return null;
   }
 
-  const wouldLock = await wouldRemoveLastAdmin(targetUserId, match.action);
+  const wouldLock = await wouldRemoveLastAdmin(db, targetUserId, match.action);
   if (!wouldLock) return null;
 
   return new Response(

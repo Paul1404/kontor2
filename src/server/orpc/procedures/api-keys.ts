@@ -74,7 +74,7 @@ export const apiKeysRouter = {
 
       // Server-side call: no request/headers passed, so the plugin accepts
       // `userId` as the key owner (a client-shaped call would reject it).
-      const created = await auth().api.createApiKey({
+      const created = await auth(context.tenant).api.createApiKey({
         body: {
           name: input.name,
           userId: input.userId,

@@ -21,7 +21,7 @@ export async function resolveApiKeyContext(
   base: AppContext,
   rawKey: string,
 ): Promise<AppContext | null> {
-  const result = await auth().api.verifyApiKey({ body: { key: rawKey } });
+  const result = await auth(base.tenant).api.verifyApiKey({ body: { key: rawKey } });
   if (!result.valid || !result.key) return null;
 
   const [user] = await base.db
