@@ -20,6 +20,7 @@
  */
 import { mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { loadTenants } from "~/server/tenants/load";
 import { listTenants, resolveTenant, type Tenant } from "~/server/tenants/registry";
 
 function arg(name: string): string | undefined {
@@ -67,6 +68,10 @@ async function main() {
   const outDir = arg("out") ?? "./backups";
   const toS3 = flag("s3");
   mkdirSync(outDir, { recursive: true });
+
+  // Control-Plane-Vereine (tenants-Tabelle) in die Registry laden, damit auch
+  // sie gesichert werden -- nicht nur die aus DATABASE_URL/TENANTS_JSON.
+  await loadTenants();
 
   const tenants = only ? [resolveTenant(only)] : listTenants();
   if (tenants.length === 0) {

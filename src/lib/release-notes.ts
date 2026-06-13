@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.84.2",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Die Vereins-Registry kann ihre Einträge jetzt aus einer Datenbanktabelle lesen, nicht mehr nur aus einer Umgebungsvariable. Grundlage für die spätere Verwaltung mehrerer Vereine. Die bisherige Konfiguration bleibt als Rückfallebene aktiv, für den bestehenden Verein ändert sich nichts.",
+      },
+    ],
+  },
+  {
     version: "0.84.1",
     date: "2026-06-13",
     changes: [

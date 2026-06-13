@@ -31,6 +31,7 @@ export const ENCRYPTED_TARGETS: EncryptedTarget[] = [
   { table: "organization_settings", column: "vereins_iban", idColumn: "id" },
   { table: "smtp_config", column: "password_encrypted", idColumn: "id" },
   { table: "membership_applications", column: "iban", idColumn: "id" },
+  { table: "tenants", column: "database_url", idColumn: "id" },
 ];
 
 /**

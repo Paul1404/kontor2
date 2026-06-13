@@ -5,6 +5,7 @@ import { installShutdownBridge } from "~/server/lib/lifecycle";
 import { registerDbLogSink } from "~/server/lib/log-sink-db";
 import { logger } from "~/server/lib/logger";
 import { startSnapshotScheduler } from "~/server/snapshots/scheduler";
+import { ensureTenantRegistryLoader } from "~/server/tenants/load";
 import type { Tenant } from "~/server/tenants/registry";
 import { resolveTenantFromHost } from "~/server/tenants/resolve";
 
@@ -41,6 +42,16 @@ export async function createContext(request: Request): Promise<AppContext> {
       startSnapshotScheduler();
     } catch (err) {
       logger.error("failed to start snapshot scheduler", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    // Hängt den Control-DB-Loader der Mandanten-Registry ein und primt den
+    // Cache im Hintergrund. Bis das erste Reload durch ist, trägt der Primär-
+    // bzw. TENANTS_JSON-Fallback die Host-Auflösung -- daher kein await.
+    try {
+      ensureTenantRegistryLoader();
+    } catch (err) {
+      logger.error("failed to init tenant registry loader", {
         error: err instanceof Error ? err.message : String(err),
       });
     }
