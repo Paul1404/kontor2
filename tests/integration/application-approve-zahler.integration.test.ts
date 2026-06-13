@@ -28,7 +28,13 @@ function authedContext(): AppContext {
     session: { id: "test", userId: ACTOR_ID },
     user: { id: ACTOR_ID, email: "appzahler-actor@test.local", role: "vorstand" },
   } as unknown as Session;
-  return { db: db(), session, headers: new Headers(), requestId: "appzahler-test" };
+  return {
+    db: db(),
+    session,
+    headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
+    requestId: "appzahler-test",
+  };
 }
 
 describe.skipIf(!onTestDb)("Antrag-Genehmigung legt Zahler an (integration)", () => {

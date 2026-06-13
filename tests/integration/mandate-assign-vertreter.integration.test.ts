@@ -25,7 +25,13 @@ function authedContext(): AppContext {
     session: { id: "test", userId: ACTOR_ID },
     user: { id: ACTOR_ID, email: "assignv-actor@test.local", role: "vorstand" },
   } as unknown as Session;
-  return { db: db(), session, headers: new Headers(), requestId: "assignv-test" };
+  return {
+    db: db(),
+    session,
+    headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
+    requestId: "assignv-test",
+  };
 }
 
 async function seedPair(opts: {

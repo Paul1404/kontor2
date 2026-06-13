@@ -25,6 +25,7 @@ function baseContext(rows: unknown[]): AppContext {
     db: dbReturning(rows),
     session: null,
     headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
     requestId: "test",
   };
 }

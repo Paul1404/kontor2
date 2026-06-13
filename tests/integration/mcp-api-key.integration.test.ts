@@ -24,6 +24,7 @@ function baseContext(): AppContext {
     db: db(),
     session: null,
     headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
     requestId: "mcp-integration-test",
   };
 }

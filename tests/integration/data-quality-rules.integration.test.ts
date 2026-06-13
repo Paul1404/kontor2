@@ -24,7 +24,13 @@ function vorstandContext(): AppContext {
     session: { id: "test", userId: "test" },
     user: { id: "test", email: "test@test.local", role: "vorstand" },
   } as unknown as Session;
-  return { db: db(), session, headers: new Headers(), requestId: "dq-rule-test" };
+  return {
+    db: db(),
+    session,
+    headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
+    requestId: "dq-rule-test",
+  };
 }
 
 const past = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
