@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.88.1",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "App-Symbol, Web-Manifest, Datei-Downloads und der Portal-Zugang nutzen jetzt durchgängig die Daten des jeweiligen Vereins statt der des Hauptvereins. Bei mehreren Vereinen wurde sonst teils das falsche Logo oder die falsche Datenbank verwendet. Für den bestehenden Verein ändert sich nichts.",
+      },
+    ],
+  },
+  {
     version: "0.88.0",
     date: "2026-06-14",
     changes: [

@@ -2,7 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, eq, lt } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
-import { db } from "~/server/db/client";
+import type { DB } from "~/server/db/client";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
 import { membersTable } from "~/server/db/schema/members";
@@ -17,9 +17,10 @@ import { deleteObject, presignDownload, presignUpload } from "~/server/s3/client
  * when the attachment is missing or its member is gone.
  */
 export async function loadDownloadableAttachment(
+  db: DB,
   id: string,
 ): Promise<{ s3Key: string; filename: string } | null> {
-  const [row] = await db()
+  const [row] = await db
     .select({ s3Key: attachmentsTable.s3Key, filename: attachmentsTable.filename })
     .from(attachmentsTable)
     .innerJoin(membersTable, eq(membersTable.id, attachmentsTable.memberId))
@@ -209,8 +210,8 @@ export const attachmentsRouter = {
    */
   getSignedDownloadUrl: authedProc
     .input(v.object({ id: v.string() }))
-    .handler(async ({ input }) => {
-      const att = await loadDownloadableAttachment(input.id);
+    .handler(async ({ context, input }) => {
+      const att = await loadDownloadableAttachment(context.db, input.id);
       if (!att) throw new ORPCError("NOT_FOUND", { message: "Anhang nicht gefunden." });
       const url = await presignDownload({
         key: att.s3Key,
