@@ -219,7 +219,7 @@ export const rundschreibenRouter = {
     )
     .handler(async ({ context, input }) => {
       const to = context.session!.user.email;
-      const mailer = await getMailer();
+      const mailer = await getMailer(context.db);
       if (!mailer) {
         throw new ORPCError("PRECONDITION_FAILED", {
           message: "SMTP ist nicht konfiguriert. Bitte unter Einstellungen > SMTP einrichten.",
@@ -250,7 +250,7 @@ export const rundschreibenRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      const mailer = await getMailer();
+      const mailer = await getMailer(context.db);
       if (!mailer) {
         throw new ORPCError("PRECONDITION_FAILED", {
           message: "SMTP ist nicht konfiguriert. Bitte unter Einstellungen > SMTP einrichten.",

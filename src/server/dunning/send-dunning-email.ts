@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { loadSmtpConfig } from "~/server/auth/send-invite";
+import type { DB } from "~/server/db/client";
 
 const LEVEL_TITLES: Record<1 | 2 | 3, string> = {
   1: "Zahlungserinnerung",
@@ -76,11 +77,14 @@ export function buildDunningEmail(p: DunningEmailParams): DunningEmailContent {
  * already stored base64-encoded on the dunning item, so we attach it
  * directly without re-rendering.
  */
-export async function sendDunningEmail(opts: {
-  content: DunningEmailContent;
-  pdfBase64: string;
-}): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const cfg = await loadSmtpConfig();
+export async function sendDunningEmail(
+  db: DB,
+  opts: {
+    content: DunningEmailContent;
+    pdfBase64: string;
+  },
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const cfg = await loadSmtpConfig(db);
   if (!cfg) return { ok: false, reason: "smtp_not_configured" };
   const t = nodemailer.createTransport({
     host: cfg.host,

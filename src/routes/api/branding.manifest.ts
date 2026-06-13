@@ -10,11 +10,12 @@ import { createFileRoute } from "@tanstack/react-router";
 async function handle(): Promise<Response> {
   let name = "Kontor2";
   let themeColor = "#dc2626";
+  // Default: the Kontor2 logo as a scalable SVG (covers all sizes). The
+  // bundled PNG icons are the old SVU shield and would otherwise show as the
+  // install icon for any Verein without its own logo.
   let icons: Array<Record<string, string>> = [
-    { src: "/favicon.svg", type: "image/svg+xml", sizes: "any" },
-    { src: "/icon-192.png", type: "image/png", sizes: "192x192" },
-    { src: "/icon-512.png", type: "image/png", sizes: "512x512" },
-    { src: "/icon-512.png", type: "image/png", sizes: "512x512", purpose: "maskable" },
+    { src: "/logo.svg", type: "image/svg+xml", sizes: "any", purpose: "any" },
+    { src: "/logo.svg", type: "image/svg+xml", sizes: "any", purpose: "maskable" },
   ];
   try {
     const [{ db }, { organizationSettingsTable }, { normalizeHex }] = await Promise.all([
