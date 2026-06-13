@@ -9,19 +9,20 @@
  *   - Der Primär (DATABASE_URL) wird ZUERST migriert. Schlägt er fehl -> Abbruch
  *     (Exit 1), der Deploy bricht ab und die alte Version bleibt live. So greift
  *     u. a. der Mitgliedsnummer-Guard aus Migration 0048 weiterhin.
+ *   - Erst danach wird die Vereinsliste eingesammelt (auch aus der `tenants`-
+ *     Tabelle, die der Primär-Lauf gerade aktualisiert hat).
  *   - Danach jeder weitere Verein. Schlägt EINER fehl -> ebenfalls Abbruch, damit
- *     die Schemata aller Vereine im Gleichschritt bleiben. Lieber ein roter
- *     Deploy als ein still zurückgebliebener Verein.
+ *     die Schemata aller Vereine im Gleichschritt bleiben.
  *
  * WICHTIG -- schlankes Runtime-Image: dieses Skript läuft im `runner`-Image, das
  * nur `dist/`, `scripts/`, `drizzle/` und `node_modules` enthält, NICHT `src/`.
  * Es darf daher weder `~/server/*` importieren noch die verschlüsselte
- * `database_url` aus der `tenants`-Tabelle entschlüsseln. Die Vereinsliste kommt
- * deshalb aus den env-Quellen, die das Image lesen kann: `DATABASE_URL` (Primär)
- * und `TENANTS_JSON`. Die Tabellen-basierte Enumeration beim Deploy gehört zu C2
- * (dort wird die DB-Identität so gespeichert, dass das slim-Skript ohne
- * Entschlüsselung URLs bauen kann -- z. B. ein plaintext-DB-Name bei Vereinen
- * derselben Postgres-Instanz). Bis dahin lebt ein Extra-Verein in TENANTS_JSON.
+ * `database_url` aus der `tenants`-Tabelle entschlüsseln. Tabellen-Vereine werden
+ * deshalb ausschließlich über den KLARTEXT-`database_name` gelesen (Verein als
+ * eigene DB in der Primär-Instanz; URL = DATABASE_URL mit getauschtem DB-Namen).
+ * Zeilen, die NUR eine verschlüsselte `database_url` haben (Fremd-Instanz), kann
+ * der Migrator hier nicht auflösen -- die müssten über TENANTS_JSON laufen; wird
+ * gewarnt. Plus weiterhin `TENANTS_JSON` als backward-compatible Quelle.
  */
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
@@ -29,49 +30,67 @@ import postgres from "postgres";
 
 type TenantTarget = { key: string; databaseUrl: string };
 
-/**
- * Vereinsliste aus den env-Quellen (Primär + TENANTS_JSON), dedupliziert nach
- * Schlüssel (Primär gewinnt). Bewusst eine schlanke Kopie der Logik aus
- * `src/server/tenants/registry.ts` -- letztere ist im Runtime-Image nicht
- * verfügbar (kein `src/`).
- */
-function enumerateTenants(): TenantTarget[] {
-  const out: TenantTarget[] = [];
-  const primary = process.env.DATABASE_URL;
-  if (!primary) {
-    console.error("[migrate] DATABASE_URL ist nicht gesetzt");
-    process.exit(1);
-  }
-  out.push({ key: process.env.PRIMARY_TENANT_KEY ?? "svu", databaseUrl: primary });
+function primaryKey(): string {
+  return process.env.PRIMARY_TENANT_KEY ?? "svu";
+}
 
+/** Verein-URL aus der Primär-URL ableiten: nur den DB-Namen (Pfad) tauschen. */
+function urlForDbName(primaryUrl: string, databaseName: string): string {
+  const u = new URL(primaryUrl);
+  u.pathname = `/${databaseName}`;
+  return u.toString();
+}
+
+/** Extra-Vereine aus TENANTS_JSON (kaputtes JSON wird gewarnt und ignoriert). */
+function tenantsFromJson(): TenantTarget[] {
   const extra = process.env.TENANTS_JSON;
-  if (extra?.trim()) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(extra);
-    } catch (e) {
-      // Ein kaputtes TENANTS_JSON darf den Primär-Migrationslauf nicht verhindern.
-      console.error(
-        `[migrate] TENANTS_JSON ignoriert (kein gültiges JSON): ${(e as Error).message}`,
-      );
-      return out;
-    }
-    if (Array.isArray(parsed)) {
-      for (const raw of parsed) {
-        const t = raw as { key?: unknown; databaseUrl?: unknown };
-        if (typeof t.key !== "string" || typeof t.databaseUrl !== "string") {
-          console.error("[migrate] TENANTS_JSON-Eintrag ohne key/databaseUrl übersprungen");
-          continue;
-        }
-        if (!out.some((x) => x.key === t.key)) {
-          out.push({ key: t.key, databaseUrl: t.databaseUrl });
-        }
-      }
+  if (!extra?.trim()) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(extra);
+  } catch (e) {
+    console.error(`[migrate] TENANTS_JSON ignoriert (kein gültiges JSON): ${(e as Error).message}`);
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    console.error("[migrate] TENANTS_JSON ist kein Array -- ignoriert");
+    return [];
+  }
+  const out: TenantTarget[] = [];
+  for (const raw of parsed) {
+    const t = raw as { key?: unknown; databaseUrl?: unknown };
+    if (typeof t.key === "string" && typeof t.databaseUrl === "string") {
+      out.push({ key: t.key, databaseUrl: t.databaseUrl });
     } else {
-      console.error("[migrate] TENANTS_JSON ist kein Array -- ignoriert");
+      console.error("[migrate] TENANTS_JSON-Eintrag ohne key/databaseUrl übersprungen");
     }
   }
   return out;
+}
+
+/**
+ * Extra-Vereine aus der `tenants`-Tabelle des Primärs -- nur über den Klartext
+ * `database_name`. Läuft NACH der Primär-Migration, die Tabelle ist also aktuell.
+ */
+async function tenantsFromTable(primaryUrl: string): Promise<TenantTarget[]> {
+  const sql = postgres(primaryUrl, { max: 1, onnotice: () => {} });
+  try {
+    const rows = (await sql`
+      select key, database_name
+      from tenants
+      where status = 'active' and database_name is not null
+    `) as unknown as Array<{ key: string; database_name: string }>;
+    return rows
+      .filter((r) => r.key !== primaryKey())
+      .map((r) => ({ key: r.key, databaseUrl: urlForDbName(primaryUrl, r.database_name) }));
+  } catch (err) {
+    console.error(
+      `[migrate] tenants-Tabelle nicht lesbar, nur env-Quellen: ${(err as Error).message}`,
+    );
+    return [];
+  } finally {
+    await sql.end();
+  }
 }
 
 async function migrateOne(target: TenantTarget): Promise<void> {
@@ -86,30 +105,39 @@ async function migrateOne(target: TenantTarget): Promise<void> {
 }
 
 async function main() {
-  const tenants = enumerateTenants();
-  console.log(`[migrate] ${tenants.length} Verein(e): ${tenants.map((t) => t.key).join(", ")}`);
-
-  // Primär zuerst -- harter Abbruch bei Fehler (wie bisher).
-  const [primary, ...rest] = tenants;
-  if (!primary) {
-    console.error("[migrate] kein Verein zu migrieren (DATABASE_URL gesetzt?)");
+  const primaryUrl = process.env.DATABASE_URL;
+  if (!primaryUrl) {
+    console.error("[migrate] DATABASE_URL ist nicht gesetzt");
     process.exit(1);
   }
+
+  // 1. Primär zuerst -- harter Abbruch bei Fehler (wie bisher).
   try {
-    await migrateOne(primary);
+    await migrateOne({ key: primaryKey(), databaseUrl: primaryUrl });
   } catch (err) {
-    console.error(`[migrate] PRIMÄR (${primary.key}) fehlgeschlagen:`, (err as Error).message);
+    console.error(`[migrate] PRIMÄR (${primaryKey()}) fehlgeschlagen:`, (err as Error).message);
     process.exit(1);
   }
 
-  // Weitere Vereine -- alle versuchen, Fehler sammeln, am Ende hart abbrechen.
+  // 2. Weitere Vereine einsammeln (Tabelle gewinnt über TENANTS_JSON; Primär raus).
+  const secondaries = new Map<string, string>();
+  for (const t of tenantsFromJson()) {
+    if (t.key !== primaryKey()) secondaries.set(t.key, t.databaseUrl);
+  }
+  for (const t of await tenantsFromTable(primaryUrl)) {
+    secondaries.set(t.key, t.databaseUrl);
+  }
+  const keys = [...secondaries.keys()];
+  console.log(`[migrate] ${1 + keys.length} Verein(e): ${[primaryKey(), ...keys].join(", ")}`);
+
+  // 3. Weitere Vereine migrieren -- alle versuchen, am Ende bei Fehler abbrechen.
   const failed: string[] = [];
-  for (const t of rest) {
+  for (const [key, databaseUrl] of secondaries) {
     try {
-      await migrateOne(t);
+      await migrateOne({ key, databaseUrl });
     } catch (err) {
-      failed.push(t.key);
-      console.error(`[migrate] ${t.key} fehlgeschlagen:`, (err as Error).message);
+      failed.push(key);
+      console.error(`[migrate] ${key} fehlgeschlagen:`, (err as Error).message);
     }
   }
   if (failed.length > 0) {
@@ -117,7 +145,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`[migrate] fertig: ${tenants.length} Verein(e) migriert`);
+  console.log(`[migrate] fertig: ${1 + keys.length} Verein(e) migriert`);
 }
 
 main().catch((err) => {
