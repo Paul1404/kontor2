@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.84.3",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Beim Ausrollen werden Datenbank-Aktualisierungen jetzt auf alle Vereins-Datenbanken angewendet, nicht mehr nur auf die des Hauptvereins. So bleibt kein Verein bei einer Schema-Änderung zurück. Für den bestehenden Verein ändert sich nichts.",
+      },
+    ],
+  },
+  {
     version: "0.84.2",
     date: "2026-06-13",
     changes: [
