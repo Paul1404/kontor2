@@ -3,18 +3,25 @@ import { createFileRoute } from "@tanstack/react-router";
 // Server imports (incl. drizzle-orm) loaded lazily inside the handler so the
 // server graph never reaches the client bundle. See `api/rpc.$.ts`.
 async function handle({ request }: { request: Request }) {
-  const [{ eq }, { db }, { portalSessionsTable }, portalAuth] = await Promise.all([
-    import("drizzle-orm"),
-    import("~/server/db/client"),
-    import("~/server/db/schema/portal"),
-    import("~/server/portal/auth"),
-  ]);
+  const [{ eq }, { dbForTenant }, { resolveTenantFromHost }, { portalSessionsTable }, portalAuth] =
+    await Promise.all([
+      import("drizzle-orm"),
+      import("~/server/db/client"),
+      import("~/server/tenants/resolve"),
+      import("~/server/db/schema/portal"),
+      import("~/server/portal/auth"),
+    ]);
   const {
     clearPortalCookieHeader,
     getPortalCookieFromHeaders,
     isSecureRequest,
     resolvePortalSession,
   } = portalAuth;
+  // Portal-Session in der DB DIESES Vereins, nicht in der Primär-DB.
+  const tenant = resolveTenantFromHost(
+    request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
+  );
+  const db = () => dbForTenant(tenant.databaseUrl);
   const cookieValue = getPortalCookieFromHeaders(request.headers);
   const session = await resolvePortalSession(db(), cookieValue);
   if (session) {

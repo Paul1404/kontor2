@@ -7,7 +7,7 @@ import { createFileRoute } from "@tanstack/react-router";
  *
  * Servercode lazy im Handler (siehe api/rpc.$.ts).
  */
-async function handle(): Promise<Response> {
+async function handle({ request }: { request: Request }): Promise<Response> {
   let name = "Kontor2";
   let themeColor = "#dc2626";
   // Default: the Kontor2 logo as a scalable SVG (covers all sizes). The
@@ -18,12 +18,22 @@ async function handle(): Promise<Response> {
     { src: "/logo.svg", type: "image/svg+xml", sizes: "any", purpose: "maskable" },
   ];
   try {
-    const [{ db }, { organizationSettingsTable }, { normalizeHex }] = await Promise.all([
+    const [
+      { dbForTenant },
+      { resolveTenantFromHost },
+      { organizationSettingsTable },
+      { normalizeHex },
+    ] = await Promise.all([
       import("~/server/db/client"),
+      import("~/server/tenants/resolve"),
       import("~/server/db/schema/organization-settings"),
       import("~/lib/branding-color"),
     ]);
-    const [row] = await db()
+    // Branding des Vereins DIESES Hosts, nicht der Primär-DB.
+    const tenant = resolveTenantFromHost(
+      request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
+    );
+    const [row] = await dbForTenant(tenant.databaseUrl)
       .select({
         vereinsname: organizationSettingsTable.vereinsname,
         anzeigename: organizationSettingsTable.anzeigename,
