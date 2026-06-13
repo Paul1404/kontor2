@@ -109,7 +109,48 @@ export function env(): Env {
   }
 }
 
+const DATA_KEY_LABEL = "kontor2:data-encryption-key:v1";
+const tenantRingCache = new Map<string, Keyring>();
+
+/**
+ * Per-Verein-Verschlüsselungs-Keyring.
+ *
+ * Der Primär behält das unsuffixierte Label `kontor2:data-encryption-key:v1` --
+ * SVU braucht damit KEIN Re-Key. Nicht-primäre Vereine leiten aus
+ * `<label>:<tenantKey>` ab (eigener Schlüssel je Verein). Der Primär-Schlüssel
+ * bleibt im `previous` des Tenant-Rings, damit
+ *  - pre-Migration-Daten (vor dem Re-Key noch mit dem Primär-Schlüssel verschlüsselt) und
+ *  - Schreibvorgänge über Nicht-ALS-Pfade (die den Default-/Primär-Ring nutzen)
+ * weiterhin lesbar bleiben. Cross-Tenant bleibt isoliert: verein2s Ring kennt
+ * verein3s Schlüssel nicht.
+ */
+export function tenantEncryptionKeyring(tenantKey: string): Keyring {
+  const e = env(); // validiert + memoisiert; e.encryptionKeyring ist der Primär-Ring
+  const primaryKey = process.env.PRIMARY_TENANT_KEY ?? "svu";
+  if (tenantKey === primaryKey) return e.encryptionKeyring;
+
+  const hit = tenantRingCache.get(tenantKey);
+  if (hit) return hit;
+
+  const master = Buffer.from(e.APP_SECRET, "hex");
+  const prevMasters = parsePreviousSecrets(e.APP_SECRET_PREV);
+  const label = `${DATA_KEY_LABEL}:${tenantKey}`;
+  const ring: Keyring = {
+    current: makeKeyringEntry("current", derive(master, label)),
+    previous: [
+      makeKeyringEntry("primary", derive(master, DATA_KEY_LABEL)),
+      ...prevMasters.map((m, i) => makeKeyringEntry(`prev-${i}`, derive(m, label))),
+      ...prevMasters.map((m, i) =>
+        makeKeyringEntry(`prev-primary-${i}`, derive(m, DATA_KEY_LABEL)),
+      ),
+    ],
+  };
+  tenantRingCache.set(tenantKey, ring);
+  return ring;
+}
+
 /** Test-only: clear the memoised env so a fresh `process.env` is re-read. */
 export function _resetEnvCache(): void {
   cached = undefined;
+  tenantRingCache.clear();
 }

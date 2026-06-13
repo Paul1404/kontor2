@@ -62,22 +62,27 @@ export async function handle({ request }: { request: Request }): Promise<Respons
     { enforceMcpRateLimit },
     { handleMcpRequest },
     { createContext },
+    { runWithTenantKeyring },
   ] = await Promise.all([
     import("~/server/mcp/auth"),
     import("~/server/mcp/rate-limit"),
     import("~/server/mcp/server"),
     import("~/server/orpc/context"),
+    import("~/server/crypto/tenant-crypto"),
   ]);
   const base = await createContext(request);
   const rawKey = request.headers.get("x-api-key");
   if (!rawKey) return unauthorized();
-  const context = await resolveApiKeyContext(base, rawKey);
-  // null means a genuine auth failure (unknown/disabled/expired key or banned
-  // owner) — never a rate limit, which is handled below with a 429.
-  if (!context) return unauthorized();
-  const limit = await enforceMcpRateLimit(rawKey);
-  if (!limit.allowed) return rateLimited(limit.retryAfterSeconds);
-  return handleMcpRequest(request, context);
+  // Im Per-Verein-Keyring: MCP-Tools lesen verschlüsselte Mitgliedsdaten (IBAN) dieses Vereins.
+  return runWithTenantKeyring(base.tenant.key, async () => {
+    const context = await resolveApiKeyContext(base, rawKey);
+    // null means a genuine auth failure (unknown/disabled/expired key or banned
+    // owner) — never a rate limit, which is handled below with a 429.
+    if (!context) return unauthorized();
+    const limit = await enforceMcpRateLimit(rawKey);
+    if (!limit.allowed) return rateLimited(limit.retryAfterSeconds);
+    return handleMcpRequest(request, context);
+  });
 }
 
 export const Route = createFileRoute("/api/mcp")({

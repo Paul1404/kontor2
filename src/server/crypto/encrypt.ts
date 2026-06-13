@@ -5,6 +5,7 @@ import {
   randomBytes,
   timingSafeEqual,
 } from "node:crypto";
+import { activeKeyring } from "~/server/crypto/active-keyring";
 import { env } from "~/server/env";
 
 const ALG = "aes-256-gcm";
@@ -35,8 +36,12 @@ export function makeKeyringEntry(id: string, key: Buffer): KeyringEntry {
   return { id, key, fingerprint: keyFingerprint(key) };
 }
 
+/**
+ * Der für die aktuelle Operation gültige Keyring: der per AsyncLocalStorage
+ * gesetzte Per-Verein-Keyring, sonst der primäre `env().encryptionKeyring`.
+ */
 function keyring(): Keyring {
-  return env().encryptionKeyring;
+  return activeKeyring() ?? env().encryptionKeyring;
 }
 
 function findKey(ring: Keyring, fp: Buffer): KeyringEntry | null {
