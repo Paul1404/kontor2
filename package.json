@@ -1,6 +1,6 @@
 {
   "name": "kontor2",
-  "version": "0.84.3",
+  "version": "0.84.4",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "author": "Paul Dresch <paul.dresch@untereuerheim.com>",
@@ -24,6 +24,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:prod": "bun scripts/migrate-all.ts",
+    "db:migrate:status": "bun scripts/migrate-status.ts",
     "db:backup": "bun scripts/backup.ts",
     "db:restore": "bun scripts/restore.ts",
     "db:reencrypt": "bun scripts/reencrypt.ts",

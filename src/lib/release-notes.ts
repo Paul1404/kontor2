@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.84.4",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Internes Wartungswerkzeug: der Migrations-Stand jeder Vereins-Datenbank lässt sich jetzt per Befehl abrufen. Keine sichtbare Änderung in der Anwendung.",
+      },
+    ],
+  },
+  {
     version: "0.84.3",
     date: "2026-06-13",
     changes: [
