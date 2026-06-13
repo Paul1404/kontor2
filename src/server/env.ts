@@ -32,9 +32,6 @@ const EnvSchema = v.object({
   AWS_ACCESS_KEY_ID: v.pipe(v.string(), v.minLength(1)),
   AWS_SECRET_ACCESS_KEY: v.pipe(v.string(), v.minLength(1)),
 
-  BOOTSTRAP_ADMIN_EMAIL: v.optional(v.string()),
-  BOOTSTRAP_ADMIN_PASSWORD: v.optional(v.string()),
-
   // Disable the in-process nightly snapshot scheduler. Useful for local
   // dev or when triggering the run externally (e.g. via Railway Cron and
   // the HMAC-protected `/api/cron/snapshots` route).

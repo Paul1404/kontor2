@@ -56,9 +56,8 @@ export const authRouter = {
   /**
    * Creates the first admin when the users table is empty. Idempotency-safe:
    * a second concurrent call sees the user table populated and refuses.
-   * This is the recovery path for the "first-boot lockout" — operators who
-   * deployed without BOOTSTRAP_ADMIN_* env vars use this instead of
-   * having to edit env and restart the container.
+   * This is the only first-admin path: on a fresh instance you visit /setup
+   * once and create it in the browser, with no secret in the environment.
    */
   completeSetup: publicProc
     .input(
