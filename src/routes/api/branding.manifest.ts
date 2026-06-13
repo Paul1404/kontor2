@@ -8,7 +8,7 @@ import { createFileRoute } from "@tanstack/react-router";
  * Servercode lazy im Handler (siehe api/rpc.$.ts).
  */
 async function handle(): Promise<Response> {
-  let name = "Vereinsverwaltung";
+  let name = "Kontor2";
   let themeColor = "#dc2626";
   let icons: Array<Record<string, string>> = [
     { src: "/favicon.svg", type: "image/svg+xml", sizes: "any" },
