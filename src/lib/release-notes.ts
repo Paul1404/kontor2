@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.85.0",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Ein neuer Verein lässt sich jetzt automatisiert einrichten: eigene Datenbank, alle Migrationen und der Registry-Eintrag werden in einem Schritt angelegt. Grundlage für die Vereinsverwaltung im Adminbereich. Für den bestehenden Verein ändert sich nichts.",
+      },
+    ],
+  },
+  {
     version: "0.84.4",
     date: "2026-06-13",
     changes: [

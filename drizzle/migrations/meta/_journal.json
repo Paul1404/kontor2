@@ -407,6 +407,13 @@
       "when": 1781377120807,
       "tag": "0057_flashy_the_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1781383728638,
+      "tag": "0058_giant_black_queen",
+      "breakpoints": true
     }
   ]
 }

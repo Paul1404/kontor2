@@ -19,24 +19,31 @@ import {
   type Tenant,
 } from "~/server/tenants/registry";
 import { primaryTenant } from "~/server/tenants/resolve";
+import { tenantUrlFromName } from "~/server/tenants/url";
 
 async function loadFromControlDb(): Promise<Tenant[]> {
-  const primaryKey = primaryTenant().key;
+  const primary = primaryTenant();
   const rows = await db()
     .select({
       key: tenantsTable.key,
+      databaseName: tenantsTable.databaseName,
       databaseUrl: tenantsTable.databaseUrl,
       displayName: tenantsTable.displayName,
     })
     .from(tenantsTable)
     .where(eq(tenantsTable.status, "active"));
-  return rows
-    .filter((r) => r.key !== primaryKey)
-    .map((r) => ({
-      key: r.key,
-      databaseUrl: r.databaseUrl,
-      displayName: r.displayName ?? undefined,
-    }));
+  const out: Tenant[] = [];
+  for (const r of rows) {
+    if (r.key === primary.key) continue; // Primär kommt aus DATABASE_URL, nie aus der Tabelle.
+    // Vorrang: expliziter databaseUrl-Override (Fremd-Instanz), sonst aus dem
+    // databaseName auf der Primär-Instanz konstruiert.
+    const databaseUrl =
+      r.databaseUrl ||
+      (r.databaseName ? tenantUrlFromName(primary.databaseUrl, r.databaseName) : "");
+    if (!databaseUrl) continue; // sollte durch den CHECK nie passieren.
+    out.push({ key: r.key, databaseUrl, displayName: r.displayName ?? undefined });
+  }
+  return out;
 }
 
 let registered = false;
