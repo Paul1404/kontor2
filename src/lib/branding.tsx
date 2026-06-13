@@ -57,8 +57,10 @@ export function useBranding(): {
 } {
   const b = useContext(BrandingContext);
   return {
-    name: b.anzeigename?.trim() || "Vereinsverwaltung",
-    logoSrc: b.logo || "/logo.png",
+    // Default: the Kontor2 product brand. A Verein white-labels on top by
+    // setting its own Anzeigename / Logo in the settings.
+    name: b.anzeigename?.trim() || "Kontor2",
+    logoSrc: b.logo || "/logo.svg",
     primaryColor: b.primaryColor,
   };
 }

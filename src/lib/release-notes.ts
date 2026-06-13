@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.84.0",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Das Standard-Erscheinungsbild ist jetzt die Produktmarke Kontor2 (Logo, Name). Ein Verein überschreibt das mit seinem eigenen Logo, Anzeigenamen und seiner Farbe unter Einstellungen > Vereinsdaten > Branding. Wer noch nichts gesetzt hat, sieht das Kontor2-Standard.",
+      },
+    ],
+  },
+  {
     version: "0.83.3",
     date: "2026-06-13",
     changes: [
