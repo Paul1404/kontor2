@@ -18,6 +18,7 @@ import {
   Layers,
   LayoutDashboard,
   ListChecks,
+  Lock,
   Mail,
   Mails,
   ScrollText,
@@ -169,6 +170,12 @@ const SECTIONS: NavSection[] = [
         to: "/app/einstellungen/ki-zugriff",
         label: "KI-Zugriff",
         icon: <KeyRound className="size-[18px]" />,
+        adminOnly: true,
+      },
+      {
+        to: "/app/einstellungen/verschluesselung",
+        label: "Verschlüsselung",
+        icon: <Lock className="size-[18px]" />,
         adminOnly: true,
       },
       {

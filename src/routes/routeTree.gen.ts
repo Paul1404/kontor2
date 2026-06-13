@@ -46,6 +46,7 @@ import { Route as AppAntraegeIndexRouteImport } from './app/antraege/index'
 import { Route as AppMitgliederNeuRouteImport } from './app/mitglieder/neu'
 import { Route as AppMitgliederMitgliedsnummerRouteImport } from './app/mitglieder/$mitgliedsnummer'
 import { Route as AppForderungenRuecklaeuferRouteImport } from './app/forderungen/ruecklaeufer'
+import { Route as AppEinstellungenVerschluesselungRouteImport } from './app/einstellungen/verschluesselung'
 import { Route as AppEinstellungenVereinRouteImport } from './app/einstellungen/verein'
 import { Route as AppEinstellungenSmtpRouteImport } from './app/einstellungen/smtp'
 import { Route as AppEinstellungenKiZugriffRouteImport } from './app/einstellungen/ki-zugriff'
@@ -268,6 +269,12 @@ const AppForderungenRuecklaeuferRoute =
   AppForderungenRuecklaeuferRouteImport.update({
     id: '/forderungen/ruecklaeufer',
     path: '/forderungen/ruecklaeufer',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppEinstellungenVerschluesselungRoute =
+  AppEinstellungenVerschluesselungRouteImport.update({
+    id: '/einstellungen/verschluesselung',
+    path: '/einstellungen/verschluesselung',
     getParentRoute: () => AppRouteRoute,
   } as any)
 const AppEinstellungenVereinRoute = AppEinstellungenVereinRouteImport.update({
@@ -523,6 +530,7 @@ export interface FileRoutesByFullPath {
   '/app/einstellungen/ki-zugriff': typeof AppEinstellungenKiZugriffRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
+  '/app/einstellungen/verschluesselung': typeof AppEinstellungenVerschluesselungRoute
   '/app/forderungen/ruecklaeufer': typeof AppForderungenRuecklaeuferRoute
   '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRoute
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
@@ -595,6 +603,7 @@ export interface FileRoutesByTo {
   '/app/einstellungen/ki-zugriff': typeof AppEinstellungenKiZugriffRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
+  '/app/einstellungen/verschluesselung': typeof AppEinstellungenVerschluesselungRoute
   '/app/forderungen/ruecklaeufer': typeof AppForderungenRuecklaeuferRoute
   '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRoute
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
@@ -671,6 +680,7 @@ export interface FileRoutesById {
   '/app/einstellungen/ki-zugriff': typeof AppEinstellungenKiZugriffRoute
   '/app/einstellungen/smtp': typeof AppEinstellungenSmtpRoute
   '/app/einstellungen/verein': typeof AppEinstellungenVereinRoute
+  '/app/einstellungen/verschluesselung': typeof AppEinstellungenVerschluesselungRoute
   '/app/forderungen/ruecklaeufer': typeof AppForderungenRuecklaeuferRoute
   '/app/mitglieder/$mitgliedsnummer': typeof AppMitgliederMitgliedsnummerRoute
   '/app/mitglieder/neu': typeof AppMitgliederNeuRoute
@@ -748,6 +758,7 @@ export interface FileRouteTypes {
     | '/app/einstellungen/ki-zugriff'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
+    | '/app/einstellungen/verschluesselung'
     | '/app/forderungen/ruecklaeufer'
     | '/app/mitglieder/$mitgliedsnummer'
     | '/app/mitglieder/neu'
@@ -820,6 +831,7 @@ export interface FileRouteTypes {
     | '/app/einstellungen/ki-zugriff'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
+    | '/app/einstellungen/verschluesselung'
     | '/app/forderungen/ruecklaeufer'
     | '/app/mitglieder/$mitgliedsnummer'
     | '/app/mitglieder/neu'
@@ -895,6 +907,7 @@ export interface FileRouteTypes {
     | '/app/einstellungen/ki-zugriff'
     | '/app/einstellungen/smtp'
     | '/app/einstellungen/verein'
+    | '/app/einstellungen/verschluesselung'
     | '/app/forderungen/ruecklaeufer'
     | '/app/mitglieder/$mitgliedsnummer'
     | '/app/mitglieder/neu'
@@ -1194,6 +1207,13 @@ declare module '@tanstack/react-router' {
       path: '/forderungen/ruecklaeufer'
       fullPath: '/app/forderungen/ruecklaeufer'
       preLoaderRoute: typeof AppForderungenRuecklaeuferRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/verschluesselung': {
+      id: '/app/einstellungen/verschluesselung'
+      path: '/einstellungen/verschluesselung'
+      fullPath: '/app/einstellungen/verschluesselung'
+      preLoaderRoute: typeof AppEinstellungenVerschluesselungRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/einstellungen/verein': {
@@ -1501,6 +1521,7 @@ interface AppRouteRouteChildren {
   AppEinstellungenKiZugriffRoute: typeof AppEinstellungenKiZugriffRoute
   AppEinstellungenSmtpRoute: typeof AppEinstellungenSmtpRoute
   AppEinstellungenVereinRoute: typeof AppEinstellungenVereinRoute
+  AppEinstellungenVerschluesselungRoute: typeof AppEinstellungenVerschluesselungRoute
   AppForderungenRuecklaeuferRoute: typeof AppForderungenRuecklaeuferRoute
   AppMitgliederMitgliedsnummerRoute: typeof AppMitgliederMitgliedsnummerRoute
   AppMitgliederNeuRoute: typeof AppMitgliederNeuRoute
@@ -1549,6 +1570,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppEinstellungenKiZugriffRoute: AppEinstellungenKiZugriffRoute,
   AppEinstellungenSmtpRoute: AppEinstellungenSmtpRoute,
   AppEinstellungenVereinRoute: AppEinstellungenVereinRoute,
+  AppEinstellungenVerschluesselungRoute: AppEinstellungenVerschluesselungRoute,
   AppForderungenRuecklaeuferRoute: AppForderungenRuecklaeuferRoute,
   AppMitgliederMitgliedsnummerRoute: AppMitgliederMitgliedsnummerRoute,
   AppMitgliederNeuRoute: AppMitgliederNeuRoute,
