@@ -47,6 +47,20 @@ export function sql(): postgres.Sql {
 }
 
 /**
+ * Verbindung zur Control-Plane-DB (`CONTROL_DATABASE_URL`), in der die
+ * `tenants`-Registry und die Operator-Accounts der Betreiber-Console leben.
+ * Fällt auf `DATABASE_URL` zurück, solange keine eigene Control-DB gesetzt ist
+ * -- dann ist es exakt der bisherige Stand (Registry in der Primär-DB).
+ */
+export function controlDbUrl(): string {
+  return env().CONTROL_DATABASE_URL || env().DATABASE_URL;
+}
+
+export function controlDb() {
+  return dbForTenant(controlDbUrl());
+}
+
+/**
  * Close every open Postgres pool. No-op when nothing was opened (e.g. SIGTERM
  * before the first request). Resets the cache so a later `db()` reconnects.
  * Called from the graceful-shutdown path so connections drain instead of being

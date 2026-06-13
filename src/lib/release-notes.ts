@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.87.2",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Grundlage für den Betreiber-Bereich: die Vereins-Registry kann jetzt aus einer eigenen Control-Datenbank gelesen werden, getrennt von den Vereinsdaten. Ohne gesetzte Control-Datenbank bleibt alles wie bisher.",
+      },
+    ],
+  },
+  {
     version: "0.87.1",
     date: "2026-06-13",
     changes: [
