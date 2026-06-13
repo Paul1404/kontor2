@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { primaryTenant, resolveTenantFromHost } from "~/server/tenants/resolve";
+import { consoleSubdomain, primaryTenant, resolveTenantFromHost } from "~/server/tenants/resolve";
 
 describe("resolveTenantFromHost", () => {
   const saved = { ...process.env };
   beforeEach(() => {
     process.env.DATABASE_URL = "postgres://primary/svu";
+    process.env.BETTER_AUTH_URL = "https://svuwv.sv-untereuerheim.de";
     delete process.env.PRIMARY_TENANT_KEY;
+    delete process.env.CONSOLE_SUBDOMAIN;
+    delete process.env.CONTROL_DATABASE_URL;
     delete process.env.TENANTS_JSON;
     delete process.env.PRODUCT_DOMAIN;
   });
@@ -13,19 +16,27 @@ describe("resolveTenantFromHost", () => {
     process.env = { ...saved };
   });
 
-  it("faellt fuer Apex, www, alte Domain und null auf den primaeren Mandanten zurueck", () => {
-    expect(resolveTenantFromHost("kontor2.com").key).toBe("svu");
-    expect(resolveTenantFromHost("www.kontor2.com").key).toBe("svu");
+  it("Default-Verein-Subdomain und Auth-/Alt-Domain lösen auf den Default-Verein", () => {
+    expect(resolveTenantFromHost("svu.kontor2.com").key).toBe("svu");
     expect(resolveTenantFromHost("svuwv.sv-untereuerheim.de").key).toBe("svu");
+    // Kein Host (intern/Health): konservativ Default-Verein.
     expect(resolveTenantFromHost(null).key).toBe("svu");
     expect(resolveTenantFromHost(undefined).key).toBe("svu");
   });
 
-  it("die Primaer-Subdomain loest auf den Primaer-Mandanten auf", () => {
-    expect(resolveTenantFromHost("svu.kontor2.com").key).toBe("svu");
+  it("apex, www und unbekannte Subdomain -> Betreiber-Realm (NICHT der Default-Verein)", () => {
+    expect(resolveTenantFromHost("kontor2.com").key).toBe(consoleSubdomain());
+    expect(resolveTenantFromHost("www.kontor2.com").key).toBe(consoleSubdomain());
+    expect(resolveTenantFromHost("nope.kontor2.com").key).toBe(consoleSubdomain());
+    // fremder Host
+    expect(resolveTenantFromHost("example.com").key).toBe(consoleSubdomain());
   });
 
-  it("loest eine bekannte Subdomain auf ihren Mandanten auf (port- und case-tolerant)", () => {
+  it("die Console-Subdomain löst auf den Operator-Realm auf", () => {
+    expect(resolveTenantFromHost("admin.kontor2.com").key).toBe("admin");
+  });
+
+  it("löst eine bekannte Subdomain auf ihren Mandanten auf (port- und case-tolerant)", () => {
     process.env.TENANTS_JSON = JSON.stringify([
       { key: "verein_b", databaseUrl: "postgres://primary/verein_b" },
     ]);
@@ -35,30 +46,26 @@ describe("resolveTenantFromHost", () => {
     expect(resolveTenantFromHost("Verein_b.kontor2.com:443").key).toBe("verein_b");
   });
 
-  it("unbekannte Subdomain faellt auf den Primaer-Mandanten zurueck", () => {
-    expect(resolveTenantFromHost("nope.kontor2.com").key).toBe("svu");
-  });
-
   it("respektiert eine abweichende PRODUCT_DOMAIN zur Aufrufzeit", () => {
     process.env.PRODUCT_DOMAIN = "example.org";
     process.env.TENANTS_JSON = JSON.stringify([
       { key: "verein_b", databaseUrl: "postgres://primary/verein_b" },
     ]);
     expect(resolveTenantFromHost("verein_b.example.org").key).toBe("verein_b");
-    // unter der alten Produkt-Domain nicht gematcht -> Primaer
-    expect(resolveTenantFromHost("verein_b.kontor2.com").key).toBe("svu");
+    // unter der alten Produkt-Domain nicht gematcht -> Betreiber-Realm
+    expect(resolveTenantFromHost("verein_b.kontor2.com").key).toBe(consoleSubdomain());
   });
 
   it("primaryTenant ist der DATABASE_URL-Mandant", () => {
     expect(primaryTenant().key).toBe("svu");
   });
 
-  it("kaputtes TENANTS_JSON wirft nicht und faellt auf den Primaer zurueck", () => {
+  it("kaputtes TENANTS_JSON wirft nicht; Default-Verein bleibt, Unbekanntes -> Operator", () => {
     process.env.TENANTS_JSON = "{ kein json";
-    // primaryTenant und die Primaer-Subdomain umgehen das Parsing komplett
     expect(primaryTenant().key).toBe("svu");
+    // Default-Verein-Subdomain: Cold-Start-Anker, unabhängig vom JSON.
     expect(resolveTenantFromHost("svu.kontor2.com").key).toBe("svu");
-    // eine fremde Subdomain wuerde parsen muessen -> faengt den Fehler ab
-    expect(resolveTenantFromHost("verein2.kontor2.com").key).toBe("svu");
+    // fremde Subdomain müsste parsen -> Fehler geschluckt -> Betreiber-Realm.
+    expect(resolveTenantFromHost("verein2.kontor2.com").key).toBe(consoleSubdomain());
   });
 });
