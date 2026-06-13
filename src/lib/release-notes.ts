@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.83.2",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Benutzerverwaltung (anlegen, sperren, entsperren, löschen, Passwort setzen), der Letzter-Admin-Schutz, API-Schlüssel und der MCP-Zugriff wirken jetzt pro Verein auf dessen eigene Daten. Für den bestehenden Verein ändert sich nichts.",
+      },
+    ],
+  },
+  {
     version: "0.83.1",
     date: "2026-06-13",
     changes: [

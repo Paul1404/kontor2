@@ -8,11 +8,13 @@ import { createFileRoute } from "@tanstack/react-router";
 const handle = async ({ request }: { request: Request }) => {
   const [
     { auth },
+    { dbForTenant },
     { resolveTenantFromHost },
     { guardAdminPluginRequest },
     { ensureSessionConfigLoaded },
   ] = await Promise.all([
     import("~/server/auth/auth"),
+    import("~/server/db/client"),
     import("~/server/tenants/resolve"),
     import("~/server/auth/last-admin-guard"),
     import("~/server/auth/session-config"),
@@ -25,7 +27,8 @@ const handle = async ({ request }: { request: Request }) => {
   // endpoints (set-user-banned / remove-user / set-role) before they reach
   // the plugin's handler. This is the catch-all for the catch-22 where an
   // admin could ban or remove themselves and leave the instance unreachable.
-  const guard = await guardAdminPluginRequest(request);
+  // Checks this Verein's admins (per-tenant db).
+  const guard = await guardAdminPluginRequest(dbForTenant(tenant.databaseUrl), request);
   if (guard) return guard;
   return auth(tenant).handler(request);
 };

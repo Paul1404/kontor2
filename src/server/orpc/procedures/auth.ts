@@ -187,7 +187,7 @@ export const authRouter = {
       if (!target) {
         throw new ORPCError("NOT_FOUND", { message: "Benutzer nicht gefunden." });
       }
-      if (await wouldRemoveLastAdmin(input.userId, "delete")) {
+      if (await wouldRemoveLastAdmin(context.db, input.userId, "delete")) {
         throw new ORPCError("CONFLICT", {
           message:
             "Letzten Administrator kann nicht löschen. Bitte zuerst einen anderen Benutzer zum Administrator machen.",
@@ -195,7 +195,7 @@ export const authRouter = {
       }
 
       try {
-        await auth().api.removeUser({
+        await auth(context.tenant).api.removeUser({
           body: { userId: input.userId },
           headers: context.headers,
         });
@@ -252,7 +252,7 @@ export const authRouter = {
       if (!target) {
         throw new ORPCError("NOT_FOUND", { message: "Benutzer nicht gefunden." });
       }
-      if (await wouldRemoveLastAdmin(input.userId, "ban")) {
+      if (await wouldRemoveLastAdmin(context.db, input.userId, "ban")) {
         throw new ORPCError("CONFLICT", {
           message:
             "Letzten aktiven Administrator kann nicht sperren. Bitte zuerst einen anderen Benutzer zum Administrator machen.",
@@ -261,7 +261,7 @@ export const authRouter = {
 
       const reason = input.reason?.trim();
       try {
-        await auth().api.banUser({
+        await auth(context.tenant).api.banUser({
           body: { userId: input.userId, ...(reason ? { banReason: reason } : {}) },
           headers: context.headers,
         });
@@ -305,7 +305,7 @@ export const authRouter = {
       }
 
       try {
-        await auth().api.unbanUser({
+        await auth(context.tenant).api.unbanUser({
           body: { userId: input.userId },
           headers: context.headers,
         });
@@ -351,7 +351,7 @@ export const authRouter = {
       }
 
       try {
-        await auth().api.revokeUserSessions({
+        await auth(context.tenant).api.revokeUserSessions({
           body: { userId: input.userId },
           headers: context.headers,
         });
@@ -401,11 +401,11 @@ export const authRouter = {
       // the 12-char minimum and high entropy.
       const tempPassword = randomBytes(18).toString("base64url");
       try {
-        await auth().api.setUserPassword({
+        await auth(context.tenant).api.setUserPassword({
           body: { userId: input.userId, newPassword: tempPassword },
           headers: context.headers,
         });
-        await auth().api.revokeUserSessions({
+        await auth(context.tenant).api.revokeUserSessions({
           body: { userId: input.userId },
           headers: context.headers,
         });
@@ -620,7 +620,7 @@ export const authRouter = {
         // (`readonly` / `vorstand` / `admin`) in the follow-up update below.
         let userId: string;
         try {
-          const created = await auth().api.createUser({
+          const created = await auth(context.tenant).api.createUser({
             body: {
               email: inv.email,
               password: input.password,
