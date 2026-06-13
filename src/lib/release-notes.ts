@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.83.1",
+    date: "2026-06-13",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Zwei Korrekturen für Vereine auf eigener Subdomain: beim vollständigen Seitenaufruf wird jetzt der richtige Verein erkannt (vorher konnte das Branding eines anderen Vereins erscheinen), und die Vereinsdaten-Seite lädt auch dann, wenn noch keine Stammdaten hinterlegt sind (vorher Dauerladekreis) -- das Formular startet mit Vorgaben und legt beim ersten Speichern den Datensatz an.",
+      },
+    ],
+  },
+  {
     version: "0.83.0",
     date: "2026-06-13",
     changes: [

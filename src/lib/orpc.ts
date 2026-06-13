@@ -20,11 +20,26 @@ const forwardedHeaders = createIsomorphicFn()
     return cookie ? { cookie } : {};
   });
 
-const link = new RPCLink({
-  url() {
-    if (typeof window !== "undefined") return `${window.location.origin}/api/rpc`;
+// The loopback URL for the SSR oRPC call. In the browser it's the current
+// origin. On the server it MUST be the host the visitor is on (not the primary
+// BETTER_AUTH_URL): otherwise a full page load on `verein2.kontor2.com` would
+// loop back to the primary Verein, resolve the wrong tenant (wrong branding,
+// and the visitor's per-host session cookie wouldn't be recognised), and the
+// /app auth gate would bounce to /login.
+const rpcUrl = createIsomorphicFn()
+  .client(() => `${window.location.origin}/api/rpc`)
+  .server(() => {
+    const h = getRequestHeaders();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    if (host) {
+      const proto = h.get("x-forwarded-proto") ?? "https";
+      return `${proto}://${host}/api/rpc`;
+    }
     return `${process.env.BETTER_AUTH_URL ?? "http://localhost:3000"}/api/rpc`;
-  },
+  });
+
+const link = new RPCLink({
+  url: () => rpcUrl(),
   headers: () => forwardedHeaders(),
   fetch: (url, init) => fetch(url, { ...init, credentials: "include" }),
 });
