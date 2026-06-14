@@ -8,6 +8,7 @@ import { KeyboardCheatsheet } from "~/components/ui/keyboard-cheatsheet";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { signOut } from "~/lib/auth-client";
 import { useBranding } from "~/lib/branding";
+import { roleLabel } from "~/lib/role";
 import { useGlobalShortcuts } from "~/lib/use-global-shortcuts";
 
 export function AppShell({
@@ -35,7 +36,7 @@ export function AppShell({
       <Sidebar role={role} />
       <MobileSidebar role={role} open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
       <main className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-2 border-b border-border glass px-3 sm:px-4 md:px-6 print:hidden">
+        <header className="sticky top-0 z-10 flex h-[4.5rem] items-center justify-between gap-2 border-b border-border glass px-3 sm:px-4 md:px-6 print:hidden">
           <div className="flex items-center gap-2 md:hidden">
             <button
               type="button"
@@ -92,8 +93,8 @@ export function AppShell({
             <div className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1 shadow-soft sm:flex">
               <span className="size-2 rounded-full bg-success" aria-hidden />
               <span className="text-xs text-muted-foreground">{userEmail}</span>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground">
-                {role}
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-foreground">
+                {roleLabel(role)}
               </span>
             </div>
             <Button

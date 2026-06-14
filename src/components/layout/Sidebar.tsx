@@ -33,6 +33,7 @@ import { VersionChip } from "~/components/ui/version-chip";
 import { useBranding } from "~/lib/branding";
 import { cn } from "~/lib/cn";
 import { orpc } from "~/lib/orpc";
+import { roleLabel } from "~/lib/role";
 import { useRecentMembers } from "~/lib/use-recent-members";
 
 type NavItem = {
@@ -362,7 +363,7 @@ function SidebarBody({
         <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent/50 px-3 py-2 text-[11px] text-sidebar-muted">
           <ShieldCheck className="size-3.5 text-brand" />
           <span>
-            Rolle: <span className="font-medium text-sidebar-foreground">{role}</span>
+            Rolle: <span className="font-medium text-sidebar-foreground">{roleLabel(role)}</span>
           </span>
         </div>
         <VersionChip />
