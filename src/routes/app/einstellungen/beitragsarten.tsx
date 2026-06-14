@@ -23,6 +23,8 @@ type Form = {
   kontoname: string;
   valuta: string;
   nichAktiv: boolean;
+  minAge: string;
+  maxAge: string;
 };
 
 const EMPTY_FORM: Form = {
@@ -33,7 +35,17 @@ const EMPTY_FORM: Form = {
   kontoname: "",
   valuta: "",
   nichAktiv: false,
+  minAge: "",
+  maxAge: "",
 };
+
+/** Parse an age input field to an integer 0-120, or null when empty/invalid. */
+function parseAge(value: string): number | null {
+  const t = value.trim();
+  if (!t) return null;
+  const n = Number.parseInt(t, 10);
+  return Number.isInteger(n) && n >= 0 && n <= 120 ? n : null;
+}
 
 function BeitragsartenSettingsPage() {
   const qc = useQueryClient();
@@ -57,6 +69,8 @@ function BeitragsartenSettingsPage() {
       kontoname: form.kontoname.trim() || null,
       valuta: form.valuta.trim() || null,
       nichAktiv: form.nichAktiv ? "J" : null,
+      minAge: parseAge(form.minAge),
+      maxAge: parseAge(form.maxAge),
     };
   }
 
@@ -102,6 +116,8 @@ function BeitragsartenSettingsPage() {
       kontoname: row.kontoname ?? "",
       valuta: row.valuta ?? "",
       nichAktiv: row.nichAktiv === "J",
+      minAge: row.minAge != null ? String(row.minAge) : "",
+      maxAge: row.maxAge != null ? String(row.maxAge) : "",
     });
     setError(null);
   }
@@ -199,6 +215,26 @@ function BeitragsartenSettingsPage() {
                   onChange={(e) => setForm({ ...form, valuta: e.target.value })}
                 />
               </FormField>
+              <FormField label="Alter von (Jahre)">
+                <Input
+                  inputMode="numeric"
+                  value={form.minAge}
+                  onChange={(e) => setForm({ ...form, minAge: e.target.value })}
+                  placeholder="z. B. 18"
+                />
+              </FormField>
+              <FormField label="Alter bis (Jahre)">
+                <Input
+                  inputMode="numeric"
+                  value={form.maxAge}
+                  onChange={(e) => setForm({ ...form, maxAge: e.target.value })}
+                  placeholder="z. B. 17"
+                />
+              </FormField>
+              <p className="-mt-1 text-xs text-muted-foreground">
+                Optional. Gesetzt, prüft die Datenqualität, ob das Alter der Mitglieder zur
+                Beitragsart passt. Leer lassen, wenn die Beitragsart nicht altersabhängig ist.
+              </p>
               <label className="mt-1 flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"

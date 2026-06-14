@@ -12,6 +12,10 @@ import { CACHE_NS, cached, invalidateFeeTypeCaches } from "~/server/search/cache
 const TextOrNull = v.optional(v.nullable(v.string()));
 const DecimalOrNull = v.optional(v.nullable(v.string()));
 
+const AgeOrNull = v.optional(
+  v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(120))),
+);
+
 const FeeTypePatch = v.object({
   bezeichnung: TextOrNull,
   abteilung: TextOrNull,
@@ -20,6 +24,8 @@ const FeeTypePatch = v.object({
   kontoname: TextOrNull,
   valuta: TextOrNull,
   nichAktiv: TextOrNull,
+  minAge: AgeOrNull,
+  maxAge: AgeOrNull,
 });
 
 function normalizeDecimal(value: string | null | undefined): string | null {
@@ -44,6 +50,8 @@ function buildPatch(input: v.InferOutput<typeof FeeTypePatch>): Record<string, u
   if ("valuta" in input) patch.valuta = input.valuta ?? null;
   if ("nichAktiv" in input) patch.nichAktiv = input.nichAktiv ?? null;
   if ("betrag1" in input) patch.betrag1 = normalizeDecimal(input.betrag1);
+  if ("minAge" in input) patch.minAge = input.minAge ?? null;
+  if ("maxAge" in input) patch.maxAge = input.maxAge ?? null;
   return patch;
 }
 
@@ -65,6 +73,8 @@ export const feeTypesRouter = {
           kontoname: feeTypesTable.kontoname,
           valuta: feeTypesTable.valuta,
           nichAktiv: feeTypesTable.nichAktiv,
+          minAge: feeTypesTable.minAge,
+          maxAge: feeTypesTable.maxAge,
           contractCount: sql<number>`(select count(*)::int from contracts c where c.art = fee_types.art)`,
         })
         .from(feeTypesTable)
