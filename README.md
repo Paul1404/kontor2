@@ -1,10 +1,10 @@
 # Kontor2
 
-Self-hosted Vereinsverwaltung for SV 1945 Untereuerheim e.V. It replaces
-Linear's commercial "Online Vereinsverwaltung" -- a per-seat cloud subscription
-advertised at 292,80 € a year -- with a single web app the club runs and owns
-outright. The entire Linear database was migrated losslessly, not re-keyed by
-hand.
+Self-hosted, multi-tenant Vereinsverwaltung. It began as a replacement for one
+club's commercial Linear "Online Vereinsverwaltung", a per-seat cloud
+subscription advertised at 292,80 € a year, and grew into a single web app that
+many clubs can run and own outright. The original Linear database was migrated
+losslessly, not re-keyed by hand.
 
 One app runs the whole back office: members, contributions, SEPA direct debit,
 dunning, a member self-service portal, DSGVO tooling, reports and an audit
@@ -12,59 +12,67 @@ trail. Internal admin tool, German UI, React 19 on Bun.
 
 ## Why this exists
 
-The club used Linear's hosted Vereinsverwaltung. The data sat in a vendor cloud,
+Clubs used Linear's hosted Vereinsverwaltung. The data sat in a vendor cloud,
 every extra Vorstand seat cost money, and the underlying schema was the kind you
-can admire in the hidden `/app/museum` route (247 columns for one address, a
+can admire in the hidden `/app/museum` route: 247 columns for one address, a
 credit-card number in cleartext, the same consent field spelled two different
-ways). So the whole thing was rebuilt as software the club controls:
+ways. So the whole thing was rebuilt as software the club controls.
 
-- **Own your data.** It lives in your own Postgres, encrypted at rest (IBANs and
-  SMTP passwords are AES-256-GCM), not on someone else's "deutsches
+- **Own your data.** It lives in your own Postgres, encrypted at rest. IBANs and
+  SMTP passwords are AES-256-GCM, not on someone else's "deutsches
   Rechenzentrum".
 - **No per-seat pricing.** Unlimited accounts, three roles, invite-only signup.
 - **One container, one secret.** Deploys to Railway (or any Docker host) from a
-  single `APP_SECRET`; every other key is derived from it.
+  single `APP_SECRET`. Every other key is derived from it.
+- **Multi-tenant by design.** Each Verein gets its own database, encryption
+  keyring and branding, resolved by request host. An operator console
+  provisions new clubs without touching another club's data.
 - **Migrated once, completely.** Members, contracts, SEPA mandates and the
   historical Sollstellungen and Lastschrift runs all came across, so there is
   nothing to keep the old subscription alive for.
 
 ## At a glance
 
-Eight feature sets, one app:
+Eight feature sets, one app.
 
-- **Member management** -- a lossless mirror of the legacy database with full
+- **Member management.** A lossless mirror of the legacy database with full
   CRUD, attachments, relationships and vCard export.
-- **Beitragsläufe** -- SEPA direct-debit billing that emits real
+- **Beitragsläufe.** SEPA direct-debit billing that emits real
   pain.008.001.02 XML.
-- **Forderungen & Mahnwesen** -- open-item tracking, SEPA return handling and a
+- **Forderungen und Mahnwesen.** Open-item tracking, SEPA return handling and a
   three-stage dunning workflow with PDF letters.
-- **Mitgliederportal** -- magic-link self-service with a Vorstand review queue
+- **Mitgliederportal.** Magic-link self-service with a Vorstand review queue
   for member-proposed changes.
-- **DSGVO** -- Art. 15 Auskunft, Art. 17 Löschung with legal retention policy,
+- **DSGVO.** Art. 15 Auskunft, Art. 17 Löschung with legal retention policy,
   and an append-only consent log, all reproducible and audited.
-- **Berichte** -- birthday, honours, statistics, finance and the DOSB-style
+- **Berichte.** Birthday, honours, statistics, finance and the DOSB-style
   Bestandserhebung, every one of them CSV- and print-ready.
-- **Import & ingest** -- one pipeline for both a 50 MB Linear `mysqldump` and a
+- **Import und ingest.** One pipeline for both a 50 MB Linear `mysqldump` and a
   live HMAC-signed JSON push.
-- **Snapshots & audit** -- nightly versioning with field-level restore and a
+- **Snapshots und audit.** Nightly versioning with field-level restore and a
   searchable record of every change.
 
 ## Technical feats
 
-The parts that took real engineering, not just CRUD:
+The parts that took real engineering, not just CRUD.
 
 - **Lossless legacy mirror.** All 247 columns of Linear's `adresse` table map
   onto `members` without truncation. `bit(1)` flags become real booleans,
   single-letter status codes stay text because that is what they are, and
-  historical tables (`mgsolln`, `mgartdat`, `lastprot`, `sportarten`, ...) are
-  carried over rather than thrown away.
+  historical tables (`mgsolln`, `mgartdat`, `lastprot`, `sportarten` and more)
+  are carried over rather than thrown away.
 - **One secret, derived keyring.** You set a single `APP_SECRET` (32-byte hex).
-  Everything else -- the better-auth signing key, the data-at-rest encryption
-  key, the SVUMS push HMAC -- is derived from it with HKDF-SHA256. IBANs and
-  SMTP passwords are AES-256-GCM encrypted at rest through a transparent
+  Everything else is derived from it with HKDF-SHA256: the better-auth signing
+  key, the data-at-rest encryption key, the legacy push HMAC. IBANs and SMTP
+  passwords are AES-256-GCM encrypted at rest through a transparent
   `encryptedText` Drizzle column type. A keyring keeps rotated-out keys
   readable, so an `APP_SECRET` rotation plus a re-encrypt pass never strands
   existing ciphertext.
+- **Per-tenant isolation.** A host-based resolver maps each request to a tenant,
+  and each tenant has its own database pool, better-auth instance and encryption
+  keyring. New clubs are provisioned (database, migrations, registry row, key)
+  from a separate operator console with its own accounts and control database,
+  so one club can never read another's data.
 - **Standards-correct SEPA.** The pain.008.001.02 writer splits FRST and RCUR
   into separate `<PmtInf>` blocks per Bundesbank rules, finalising a run flips
   its mandates FRST to RCUR for the next cycle, and money is summed in integer
@@ -73,17 +81,18 @@ The parts that took real engineering, not just CRUD:
   SHA-256 over a canonical serialization, recorded in `dsgvo_requests` so an
   export can be reproduced and verified later. The Bestandserhebung is archived
   with the same kind of fingerprint so a reprint never silently diverges.
-  Generated letters (Mahnung, Austrittsbestätigung, Kulanz) follow the DIN 5008
-  business-letter standard and carry sequential document numbers.
+  Generated documents carry a reference number: random and opaque for most
+  document types (so it leaks no order or count), and a sequential
+  Rechnungsnummer for invoices as German law requires.
 - **One ingest path, two front doors.** A 50 MB SQL upload and a live JSON push
   share the same mapper and write pipeline. Re-imports are idempotent: a unique
   index on Linear's GUID dedupes runs, and historical Sollstellungen are folded
   by summing per Vertrag and Jahr so the existing constraint holds.
 - **Defence in depth on auth.** Every protected oRPC procedure checks its role
-  server-side through a hierarchical gate (`admin` ⊃ `vorstand` ⊃ `readonly`);
-  route guards are never trusted alone. A last-admin guard intercepts the
-  better-auth admin endpoints so no operator can lock everyone out of the
-  building from the inside.
+  server-side through a hierarchical gate (`admin` enthält `vorstand` enthält
+  `readonly`). Route guards are never trusted alone. A last-admin guard
+  intercepts the better-auth admin endpoints so no operator can lock everyone
+  out of the building from the inside.
 - **Safe nightly snapshots.** Versioning runs in-process, skips unchanged rows
   and takes a Postgres advisory lock so multiple replicas never collide. It can
   be moved to an external scheduler with one env var.
@@ -92,10 +101,10 @@ The parts that took real engineering, not just CRUD:
 
 ### Members
 
-- Lossless mirror of the Linear `adresse` schema (247 columns), IBANs
-  AES-256-GCM encrypted at rest, clients only ever see the last four digits.
+- Lossless mirror of the Linear `adresse` schema (247 columns). IBANs are
+  AES-256-GCM encrypted at rest, and clients only ever see the last four digits.
 - Full CRUD with edit, create, soft-delete and undelete.
-- Many-to-many Abteilungen with per-Abteilung Eintritts- and Austrittsdaten.
+- Many-to-many Abteilungen with per-Abteilung Eintritts- und Austrittsdaten.
 - Verknüpfungen (Familienbeziehungen) imported from Linear and editable.
 - Kontakt entries (Zahlende ohne eigene Mitgliedschaft) are first-class. They
   fall back to `AdrNr` when there is no Mitgliedsnummer and get a "Kontakt"
@@ -104,7 +113,7 @@ The parts that took real engineering, not just CRUD:
 - vCard 3.0 export per member. Works with iOS and macOS Contacts.
 - Clickable phone, email and address (`tel:`, `mailto:`, maps link).
 - DSGVO panel on the member detail page links straight to Auskunft, Löschung
-  and Einwilligungs-Log for that person.
+  und Einwilligungs-Log for that person.
 
 ### Beitragsläufe
 
@@ -122,7 +131,7 @@ The parts that took real engineering, not just CRUD:
 - Forderungen-Dashboard. Open Sollstellungen grouped per member, filterable by
   Mahnstufe, batch "mark as paid" for cash and Überweisung.
 - SEPA-Rückläufer erfassen. Pick a committed `fee_run_item`, attach an
-  R-Transaction reason code (AC04, AM04, MS03, ...) and optional
+  R-Transaction reason code (AC04, AM04, MS03 and more) and optional
   Rücklastschriftgebühr. Reopens the matching Sollstellung as `returned`.
 - Mahnläufe in three escalation levels (Erinnerung, 1. Mahnung, 2. Mahnung).
   Configurable Mahngebühren per Stufe, one PDF per member, `mahnstufe` bumped on
@@ -169,27 +178,27 @@ The parts that took real engineering, not just CRUD:
 - Ehrungen (10/25/40/50/60/70 Jahre) with year selector.
 - Abteilungs-Statistik. Mitglieder je Abteilung, Altersverteilung, Geschlecht.
 - Finanzbericht. Sollstellungen aggregated by Beitragsart.
-- Bestandserhebung zum Stichtag. Pro Abteilung × Geschlecht × LSB-Altersgruppe.
-  Mehrfachmitgliedschaften zählen mehrfach wie vom DOSB vorgegeben. CSV-Export
-  plus Unterschriften-PDF. Each run is archived with a SHA-256 fingerprint so
-  reprints do not diverge.
+- Bestandserhebung zum Stichtag. Pro Abteilung mal Geschlecht mal
+  LSB-Altersgruppe. Mehrfachmitgliedschaften zählen mehrfach wie vom DOSB
+  vorgegeben. CSV-Export plus Unterschriften-PDF. Each run is archived with a
+  SHA-256 fingerprint so reprints do not diverge.
 - Every report exports to CSV and has a print-friendly view.
 
 ### Import and ingest
 
 - Linear Webverein `mysqldump` upload up to 50 MB. Parsed in process, multi-row
   inserts split, MySQL escapes decoded, written in batches with live progress.
-- SVUMS push compatibility. `POST /api/ingest/svums` accepts the same record
+- Legacy push compatibility. `POST /api/ingest/svums` accepts the same record
   shape so the mapper is shared between SQL upload and JSON push.
 - Both paths write through the same ingest pipeline. Diffs land in the audit log
   and trigger a pre-import snapshot.
-- Historical tables are carried over, not discarded:
+- Historical tables are carried over, not discarded.
   - `mgsolln` becomes Sollstellungen (`source='linear_import'`), aggregated by
-    summing `Betrag/Bezahlt/Offen` per Vertrag + Jahr. Linear's GUID is kept on
-    `linear_guid` and used to join `lastprots.SollGUID`.
+    summing `Betrag/Bezahlt/Offen` per Vertrag und Jahr. Linear's GUID is kept
+    on `linear_guid` and used to join `lastprots.SollGUID`.
   - `mgartdat` populates `fee_type_price_history` so reports resolve the
     effective Beitragsart-Preis per Monat.
-  - `sportarten` and `fachverbaende` load into `linear_sport_types` and
+  - `sportarten` und `fachverbaende` load into `linear_sport_types` und
     `linear_federations` for Abteilungs-Picklists.
   - `lastprot` / `lastproth` become `legacy_sepa_runs` with the raw pain.008 XML
     preserved verbatim; `lastprots` / `lastprotsh` map to `legacy_sepa_run_items`.
@@ -204,13 +213,14 @@ The parts that took real engineering, not just CRUD:
 - Granular restore. Pick a member, pick a snapshot, see the field-level diff,
   restore the whole row or individual fields. A Postgres advisory lock keeps
   replicas from colliding.
-- Audit log. Every change records actor, source (UI, import, SVUMS, system),
-  before/after JSON and a human-readable summary. Full-text search over actor,
-  member number, summary and field name; filter by source, date and member.
+- Audit log. Every change records actor, source (UI, import, legacy push,
+  system), before/after JSON and a human-readable summary. Full-text search over
+  actor, member number, summary and field name; filter by source, date and
+  member.
 
 ### Auth and access
 
-- better-auth with `tanstackStartCookies`. Email + password.
+- better-auth with `tanstackStartCookies`. Email plus password.
 - Invite-only signup with single-use tokens. A partially-failed acceptance can
   be retried instead of permanently blocking the address.
 - Three roles: Admin, Vorstand, Readonly. Every protected oRPC procedure checks
@@ -267,7 +277,7 @@ The parts that took real engineering, not just CRUD:
   type-to-confirm dialog.
 - Version chip in the sidebar and on login/setup. One click opens a "Was ist
   neu" dialog from the curated release log, with an unread dot per new version.
-- Light and dark theme. Full favicon set built from the SV Untereuerheim crest.
+- Light and dark theme. Full favicon set built from the configured club logo.
 
 ## Stack
 
@@ -288,43 +298,46 @@ front of it.
 
 1. A request hits the Bun server. Static files are served directly; everything
    else falls through to the SSR handler.
-2. File-based routes in `src/routes` resolve. `__root.tsx` is the document
+2. The request host resolves to a tenant, which carries that tenant's database,
+   auth instance and encryption keyring for the rest of the request.
+3. File-based routes in `src/routes` resolve. `__root.tsx` is the document
    shell, `app/route.tsx` is the authed app, `portal/route.tsx` is the member
-   self-service shell, and `api/*.ts` are server routes.
-3. Data and mutations go through oRPC, mounted at `/api/rpc/$`. The browser
+   self-service shell, `console/route.tsx` is the operator console, and
+   `api/*.ts` are server routes.
+4. Data and mutations go through oRPC, mounted at `/api/rpc/$`. The browser
    talks to it through an isomorphic `@orpc/tanstack-query` client so the same
    calls work during SSR and after hydration.
-4. Every procedure runs through one middleware chain: `observability` (times the
+5. Every procedure runs through one middleware chain: `observability` (times the
    call, logs the outcome once with a request id) then a role gate. That gives
    four entrypoints in `src/server/orpc/base.ts`: `publicProc`, `authedProc`,
-   `vorstandProc`, `adminProc`. Roles are hierarchical (`admin` ⊃ `vorstand` ⊃
-   `readonly`) and checked server-side on every call.
-5. `createContext` builds the per-request context (Drizzle handle, better-auth
+   `vorstandProc`, `adminProc`. Roles are hierarchical (`admin` enthält
+   `vorstand` enthält `readonly`) and checked server-side on every call.
+6. `createContext` builds the per-request context (Drizzle handle, better-auth
    session, headers, request id), ensures the bootstrap admin exists, and lazily
    starts the snapshot scheduler.
 
 ### Layers
 
-- **Routes** (`src/routes`) -- thin. They load data via oRPC and render
+- **Routes** (`src/routes`). Thin. They load data via oRPC and render
   components. The route tree (`routeTree.gen.ts`) is generated.
-- **API** (`src/server/orpc`) -- `router.ts` composes one domain router per file
+- **API** (`src/server/orpc`). `router.ts` composes one domain router per file
   in `procedures/` into `appRouter`. Input and output are validated with
   Valibot. Errors are thrown as `ORPCError` with uppercase codes.
-- **Domain logic** (`src/server/*`) -- the heavy lifting lives outside the
-  procedures so it stays testable:
-  - `importer/` -- Linear `mysqldump` ingest. `sql-tokenizer.ts` splits the
+- **Domain logic** (`src/server/*`). The heavy lifting lives outside the
+  procedures so it stays testable.
+  - `importer/`. Linear `mysqldump` ingest. `sql-tokenizer.ts` splits the
     dump, `linear-mapper.ts` maps raw columns, `aggregate-mgsolln.ts` folds
     historical Sollstellungen, `ingest-pipeline.ts` is the shared write path.
-  - `sepa/` -- `build-fee-run.ts`, `select-mandate.ts`, `pain008.ts`, `iban.ts`,
+  - `sepa/`. `build-fee-run.ts`, `select-mandate.ts`, `pain008.ts`, `iban.ts`,
     `direct-debit.ts`.
   - `dunning/`, `dsgvo/` (`auskunft`, `erasure`, `policy`), `reports/`,
     `verbandsmeldung/` (Bestandserhebung), `snapshots/`, `audit/`.
-  - `pdf/` -- `@react-pdf/renderer` templates and a render wrapper.
-- **Data** (`src/server/db`) -- Drizzle over Postgres (`postgres.js`). Tables in
+  - `pdf/`. `@react-pdf/renderer` templates and a render wrapper.
+- **Data** (`src/server/db`). Drizzle over Postgres (`postgres.js`). Tables in
   `schema/`, columns snake_case mirroring Linear, table objects camelCase.
   Secret columns use the `encryptedText` type, which transparently AES-256-GCM
   encrypts on write and decrypts on read.
-- **Frontend libs** (`src/lib`) -- theme, global shortcuts, saved table views,
+- **Frontend libs** (`src/lib`). Theme, global shortcuts, saved table views,
   vCard, CSV export, formatting, and the release-notes source of truth.
   Components live in `src/components`, with shadcn-style primitives in
   `components/ui`.
@@ -333,18 +346,21 @@ front of it.
 
 A single `APP_SECRET` (32-byte hex) is the only secret you set. Everything else
 is derived from it with HKDF-SHA256 in `src/server/env.ts`: the better-auth
-signing key, the data-at-rest encryption key, and the SVUMS push HMAC key. The
-encryption keyring keeps rotated-out keys readable, so an `APP_SECRET` rotation
-plus a re-encrypt pass never strands existing ciphertext. Env is parsed and
-validated with Valibot at startup; a bad value fails fast with a readable
-message.
+signing key, the data-at-rest encryption key, and the legacy push HMAC key. Each
+tenant derives its own keyring label, so one club's ciphertext is unreadable
+with another's keys. The encryption keyring keeps rotated-out keys readable, so
+an `APP_SECRET` rotation plus a re-encrypt pass never strands existing
+ciphertext. Env is parsed and validated with Valibot at startup; a bad value
+fails fast with a readable message.
 
 ### External services
 
-- **Postgres** -- system of record, accessed only from server code.
-- **Redis** (`ioredis`) -- live member-search cache behind the command palette
-  and nonce dedupe for SVUMS push replay protection.
-- **S3** -- per-member file attachments, served through short-lived signed URLs.
+- **Postgres.** System of record, accessed only from server code. A control
+  database holds the tenant registry and operator accounts; each tenant has its
+  own database.
+- **Redis** (`ioredis`). Live member-search cache behind the command palette
+  and nonce dedupe for legacy push replay protection.
+- **S3.** Per-member file attachments, served through short-lived signed URLs.
 
 ### Scheduling
 
@@ -357,13 +373,13 @@ lock keeps multiple replicas from running it at once. Set
 
 ### Server routes
 
-- `/api/rpc/$` -- oRPC handler (all app data and mutations).
-- `/api/auth/$` -- better-auth handler.
-- `/api/health` -- Railway healthcheck.
-- `/api/files/$id` -- signed attachment download.
-- `/api/ingest/svums` -- HMAC-signed SVUMS push.
-- `/api/cron/snapshots` -- external snapshot trigger.
-- `/api/portal/zugang/$token`, `/api/portal/logout` -- magic-link portal session.
+- `/api/rpc/$`. oRPC handler (all app data and mutations).
+- `/api/auth/$`. better-auth handler.
+- `/api/health`. Railway healthcheck.
+- `/api/files/$id`. Signed attachment download.
+- `/api/ingest/svums`. HMAC-signed legacy push.
+- `/api/cron/snapshots`. External snapshot trigger.
+- `/api/portal/zugang/$token`, `/api/portal/logout`. Magic-link portal session.
 
 ## Run locally
 
@@ -411,12 +427,12 @@ Required Railway services:
 
 Manually set:
 - `APP_SECRET`. 32-byte hex. Every other secret (better-auth signing key,
-  data-at-rest key, SVUMS push HMAC) is derived from this via HKDF-SHA256.
+  data-at-rest key, legacy push HMAC) is derived from this via HKDF-SHA256.
   See `bun scripts/print-derived-secrets.ts`.
 - `APP_SECRET_PREV`. Optional. Previous APP_SECRET(s), comma-separated, kept in
   the keyring during a rotation so existing encrypted rows stay readable.
   Rotation: set this to the current secret, generate a new `APP_SECRET`, deploy,
-  run Einstellungen > Verschlüsselung > Re-encrypt, then unset.
+  run Einstellungen, Verschlüsselung, Re-encrypt, then unset.
 - `BETTER_AUTH_URL`. Public URL of the deployment.
 
 `railway.toml` runs `bun run db:migrate:prod` before each deploy and points the
@@ -425,15 +441,15 @@ migrator. `drizzle-kit` stays a dev dependency and does not ship in the runtime
 image.
 
 The nightly snapshot scheduler runs in-process by default. To move it to an
-external scheduler (Railway Cron, GitHub Actions, etc.), set
+external scheduler (Railway Cron, GitHub Actions and the like), set
 `SNAPSHOT_CRON_DISABLED=1` and hit `POST /api/cron/snapshots` with the same HMAC
-headers used for SVUMS push.
+headers used for the legacy push.
 
 ## Environment
 
 See [`.env.example`](.env.example).
 
-## SVUMS push contract
+## Legacy push contract
 
 `POST /api/ingest/svums` with JSON body. Headers:
 
