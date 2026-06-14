@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.6",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "DSGVO-Löschung überarbeitet: Mahnungen werden nicht mehr gelöscht, sondern als Beleg behalten (Aufbewahrungspflicht nach §147 AO), wobei das gerenderte PDF und der Empfänger entfernt werden. Hochgeladene Dokumente eines Mitglieds werden bei der Löschung jetzt auch aus dem Dateispeicher entfernt, und der Freitext im Einwilligungs-Log wird geleert.",
+      },
+    ],
+  },
+  {
     version: "0.94.5",
     date: "2026-06-14",
     changes: [
