@@ -293,16 +293,21 @@ async function loadAbteilungStats(
   const startOfYear = new Date(Date.UTC(input.year, 0, 1)).toISOString().slice(0, 10);
   const endOfYear = new Date(Date.UTC(input.year, 11, 31)).toISOString().slice(0, 10);
 
+  // Exclude soft-deleted members: join to members and gate every count on
+  // `deleted_at is null`, so a deleted member's Abteilung row no longer inflates
+  // the statistics.
+  const notDeleted = sql`${membersTable.deletedAt} is null`;
   const rows = await db
     .select({
       abteilungId: abteilungenTable.id,
       name: abteilungenTable.name,
-      aktivCount: sql<number>`count(${memberAbteilungenTable.memberId}) filter (where ${memberAbteilungenTable.austrittsdatum} is null)::int`,
-      joiners: sql<number>`count(${memberAbteilungenTable.memberId}) filter (where ${memberAbteilungenTable.eintrittsdatum} between ${startOfYear}::date and ${endOfYear}::date)::int`,
-      leavers: sql<number>`count(${memberAbteilungenTable.memberId}) filter (where ${memberAbteilungenTable.austrittsdatum} between ${startOfYear}::date and ${endOfYear}::date)::int`,
+      aktivCount: sql<number>`count(${memberAbteilungenTable.memberId}) filter (where ${memberAbteilungenTable.austrittsdatum} is null and ${notDeleted})::int`,
+      joiners: sql<number>`count(${memberAbteilungenTable.memberId}) filter (where ${memberAbteilungenTable.eintrittsdatum} between ${startOfYear}::date and ${endOfYear}::date and ${notDeleted})::int`,
+      leavers: sql<number>`count(${memberAbteilungenTable.memberId}) filter (where ${memberAbteilungenTable.austrittsdatum} between ${startOfYear}::date and ${endOfYear}::date and ${notDeleted})::int`,
     })
     .from(abteilungenTable)
     .leftJoin(memberAbteilungenTable, eq(memberAbteilungenTable.abteilungId, abteilungenTable.id))
+    .leftJoin(membersTable, eq(membersTable.id, memberAbteilungenTable.memberId))
     .groupBy(abteilungenTable.id, abteilungenTable.name)
     .orderBy(asc(abteilungenTable.name));
 

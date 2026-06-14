@@ -134,3 +134,16 @@ export async function invalidateFeeTypeCaches(tenantKey: string): Promise<void> 
     /* tolerate redis down */
   }
 }
+
+/**
+ * Invalidate the cached dashboard KPIs for one tenant. Call after billing,
+ * payment and dunning mutations: they change revenue, Zahlungsquote and the
+ * Mahnstufen-Funnel, which the dashboard insights cache otherwise serves stale.
+ */
+export async function invalidateDashboardCaches(tenantKey: string): Promise<void> {
+  try {
+    await clearPrefix(nsPrefix(tenantKey, CACHE_NS.dashboard));
+  } catch {
+    /* tolerate redis down */
+  }
+}
