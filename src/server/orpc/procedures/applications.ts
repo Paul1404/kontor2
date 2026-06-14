@@ -108,8 +108,10 @@ const SubmitInput = v.object({
   iban: v.pipe(v.string(), v.minLength(15)),
   bic: v.optional(v.nullable(v.string()), null),
   kreditinstitut: v.optional(v.nullable(v.string()), null),
-  /** Inline signature PNG as a data URI; absent for the paper-form path. */
-  unterschriftBase64: v.optional(v.nullable(v.string()), null),
+  /** Inline signature PNG as a data URI; absent for the paper-form path.
+   *  Bounded so a crafted submit cannot pin memory or stall the PDF render
+   *  (a real signature data URI is a few KB; 3 MB is a generous ceiling). */
+  unterschriftBase64: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(3_000_000))), null),
   datenschutzAccepted: v.boolean(),
   satzungAccepted: v.boolean(),
   isTest: v.optional(v.boolean(), false),
@@ -1051,15 +1053,29 @@ export const applicationsRouter = {
       if (body.byteLength > 10 * 1024 * 1024) {
         throw new ORPCError("VALIDATION_FAILED", { message: "Datei zu groß (max. 10 MB)." });
       }
-      const claim = await consumeUploadToken(context.db, input.token);
-      if (!claim) {
+      // Resolve the token WITHOUT consuming it, store the file in S3, and only
+      // then consume the token. Consuming first meant a transient S3 failure
+      // burned the single-use link forever with no file stored. peek->store->
+      // consume keeps the link reusable if the upload fails; the consume still
+      // closes the concurrent-claim race (consumed_at IS NULL guard).
+      const peek = await peekUploadToken(context.db, input.token);
+      if (!peek) {
         throw new ORPCError("NOT_FOUND", {
           message: "Der Upload-Link ist ungültig, abgelaufen oder bereits benutzt.",
         });
       }
       const ext = input.filename.split(".").pop()?.toLowerCase() ?? "bin";
-      const s3Key = `applications/${claim.applicationId}/signed-${Date.now()}.${ext}`;
+      const s3Key = `applications/${peek.applicationId}/signed-${Date.now()}.${ext}`;
       await putObject({ key: s3Key, body, contentType: input.mimeType });
+
+      const claim = await consumeUploadToken(context.db, input.token);
+      if (!claim) {
+        // Consumed by a concurrent request between peek and now. The stored
+        // object is a harmless orphan; the link was already used once.
+        throw new ORPCError("NOT_FOUND", {
+          message: "Der Upload-Link ist ungültig, abgelaufen oder bereits benutzt.",
+        });
+      }
       await context.db.insert(membershipApplicationFilesTable).values({
         applicationId: claim.applicationId,
         kind: "signed_scan",
@@ -1697,6 +1713,20 @@ export const applicationsRouter = {
 
       const result = await withUniqueRetry(() =>
         context.db.transaction(async (tx) => {
+          // Lock the application row and re-check inside the transaction. The
+          // status check above runs outside any lock, so two concurrent approve
+          // calls could both pass it and each create a full set of members. The
+          // FOR UPDATE lock serializes them; the second sees genehmigt/memberId
+          // and aborts (rolling back its just-created members).
+          const [locked] = await tx
+            .select({ status: t.status, memberId: t.memberId })
+            .from(t)
+            .where(eq(t.id, app.id))
+            .limit(1)
+            .for("update");
+          if (!locked || locked.status === "genehmigt" || locked.memberId) {
+            throw new ORPCError("CONFLICT", { message: "Antrag ist bereits genehmigt." });
+          }
           const primary = await onboardMember(tx, {
             patch: primaryPatch,
             isKontakt: false,
