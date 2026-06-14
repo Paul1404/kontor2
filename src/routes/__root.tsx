@@ -65,7 +65,7 @@ function RootDocument({
   children?: ReactNode;
 }): ReactNode {
   const title = `${branding?.anzeigename?.trim() || "Kontor2"} – Vereinsverwaltung`;
-  const themeColor = branding?.primaryColor || "#dc2626";
+  const themeColor = branding?.primaryColor || "#335c99";
   const brandCss = brandColorCss(branding?.primaryColor);
   const iconUrl = branding ? brandingIconUrl(branding) : null;
   return (

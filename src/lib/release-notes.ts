@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.90.0",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Kontor2 hat ein neues Erscheinungsbild: tiefes Navy mit warmem Messing-Akzent und ein neues Logo, passend zum Namen (Handelskontor). Vereine mit eigenem Logo und eigener Farbe bleiben unverändert.",
+      },
+    ],
+  },
+  {
     version: "0.89.0",
     date: "2026-06-14",
     changes: [

@@ -9,7 +9,7 @@ import { createFileRoute } from "@tanstack/react-router";
  */
 async function handle({ request }: { request: Request }): Promise<Response> {
   let name = "Kontor2";
-  let themeColor = "#dc2626";
+  let themeColor = "#335c99";
   // Default: the Kontor2 logo as a scalable SVG (covers all sizes). The
   // bundled PNG icons are the old SVU shield and would otherwise show as the
   // install icon for any Verein without its own logo.
