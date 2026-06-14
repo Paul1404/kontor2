@@ -21,6 +21,14 @@ export type OnboardContractValues = {
   /** Divergent account holder (abweichender Kontoinhaber), or null when the
    *  member's own name is the debtor. Printed as the SEPA debtor name. */
   abwKontoInh?: string | null;
+  /**
+   * Whether this contract is collected by SEPA direct debit. Drives the fee
+   * run: false routes the contract to the invoice (Rechnungszahler) branch and
+   * skips the direct-debit line. Set from whether a bank account exists for the
+   * payer, NOT from where the mandate sits (a minor's contract is direct debit
+   * even though the mandate is on the guardian). Defaults to false.
+   */
+  isDirectDebit?: boolean;
 };
 
 export type OnboardSepaValues = {
@@ -145,6 +153,7 @@ export async function onboardMember(
       sollstellung: opts.contract.sollstellung ?? null,
       vertragBegin: opts.contract.vertragBegin,
       abwKontoInh: opts.contract.abwKontoInh ?? null,
+      isDirectDebit: opts.contract.isDirectDebit ?? false,
     } as never);
   }
 

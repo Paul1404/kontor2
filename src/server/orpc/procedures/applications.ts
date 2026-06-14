@@ -1665,6 +1665,10 @@ export const applicationsRouter = {
               sollstellung: null,
               vertragBegin: new Date(),
               abwKontoInh: selfPayerAbwKontoInh,
+              // Direct debit whenever a bank account was given. True for a
+              // minor's contract too: the debit runs against the guardian's
+              // mandate (resolved via the Vertreter link in the fee run).
+              isDirectDebit: ibanPlain != null,
             }
           : null;
       const sepa = ibanPlain
@@ -1682,6 +1686,12 @@ export const applicationsRouter = {
         const nach = app.erziehungsberechtigterNachname?.trim() || "";
         if (nach || vor) return { vorname: vor, nachname: nach };
         if (app.kontoinhaber) return parsePayerName(app.kontoinhaber, app.nachname);
+        // No guardian name and no Kontoinhaber, but a bank account is on file:
+        // still create a payer contact (under the child's family name) so the
+        // IBAN and SEPA mandate are not silently dropped on approval.
+        if (ibanPlain) {
+          return { vorname: "", nachname: app.nachname?.trim() || "Erziehungsberechtigt" };
+        }
         return { vorname: "", nachname: "" };
       })();
 
