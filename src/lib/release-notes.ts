@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.96.4",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Abhängigkeiten aktualisiert (better-auth, sharp, Bun-Basis-Image und CI-Actions). Keine funktionalen Änderungen.",
+      },
+    ],
+  },
+  {
     version: "0.96.3",
     date: "2026-06-14",
     changes: [
