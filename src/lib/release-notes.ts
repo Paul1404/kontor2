@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.96.2",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Härtung im Hintergrund: Eine bereits versendete Mahnung lässt sich nicht erneut versenden. Der Beitragslauf-Vergleich zählt jetzt auch Rechnungszahler korrekt mit. Eine Einladung, deren erster Versuch abbrach, übernimmt beim zweiten Versuch das neu gesetzte Passwort. Der KI-Zugang ist auch gegen ungültige Schlüssel gedrosselt. Kleinere Korrekturen an Fehlermeldungen und Sperren.",
+      },
+    ],
+  },
+  {
     version: "0.96.1",
     date: "2026-06-14",
     changes: [

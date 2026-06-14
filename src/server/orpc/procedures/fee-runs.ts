@@ -96,17 +96,33 @@ export const feeRunsRouter = {
 
     const cents = (s: string) => Math.round(Number.parseFloat(s) * 100);
     const prevByContract = new Map(prevRows.map((p) => [p.contractId, p]));
-    const thisByContract = new Map(preview.candidates.map((c) => [c.contractId, c]));
+    // The year-over-year diff must cover every posting this run would create,
+    // not just direct-debit ones. Invoice payers (and contracts that switched
+    // DD -> Rechnung) also produce a Sollstellung; leaving them out reported
+    // them as "removed" and dropped their amount from the this-year totals.
+    const thisPostings = [
+      ...preview.candidates.map((c) => ({
+        contractId: c.contractId,
+        name: c.debtorName,
+        amount: c.amount,
+      })),
+      ...preview.invoices.map((i) => ({
+        contractId: i.contractId,
+        name: i.memberName,
+        amount: i.amount,
+      })),
+    ];
+    const thisByContract = new Map(thisPostings.map((p) => [p.contractId, p]));
 
     const added: Array<{ name: string; amount: string }> = [];
     const changed: Array<{ name: string; from: string; to: string }> = [];
     let unchangedCount = 0;
-    for (const c of preview.candidates) {
+    for (const c of thisPostings) {
       const prev = prevByContract.get(c.contractId);
       if (!prev) {
-        added.push({ name: c.debtorName, amount: c.amount });
+        added.push({ name: c.name, amount: c.amount });
       } else if (cents(prev.amount) !== cents(c.amount)) {
-        changed.push({ name: c.debtorName, from: prev.amount, to: c.amount });
+        changed.push({ name: c.name, from: prev.amount, to: c.amount });
       } else {
         unchangedCount += 1;
       }
@@ -116,8 +132,9 @@ export const feeRunsRouter = {
       .map((p) => ({ name: p.name, amount: p.amount }));
 
     const prevTotalCents = prevRows.reduce((s, p) => s + cents(p.amount), 0);
+    const thisTotalCents = thisPostings.reduce((s, p) => s + cents(p.amount), 0);
     return {
-      thisYear: { count: preview.totals.count, total: preview.totals.grandTotal },
+      thisYear: { count: thisPostings.length, total: (thisTotalCents / 100).toFixed(2) },
       lastYear: {
         year: input.billingYear - 1,
         count: prevRows.length,

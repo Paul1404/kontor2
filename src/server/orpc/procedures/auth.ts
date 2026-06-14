@@ -664,6 +664,14 @@ export const authRouter = {
             });
           }
           userId = orphan.id;
+          // The orphan's credential password is whatever the failed first
+          // attempt stored, not the password the user just typed on this
+          // retry. Reset it to `input.password` so the auto-login that the
+          // invite page fires on success actually matches; otherwise the user
+          // is bounced to /login with a password that was never saved.
+          await auth(context.tenant).api.setUserPassword({
+            body: { userId, newPassword: input.password },
+          });
           logger.info("invite.adopt-orphan", {
             userId,
             invitationId: inv.id,

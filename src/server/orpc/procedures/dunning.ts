@@ -781,6 +781,15 @@ export const dunningRouter = {
     .input(v.object({ itemId: v.string() }))
     .handler(async ({ context, input }) => {
       const { content, hasEmail, row } = await loadDunningEmailContext(context.db, input.itemId);
+      // Block a re-send: once an item is marked sent (email or post), sending
+      // again would dispatch a duplicate dunning mail. The UI hides the button
+      // in that state, but the procedure must enforce it too against a stale
+      // tab or a double click.
+      if (row.sentChannel !== "pending") {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Diese Mahnung wurde bereits versendet.",
+        });
+      }
       if (!hasEmail || !content) {
         throw new ORPCError("PRECONDITION_FAILED", {
           message: "Für dieses Mitglied ist keine E-Mail-Adresse hinterlegt.",
@@ -1176,17 +1185,27 @@ export const dunningRouter = {
         // -- but only where the current Mahnstufe is exactly `level`, so we
         // don't clobber a later run that already escalated them again.
         const items = await tx
-          .select({ sollIdsJson: dunningItemsTable.sollIdsJson })
+          .select({ id: dunningItemsTable.id, sollIdsJson: dunningItemsTable.sollIdsJson })
           .from(dunningItemsTable)
           .where(eq(dunningItemsTable.dunningRunId, input.id));
         const allSollIds: string[] = [];
         for (const it of items) {
+          let parsed: unknown;
           try {
-            const parsed = JSON.parse(it.sollIdsJson) as string[];
-            for (const s of parsed) allSollIds.push(s);
+            parsed = JSON.parse(it.sollIdsJson);
           } catch {
-            // ignore — corrupted item, leave Mahnstufe untouched
+            parsed = null;
           }
+          // Abort the whole storno on a corrupt item rather than swallowing it.
+          // Silently skipping would leave that item's Sollstellungen stuck at
+          // the higher Mahnstufe with no record of why; the transaction rolls
+          // back so the run stays committed and the operator sees the problem.
+          if (!Array.isArray(parsed) || parsed.some((s) => typeof s !== "string")) {
+            throw new ORPCError("INTERNAL_SERVER_ERROR", {
+              message: `Mahnlauf kann nicht storniert werden: beschädigte Sollstellungs-Referenz in Position ${it.id}. Bitte den Support kontaktieren.`,
+            });
+          }
+          for (const s of parsed) allSollIds.push(s);
         }
         if (allSollIds.length > 0) {
           await tx
