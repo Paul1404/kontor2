@@ -57,6 +57,18 @@ const UpdateInput = v.object({
   satzungUrl: v.optional(v.nullable(v.string()), null),
   mandatsreferenzPrefix: v.optional(v.string(), ""),
   beitragsstaffel: v.optional(v.nullable(BeitragsstaffelInput), null),
+  kategorieKindMaxAlter: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(120)),
+    14,
+  ),
+  kategorieJugendlichMaxAlter: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(120)),
+    18,
+  ),
+  kategorieJungerErwachsenerMaxAlter: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(120)),
+    25,
+  ),
   antragBenachrichtigungAktiv: v.optional(v.boolean(), true),
   antragVorstandEmail: v.optional(v.nullable(v.string()), null),
   /** PNG data URI, max ~512 KB encoded, or null to clear. */
@@ -105,6 +117,20 @@ export const organizationSettingsRouter = {
       throw new ORPCError("BAD_REQUEST", { message: "BIC ungültig (8 oder 11 Zeichen erwartet)." });
     }
 
+    // The category boundaries must strictly increase, or categoryFromAge would
+    // skip a tier (e.g. nobody could ever be "jugendlich").
+    if (
+      !(
+        input.kategorieKindMaxAlter < input.kategorieJugendlichMaxAlter &&
+        input.kategorieJugendlichMaxAlter < input.kategorieJungerErwachsenerMaxAlter
+      )
+    ) {
+      throw new ORPCError("BAD_REQUEST", {
+        message:
+          "Die Altersgrenzen müssen aufsteigend sein (Kind kleiner Jugendlich kleiner Junger Erwachsener).",
+      });
+    }
+
     const existing = (await context.db.select().from(organizationSettingsTable).limit(1))[0];
 
     const next = {
@@ -136,6 +162,9 @@ export const organizationSettingsRouter = {
       satzungUrl: input.satzungUrl,
       mandatsreferenzPrefix: input.mandatsreferenzPrefix,
       beitragsstaffel: input.beitragsstaffel,
+      kategorieKindMaxAlter: input.kategorieKindMaxAlter,
+      kategorieJugendlichMaxAlter: input.kategorieJugendlichMaxAlter,
+      kategorieJungerErwachsenerMaxAlter: input.kategorieJungerErwachsenerMaxAlter,
       antragBenachrichtigungAktiv: input.antragBenachrichtigungAktiv,
       antragVorstandEmail: input.antragVorstandEmail,
       antragGegenzeichnungBild: input.antragGegenzeichnungBild,

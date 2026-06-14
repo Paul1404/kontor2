@@ -34,6 +34,7 @@ import {
 } from "~/server/db/schema/organization-settings";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import {
+  type Altersgrenzen,
   type Antragstyp,
   detectAntragstyp,
   mitgliedschaftTypFor,
@@ -170,6 +171,15 @@ async function loadActiveAbteilungen(db: DBOrTx, ids: string[]): Promise<Map<str
     .from(abteilungenTable)
     .where(inArray(abteilungenTable.id, ids));
   return new Map(rows.filter((r) => !r.inaktiv).map((r) => [r.id, r.name]));
+}
+
+/** The club's configured fee-category age boundaries from its settings row. */
+function altersgrenzenOf(org: OrganizationSettings): Altersgrenzen {
+  return {
+    kindMax: org.kategorieKindMaxAlter,
+    jugendlichMax: org.kategorieJugendlichMaxAlter,
+    jungerErwachsenerMax: org.kategorieJungerErwachsenerMaxAlter,
+  };
 }
 
 /**
@@ -585,13 +595,17 @@ export const applicationsRouter = {
       if (Number.isNaN(dob.getTime())) {
         throw new ORPCError("VALIDATION_FAILED", { message: "Ungültiges Geburtsdatum." });
       }
-      const kategorie = mitgliedschaftTypFor(input.antragstyp as Antragstyp, dob);
       const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
       if (!org?.beitragsstaffel) {
         throw new ORPCError("PRECONDITION_FAILED", {
           message: "Die Jahresbeiträge für den Online-Antrag sind noch nicht hinterlegt.",
         });
       }
+      const kategorie = mitgliedschaftTypFor(
+        input.antragstyp as Antragstyp,
+        dob,
+        altersgrenzenOf(org),
+      );
       const fee = calculateFee({
         kategorie,
         elternteilMitglied: input.elternteilMitglied,
@@ -761,7 +775,13 @@ export const applicationsRouter = {
       (input.partnerVorname ?? "").trim().length >= 2 &&
       (input.partnerNachname ?? "").trim().length >= 2;
     const antragstyp = detectAntragstyp({ geburtsdatum: dob, hasChildren, hasPartner });
-    const kategorie = mitgliedschaftTypFor(antragstyp, dob);
+    const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+    if (!org) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Der Verein hat das Antragsformular noch nicht eingerichtet.",
+      });
+    }
+    const kategorie = mitgliedschaftTypFor(antragstyp, dob, altersgrenzenOf(org));
 
     if (antragstyp === "kind") {
       if (
@@ -778,13 +798,6 @@ export const applicationsRouter = {
     if (!validateIban(iban)) {
       throw new ORPCError("VALIDATION_FAILED", {
         message: "IBAN ungültig (Prüfsumme fehlerhaft).",
-      });
-    }
-
-    const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
-    if (!org) {
-      throw new ORPCError("BAD_REQUEST", {
-        message: "Der Verein hat das Antragsformular noch nicht eingerichtet.",
       });
     }
 

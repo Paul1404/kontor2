@@ -77,6 +77,9 @@ function VereinsdatenPage() {
     satzungUrl: "",
     mandatsreferenzPrefix: "",
     beitragsstaffel: DEFAULT_STAFFEL,
+    kategorieKindMaxAlter: 14,
+    kategorieJugendlichMaxAlter: 18,
+    kategorieJungerErwachsenerMaxAlter: 25,
     antragBenachrichtigungAktiv: true,
     antragVorstandEmail: "",
     antragGegenzeichnungBild: "",
@@ -114,6 +117,9 @@ function VereinsdatenPage() {
         satzungUrl: cfg.data.satzungUrl ?? "",
         mandatsreferenzPrefix: cfg.data.mandatsreferenzPrefix ?? "",
         beitragsstaffel: cfg.data.beitragsstaffel ?? DEFAULT_STAFFEL,
+        kategorieKindMaxAlter: cfg.data.kategorieKindMaxAlter ?? 14,
+        kategorieJugendlichMaxAlter: cfg.data.kategorieJugendlichMaxAlter ?? 18,
+        kategorieJungerErwachsenerMaxAlter: cfg.data.kategorieJungerErwachsenerMaxAlter ?? 25,
         antragBenachrichtigungAktiv: cfg.data.antragBenachrichtigungAktiv ?? true,
         antragVorstandEmail: cfg.data.antragVorstandEmail ?? "",
         antragGegenzeichnungBild: cfg.data.antragGegenzeichnungBild ?? "",
@@ -160,6 +166,9 @@ function VereinsdatenPage() {
           jungerErwachsener: normalizeMoney(form.beitragsstaffel.jungerErwachsener),
           erwachsener: normalizeMoney(form.beitragsstaffel.erwachsener),
         },
+        kategorieKindMaxAlter: form.kategorieKindMaxAlter,
+        kategorieJugendlichMaxAlter: form.kategorieJugendlichMaxAlter,
+        kategorieJungerErwachsenerMaxAlter: form.kategorieJungerErwachsenerMaxAlter,
         antragBenachrichtigungAktiv: form.antragBenachrichtigungAktiv,
         antragVorstandEmail: form.antragVorstandEmail || null,
         antragGegenzeichnungBild: form.antragGegenzeichnungBild || null,
@@ -555,6 +564,54 @@ function VereinsdatenPage() {
                     value={form.antragVorstandEmail}
                     onChange={(e) => setForm({ ...form, antragVorstandEmail: e.target.value })}
                     placeholder="mitgliedschaft@verein.de"
+                  />
+                </Field>
+              </div>
+              <h4 className="mb-3 mt-5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Altersgrenzen der Kategorien (Jahre)
+              </h4>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Bis zu welchem Alter eine Kategorie gilt (am Stichtag, jeweils bis zum genannten
+                Geburtstag). Standard 14 / 18 / 25.
+              </p>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                <Field label="Kind bis" hint="Bis zu diesem Alter gilt der Kinder-Tarif.">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={form.kategorieKindMaxAlter}
+                    onChange={(e) =>
+                      setForm({ ...form, kategorieKindMaxAlter: Number(e.target.value) })
+                    }
+                  />
+                </Field>
+                <Field label="Jugendlich bis" hint="Bis zu diesem Alter gilt der Jugend-Tarif.">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={form.kategorieJugendlichMaxAlter}
+                    onChange={(e) =>
+                      setForm({ ...form, kategorieJugendlichMaxAlter: Number(e.target.value) })
+                    }
+                  />
+                </Field>
+                <Field
+                  label="Junger Erwachsener bis"
+                  hint="Bis zu diesem Alter gilt der Tarif für junge Erwachsene, darüber Erwachsene."
+                >
+                  <Input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={form.kategorieJungerErwachsenerMaxAlter}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        kategorieJungerErwachsenerMaxAlter: Number(e.target.value),
+                      })
+                    }
                   />
                 </Field>
               </div>

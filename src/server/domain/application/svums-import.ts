@@ -7,6 +7,7 @@ import type {
 } from "~/server/db/schema/membership-applications";
 import {
   type Antragstyp,
+  DEFAULT_ALTERSGRENZEN,
   mitgliedschaftTypFor,
   parseISODate,
 } from "~/server/domain/application/antragstyp";
@@ -340,7 +341,11 @@ export function mapSvumsApplication(
   if (MITGLIEDSCHAFT_TYPEN.includes(item.mitgliedschaft_typ as MitgliedschaftTyp)) {
     mitgliedschaftTyp = item.mitgliedschaft_typ as MitgliedschaftTyp;
   } else {
-    mitgliedschaftTyp = mitgliedschaftTypFor(antragstyp as Antragstyp, geburtsdatum);
+    mitgliedschaftTyp = mitgliedschaftTypFor(
+      antragstyp as Antragstyp,
+      geburtsdatum,
+      DEFAULT_ALTERSGRENZEN,
+    );
     warnings.push(
       `Mitgliedschaftstyp "${item.mitgliedschaft_typ ?? ""}" unbekannt, aus dem Geburtsdatum abgeleitet: ${mitgliedschaftTyp}.`,
     );

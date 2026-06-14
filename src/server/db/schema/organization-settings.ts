@@ -111,6 +111,17 @@ export const organizationSettingsTable = pgTable("organization_settings", {
   mandatsreferenzPrefix: text("mandatsreferenz_prefix").notNull().default(""),
   /** Altersabhängige Jahresbeiträge für den Online-Aufnahmeantrag. */
   beitragsstaffel: jsonb("beitragsstaffel").$type<Beitragsstaffel>(),
+  /**
+   * Exklusive Altersgrenzen (Jahre, am Stichtag) für die Beitragskategorien des
+   * Online-Antrags: bis zu dieser Grenze gilt die jeweilige Kategorie. Defaults
+   * 14/18/25 entsprechen dem bisherigen Verhalten. Die Volljährigkeit (18,
+   * gesetzliche Vertretung) ist davon unberührt und bleibt fest.
+   */
+  kategorieKindMaxAlter: integer("kategorie_kind_max_alter").notNull().default(14),
+  kategorieJugendlichMaxAlter: integer("kategorie_jugendlich_max_alter").notNull().default(18),
+  kategorieJungerErwachsenerMaxAlter: integer("kategorie_junger_erwachsener_max_alter")
+    .notNull()
+    .default(25),
   /** Bei neuem Online-Antrag eine Benachrichtigung an den Verein senden? */
   antragBenachrichtigungAktiv: boolean("antrag_benachrichtigung_aktiv").notNull().default(true),
   /**
