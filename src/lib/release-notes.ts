@@ -41,6 +41,22 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.0",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Beitrittserklärung: die Anrede passt jetzt zum Text. Statt den Antragsteller mit Sehr geehrter Herr anzureden, beginnt das Dokument mit Sehr geehrte Damen und Herren, da der Antrag an den Verein gerichtet ist.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Antrags- und Dokumentnummern sind jetzt zufällig und nicht mehr fortlaufend, so wie die Mitgliedsnummern. Sie verraten damit keine Reihenfolge oder Anzahl mehr. Rechnungsnummern bleiben fortlaufend, wie es für Rechnungen vorgeschrieben ist.",
+      },
+    ],
+  },
+  {
     version: "0.93.0",
     date: "2026-06-14",
     changes: [

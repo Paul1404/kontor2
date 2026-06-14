@@ -421,6 +421,13 @@
       "when": 1781424253553,
       "tag": "0059_cynical_thundra",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1781425770057,
+      "tag": "0060_thick_pyro",
+      "breakpoints": true
     }
   ]
 }
