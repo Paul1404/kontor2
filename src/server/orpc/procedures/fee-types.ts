@@ -6,7 +6,7 @@ import { withUniqueRetry } from "~/server/db/retry";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { feeTypePriceHistoryTable } from "~/server/db/schema/fee-type-history";
 import { feeTypesTable } from "~/server/db/schema/fee-types";
-import { adminProc, authedProc } from "~/server/orpc/base";
+import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import { CACHE_NS, cached, invalidateFeeTypeCaches } from "~/server/search/cache";
 
 const TextOrNull = v.optional(v.nullable(v.string()));
@@ -159,6 +159,64 @@ export const feeTypesRouter = {
         const changes = diff(existing as unknown as Record<string, unknown>, {
           ...(existing as unknown as Record<string, unknown>),
           ...patch,
+        });
+        if (Object.keys(changes).length > 0) {
+          await appendAudit(tx, {
+            entityType: "fee_type",
+            entityId: String(input.art),
+            action: "update",
+            source: "ui",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            changes,
+            requestId: context.requestId ?? null,
+          });
+        }
+      });
+      await invalidateFeeTypeCaches(context.tenant.key);
+      return { ok: true };
+    }),
+
+  /**
+   * Set ONLY the optional age range (minAge/maxAge) of a Beitragsart. Unlike
+   * `update` (adminProc, edits any field), this is intentionally vorstand-level
+   * and limited to the two age fields: they drive only the data-quality check
+   * `tarif_passt_nicht_zum_alter` and never touch billing or money. Exposed to
+   * the MCP so an assistant can arm that check (issue #244).
+   */
+  setAgeRange: vorstandProc
+    .input(
+      v.object({
+        art: v.pipe(v.number(), v.integer()),
+        minAge: AgeOrNull,
+        maxAge: AgeOrNull,
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const minAge = input.minAge ?? null;
+      const maxAge = input.maxAge ?? null;
+      if (minAge != null && maxAge != null && minAge > maxAge) {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: "Alter von darf nicht größer als Alter bis sein.",
+        });
+      }
+      await context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(feeTypesTable)
+          .where(eq(feeTypesTable.art, input.art))
+          .limit(1);
+        if (!existing) {
+          throw new ORPCError("NOT_FOUND", { message: "Beitragsart nicht gefunden." });
+        }
+        await tx
+          .update(feeTypesTable)
+          .set({ minAge, maxAge, updatedAt: new Date() })
+          .where(eq(feeTypesTable.art, input.art));
+        const changes = diff(existing as unknown as Record<string, unknown>, {
+          ...(existing as unknown as Record<string, unknown>),
+          minAge,
+          maxAge,
         });
         if (Object.keys(changes).length > 0) {
           await appendAudit(tx, {

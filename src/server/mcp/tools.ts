@@ -59,6 +59,8 @@ function defineTool<TSchema extends v.GenericSchema>(def: {
 const PageInput = v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)));
 const YearInput = v.pipe(v.number(), v.integer(), v.minValue(1900), v.maxValue(2200));
 const DateInput = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
+/** Age in completed years for a Beitragsart range, or null to clear it. */
+const AgeInput = v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(120)));
 
 /**
  * Optional idempotency key for write tools (issue #83): a retried create with
@@ -387,6 +389,18 @@ const TOOLS: McpTool[] = [
     minRole: "vorstand",
     input: v.object({ id: v.string(), status: v.picklist(["open", "done"]) }),
     execute: (context, input) => call(appRouter.tasks.setStatus, input, { context }),
+  }),
+  defineTool({
+    name: "set_fee_type_age_range",
+    description:
+      "Set the expected age range (in completed years) of a Beitragsart, which arms the data-quality check 'tarif_passt_nicht_zum_alter'. Resolve `art` via list_fee_types (its minAge/maxAge show the current range). Pass minAge/maxAge as integers, or null to clear a bound. This only affects the data-quality display, never billing. The change is audited.",
+    minRole: "vorstand",
+    input: v.object({
+      art: v.pipe(v.number(), v.integer()),
+      minAge: AgeInput,
+      maxAge: AgeInput,
+    }),
+    execute: (context, input) => call(appRouter.feeTypes.setAgeRange, input, { context }),
   }),
   defineTool({
     name: "dunning_mark_paid",
