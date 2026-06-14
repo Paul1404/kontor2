@@ -287,7 +287,7 @@ export function CommandPalette({ role }: { role: Role }) {
         setOpen(false);
         navigate({
           to: "/app/mitglieder/$mitgliedsnummer",
-          params: { mitgliedsnummer: recentItem.mitgliedsnummer },
+          params: { mitgliedsnummer: recentItem.reference },
         });
       }
     }
@@ -440,10 +440,10 @@ export function CommandPalette({ role }: { role: Role }) {
                     const i = runningIndex++;
                     return (
                       <CommandItem
-                        key={r.mitgliedsnummer}
+                        key={r.reference}
                         icon={<Users className="size-4" />}
-                        label={r.name || `#${r.mitgliedsnummer}`}
-                        sublabel={`#${r.mitgliedsnummer}`}
+                        label={r.name || `#${r.reference}`}
+                        sublabel={`#${r.reference}`}
                         active={i === highlight}
                         onMouseEnter={() => setHighlight(i)}
                         onClick={() => executeAt(i)}

@@ -47,6 +47,7 @@ import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/
 import { formatLand } from "~/lib/country";
 import { triggerDownload, triggerDownloadBase64 } from "~/lib/download";
 import { EMPTY_VALUE, formatCurrency, formatDate, formatDateTime, formatPhone } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { memberStatusView } from "~/lib/member-status";
 import { orpc } from "~/lib/orpc";
 import { usePageShortcut } from "~/lib/use-global-shortcuts";
@@ -137,10 +138,11 @@ function MemberDetailPage() {
     return [m.titel1, m.vorname, m.nachname].filter(Boolean).join(" ") || m.firma1 || "Unbenannt";
   }, [detail.data?.member]);
 
+  const memberReference = detail.data?.member ? memberRef(detail.data.member) : "";
   useEffect(() => {
-    if (!detail.data?.member?.mitgliedsnummer) return;
-    pushRecent({ mitgliedsnummer: detail.data.member.mitgliedsnummer, name: memberDisplayName });
-  }, [detail.data?.member?.mitgliedsnummer, memberDisplayName, pushRecent]);
+    if (!memberReference) return;
+    pushRecent({ reference: memberReference, name: memberDisplayName });
+  }, [memberReference, memberDisplayName, pushRecent]);
 
   if (detail.isLoading) return <MemberDetailSkeleton />;
   if (detail.isError || !detail.data) {
