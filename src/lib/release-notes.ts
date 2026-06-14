@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.99.0",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Der Online-Antrag kann seinen Beitrag jetzt direkt aus den Beitragsarten ziehen. Unter Einstellungen > Beitragsarten lässt sich je Beitragsart eine Rolle im Online-Antrag setzen (Familie, Kind, Jugendlich usw.); dann wird deren Betrag angeboten und die Beitragsart bei der Genehmigung gleich vorausgewählt. So gibt es eine Quelle für den Preis statt zweier. Solange keine Beitragsart zugeordnet ist, gilt weiter die Beitragsstaffel unter Vereinsdaten. Für bestehende Vereine ändert sich nichts, bis sie eine Zuordnung setzen.",
+      },
+    ],
+  },
+  {
     version: "0.98.0",
     date: "2026-06-14",
     changes: [

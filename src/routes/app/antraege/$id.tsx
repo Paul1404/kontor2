@@ -148,6 +148,10 @@ function AntragDetailPage() {
     setWorkStatus(
       (WORKFLOW_STATUS as readonly string[]).includes(s) ? (s as WorkflowStatus) : "neu",
     );
+    // Pre-select the Beitragsart matched at submit time so the approved contract
+    // uses the same Beitragsart the applicant was quoted from. The Vorstand can
+    // still change it; the Betrag field falls back to the quoted Jahresbeitrag.
+    if (detail.data.vorgeschlageneArt != null) setArt(detail.data.vorgeschlageneArt);
   }, [detail.data]);
 
   const invalidate = () => {

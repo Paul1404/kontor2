@@ -92,6 +92,12 @@ export const membershipApplicationsTable = pgTable(
     abteilungen: jsonb("abteilungen").$type<string[]>().notNull().default([]),
     elternteilMitglied: boolean("elternteil_mitglied").notNull().default(false),
     jahresbeitrag: numeric("jahresbeitrag", { precision: 19, scale: 2 }),
+    /**
+     * Beitragsart matched for this application's role at submit time (via the
+     * Beitragsart-Zuordnung), so approval can pre-select it. Null when the quote
+     * came from the Beitragsstaffel and no Beitragsart was tagged.
+     */
+    vorgeschlageneArt: integer("vorgeschlagene_art"),
 
     // SEPA. IBAN is AES-256-GCM encrypted; last 4 kept in plaintext for display.
     kontoinhaber: text("kontoinhaber"),
