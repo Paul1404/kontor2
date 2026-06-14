@@ -5,10 +5,10 @@ import { Label } from "~/components/ui/label";
 import { orpc } from "~/lib/orpc";
 
 /**
- * Address block for the public application form with OpenStreetMap-backed
- * autocomplete: street suggestions as you type and PLZ -> Ort resolution.
- * Lookups are debounced and best-effort; the plain inputs always work even if
- * the suggestion service is unavailable.
+ * Address block for the public application form with directory-backed
+ * autocomplete: street suggestions as you type and PLZ -> Ort resolution, from
+ * the official OpenPLZ directory (Nominatim as fallback). Lookups are debounced
+ * and best-effort; the plain inputs always work even if the service is down.
  */
 export function AddressFields({
   strasse,
@@ -196,8 +196,8 @@ export function AddressFields({
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Adressvorschläge kommen von OpenStreetMap. Beim Tippen wird die Eingabe zur Suche dorthin
-        übermittelt.
+        Adressvorschläge kommen aus dem amtlichen Verzeichnis (OpenPLZ), ersatzweise aus
+        OpenStreetMap. Beim Tippen wird die Eingabe zur Suche dorthin übermittelt.
       </p>
     </div>
   );
