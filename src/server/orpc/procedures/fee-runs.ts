@@ -1217,6 +1217,7 @@ export const feeRunsRouter = {
       let sent = 0;
       let failed = 0;
       let skipped = 0;
+      let firstError: string | null = null;
       for (const it of items) {
         const to = it.email?.trim();
         if (!to?.includes("@")) {
@@ -1235,15 +1236,21 @@ export const feeRunsRouter = {
         try {
           await mailer.send({ to, subject, text });
           sent += 1;
-        } catch {
+        } catch (e) {
           failed += 1;
+          if (!firstError) firstError = e instanceof Error ? e.message : String(e);
         }
       }
 
-      await context.db
-        .update(feeRunsTable)
-        .set({ prenotifiedAt: new Date() })
-        .where(eq(feeRunsTable.id, input.id));
+      // Only mark the run as pre-notified when at least one mail actually went
+      // out. Marking it on a total failure would claim a Vorabankündigung was
+      // sent when none was, and the SEPA debit must not run without it.
+      if (sent > 0) {
+        await context.db
+          .update(feeRunsTable)
+          .set({ prenotifiedAt: new Date() })
+          .where(eq(feeRunsTable.id, input.id));
+      }
       await appendAudit(context.db, {
         entityType: "fee_run",
         entityId: input.id,
@@ -1251,11 +1258,15 @@ export const feeRunsRouter = {
         source: "ui",
         actorId: context.session!.user.id,
         actorEmail: context.session!.user.email,
-        changes: { prenotificationsSent: { before: null, after: sent } },
+        changes: {
+          prenotificationsSent: { before: null, after: sent },
+          prenotificationsFailed: { before: null, after: failed },
+          ...(firstError ? { prenotificationError: { before: null, after: firstError } } : {}),
+        },
         requestId: context.requestId ?? null,
       });
 
-      return { sent, failed, skipped, total: items.length };
+      return { sent, failed, skipped, total: items.length, firstError };
     }),
 };
 
