@@ -128,6 +128,13 @@ export const feeRunItemsTable = pgTable(
     // Soft pointer (no FK) -- breaks the circular reference between
     // fee_run_items and soll_stellungen. Joined manually when needed.
     sollStellungId: uuid("soll_stellung_id"),
+    // The account holder actually debited (family payer / guardian / explicit
+    // Vertrags-Zahler), which may differ from the billed memberId. Used to send
+    // the SEPA pre-notification to the right person. Nullable for rows written
+    // before this column existed; readers fall back to memberId.
+    zahlerMemberId: uuid("zahler_member_id").references(() => membersTable.id, {
+      onDelete: "set null",
+    }),
     amount: numeric("amount", { precision: 19, scale: 8 }).notNull(),
     purpose: text("purpose").notNull(),
     includesAufnahmegebuhr: boolean("includes_aufnahmegebuhr").notNull().default(false),
@@ -177,6 +184,11 @@ export const sollStellungenTable = pgTable(
     // Soft pointer (no FK) -- the corresponding fee_run_item may be cascade
     // deleted with its fee_run; we keep this as a historical hint only.
     lastFeeRunItemId: uuid("last_fee_run_item_id"),
+    // The fee run that created/last touched this posting. Lets Storno revert the
+    // invoice-payer postings it produced (status "open", which have no
+    // fee_run_item to revert through). Null for linear_import rows and manual
+    // postings.
+    feeRunId: uuid("fee_run_id").references(() => feeRunsTable.id, { onDelete: "set null" }),
     notes: text("notes"),
     /** Provenance. `linear_import` rows mirror Linear's `mgsolln`. */
     source: feeRunSourceEnum("source").notNull().default("app"),

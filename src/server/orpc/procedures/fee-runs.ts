@@ -303,6 +303,7 @@ export const feeRunsRouter = {
           paidAmount: c.amount,
           openAmount: "0",
           status: "eingezogen" as const,
+          feeRunId: run.id,
         }));
         const insertedSoll = await tx
           .insert(sollStellungenTable)
@@ -315,6 +316,7 @@ export const feeRunsRouter = {
               paidAmount: sql`excluded.amount`,
               status: "eingezogen",
               falligkeitsdatum: input.falligkeitsdatum,
+              feeRunId: run.id,
               updatedAt: new Date(),
             },
           })
@@ -342,6 +344,7 @@ export const feeRunsRouter = {
               paidAmount: "0",
               openAmount: i.amount,
               status: "open" as const,
+              feeRunId: run.id,
             })) as never,
           )
           .onConflictDoUpdate({
@@ -352,6 +355,7 @@ export const feeRunsRouter = {
               paidAmount: "0",
               status: "open",
               falligkeitsdatum: input.falligkeitsdatum,
+              feeRunId: run.id,
               updatedAt: new Date(),
             },
           });
@@ -379,6 +383,7 @@ export const feeRunsRouter = {
           memberId: c.memberId,
           contractId: c.contractId,
           sepaMandateId: c.chosenMandateId,
+          zahlerMemberId: c.zahlerMemberId,
           sollStellungId: sollByContract.get(c.contractId) ?? null,
           amount: c.amount,
           purpose: `Mitgliedsbeitrag ${input.billingYear}${c.includesAufnahmegebuhr ? " inkl. Aufnahmegebühr" : ""}`,
@@ -1125,6 +1130,22 @@ export const feeRunsRouter = {
             );
         }
 
+        // Invoice-payer postings this run created have status "open" and no
+        // fee_run_item to revert through, so the loop above misses them and they
+        // stay open and dunnable after a Storno. Cancel them via the run link,
+        // but only while still fully open (untouched): a partially paid posting
+        // must keep its real open balance.
+        await tx
+          .update(sollStellungenTable)
+          .set({ status: "cancelled", updatedAt: new Date() })
+          .where(
+            and(
+              eq(sollStellungenTable.feeRunId, input.id),
+              eq(sollStellungenTable.status, "open"),
+              sql`${sollStellungenTable.paidAmount} = 0`,
+            ),
+          );
+
         await appendAudit(tx, {
           entityType: "fee_run",
           entityId: input.id,
@@ -1160,7 +1181,16 @@ export const feeRunsRouter = {
       const rows = await context.db
         .select({ email: membersTable.email })
         .from(feeRunItemsTable)
-        .innerJoin(membersTable, eq(membersTable.id, feeRunItemsTable.memberId))
+        // The SEPA debit hits the Zahler's account, so the pre-notification must
+        // go to the Zahler (family payer / guardian), not the billed member.
+        // Fall back to the billed member for rows written before zahlerMemberId.
+        .innerJoin(
+          membersTable,
+          eq(
+            membersTable.id,
+            sql`coalesce(${feeRunItemsTable.zahlerMemberId}, ${feeRunItemsTable.memberId})`,
+          ),
+        )
         .where(eq(feeRunItemsTable.feeRunId, input.id));
       const withEmail = rows.filter((r) => !!r.email?.trim() && r.email.includes("@")).length;
       return {
@@ -1211,7 +1241,16 @@ export const feeRunsRouter = {
           adrNr: membersTable.adrNr,
         })
         .from(feeRunItemsTable)
-        .innerJoin(membersTable, eq(membersTable.id, feeRunItemsTable.memberId))
+        // The SEPA debit hits the Zahler's account, so the pre-notification must
+        // go to the Zahler (family payer / guardian), not the billed member.
+        // Fall back to the billed member for rows written before zahlerMemberId.
+        .innerJoin(
+          membersTable,
+          eq(
+            membersTable.id,
+            sql`coalesce(${feeRunItemsTable.zahlerMemberId}, ${feeRunItemsTable.memberId})`,
+          ),
+        )
         .where(eq(feeRunItemsTable.feeRunId, input.id));
 
       let sent = 0;

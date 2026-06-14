@@ -428,6 +428,13 @@
       "when": 1781425770057,
       "tag": "0060_thick_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1781445233923,
+      "tag": "0061_blue_layla_miller",
+      "breakpoints": true
     }
   ]
 }

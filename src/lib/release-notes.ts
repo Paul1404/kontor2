@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.11",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Storno eines Beitragslaufs storniert jetzt auch die offenen Rechnungs-Sollstellungen, die er erzeugt hat, sofern noch nichts darauf bezahlt wurde. Vorher blieben sie offen und mahnbar. Außerdem geht die SEPA-Vorabankündigung an den tatsächlichen Kontoinhaber (Zahler), nicht mehr an das abgerechnete Mitglied.",
+      },
+    ],
+  },
+  {
     version: "0.94.10",
     date: "2026-06-14",
     changes: [
