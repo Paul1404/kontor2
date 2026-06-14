@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.95.3",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Antragsprozess robuster: ein Antrag kann nicht mehr durch gleichzeitiges Genehmigen doppelt zu Mitgliedern führen. Schlägt das Hochladen des unterschriebenen Dokuments wegen einer Speicher-Störung fehl, bleibt der Upload-Link nutzbar statt verbraucht. Die Unterschrift im Online-Antrag ist jetzt größenbegrenzt.",
+      },
+    ],
+  },
+  {
     version: "0.95.2",
     date: "2026-06-14",
     changes: [
