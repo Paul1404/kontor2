@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.95.7",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Portal-Änderungsanträge überschreiben keine zwischenzeitlich geänderten Felder mehr. Wurde ein Feld nach dem Antrag bearbeitet, bleibt der neuere Wert erhalten und das übersprungene Feld wird vermerkt. Außerdem blockiert ein fehlgeschlagener KI-Schreibzugriff den verwendeten Idempotency-Key nicht mehr dauerhaft.",
+      },
+    ],
+  },
+  {
     version: "0.95.6",
     date: "2026-06-14",
     changes: [
