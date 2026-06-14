@@ -106,7 +106,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Build the production image (no push) so a broken Dockerfile fails here
       # instead of at deploy time. The GitHub Actions cache persists the Bun
