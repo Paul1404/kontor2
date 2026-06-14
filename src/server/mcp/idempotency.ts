@@ -43,7 +43,19 @@ export async function withIdempotency<T>(
     });
   }
 
-  const result = await run();
+  let result: T;
+  try {
+    result = await run();
+  } catch (err) {
+    // The operation failed, so release the reservation instead of leaving an
+    // incomplete row. Otherwise every retry with the same key would hit the
+    // CONFLICT branch above forever, permanently bricking the key.
+    await db
+      .delete(idempotencyKeysTable)
+      .where(eq(idempotencyKeysTable.id, reserved.id))
+      .catch(() => {});
+    throw err;
+  }
   await db
     .update(idempotencyKeysTable)
     .set({ result: result as unknown as Record<string, unknown>, completedAt: new Date() })

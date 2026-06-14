@@ -379,53 +379,71 @@ export const portalRouter = {
         EDITABLE_FIELDS.includes(k as EditableField),
       );
       const applied = input.applyFields.filter((k) => allKeys.includes(k));
-      const willApply = applied.length > 0;
-
-      const nextStatus =
-        applied.length === allKeys.length
-          ? "applied"
-          : applied.length === 0
-            ? "rejected"
-            : "partial";
+      // Filled inside the transaction once we know the member's current values.
+      const effectiveApplied: string[] = [];
+      const staleSkipped: string[] = [];
 
       await context.db.transaction(async (tx) => {
-        if (willApply) {
-          // Re-read member to capture true `before` for audit and avoid
-          // overwriting a value that has shifted since submission.
+        if (applied.length > 0) {
+          // Re-read the member and apply only the fields that have NOT changed
+          // since the request was submitted: optimistic concurrency. A field
+          // whose current value no longer matches the value the member had at
+          // submission (`payload[f].before`) was edited in the meantime, so
+          // writing the request's stale `after` would silently lose that edit.
+          // Such fields are skipped and reported back instead of overwritten.
           const [memberBefore] = await tx
             .select()
             .from(membersTable)
             .where(eq(membersTable.id, req.memberId))
             .limit(1);
 
-          const updates: Record<string, unknown> = {};
-          for (const f of applied) {
-            updates[f] = payload[f]?.after ?? null;
-          }
-          updates.updatedAt = new Date();
+          if (memberBefore) {
+            const current = memberBefore as unknown as Record<string, unknown>;
+            // Match submitChanges' normalize (trim, empty -> none) so a pure
+            // whitespace difference is not mistaken for a real drift.
+            const norm = (v: unknown) => (v == null ? "" : String(v).trim());
+            const updates: Record<string, unknown> = {};
+            for (const f of applied) {
+              if (norm(current[f]) === norm(payload[f]?.before)) {
+                updates[f] = payload[f]?.after ?? null;
+                effectiveApplied.push(f);
+              } else {
+                staleSkipped.push(f);
+              }
+            }
 
-          const [memberAfter] = await tx
-            .update(membersTable)
-            .set(updates as never)
-            .where(eq(membersTable.id, req.memberId))
-            .returning();
-
-          if (memberBefore && memberAfter) {
-            await appendAudit(tx, {
-              entityType: "member",
-              entityId: req.memberId,
-              action: "update",
-              source: "ui",
-              actorId: context.session!.user.id,
-              actorEmail: context.session!.user.email,
-              changes: diff(
-                memberBefore as unknown as Record<string, unknown>,
-                memberAfter as unknown as Record<string, unknown>,
-              ),
-              requestId: context.requestId ?? null,
-            });
+            if (effectiveApplied.length > 0) {
+              updates.updatedAt = new Date();
+              const [memberAfter] = await tx
+                .update(membersTable)
+                .set(updates as never)
+                .where(eq(membersTable.id, req.memberId))
+                .returning();
+              if (memberAfter) {
+                await appendAudit(tx, {
+                  entityType: "member",
+                  entityId: req.memberId,
+                  action: "update",
+                  source: "ui",
+                  actorId: context.session!.user.id,
+                  actorEmail: context.session!.user.email,
+                  changes: diff(current, memberAfter as unknown as Record<string, unknown>),
+                  requestId: context.requestId ?? null,
+                });
+              }
+            }
           }
         }
+
+        // Status reflects what was actually applied. The admin rejecting all
+        // fields is "rejected"; drift that left some fields unapplied is
+        // "partial", not "applied".
+        const nextStatus =
+          applied.length === 0
+            ? "rejected"
+            : effectiveApplied.length === allKeys.length
+              ? "applied"
+              : "partial";
 
         await tx
           .update(portalChangeRequestsTable)
@@ -434,7 +452,7 @@ export const portalRouter = {
             reviewedAt: new Date(),
             reviewedBy: context.session!.user.id,
             reviewerNotes: input.rejectNotes,
-            appliedFields: applied,
+            appliedFields: effectiveApplied,
           })
           .where(eq(portalChangeRequestsTable.id, input.id));
 
@@ -447,13 +465,22 @@ export const portalRouter = {
           actorEmail: context.session!.user.email,
           changes: {
             status: { before: "pending", after: nextStatus },
-            applied: { before: null, after: applied.join(",") || null },
+            applied: { before: null, after: effectiveApplied.join(",") || null },
+            ...(staleSkipped.length > 0
+              ? { uebersprungen_geaendert: { before: null, after: staleSkipped.join(",") } }
+              : {}),
           },
           requestId: context.requestId ?? null,
         });
       });
 
-      return { ok: true, applied, status: nextStatus };
+      const status =
+        applied.length === 0
+          ? "rejected"
+          : effectiveApplied.length === allKeys.length
+            ? "applied"
+            : "partial";
+      return { ok: true, applied: effectiveApplied, skipped: staleSkipped, status };
     }),
 
   listTokensForMember: vorstandProc
