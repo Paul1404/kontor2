@@ -14,6 +14,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { toast } from "~/components/ui/toaster";
 import { triggerDownload, triggerDownloadBase64 } from "~/lib/download";
+import { EMPTY_VALUE, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 const CONSENT_OPTIONS = [
@@ -178,11 +179,11 @@ function ConsentSection({
                       </span>
                     )
                   ) : (
-                    <span className="text-muted-foreground">—</span>
+                    <span className="text-muted-foreground">{EMPTY_VALUE}</span>
                   )}
                 </td>
                 <td className="py-2 pl-3 text-xs text-muted-foreground">
-                  {cur ? new Date(cur.recordedAt).toLocaleDateString("de-DE") : ""}
+                  {cur ? formatDate(cur.recordedAt) : ""}
                 </td>
               </tr>
             );
@@ -290,14 +291,12 @@ function ErasureSection({ memberId, memberSlug }: { memberId: string; memberSlug
       <div className="rounded border border-border bg-muted/40 p-2 text-xs">
         <div>
           Letztes finanzwirksames Ereignis:{" "}
-          {retention.lastFinancialEventAt
-            ? new Date(retention.lastFinancialEventAt).toLocaleDateString("de-DE")
-            : "keines"}
+          {retention.lastFinancialEventAt ? formatDate(retention.lastFinancialEventAt) : "keines"}
         </div>
         <div>
           Frühester Löschtermin:{" "}
           <span className={expired ? "text-success" : "text-amber-600"}>
-            {new Date(retention.earliestErasureDate).toLocaleDateString("de-DE")}
+            {formatDate(retention.earliestErasureDate)}
           </span>
         </div>
       </div>

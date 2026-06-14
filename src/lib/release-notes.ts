@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.99.1",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Kleinere Politur in der Antragsansicht: Beträge erscheinen einheitlich als 0,00 € und Datumsangaben im gewohnten Format und ohne Zeitzonen-Verschiebung. Im PDF-Viewer ist der Knopf zum Öffnen in neuem Tab jetzt für Screenreader beschriftet.",
+      },
+    ],
+  },
+  {
     version: "0.99.0",
     date: "2026-06-14",
     changes: [
@@ -2236,7 +2247,7 @@ export const RELEASES: Release[] = [
       {
         category: "improvement",
         description:
-          "Reine Zahler und Kontakte ohne Mitgliedschaft bekommen eine eigene Kontaktnummer (K-...). Die frühere Notlösung über die interne Adressnummer entfällt.",
+          "Reine Zahler und Kontakte ohne Mitgliedschaft bekommen eine eigene Kontaktnummer (K-…). Die frühere Notlösung über die interne Adressnummer entfällt.",
       },
     ],
   },

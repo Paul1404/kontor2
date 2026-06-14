@@ -9,6 +9,7 @@ import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
 import { cn } from "~/lib/cn";
 import { exportCsvFile } from "~/lib/export";
+import { formatCurrency } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/antraege/")({
@@ -207,7 +208,7 @@ function AntraegeListPage() {
                       ) : null}
                     </td>
                     <td className="px-4 py-3 capitalize">{r.antragstyp}</td>
-                    <td className="px-4 py-3">{r.jahresbeitrag ? `${r.jahresbeitrag} €` : "—"}</td>
+                    <td className="px-4 py-3">{formatCurrency(r.jahresbeitrag)}</td>
                     <td className="px-4 py-3">
                       <Badge className={cn("font-normal", STATUS_TONE[r.status] ?? "")}>
                         {STATUS_LABELS[r.status] ?? r.status}

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { ORPCError } from "@orpc/server";
 import { asc, desc, eq } from "drizzle-orm";
 import { lastFour } from "~/server/crypto/encrypt";
 import type { DB } from "~/server/db/client";
@@ -103,7 +104,7 @@ export async function buildAuskunftsPackage(
     .limit(1);
 
   if (!memberRow) {
-    throw new Error(`Mitglied ${memberId} nicht gefunden.`);
+    throw new ORPCError("NOT_FOUND", { message: `Mitglied ${memberId} nicht gefunden.` });
   }
 
   const [

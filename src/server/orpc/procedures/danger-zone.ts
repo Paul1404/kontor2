@@ -322,5 +322,3 @@ export const dangerZoneRouter = {
       return { wiped: true, totalsBefore };
     }),
 };
-
-export const DANGER_PHRASES = PHRASES;
