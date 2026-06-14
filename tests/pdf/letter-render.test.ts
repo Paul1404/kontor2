@@ -195,6 +195,7 @@ describe("DIN 5008 letter templates", () => {
       titel: "40 Jahre Mitgliedschaft",
       verliehenAm: "2025-03-15",
       docRef: "EU-2025-0007",
+      brandColor: "#335c99",
     });
     await expectValidPdf(EhrungsurkundeDocument({ model: jubilaeum }));
 
@@ -209,6 +210,7 @@ describe("DIN 5008 letter templates", () => {
       titel: "Goldene Ehrennadel",
       verliehenAm: "2025-03-15",
       docRef: "EU-2025-0008",
+      brandColor: null,
     });
     await expectValidPdf(EhrungsurkundeDocument({ model: sonder }));
   });

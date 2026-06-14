@@ -13,8 +13,7 @@ import { logger } from "~/server/lib/logger";
 import { redis } from "~/server/redis/client";
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
-const USER_AGENT =
-  "kontor2/1.0 (Vereinsverwaltung SV Untereuerheim; +https://github.com/Paul1404/kontor2)";
+const USER_AGENT = "kontor2/1.0 (Vereinsverwaltung; +https://github.com/Paul1404/kontor2)";
 
 const PLZ_CACHE_TTL = 60 * 60 * 24 * 30; // 30 days
 const STREET_CACHE_TTL = 60 * 60 * 24; // 1 day
