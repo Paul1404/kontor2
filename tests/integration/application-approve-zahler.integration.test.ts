@@ -125,10 +125,14 @@ describe.skipIf(!onTestDb)("Antrag-Genehmigung legt Zahler an (integration)", ()
     if (child) createdMemberIds.push(child.id);
 
     const childContracts = await db()
-      .select({ id: contractsTable.id })
+      .select({ id: contractsTable.id, isDirectDebit: contractsTable.isDirectDebit })
       .from(contractsTable)
       .where(eq(contractsTable.memberId, child?.id as string));
     expect(childContracts.length).toBe(1);
+    // The child's contract is direct debit even though the mandate sits on the
+    // guardian; the fee run routes the debit via the Vertreter link. Without
+    // this it would be booked as an invoice payer and never debited.
+    expect(childContracts[0]?.isDirectDebit).toBe(true);
 
     // Erziehungsberechtigter: Kontakt (K-) mit IBAN + Mandat.
     const [guardian] = await db()

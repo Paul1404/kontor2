@@ -840,8 +840,12 @@ export const membersRouter = {
             .where(and(notDeleted, memberHasDied())),
           context.db
             .select({ c: count() })
+            // Kontakte = rows without an app member number (kontaktNo set),
+            // matching the orphanOnly filter. The legacy `mitgliedsnummer` is
+            // null for every in-app-created member too, so using it here would
+            // miscount real members as Kontakte.
             .from(membersTable)
-            .where(and(notDeleted, isNull(membersTable.mitgliedsnummer))),
+            .where(and(notDeleted, isNull(membersTable.memberNo))),
         ]);
       return {
         total: total?.c ?? 0,
@@ -1981,6 +1985,9 @@ export const membersRouter = {
               input.contract.vertragBegin ?? eintrittIso,
               "Vertragsbeginn",
             ),
+            // Direct debit when a SEPA mandate is set up or an IBAN is on file;
+            // otherwise the member is an invoice (Rechnungs) payer.
+            isDirectDebit: input.sepa != null || Boolean(input.patch.iban1),
           }
         : null;
       const sepa = input.sepa

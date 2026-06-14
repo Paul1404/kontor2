@@ -41,6 +41,27 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.5",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Genehmigte oder neu angelegte Mitglieder mit Bankverbindung werden jetzt korrekt per Lastschrift eingezogen. Vorher wurde der Vertrag fälschlich als Rechnung geführt und nie abgebucht, obwohl ein SEPA-Mandat vorlag.",
+      },
+      {
+        category: "fix",
+        description:
+          "Die Kachel Kontakte in der Mitgliederübersicht zählte in der App angelegte echte Mitglieder mit. Jetzt werden nur noch echte Kontakte ohne Mitgliedsnummer gezählt.",
+      },
+      {
+        category: "fix",
+        description:
+          "Beim Genehmigen eines Kind-Antrags ohne Namen der Erziehungsberechtigten ging die Bankverbindung verloren. Jetzt wird in dem Fall trotzdem ein Zahler-Kontakt mit IBAN und Mandat angelegt.",
+      },
+    ],
+  },
+  {
     version: "0.94.4",
     date: "2026-06-14",
     changes: [
