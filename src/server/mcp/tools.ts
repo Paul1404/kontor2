@@ -309,7 +309,7 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "report_finance",
     description:
-      "Annual financial report (Finanzbericht): billed, paid and open totals, per Abteilung and per fee type. Amounts are integer cents.",
+      'Annual financial report (Finanzbericht): billed, paid and open totals, per Abteilung and per fee type. Amounts are decimal EUR strings, e.g. "1234.56".',
     minRole: "vorstand",
     input: v.object({ year: YearInput }),
     execute: (context, input) => call(appRouter.reports.finanzbericht, input, { context }),

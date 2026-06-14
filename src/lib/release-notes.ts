@@ -41,6 +41,22 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.12",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Sperren, Rollenänderungen und erzwungenes Abmelden eines Benutzers wirken jetzt sofort statt erst nach einigen Minuten. Zuvor konnte ein gerade herabgestufter Administrator kurzzeitig weiter mit Adminrechten arbeiten.",
+      },
+      {
+        category: "fix",
+        description:
+          "KI-Zugriff: der Finanzbericht gibt Beträge als Euro-Werte zurück. Die Werkzeugbeschreibung sprach fälschlich von Cent, was eine KI um den Faktor 100 verrechnen konnte.",
+      },
+    ],
+  },
+  {
     version: "0.94.11",
     date: "2026-06-14",
     changes: [

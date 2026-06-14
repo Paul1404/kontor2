@@ -155,7 +155,13 @@ function buildAuth(tenant: Tenant) {
       // refreshed once per day.
       expiresIn: sessionConfig.expiresInDays * 24 * 60 * 60,
       updateAge: sessionConfig.updateAgeHours * 60 * 60,
-      cookieCache: { enabled: true, maxAge: 60 * 5 },
+      // Cookie cache deliberately OFF: with it on, getSession reads the user's
+      // role and banned flag from a signed cookie for up to its maxAge, so a
+      // ban, role demotion or forced logout would only take effect minutes
+      // later (a demoted admin could keep acting as admin in the meantime).
+      // The app validates the session once per request in createContext, so a
+      // store lookup per request is the correct trade for immediate effect.
+      cookieCache: { enabled: false },
     },
     // `defaultRole` MUST be one of our `user_role` enum values: the admin
     // plugin's built-in default is "user", which is not in the enum and makes
