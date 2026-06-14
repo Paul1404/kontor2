@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { membersTable } from "~/server/db/schema/members";
 import { memberTasksTable } from "~/server/db/schema/tasks";
@@ -84,43 +84,98 @@ export const tasksRouter = {
     return { ok: true };
   }),
 
-  /** All open tasks across members, soonest due first, for the worklist page. */
-  worklist: authedProc.handler(async ({ context }) => {
-    const rows = await context.db
-      .select({
-        id: memberTasksTable.id,
-        title: memberTasksTable.title,
-        notes: memberTasksTable.notes,
-        dueDate: memberTasksTable.dueDate,
-        createdAt: memberTasksTable.createdAt,
-        createdByEmail: memberTasksTable.createdByEmail,
-        memberId: membersTable.id,
-        memberNo: membersTable.memberNo,
-        kontaktNo: membersTable.kontaktNo,
-        mitgliedsnummer: membersTable.mitgliedsnummer,
-        adrNr: membersTable.adrNr,
-        vorname: membersTable.vorname,
-        nachname: membersTable.nachname,
-        kurzname: membersTable.kurzname,
-        firma1: membersTable.firma1,
-      })
-      .from(memberTasksTable)
-      .innerJoin(membersTable, eq(membersTable.id, memberTasksTable.memberId))
-      .where(eq(memberTasksTable.status, "open"))
-      .orderBy(sql`${memberTasksTable.dueDate} asc nulls last`, desc(memberTasksTable.createdAt))
-      .limit(500);
-    return rows.map((r) => ({
-      id: r.id,
-      title: r.title,
-      notes: r.notes,
-      dueDate: r.dueDate,
-      createdAt: r.createdAt,
-      createdByEmail: r.createdByEmail,
-      memberId: r.memberId,
-      reference: memberRef(r),
-      name: memberDisplayName(r),
-    }));
-  }),
+  /** Bulk open/done for the worklist multiselect. */
+  setStatusMany: vorstandProc
+    .input(
+      v.object({
+        ids: v.pipe(v.array(v.string()), v.minLength(1)),
+        status: v.picklist(["open", "done"]),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const done = input.status === "done";
+      const res = await context.db
+        .update(memberTasksTable)
+        .set({
+          status: input.status,
+          completedAt: done ? new Date() : null,
+          completedByEmail: done ? context.session!.user.email : null,
+        })
+        .where(inArray(memberTasksTable.id, input.ids))
+        .returning({ id: memberTasksTable.id });
+      return { count: res.length };
+    }),
+
+  /** Bulk delete for the worklist multiselect. */
+  removeMany: vorstandProc
+    .input(v.object({ ids: v.pipe(v.array(v.string()), v.minLength(1)) }))
+    .handler(async ({ context, input }) => {
+      const res = await context.db
+        .delete(memberTasksTable)
+        .where(inArray(memberTasksTable.id, input.ids))
+        .returning({ id: memberTasksTable.id });
+      return { count: res.length };
+    }),
+
+  /**
+   * Tasks across all members for the worklist page, soonest due first. The
+   * `view` filter picks which lifecycle bucket to show: open tasks (default),
+   * already-done ones (kept until deleted), or both.
+   */
+  worklist: authedProc
+    .input(
+      v.optional(v.object({ view: v.optional(v.picklist(["open", "done", "all"]), "open") }), {
+        view: "open",
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const view = input.view;
+      const rows = await context.db
+        .select({
+          id: memberTasksTable.id,
+          title: memberTasksTable.title,
+          notes: memberTasksTable.notes,
+          dueDate: memberTasksTable.dueDate,
+          status: memberTasksTable.status,
+          completedAt: memberTasksTable.completedAt,
+          completedByEmail: memberTasksTable.completedByEmail,
+          createdAt: memberTasksTable.createdAt,
+          createdByEmail: memberTasksTable.createdByEmail,
+          memberId: membersTable.id,
+          memberNo: membersTable.memberNo,
+          kontaktNo: membersTable.kontaktNo,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
+          adrNr: membersTable.adrNr,
+          vorname: membersTable.vorname,
+          nachname: membersTable.nachname,
+          kurzname: membersTable.kurzname,
+          firma1: membersTable.firma1,
+        })
+        .from(memberTasksTable)
+        .innerJoin(membersTable, eq(membersTable.id, memberTasksTable.memberId))
+        .where(view === "all" ? undefined : eq(memberTasksTable.status, view))
+        .orderBy(
+          // Open first when both are shown, then soonest due, newest last.
+          asc(memberTasksTable.status),
+          sql`${memberTasksTable.dueDate} asc nulls last`,
+          desc(memberTasksTable.createdAt),
+        )
+        .limit(500);
+      return rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        notes: r.notes,
+        dueDate: r.dueDate,
+        status: r.status,
+        completedAt: r.completedAt,
+        completedByEmail: r.completedByEmail,
+        createdAt: r.createdAt,
+        createdByEmail: r.createdByEmail,
+        memberId: r.memberId,
+        reference: memberRef(r),
+        name: memberDisplayName(r),
+      }));
+    }),
 
   /** Counts for the sidebar badge: open total and overdue (due date in the past). */
   counts: authedProc.handler(async ({ context }) => {

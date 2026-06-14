@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.93.0",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Wiedervorlagen überarbeitet: Mehrfachauswahl mit gemeinsamem Erledigen, Wieder-öffnen und Löschen. Über den Filter Offen, Erledigt oder Alle lassen sich auch erledigte Aufgaben einsehen. Einzelne Aufgaben können jetzt gelöscht werden.",
+      },
+    ],
+  },
+  {
     version: "0.92.0",
     date: "2026-06-14",
     changes: [
