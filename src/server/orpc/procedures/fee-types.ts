@@ -49,7 +49,7 @@ function buildPatch(input: v.InferOutput<typeof FeeTypePatch>): Record<string, u
 
 export const feeTypesRouter = {
   list: authedProc.input(v.void()).handler(async ({ context }) =>
-    cached(CACHE_NS.feeTypes, "list", 300, () =>
+    cached(context.tenant.key, CACHE_NS.feeTypes, "list", 300, () =>
       // Aliased subquery is intentional: Drizzle elides table qualifiers for
       // column refs inside `sql` templates when used in a top-level select(),
       // so `${contractsTable.art} = ${feeTypesTable.art}` would compile to
@@ -117,7 +117,7 @@ export const feeTypesRouter = {
           return { art };
         }),
       );
-      await invalidateFeeTypeCaches();
+      await invalidateFeeTypeCaches(context.tenant.key);
       return result;
     }),
 
@@ -163,7 +163,7 @@ export const feeTypesRouter = {
           });
         }
       });
-      await invalidateFeeTypeCaches();
+      await invalidateFeeTypeCaches(context.tenant.key);
       return { ok: true };
     }),
 
@@ -202,7 +202,7 @@ export const feeTypesRouter = {
           requestId: context.requestId ?? null,
         });
       });
-      await invalidateFeeTypeCaches();
+      await invalidateFeeTypeCaches(context.tenant.key);
       return { ok: true };
     }),
 
@@ -301,7 +301,7 @@ export const feeTypesRouter = {
 
         return { reassigned: moved.length, fromArt: input.fromArt, toArt: input.toArt };
       });
-      await invalidateFeeTypeCaches();
+      await invalidateFeeTypeCaches(context.tenant.key);
       return result;
     }),
 };

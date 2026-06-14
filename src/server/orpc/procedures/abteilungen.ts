@@ -23,7 +23,7 @@ const DateStringInput = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
 
 export const abteilungenRouter = {
   list: authedProc.input(v.void()).handler(async ({ context }) =>
-    cached(CACHE_NS.abteilungen, "full", 300, () =>
+    cached(context.tenant.key, CACHE_NS.abteilungen, "full", 300, () =>
       // Use raw qualified table names in the correlated subquery. Drizzle's
       // `sql` template elides column qualifiers inside .select(), so passing
       // `${table.column}` here yields `"id" = "id"` (always true).
@@ -79,7 +79,7 @@ export const abteilungenRouter = {
       });
       return inserted;
     });
-    await invalidateAbteilungCaches();
+    await invalidateAbteilungCaches(context.tenant.key);
     return result;
   }),
 
@@ -124,7 +124,7 @@ export const abteilungenRouter = {
         });
         return { ok: true };
       });
-      await invalidateAbteilungCaches();
+      await invalidateAbteilungCaches(context.tenant.key);
       return result;
     }),
 
@@ -172,7 +172,7 @@ export const abteilungenRouter = {
           requestId: context.requestId ?? null,
         });
       });
-      await invalidateAbteilungCaches();
+      await invalidateAbteilungCaches(context.tenant.key);
       return { ok: true };
     }),
 
@@ -208,7 +208,7 @@ export const abteilungenRouter = {
         requestId: context.requestId ?? null,
       });
     });
-    await invalidateAbteilungCaches();
+    await invalidateAbteilungCaches(context.tenant.key);
     return { ok: true };
   }),
 
@@ -304,9 +304,9 @@ export const abteilungenRouter = {
 
         return { reassigned: totalLinks, fromName: from.name, toName: to.name };
       });
-      await invalidateAbteilungCaches();
-      await invalidateMemberCaches();
-      await invalidateFeeTypeCaches();
+      await invalidateAbteilungCaches(context.tenant.key);
+      await invalidateMemberCaches(context.tenant.key);
+      await invalidateFeeTypeCaches(context.tenant.key);
       return result;
     }),
 
@@ -366,8 +366,8 @@ export const abteilungenRouter = {
       }
       return { assigned };
     });
-    await invalidateAbteilungCaches();
-    await invalidateMemberCaches();
+    await invalidateAbteilungCaches(context.tenant.key);
+    await invalidateMemberCaches(context.tenant.key);
     return result;
   }),
 
@@ -424,7 +424,7 @@ export const abteilungenRouter = {
           requestId: context.requestId ?? null,
         });
       });
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return { ok: true };
     }),
 
@@ -484,7 +484,7 @@ export const abteilungenRouter = {
           requestId: context.requestId ?? null,
         });
       });
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return { ok: true };
     }),
 
@@ -523,7 +523,7 @@ export const abteilungenRouter = {
           requestId: context.requestId ?? null,
         });
       });
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return { ok: true };
     }),
 };

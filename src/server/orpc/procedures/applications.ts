@@ -1857,7 +1857,7 @@ export const applicationsRouter = {
         }),
       );
 
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
 
       const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
       const approvedAt = new Date();
