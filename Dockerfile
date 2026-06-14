@@ -2,7 +2,7 @@
 
 # Pinned Bun base shared by every stage. Dependabot (docker ecosystem) bumps it.
 # Pinning keeps builds reproducible and the install cache stable across deploys.
-FROM oven/bun:1.3.11-slim AS base
+FROM oven/bun:1.3.14-slim AS base
 WORKDIR /app
 
 # Install all dependencies (incl. dev) and build. The cache mount keeps Bun's
