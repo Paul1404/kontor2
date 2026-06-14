@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
   Ban,
   CheckCircle2,
@@ -11,10 +13,12 @@ import {
   MailWarning,
   MailX,
   Save,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { PdfViewer } from "~/components/ui/pdf-viewer";
@@ -190,6 +194,29 @@ function AntragDetailPage() {
     onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Öffnen fehlgeschlagen."),
   });
 
+  const setArchived = useMutation({
+    mutationFn: (next: boolean) => orpc.applications.setArchived({ id, archived: next }),
+    onSuccess: (_res, next) => {
+      setMsg(next ? "Antrag archiviert." : "Antrag aus dem Archiv geholt.");
+      invalidate();
+    },
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Aktion fehlgeschlagen."),
+  });
+
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const remove = useMutation({
+    mutationFn: () => orpc.applications.remove({ id }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["applications.list"] });
+      qc.invalidateQueries({ queryKey: ["applications.stats"] });
+      navigate({ to: "/app/antraege" });
+    },
+    onError: (e: unknown) => {
+      setConfirmDelete(false);
+      setMsg(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
+    },
+  });
+
   if (detail.isError) {
     return (
       <QueryError
@@ -224,6 +251,11 @@ function AntragDetailPage() {
         </h1>
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
           <StatusBadge status={a.status} />
+          {a.archivedAt ? (
+            <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+              Archiviert
+            </span>
+          ) : null}
           <span>
             Antrag <span className="font-mono text-foreground">{a.antragsnummer}</span>
           </span>
@@ -492,6 +524,69 @@ function AntragDetailPage() {
           Zum Mitglied
         </Button>
       ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Archive className="size-5 text-muted-foreground" /> Verwaltung
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Archivieren blendet den Antrag aus der Standardliste aus, ohne ihn zu löschen.
+            Endgültiges Löschen entfernt den Antrag samt Dokumenten und kann nicht rückgängig
+            gemacht werden.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={setArchived.isPending}
+              onClick={() => {
+                setMsg(null);
+                setArchived.mutate(!a.archivedAt);
+              }}
+            >
+              {setArchived.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : a.archivedAt ? (
+                <ArchiveRestore className="size-4" />
+              ) : (
+                <Archive className="size-4" />
+              )}
+              {a.archivedAt ? "Aus Archiv holen" : "Archivieren"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              disabled={remove.isPending}
+              onClick={() => {
+                setMsg(null);
+                setConfirmDelete(true);
+              }}
+            >
+              {remove.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
+              Endgültig löschen
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Antrag endgültig löschen?"
+        description={`Der Antrag ${a.antragsnummer} und alle zugehörigen Dokumente werden dauerhaft entfernt. Dies kann nicht rückgängig gemacht werden.`}
+        confirmLabel="Endgültig löschen"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() => remove.mutate()}
+      />
 
       <PdfViewer
         open={viewer !== null}
