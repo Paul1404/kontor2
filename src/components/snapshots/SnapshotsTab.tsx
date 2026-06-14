@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { toast } from "~/components/ui/toaster";
 import { fieldLabel, formatAuditValue, isHiddenField } from "~/lib/audit-labels";
-import { formatDateTime } from "~/lib/format";
+import { formatBytes, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 type SnapshotMeta = {
@@ -449,12 +449,6 @@ function sumDepChanges(d: SnapshotDetail["diffVsCurrent"]): {
     changed += v.changedIds?.length ?? 0;
   }
   return { added, removed, changed };
-}
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} kB`;
-  return `${(n / 1024 / 1024).toFixed(2)} MB`;
 }
 
 function messageOf(err: unknown): string {

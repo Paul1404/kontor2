@@ -15,6 +15,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { FilterChip } from "~/components/ui/filter-chip";
 import { InfoBox } from "~/components/ui/info-box";
 import { QueryError } from "~/components/ui/query-error";
 import { SkeletonText } from "~/components/ui/skeleton";
@@ -318,30 +319,6 @@ function MahnstufeBadge({ stufe }: { stufe: number }) {
   const label = stufe === 1 ? "1. Erinnerung" : stufe === 2 ? "1. Mahnung" : "2. Mahnung";
   const variant = stufe === 1 ? "info" : stufe === 2 ? "warning" : "destructive";
   return <Badge variant={variant}>{label}</Badge>;
-}
-
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-input text-muted-foreground hover:bg-accent hover:text-foreground"
-      }`}
-    >
-      {label}
-    </button>
-  );
 }
 
 type Tone = "primary" | "success" | "info" | "warning";
