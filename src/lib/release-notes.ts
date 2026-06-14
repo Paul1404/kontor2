@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.7",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Beim Zurücksetzen eines einzelnen Feldes aus einem Snapshot wurde eine IBAN im Klartext ins Änderungsprotokoll geschrieben. Solche Geheimfelder werden jetzt auch hier nur noch verkürzt (letzte vier Stellen) protokolliert.",
+      },
+    ],
+  },
+  {
     version: "0.94.6",
     date: "2026-06-14",
     changes: [

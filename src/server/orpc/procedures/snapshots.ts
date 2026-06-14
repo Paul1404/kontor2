@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { and, asc, desc, eq, inArray, lt } from "drizzle-orm";
 import * as v from "valibot";
-import { appendAudit } from "~/server/audit/log";
+import { appendAudit, diff } from "~/server/audit/log";
 import type { DBOrTx } from "~/server/db/client";
 import { memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { attachmentsTable } from "~/server/db/schema/attachments";
@@ -452,7 +452,11 @@ export const snapshotsRouter = {
           actorId: context.session!.user.id,
           actorEmail: context.session!.user.email,
           changes: {
-            [input.fieldName]: { before: before ?? null, after: after ?? null },
+            // Route the field change through diff() so SECRET_COLUMNS (iban1,
+            // passwordEncrypted, vereinsIban) are masked to lastFour/***. Hand
+            // building this object wrote the full cleartext IBAN into the audit
+            // log, defeating the at-rest encryption.
+            ...diff({ [input.fieldName]: before }, { [input.fieldName]: after }),
             __meta: {
               before: null,
               after: {
