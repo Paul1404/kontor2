@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.99.3",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Der sanfte Hintergrundschimmer und die Verlaufsüberschriften nutzen jetzt durchgehend die Markenfarben Navy und Messing. Vorher schimmerten noch Rot, Violett und Cyan aus der Vorgängeranwendung durch.",
+      },
+    ],
+  },
+  {
     version: "0.99.2",
     date: "2026-06-14",
     changes: [
