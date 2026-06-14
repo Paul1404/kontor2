@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.90.3",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Kleinere Oberflächen-Politur: die Rolle wird ausgeschrieben (z. B. Administrator statt admin), und die Trennlinie der oberen Leiste liegt jetzt bündig mit der Linie der Seitenleiste.",
+      },
+    ],
+  },
+  {
     version: "0.90.2",
     date: "2026-06-14",
     changes: [
