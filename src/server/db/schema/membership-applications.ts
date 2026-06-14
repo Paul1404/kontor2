@@ -115,6 +115,13 @@ export const membershipApplicationsTable = pgTable(
 
     emailSent: boolean("email_sent").notNull().default(false),
     isTest: boolean("is_test").notNull().default(false),
+    /**
+     * When set, the application is archived: kept for the record but hidden from
+     * the default Anträge list. Reversible (unarchive clears it). Independent of
+     * `status` so a genehmigt/abgelehnt application can be tidied away without
+     * losing its outcome.
+     */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -123,6 +130,7 @@ export const membershipApplicationsTable = pgTable(
     index("membership_applications_status_idx").on(t.status, t.createdAt),
     index("membership_applications_name_idx").on(t.nachname, t.vorname),
     index("membership_applications_email_idx").on(t.email),
+    index("membership_applications_archived_idx").on(t.archivedAt),
   ],
 );
 

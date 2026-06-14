@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.92.0",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Anträge lassen sich jetzt archivieren und endgültig löschen. Archivierte Anträge sind über den Filter Archiviert weiter einsehbar, tauchen aber nicht mehr in der Standardliste auf. Löschen entfernt den Antrag samt Dokumenten dauerhaft.",
+      },
+    ],
+  },
+  {
     version: "0.91.3",
     date: "2026-06-14",
     changes: [

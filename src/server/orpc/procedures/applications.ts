@@ -67,7 +67,7 @@ import { resolveClubLogo } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { BeitrittserklaerungDocument } from "~/server/pdf/templates/beitrittserklaerung";
 import { rateLimit } from "~/server/redis/client";
-import { getObject, presignDownload, putObject } from "~/server/s3/client";
+import { deleteObject, getObject, presignDownload, putObject } from "~/server/s3/client";
 import { invalidateMemberCaches } from "~/server/search/cache";
 import { formatIbanGrouped, normalizeIban, validateIban } from "~/server/sepa/iban";
 import type { Tenant } from "~/server/tenants/registry";
@@ -1264,6 +1264,8 @@ export const applicationsRouter = {
           null,
         ),
         includeTest: v.optional(v.boolean(), false),
+        /** Which archive bucket to show: active (default), only archived, or all. */
+        archived: v.optional(v.picklist(["aktiv", "archiviert", "alle"]), "aktiv"),
         page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
         pageSize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
       }),
@@ -1273,6 +1275,8 @@ export const applicationsRouter = {
       const conds = [];
       if (!input.includeTest) conds.push(eq(t.isTest, false));
       if (input.status) conds.push(eq(t.status, input.status));
+      if (input.archived === "aktiv") conds.push(isNull(t.archivedAt));
+      else if (input.archived === "archiviert") conds.push(sql`${t.archivedAt} is not null`);
       const q = input.q.trim();
       if (q) {
         const like = `%${escapeLike(q)}%`;
@@ -1301,6 +1305,7 @@ export const applicationsRouter = {
           mitgliedschaftTyp: t.mitgliedschaftTyp,
           jahresbeitrag: t.jahresbeitrag,
           isTest: t.isTest,
+          archivedAt: t.archivedAt,
           createdAt: t.createdAt,
         })
         .from(t)
@@ -1417,6 +1422,94 @@ export const applicationsRouter = {
         .where(eq(t.id, input.id))
         .returning({ id: t.id });
       if (res.length === 0) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+      return { ok: true };
+    }),
+
+  /**
+   * Archive or unarchive an application. Archiving keeps the row for the record
+   * but hides it from the default list; it is fully reversible. Independent of
+   * the workflow status, so a genehmigt/abgelehnt Antrag can be tidied away.
+   */
+  setArchived: vorstandProc
+    .input(v.object({ id: v.pipe(v.string(), v.uuid()), archived: v.boolean() }))
+    .handler(async ({ context, input }) => {
+      const t = membershipApplicationsTable;
+      const [app] = await context.db
+        .select({ id: t.id, archivedAt: t.archivedAt })
+        .from(t)
+        .where(eq(t.id, input.id))
+        .limit(1);
+      if (!app) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+      const next = input.archived ? new Date() : null;
+      await context.db
+        .update(t)
+        .set({ archivedAt: next, updatedAt: new Date() })
+        .where(eq(t.id, input.id));
+      await appendAudit(context.db, {
+        entityType: "membership_application",
+        entityId: input.id,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: {
+          archived: { before: app.archivedAt != null, after: input.archived },
+        },
+        requestId: context.requestId ?? null,
+      });
+      return { ok: true };
+    }),
+
+  /**
+   * Permanently delete an application and its stored documents. Use for test or
+   * spam submissions, not routine cleanup (prefer archive). The database cascade
+   * removes the file and token rows; the S3 objects are deleted best-effort
+   * first so an orphaned key does not block the row delete. The email and audit
+   * log entries remain as a historical trail.
+   */
+  remove: vorstandProc
+    .input(v.object({ id: v.pipe(v.string(), v.uuid()) }))
+    .handler(async ({ context, input }) => {
+      const t = membershipApplicationsTable;
+      const [app] = await context.db
+        .select({ id: t.id, antragsnummer: t.antragsnummer, status: t.status })
+        .from(t)
+        .where(eq(t.id, input.id))
+        .limit(1);
+      if (!app) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+
+      const files = await context.db
+        .select({ s3Key: membershipApplicationFilesTable.s3Key })
+        .from(membershipApplicationFilesTable)
+        .where(eq(membershipApplicationFilesTable.applicationId, input.id));
+      for (const f of files) {
+        try {
+          await deleteObject(f.s3Key);
+        } catch (err) {
+          // A missing or already-deleted object must not block the row delete.
+          logger.warn("antrag delete: S3 object cleanup failed", {
+            err: err instanceof Error ? err.message : String(err),
+            s3Key: f.s3Key,
+            applicationId: input.id,
+          });
+        }
+      }
+
+      // Record the deletion before the row vanishes so the audit trail keeps it.
+      await appendAudit(context.db, {
+        entityType: "membership_application",
+        entityId: input.id,
+        action: "delete",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: {
+          antragsnummer: { before: app.antragsnummer, after: null },
+          status: { before: app.status, after: null },
+        },
+        requestId: context.requestId ?? null,
+      });
+      await context.db.delete(t).where(eq(t.id, input.id));
       return { ok: true };
     }),
 
@@ -1831,7 +1924,7 @@ export const applicationsRouter = {
     const rows = await context.db
       .select({ status: t.status, n: count() })
       .from(t)
-      .where(eq(t.isTest, false))
+      .where(and(eq(t.isTest, false), isNull(t.archivedAt)))
       .groupBy(t.status);
     const byStatus: Record<string, number> = {};
     let total = 0;
@@ -1843,7 +1936,7 @@ export const applicationsRouter = {
       await context.db
         .select({ revenue: sql<string>`coalesce(sum(${t.jahresbeitrag}), 0)::text` })
         .from(t)
-        .where(and(eq(t.isTest, false), eq(t.status, "genehmigt")))
+        .where(and(eq(t.isTest, false), isNull(t.archivedAt), eq(t.status, "genehmigt")))
     )[0];
     return { total, byStatus, revenueApproved: revenueRow?.revenue ?? "0" };
   }),

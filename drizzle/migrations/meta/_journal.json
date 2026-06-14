@@ -414,6 +414,13 @@
       "when": 1781383728638,
       "tag": "0058_giant_black_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1781424253553,
+      "tag": "0059_cynical_thundra",
+      "breakpoints": true
     }
   ]
 }

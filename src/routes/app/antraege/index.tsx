@@ -47,18 +47,28 @@ const TABS: { key: StatusFilter; label: string }[] = [
   { key: "abgelehnt", label: "Abgelehnt" },
 ];
 
+type ArchiveView = "aktiv" | "archiviert" | "alle";
+
+const ARCHIVE_TABS: { key: ArchiveView; label: string }[] = [
+  { key: "aktiv", label: "Aktiv" },
+  { key: "archiviert", label: "Archiviert" },
+  { key: "alle", label: "Alle" },
+];
+
 function AntraegeListPage() {
   const [q, setQ] = useState("");
   const [tab, setTab] = useState<StatusFilter>("alle");
+  const [archived, setArchived] = useState<ArchiveView>("aktiv");
 
   const [exporting, setExporting] = useState(false);
 
   const list = useQuery({
-    queryKey: ["applications.list", q, tab],
+    queryKey: ["applications.list", q, tab, archived],
     queryFn: () =>
       orpc.applications.list({
         q,
         status: tab === "alle" ? null : tab,
+        archived,
         page: 1,
         pageSize: 100,
       }),
@@ -132,6 +142,24 @@ function AntraegeListPage() {
         </div>
       </div>
 
+      <div className="flex items-center gap-1 self-start rounded-lg border border-border p-0.5">
+        {ARCHIVE_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setArchived(t.key)}
+            className={cn(
+              "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+              archived === t.key
+                ? "bg-primary/10 text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {list.isError ? (
         <QueryError
           title="Anträge konnten nicht geladen werden"
@@ -171,6 +199,11 @@ function AntraegeListPage() {
                       {r.vorname} {r.nachname}
                       {r.isTest ? (
                         <span className="ml-2 text-xs text-muted-foreground">(Test)</span>
+                      ) : null}
+                      {r.archivedAt ? (
+                        <Badge className="ml-2 bg-muted font-normal text-muted-foreground">
+                          Archiviert
+                        </Badge>
                       ) : null}
                     </td>
                     <td className="px-4 py-3 capitalize">{r.antragstyp}</td>
