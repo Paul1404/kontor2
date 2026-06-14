@@ -112,7 +112,7 @@ jobs:
       # instead of at deploy time. The GitHub Actions cache persists the Bun
       # install and build layers between runs.
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
