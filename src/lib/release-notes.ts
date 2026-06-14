@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.96.5",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Aufrufe der bisherigen Adresse svuwv.sv-untereuerheim.de werden jetzt automatisch auf svu.kontor2.com weitergeleitet. Alte Lesezeichen und Links funktionieren damit weiter.",
+      },
+    ],
+  },
+  {
     version: "0.96.4",
     date: "2026-06-14",
     changes: [
