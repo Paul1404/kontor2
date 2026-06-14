@@ -515,7 +515,9 @@ export const reportsRouter = {
         eintritt: membersTable.eintritt,
         austritt: membersTable.austritt,
         verstorbenAm: membersTable.verstorbenAm,
-        aktivPasiv: membersTable.status,
+        // Derived aktiv/passiv (real Abteilung), matching the selection export
+        // and the member badge. The stored `status` column is stale.
+        aktivPasiv: aktivPasivLabel(),
       })
       .from(membersTable)
       .where(where)
