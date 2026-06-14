@@ -18,6 +18,9 @@ export type OnboardContractValues = {
   betrag: string | null;
   vertragBegin: Date | null;
   sollstellung: string | null;
+  /** Divergent account holder (abweichender Kontoinhaber), or null when the
+   *  member's own name is the debtor. Printed as the SEPA debtor name. */
+  abwKontoInh?: string | null;
 };
 
 export type OnboardSepaValues = {
@@ -141,6 +144,7 @@ export async function onboardMember(
       betrag: opts.contract.betrag,
       sollstellung: opts.contract.sollstellung ?? null,
       vertragBegin: opts.contract.vertragBegin,
+      abwKontoInh: opts.contract.abwKontoInh ?? null,
     } as never);
   }
 

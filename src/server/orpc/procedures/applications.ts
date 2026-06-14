@@ -41,6 +41,7 @@ import {
   realAge,
 } from "~/server/domain/application/antragstyp";
 import { calculateFee } from "~/server/domain/application/fees";
+import { divergentKontoinhaber } from "~/server/domain/application/payer";
 import {
   fileBasename,
   mapSvumsApplication,
@@ -1636,6 +1637,14 @@ export const applicationsRouter = {
         primaryPatch.vertreterPlz = app.plz;
         primaryPatch.vertreterOrt = app.ort;
       }
+      // Abweichender Kontoinhaber: zahlt der Antragsteller von einem fremden
+      // Konto (Kontoinhaber != Antragsteller), wird der echte Kontoinhaber als
+      // SEPA-Lastschrift-Name gefuehrt. Nur fuer Selbstzahler (Einzel/Familie);
+      // bei Minderjaehrigen ist der Zahler ohnehin der Vertreter (Kontakt).
+      const selfPayerAbwKontoInh = isMinor
+        ? null
+        : divergentKontoinhaber(app.kontoinhaber, app.vorname, app.nachname);
+
       // Bei Minderjährigen liegt die Bankverbindung beim Erziehungsberechtigten
       // (Zahler), nicht beim Kind. Sonst (Einzel/Familie) zahlt der
       // Antragsteller selbst.
@@ -1643,6 +1652,7 @@ export const applicationsRouter = {
         primaryPatch.iban1 = ibanPlain;
         primaryPatch.iban1Last4 = app.ibanLast4 ?? lastFour(ibanPlain);
         primaryPatch.bic1 = app.bic;
+        if (selfPayerAbwKontoInh) primaryPatch.abwKontoInh = selfPayerAbwKontoInh;
       }
 
       const contract =
@@ -1654,6 +1664,7 @@ export const applicationsRouter = {
               betrag: input.betrag ?? app.jahresbeitrag ?? null,
               sollstellung: null,
               vertragBegin: new Date(),
+              abwKontoInh: selfPayerAbwKontoInh,
             }
           : null;
       const sepa = ibanPlain
