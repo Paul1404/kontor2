@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { toast } from "~/components/ui/toaster";
-import { formatDateTime } from "~/lib/format";
+import { formatBytes, formatDateTime } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
@@ -380,10 +380,4 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
       </ConfirmDialog>
     </Card>
   );
-}
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} kB`;
-  return `${(n / 1024 / 1024).toFixed(2)} MB`;
 }

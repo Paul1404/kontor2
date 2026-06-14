@@ -6,6 +6,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { FilterChip } from "~/components/ui/filter-chip";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
@@ -284,30 +285,6 @@ function RequestRow({ row, onAction }: { row: Row; onAction: () => void }) {
         </p>
       )}
     </li>
-  );
-}
-
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-input text-muted-foreground hover:bg-accent hover:text-foreground"
-      }`}
-    >
-      {label}
-    </button>
   );
 }
 

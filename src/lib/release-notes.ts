@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.99.2",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Aufräumen ohne sichtbare Änderung: doppelte Filter-Chips und die Größenformatierung wurden zu gemeinsamen Bausteinen zusammengeführt.",
+      },
+    ],
+  },
+  {
     version: "0.99.1",
     date: "2026-06-14",
     changes: [

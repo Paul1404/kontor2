@@ -106,6 +106,13 @@ export function formatCurrency(value: string | number | null | undefined): strin
   return new Intl.NumberFormat(DE, { style: "currency", currency: "EUR" }).format(n);
 }
 
+/** Human-readable byte size: B, kB (1 decimal), MB (2 decimals). */
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} kB`;
+  return `${(n / 1024 / 1024).toFixed(2)} MB`;
+}
+
 export function memberStatus(opts: {
   austritt: Date | string | null;
   verstorbenAm: Date | string | null;
