@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.91.1",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Der Filter Aktiv zeigt jetzt nur noch sport-aktive Mitglieder. Passive (fördernde) Mitglieder erscheinen nicht mehr in der Aktiv-Liste, sondern über die Kachel Passiv. Die Zähler Aktiv und Passiv passen damit zum Mitglieder-Badge.",
+      },
+    ],
+  },
+  {
     version: "0.91.0",
     date: "2026-06-14",
     changes: [

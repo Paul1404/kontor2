@@ -105,12 +105,14 @@ function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>)
     conditions.push(memberHasPendingExit() as never);
   }
   if (input.status === "aktiv") {
-    // Mirror the members list: an explicit "aktiv" status means still a member
-    // today and not deceased, enforced directly so it stays correct even when
-    // `includeAusgetretene` is set. Otherwise exited members leak into the
-    // "aktiv" CSV and the export disagrees with the on-screen list.
+    // Mirror the members list: "aktiv" means a living member (not exited, not
+    // deceased) MIT aktiver Mitgliedschaft in einer echten Abteilung. The
+    // Abteilung condition keeps the CSV in sync with the on-screen Aktiv-Liste
+    // und dem Aktiv/Passiv-Badge; ohne sie rutschten passive Mitglieder in die
+    // Aktiv-CSV. Direkt erzwungen, damit es auch bei `includeAusgetretene` gilt.
     conditions.push(memberNotExited() as never);
     conditions.push(memberNotDeceased() as never);
+    conditions.push(memberHasRealAbteilung() as never);
   }
   if (input.status === "passiv") {
     // Passiv is derived, not stored: a live member with no active membership
