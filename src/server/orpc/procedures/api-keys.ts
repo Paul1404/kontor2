@@ -79,6 +79,11 @@ export const apiKeysRouter = {
           name: input.name,
           userId: input.userId,
           expiresIn: input.expiresInDays ? input.expiresInDays * 24 * 60 * 60 : null,
+          // Freeze the role granted at issuance. The MCP resolver caps the
+          // key's effective role at min(grantedRole, owner's current role), so
+          // a later promotion of the owner can never silently widen the key
+          // beyond the role an admin confirmed here (issue #191).
+          metadata: { grantedRole: owner.role },
         },
       });
 

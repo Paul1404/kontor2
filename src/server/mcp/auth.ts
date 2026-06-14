@@ -1,7 +1,31 @@
 import { eq } from "drizzle-orm";
 import { auth, type Session } from "~/server/auth/auth";
 import { users } from "~/server/db/schema";
+import type { Role } from "~/server/db/schema/auth";
 import type { AppContext } from "~/server/orpc/context";
+
+const ROLE_RANK: Record<Role, number> = { readonly: 1, vorstand: 2, admin: 3 };
+
+function safeParse(s: string): unknown {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
+/** The lower-privilege of two roles (the cap). Unknown grant = no cap. */
+export function lowerRole(granted: Role | undefined, live: Role): Role {
+  if (!granted || !(granted in ROLE_RANK)) return live;
+  return ROLE_RANK[granted] <= ROLE_RANK[live] ? granted : live;
+}
+
+/** Role frozen on the key at issuance (issue #191), if present. */
+export function grantedRoleOf(metadata: unknown): Role | undefined {
+  const raw = typeof metadata === "string" ? safeParse(metadata) : metadata;
+  const role = (raw as { grantedRole?: unknown } | null)?.grantedRole;
+  return typeof role === "string" && role in ROLE_RANK ? (role as Role) : undefined;
+}
 
 /**
  * Turn a raw `x-api-key` value into a full AppContext for the MCP endpoint.
@@ -31,6 +55,14 @@ export async function resolveApiKeyContext(
     .limit(1);
   if (!user || user.banned) return null;
 
+  // Cap the key's effective role at min(role granted at issuance, owner's
+  // current role). This stops a later promotion of the owner from silently
+  // widening an already-issued key beyond what an admin confirmed (#191).
+  // Keys issued before grantedRole existed have no cap (fall back to live role).
+  const liveRole = (user.role as Role | undefined) ?? "readonly";
+  const effectiveRole = lowerRole(grantedRoleOf(result.key.metadata), liveRole);
+  const cappedUser = { ...user, role: effectiveRole };
+
   const now = new Date();
   // Narrow cast: Session is inferred from better-auth's getSession return.
   // The shape below mirrors it (admin-plugin fields included); the key id in
@@ -47,7 +79,7 @@ export async function resolveApiKeyContext(
       userAgent: "mcp-api-key",
       impersonatedBy: null,
     },
-    user,
+    user: cappedUser,
   } as unknown as Session;
 
   return { ...base, session };
