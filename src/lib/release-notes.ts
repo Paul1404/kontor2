@@ -41,6 +41,22 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.3",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Antragsgenehmigung: zahlt ein Antragsteller von einem fremden Konto, wird der abweichende Kontoinhaber jetzt übernommen und als Name der SEPA-Lastschrift geführt. Vorher erschien fälschlich der Name des Mitglieds.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Beim Genehmigen ohne Beitragsart weist ein Hinweis jetzt darauf hin, dass kein Vertrag angelegt wird und das Mitglied bis dahin nicht abgerechnet wird.",
+      },
+    ],
+  },
+  {
     version: "0.94.2",
     date: "2026-06-14",
     changes: [

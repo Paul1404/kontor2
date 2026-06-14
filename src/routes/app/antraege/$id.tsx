@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   Archive,
   ArchiveRestore,
   ArrowLeft,
@@ -455,6 +456,15 @@ function AntragDetailPage() {
                   />
                 </Label>
               </div>
+              {art === "" ? (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-300/60 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <span>
+                    Ohne Beitragsart wird kein Vertrag angelegt. Das Mitglied wird dann nicht
+                    abgerechnet, bis später ein Vertrag erfasst wird.
+                  </span>
+                </div>
+              ) : null}
               <Button
                 type="button"
                 className="self-start"
