@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.96.0",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "KI-Zugriff: ein neues Werkzeug setzt die Altersgrenzen einer Beitragsart (Alter von/bis). Damit lässt sich die Datenqualitätsprüfung Beitragsart passt nicht zum Alter auch per Assistent scharf schalten. Nur diese Felder sind setzbar, die Änderung wird protokolliert; übrige Einstellungen bleiben gesperrt.",
+      },
+    ],
+  },
+  {
     version: "0.95.9",
     date: "2026-06-14",
     changes: [
