@@ -118,7 +118,7 @@ export const dangerZoneRouter = {
         });
         return { deleted: targets.length };
       });
-      if (result.deleted > 0) await invalidateMemberCaches();
+      if (result.deleted > 0) await invalidateMemberCaches(context.tenant.key);
       return result;
     }),
 
@@ -187,7 +187,7 @@ export const dangerZoneRouter = {
         });
         return { purged: targets.length };
       });
-      if (result.purged > 0) await invalidateMemberCaches();
+      if (result.purged > 0) await invalidateMemberCaches(context.tenant.key);
       return result;
     }),
 
@@ -318,7 +318,7 @@ export const dangerZoneRouter = {
           },
         });
       });
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return { wiped: true, totalsBefore };
     }),
 };

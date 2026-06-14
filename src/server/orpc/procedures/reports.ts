@@ -437,7 +437,7 @@ export const reportsRouter = {
   abteilungenList: authedProc
     .input(v.void())
     .handler(async ({ context }) =>
-      cached(CACHE_NS.abteilungen, "reports-list", 300, () =>
+      cached(context.tenant.key, CACHE_NS.abteilungen, "reports-list", 300, () =>
         context.db
           .select({ id: abteilungenTable.id, name: abteilungenTable.name })
           .from(abteilungenTable)

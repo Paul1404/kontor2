@@ -121,7 +121,11 @@ export type IngestResult = {
   validationReport: BatchReport;
 };
 
-export async function runIngest(db: DB, input: IngestInput): Promise<IngestResult> {
+export async function runIngest(
+  db: DB,
+  input: IngestInput,
+  tenantKey: string,
+): Promise<IngestResult> {
   const auditSource = input.source === "sql_upload" ? "import" : "svums_push";
   const errors: IngestResult["errors"] = [];
 
@@ -1006,7 +1010,7 @@ export async function runIngest(db: DB, input: IngestInput): Promise<IngestResul
     })
     .where(eq(importBatchesTable.id, batch.id));
 
-  await invalidateMemberCaches();
+  await invalidateMemberCaches(tenantKey);
 
   return {
     batchId: batch.id,

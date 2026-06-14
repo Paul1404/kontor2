@@ -39,7 +39,7 @@ export const dashboardRouter = {
     // a short TTL as a backstop. The `since` (month start) is part of the
     // semantics but not the cache key — at month rollover the stale entry
     // expires within the TTL.
-    cached(CACHE_NS.dashboard, "stats", 120, async () => {
+    cached(context.tenant.key, CACHE_NS.dashboard, "stats", 120, async () => {
       const since = startOfMonth();
       // All counts must exclude soft-deleted members or the dashboard drifts
       // from the member list / fee runs. The legacy Linear `geloscht` flag is
@@ -234,7 +234,7 @@ export const dashboardRouter = {
    * Cached longer than the KPIs -- these move slowly and are heavier to compute.
    */
   insights: authedProc.input(v.void()).handler(async ({ context }) =>
-    cached(CACHE_NS.dashboard, "insights", 300, async () => {
+    cached(context.tenant.key, CACHE_NS.dashboard, "insights", 300, async () => {
       const [membersOverTime, revenueRows, funnelRows, zahlartRows, pyramidRows, dqTrendRows] =
         await Promise.all([
           context.db.execute<{

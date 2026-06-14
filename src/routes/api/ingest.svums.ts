@@ -35,6 +35,7 @@ async function handle({ request }: { request: Request }): Promise<Response> {
     { db },
     { env },
     { runIngest },
+    { primaryTenant },
     { logger },
     { acquireNonce, rateLimit },
   ] = await Promise.all([
@@ -42,6 +43,7 @@ async function handle({ request }: { request: Request }): Promise<Response> {
     import("~/server/db/client"),
     import("~/server/env"),
     import("~/server/importer/ingest-pipeline"),
+    import("~/server/tenants/resolve"),
     import("~/server/lib/logger"),
     import("~/server/redis/client"),
   ]);
@@ -120,27 +122,31 @@ async function handle({ request }: { request: Request }): Promise<Response> {
     });
   }
 
-  const result = await runIngest(db(), {
-    source: "svums_push",
-    filename: payload.batch?.svumsBatchId ?? null,
-    fileSizeBytes: raw.length,
-    members: payload.members as never,
-    feeTypes: payload.feeTypes as never,
-    contracts: payload.contracts as never,
-    sepa: payload.sepaMandates as never,
-    relationships: payload.relationships as never,
-    inter: payload.inter as never,
-    interes: payload.interes as never,
-    mgsolln: payload.mgsolln as never,
-    mgartdat: payload.mgartdat as never,
-    sportarten: payload.sportarten as never,
-    fachverbaende: payload.fachverbaende as never,
-    lastprot: payload.lastprot as never,
-    lastproth: payload.lastproth as never,
-    lastprots: payload.lastprots as never,
-    lastprotsh: payload.lastprotsh as never,
-    requestId: request.headers.get("x-request-id"),
-  });
+  const result = await runIngest(
+    db(),
+    {
+      source: "svums_push",
+      filename: payload.batch?.svumsBatchId ?? null,
+      fileSizeBytes: raw.length,
+      members: payload.members as never,
+      feeTypes: payload.feeTypes as never,
+      contracts: payload.contracts as never,
+      sepa: payload.sepaMandates as never,
+      relationships: payload.relationships as never,
+      inter: payload.inter as never,
+      interes: payload.interes as never,
+      mgsolln: payload.mgsolln as never,
+      mgartdat: payload.mgartdat as never,
+      sportarten: payload.sportarten as never,
+      fachverbaende: payload.fachverbaende as never,
+      lastprot: payload.lastprot as never,
+      lastproth: payload.lastproth as never,
+      lastprots: payload.lastprots as never,
+      lastprotsh: payload.lastprotsh as never,
+      requestId: request.headers.get("x-request-id"),
+    },
+    primaryTenant().key,
+  );
 
   return Response.json({
     ok: true,

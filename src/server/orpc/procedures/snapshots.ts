@@ -387,7 +387,7 @@ export const snapshotsRouter = {
         return { applied: true, diff: diffPayload, snapshotId: input.snapshotId };
       });
 
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return result;
     }),
 
@@ -472,7 +472,7 @@ export const snapshotsRouter = {
         });
         return { applied: true, before, after };
       });
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return result;
     }),
 
@@ -656,7 +656,7 @@ export const snapshotsRouter = {
           });
         }
       }
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return { perMember, applied: !input.dryRun };
     }),
 };

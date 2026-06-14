@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.4",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Sicherheitsfix für die Mandantenfähigkeit: zwischengespeicherte Daten (Mitgliederliste, Suche, Dashboard, Abteilungen, Beitragsarten) werden jetzt streng pro Verein getrennt. Vorher konnten sich bei gleichen Abfragen Daten zwischen Vereinen über den gemeinsamen Cache vermischen.",
+      },
+    ],
+  },
+  {
     version: "0.94.3",
     date: "2026-06-14",
     changes: [

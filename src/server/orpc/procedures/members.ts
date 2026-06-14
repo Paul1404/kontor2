@@ -324,7 +324,7 @@ const OnboardSepa = v.object({
 
 export const membersRouter = {
   list: authedProc.input(ListInput).handler(async ({ context, input }) => {
-    const cacheKey = searchCacheKey(input);
+    const cacheKey = searchCacheKey(context.tenant.key, input);
     const cached = await getCached<{ rows: unknown[]; total: number }>(cacheKey);
     if (cached) return cached;
 
@@ -789,7 +789,7 @@ export const membersRouter = {
     }),
 
   abteilungenList: authedProc.input(v.void()).handler(async ({ context }) =>
-    cached(CACHE_NS.abteilungen, "members-list", 300, () =>
+    cached(context.tenant.key, CACHE_NS.abteilungen, "members-list", 300, () =>
       context.db
         .select({
           id: abteilungenTable.id,
@@ -811,7 +811,7 @@ export const membersRouter = {
    * which is invalidated whenever a member changes.
    */
   stats: authedProc.input(v.void()).handler(async ({ context }) =>
-    cached(CACHE_NS.dashboard, "members-stats", 120, async () => {
+    cached(context.tenant.key, CACHE_NS.dashboard, "members-stats", 120, async () => {
       const notDeleted = memberNotDeleted();
       // "Lebt": still a member today (a future-dated Austritt still counts).
       const lebt = and(notDeleted, memberNotExited(), memberNotDeceased());
@@ -960,7 +960,7 @@ export const membersRouter = {
         return { mitgliedsnummer: existing.mitgliedsnummer };
       });
 
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return { ok: true, mitgliedsnummer: result.mitgliedsnummer };
     }),
 
@@ -1056,7 +1056,7 @@ export const membersRouter = {
         }),
       );
 
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return result;
     }),
 
@@ -1280,7 +1280,7 @@ export const membersRouter = {
 
         return { winnerId: w, loserId: l, winnerRef, loserRef, moved, skipped };
       });
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return result;
     }),
 
@@ -1322,7 +1322,7 @@ export const membersRouter = {
         });
       });
 
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return { ok: true };
     }),
 
@@ -1364,7 +1364,7 @@ export const membersRouter = {
         });
       });
 
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return { ok: true };
     }),
 
@@ -1587,7 +1587,7 @@ export const membersRouter = {
         return { changed, skipped };
       });
 
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return { ok: true, ...result };
     }),
 
@@ -1786,7 +1786,7 @@ export const membersRouter = {
       };
     });
 
-    await invalidateMemberCaches();
+    await invalidateMemberCaches(context.tenant.key);
     return { ok: true, ...result };
   }),
 
@@ -1926,7 +1926,7 @@ export const membersRouter = {
         return { mitgliedsnummer: member.mitgliedsnummer };
       });
 
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return { ok: true, ...result };
     }),
 
@@ -2008,7 +2008,7 @@ export const membersRouter = {
         ),
       );
 
-      await invalidateMemberCaches();
+      await invalidateMemberCaches(context.tenant.key);
       return result;
     }),
 };

@@ -73,10 +73,14 @@ describe.skipIf(!onTestDb)("ingest preserves explicit Zahler-Override (integrati
     expect(before[0]?.zahlerMemberId).toBe(zahler?.id);
 
     // Re-import the same contract as Linear would deliver it: no Zahler field.
-    await runIngest(db(), {
-      source: "sql_upload",
-      contracts: [{ AdrNr: memberAdr, VertragNr: "V1", Art: 1, Betrag: "60" }],
-    });
+    await runIngest(
+      db(),
+      {
+        source: "sql_upload",
+        contracts: [{ AdrNr: memberAdr, VertragNr: "V1", Art: 1, Betrag: "60" }],
+      },
+      "svu",
+    );
 
     const after = await db()
       .select({ id: contractsTable.id, zahlerMemberId: contractsTable.zahlerMemberId })
@@ -108,13 +112,17 @@ describe.skipIf(!onTestDb)("ingest preserves explicit Zahler-Override (integrati
         isDirectDebit: true,
       });
 
-    await runIngest(db(), {
-      source: "sql_upload",
-      contracts: [
-        { AdrNr: memberAdr, VertragNr: "V1", Art: 1, Betrag: "60" },
-        { AdrNr: memberAdr, VertragNr: "V2", Art: 2, Betrag: "30" },
-      ],
-    });
+    await runIngest(
+      db(),
+      {
+        source: "sql_upload",
+        contracts: [
+          { AdrNr: memberAdr, VertragNr: "V1", Art: 1, Betrag: "60" },
+          { AdrNr: memberAdr, VertragNr: "V2", Art: 2, Betrag: "30" },
+        ],
+      },
+      "svu",
+    );
 
     const [v2] = await db()
       .select({ zahlerMemberId: contractsTable.zahlerMemberId })
