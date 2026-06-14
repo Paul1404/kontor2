@@ -373,15 +373,18 @@
  * disabled under prefers-reduced-motion.
  */
 :root {
-  --aurora-1: rgba(220, 38, 38, 0.14);
-  --aurora-2: rgba(168, 85, 247, 0.12);
-  --aurora-3: rgba(56, 189, 248, 0.12);
+  /* On-brand ambient wash: navy (brand primary), Messing/brass (brand accent),
+     and a soft steel blue. Replaces the old svums red/violet/cyan so the glow
+     reads as one identity with the Navy-&-Messing brand. */
+  --aurora-1: rgba(51, 92, 153, 0.13);
+  --aurora-2: rgba(193, 148, 86, 0.11);
+  --aurora-3: rgba(90, 130, 180, 0.1);
 }
 
 .dark {
-  --aurora-1: rgba(220, 38, 38, 0.2);
-  --aurora-2: rgba(168, 85, 247, 0.16);
-  --aurora-3: rgba(56, 189, 248, 0.14);
+  --aurora-1: rgba(74, 116, 180, 0.2);
+  --aurora-2: rgba(200, 162, 96, 0.16);
+  --aurora-3: rgba(96, 140, 190, 0.15);
 }
 
 body::before,
@@ -475,12 +478,7 @@ body::after {
 }
 
 .dark .brand-gradient-text {
-  background-image: linear-gradient(
-    135deg,
-    hsl(0 84% 67%) 0%,
-    hsl(24 95% 64%) 50%,
-    hsl(330 86% 70%) 100%
-  );
+  background-image: linear-gradient(135deg, hsl(214 58% 64%) 0%, hsl(40 60% 62%) 100%);
 }
 
 /*
