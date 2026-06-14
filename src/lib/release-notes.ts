@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.10",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "SEPA-Beitragslauf robuster: ein neues Mandat erzeugt auch bei mehreren Verträgen nur noch eine Erstlastschrift (FRST). Anteilige Beiträge, die auf 0,00 EUR runden, erzeugen keine ungültige Lastschrift mehr. Die Vorabankündigung gilt nur als versendet, wenn mindestens eine Mail wirklich rausging, und Fehler werden jetzt protokolliert statt verschluckt.",
+      },
+    ],
+  },
+  {
     version: "0.94.9",
     date: "2026-06-14",
     changes: [

@@ -139,6 +139,11 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
   const excluded: PreviewExclusion[] = [];
   const invoices: PreviewInvoice[] = [];
   const conflicts: Preview["conflicts"] = [];
+  // A new mandate is FRST only on its first use in this run. If the same
+  // mandate is hit by more than one contract (e.g. a family payer with two
+  // contracts), every later use must be RCUR, or the pain.008 carries two FRST
+  // for one mandate, which the bank rejects.
+  const frstMandateIds = new Set<string>();
   const issues: Preview["issues"] = [];
 
   // Load all active contracts for the year. JOIN to members so we can
@@ -429,6 +434,20 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
     const baseCents = applyFactor(toCents(baseAmount), proration.factor);
     const totalCents = baseCents + (includeAufn ? toCents(aufnRaw) : 0n);
 
+    if (totalCents <= 0n) {
+      // A positive fee can prorate down to 0,00 (e.g. a few days at a low rate).
+      // A 0,00 SEPA direct-debit line is invalid, so skip it rather than emit it.
+      excluded.push({
+        memberId: member.id,
+        memberName,
+        contractId: contract.id,
+        vertragNr: contract.vertragNr,
+        artName: contract.artName,
+        reason: "Anteiliger Betrag rundet auf 0,00 EUR, keine Lastschrift erzeugt",
+      });
+      continue;
+    }
+
     const warnings: string[] = [];
     if (sel.conflict) {
       warnings.push("Mehrere aktive Mandate -- bitte prüfen");
@@ -439,7 +458,13 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
       });
     }
 
-    const sequenceType = sequenceTypeFor(sel.chosen);
+    // FRST only on the mandate's first appearance in this run; demote later
+    // uses of the same mandate to RCUR (see frstMandateIds above).
+    let sequenceType = sequenceTypeFor(sel.chosen);
+    if (sequenceType === "FRST") {
+      if (frstMandateIds.has(sel.chosen.id)) sequenceType = "RCUR";
+      else frstMandateIds.add(sel.chosen.id);
+    }
     candidates.push({
       memberId: member.id,
       memberName,
