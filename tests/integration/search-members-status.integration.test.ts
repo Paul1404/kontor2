@@ -75,9 +75,8 @@ describe.skipIf(!onTestDb)("search_members status filter (integration)", () => {
     await seed("deleted", { memberNo: `${MARKER}-D`, deletedAt: past, status: "aktiv" });
 
     // Aktiv vs passiv is derived from an open membership in a real Abteilung.
-    // Give the "aktiv" member exactly that so it qualifies; "passiv" stays
-    // without one. The "gekuendigt" member also gets one to prove the lifecycle
-    // filter (pending exit) wins over the Abteilung-derived aktiv signal.
+    // Only the "aktiv" member gets one; "passiv" (and the pending-exit member)
+    // stay without, so they fall on the passiv side of the derived signal.
     const [abt] = await db()
       .insert(abteilungenTable)
       .values({ name: `${MARKER}-Sparte`, slug: `${MARKER.toLowerCase()}-sparte` })
@@ -85,13 +84,11 @@ describe.skipIf(!onTestDb)("search_members status filter (integration)", () => {
     abteilungId = abt?.id ?? "";
     await db()
       .insert(memberAbteilungenTable)
-      .values(
-        ["aktiv", "gekuendigt"].map((key) => ({
-          memberId: ids[key] as string,
-          abteilungId,
-          eintrittsdatum: "2000-01-01",
-        })),
-      );
+      .values({
+        memberId: ids.aktiv as string,
+        abteilungId,
+        eintrittsdatum: "2000-01-01",
+      });
   });
 
   afterAll(async () => {
@@ -150,19 +147,20 @@ describe.skipIf(!onTestDb)("search_members status filter (integration)", () => {
     expect(all.size).toBeGreaterThan(aktiv.size);
   });
 
-  it("aktiv and passiv are disjoint and together are the living members", async () => {
+  it("aktiv and passiv split the living members by real Abteilung", async () => {
     const aktiv = await listIds("aktiv");
     const passiv = await listIds("passiv");
     // The Abteilung membership is the only thing separating the two seeded
-    // living members, so each lands in exactly one bucket.
+    // living members, so each lands in exactly one bucket and never both.
     expect(aktiv.has(id("aktiv"))).toBe(true);
     expect(aktiv.has(id("passiv"))).toBe(false);
     expect(passiv.has(id("passiv"))).toBe(true);
     expect(passiv.has(id("aktiv"))).toBe(false);
-    // A pending-exit member is gekuendigt, not aktiv/passiv, even with an
-    // open Abteilung membership.
+    // A member with notice for a future date is still living, so without a real
+    // Abteilung it shows under passiv (and under its own gekuendigt lens), but
+    // never under aktiv.
     expect(aktiv.has(id("gekuendigt"))).toBe(false);
-    expect(passiv.has(id("gekuendigt"))).toBe(false);
+    expect(passiv.has(id("gekuendigt"))).toBe(true);
   });
 
   it("count(alle) equals the sum of the disjoint lifecycle buckets", async () => {
