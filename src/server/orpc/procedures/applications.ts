@@ -77,11 +77,16 @@ const ANRede = v.picklist(["Herr", "Frau", "keine Angabe"]);
 const ISODate = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
 const Name = v.pipe(v.string(), v.trim(), v.minLength(2), v.maxLength(100));
 
+// Bounded so a crafted public submit can't send a huge array (memory / work
+// amplification). A club has far fewer than 50 Abteilungen and families far
+// fewer than 30 children.
+const AbteilungIds = v.pipe(v.array(v.pipe(v.string(), v.maxLength(64))), v.maxLength(50));
+
 const KindInput = v.object({
   vorname: Name,
   nachname: Name,
   geburtsdatum: ISODate,
-  abteilungen: v.array(v.string()),
+  abteilungen: AbteilungIds,
 });
 
 const SubmitInput = v.object({
@@ -95,14 +100,14 @@ const SubmitInput = v.object({
   ort: v.optional(v.nullable(v.string()), null),
   telefon: v.optional(v.nullable(v.string()), null),
   email: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.email())), null),
-  abteilungen: v.array(v.string()),
+  abteilungen: AbteilungIds,
   erziehungsberechtigterVorname: v.optional(v.nullable(v.string()), null),
   erziehungsberechtigterNachname: v.optional(v.nullable(v.string()), null),
   partnerVorname: v.optional(v.nullable(v.string()), null),
   partnerNachname: v.optional(v.nullable(v.string()), null),
   partnerGeburtsdatum: v.optional(v.nullable(ISODate), null),
-  partnerAbteilungen: v.optional(v.array(v.string()), []),
-  kinder: v.optional(v.array(KindInput), []),
+  partnerAbteilungen: v.optional(AbteilungIds, []),
+  kinder: v.optional(v.pipe(v.array(KindInput), v.maxLength(30)), []),
   elternteilMitglied: v.optional(v.boolean(), false),
   kontoinhaber: v.optional(v.nullable(v.string()), null),
   iban: v.pipe(v.string(), v.minLength(15)),

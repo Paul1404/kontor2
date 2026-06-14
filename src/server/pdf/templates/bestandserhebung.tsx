@@ -86,8 +86,9 @@ export function BestandserhebungDocument({
         <Text style={styles.h1}>Bestandserhebung</Text>
         <Text style={styles.meta}>
           Dokument {docRef} · {vereinsname} · Stichtag{" "}
-          {new Date(data.stichtag).toLocaleDateString("de-DE")} · Mitglieder gesamt:{" "}
-          {data.grandTotal}
+          {/* Format the YYYY-MM-DD Stichtag directly so it never shifts a day
+              via timezone-dependent Date parsing. */}
+          {data.stichtag.split("-").reverse().join(".")} · Mitglieder gesamt: {data.grandTotal}
         </Text>
 
         <Text style={styles.sectionTitle}>Übersicht je Abteilung</Text>
