@@ -4,7 +4,7 @@ import {
   ArrowLeft,
   Ban,
   CheckCircle2,
-  Download,
+  Eye,
   Loader2,
   Mail,
   MailCheck,
@@ -17,9 +17,41 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { PdfViewer } from "~/components/ui/pdf-viewer";
 import { QueryError } from "~/components/ui/query-error";
 import { Textarea } from "~/components/ui/textarea";
 import { orpc } from "~/lib/orpc";
+
+const ANTRAGSTYP_LABEL: Record<string, string> = {
+  einzel: "Einzelmitgliedschaft",
+  kind: "Kindermitgliedschaft",
+  familie: "Familienmitgliedschaft",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  neu: "Eingegangen",
+  scan_eingegangen: "Scan eingegangen",
+  dokument_hochgeladen: "Dokument hochgeladen",
+  in_bearbeitung: "In Bearbeitung",
+  genehmigt: "Genehmigt",
+  abgelehnt: "Abgelehnt",
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const cls =
+    status === "genehmigt"
+      ? "bg-emerald-100 text-emerald-700"
+      : status === "abgelehnt"
+        ? "bg-red-100 text-red-700"
+        : "bg-blue-100 text-blue-700";
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}
+    >
+      {STATUS_LABEL[status] ?? status}
+    </span>
+  );
+}
 
 export const Route = createFileRoute("/app/antraege/$id")({
   component: AntragDetailPage,
@@ -101,6 +133,7 @@ function AntragDetailPage() {
 
   const [notes, setNotes] = useState("");
   const [workStatus, setWorkStatus] = useState<WorkflowStatus>("neu");
+  const [viewer, setViewer] = useState<{ url: string; filename: string } | null>(null);
   // Seed the editor from the loaded application; re-seed whenever a different
   // application is opened (id change) so stale edits don't leak across rows.
   useEffect(() => {
@@ -151,10 +184,10 @@ function AntragDetailPage() {
     onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Ablehnung fehlgeschlagen."),
   });
 
-  const downloadFile = useMutation({
+  const openFile = useMutation({
     mutationFn: (fileId: string) => orpc.applications.fileUrl({ id: fileId }),
-    onSuccess: (res) => window.open(res.url, "_blank", "noopener,noreferrer"),
-    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Download fehlgeschlagen."),
+    onSuccess: (res) => setViewer({ url: res.url, filename: res.filename }),
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Öffnen fehlgeschlagen."),
   });
 
   if (detail.isError) {
@@ -189,9 +222,14 @@ function AntragDetailPage() {
         <h1 className="text-2xl font-semibold tracking-tight">
           {a.vorname} {a.nachname}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          {a.antragsnummer} · {a.antragstyp} · Status: {a.status}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <StatusBadge status={a.status} />
+          <span>
+            Antrag <span className="font-mono text-foreground">{a.antragsnummer}</span>
+          </span>
+          <span aria-hidden>·</span>
+          <span>{ANTRAGSTYP_LABEL[a.antragstyp] ?? a.antragstyp}</span>
+        </div>
       </div>
 
       {msg ? (
@@ -211,7 +249,9 @@ function AntragDetailPage() {
           </Row>
           <Row label="Mitgliedschaft">{a.mitgliedschaftTyp}</Row>
           <Row label="Jahresbeitrag">{a.jahresbeitrag ? `${a.jahresbeitrag} €` : "—"}</Row>
-          <Row label="IBAN">{a.ibanMasked ?? "—"}</Row>
+          <Row label="IBAN">
+            <span className="font-mono">{a.ibanFormatted ?? "—"}</span>
+          </Row>
           <Row label="Mandatsreferenz">{a.mandatsreferenz ?? "—"}</Row>
           {a.erziehungsberechtigterVorname ? (
             <Row label="Gesetzliche Vertretung">
@@ -245,10 +285,14 @@ function AntragDetailPage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={downloadFile.isPending}
-                    onClick={() => downloadFile.mutate(f.id)}
+                    disabled={openFile.isPending}
+                    onClick={() => openFile.mutate(f.id)}
                   >
-                    <Download className="size-4" />
+                    {openFile.isPending && openFile.variables === f.id ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Eye className="size-4" />
+                    )}
                     Öffnen
                   </Button>
                 </div>
@@ -448,6 +492,15 @@ function AntragDetailPage() {
           Zum Mitglied
         </Button>
       ) : null}
+
+      <PdfViewer
+        open={viewer !== null}
+        onOpenChange={(o) => {
+          if (!o) setViewer(null);
+        }}
+        url={viewer?.url ?? null}
+        filename={viewer?.filename}
+      />
     </div>
   );
 }

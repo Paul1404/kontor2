@@ -42,6 +42,9 @@ const DEFAULT_CSP = [
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",
+  // Eingebauter PDF-Viewer rendert das (inline ausgelieferte) Dokument von der
+  // S3-Presigned-URL in einem iframe -> https erlauben (sonst greift default-src 'self').
+  "frame-src 'self' https: blob:",
   "form-action 'self'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
