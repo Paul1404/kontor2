@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.95.9",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Der nächtliche Snapshot- und Status-Abgleich läuft jetzt für alle Vereine, nicht nur für den Hauptmandanten. Jeder Verein wird in seiner eigenen Datenbank gesichert.",
+      },
+    ],
+  },
+  {
     version: "0.95.8",
     date: "2026-06-14",
     changes: [
