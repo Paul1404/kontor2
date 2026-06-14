@@ -17,9 +17,9 @@ export const importRouter = {
    *  generated and passed to `uploadSqlDump`. Polled by the upload UI. */
   progress: adminProc
     .input(v.object({ token: v.pipe(v.string(), v.minLength(1)) }))
-    .handler(async ({ input }) => {
+    .handler(async ({ context, input }) => {
       return (
-        (await readImportProgress(input.token)) ?? {
+        (await readImportProgress(context.tenant.key, input.token)) ?? {
           phase: "",
           processed: 0,
           total: 0,
@@ -42,7 +42,7 @@ export const importRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      const reporter = createProgressReporter(input.progressToken);
+      const reporter = createProgressReporter(context.tenant.key, input.progressToken);
       const buf = Buffer.from(input.contentBase64, "base64");
       if (buf.length === 0) {
         throw new ORPCError("BAD_REQUEST", { message: "Leere Datei." });

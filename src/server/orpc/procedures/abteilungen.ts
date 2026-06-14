@@ -3,6 +3,7 @@ import { and, asc, count, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { KEINE_ABTEILUNG_NAME } from "~/lib/abteilung-filter";
 import { appendAudit, diff } from "~/server/audit/log";
+import { isUniqueViolation } from "~/server/db/retry";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { membersTable } from "~/server/db/schema/members";
@@ -402,10 +403,16 @@ export const abteilungenRouter = {
             eintrittsdatum: input.eintrittsdatum,
           });
         } catch (e) {
-          throw new ORPCError("CONFLICT", {
-            message: "Diese Abteilungs-Mitgliedschaft existiert bereits.",
-            cause: e,
-          });
+          // Only a unique-violation means the membership already exists. Any
+          // other DB error (connection drop, FK, type) must surface as itself,
+          // not be mislabelled "existiert bereits".
+          if (isUniqueViolation(e)) {
+            throw new ORPCError("CONFLICT", {
+              message: "Diese Abteilungs-Mitgliedschaft existiert bereits.",
+              cause: e,
+            });
+          }
+          throw e;
         }
 
         await appendAudit(tx, {

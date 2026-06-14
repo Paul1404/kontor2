@@ -44,10 +44,17 @@ export async function rateLimit(opts: {
     const r = redis();
     const k = `rl:${opts.key}`;
     const count = await r.incr(k);
-    if (count === 1) {
+    let ttl = await r.ttl(k);
+    // Re-arm the expiry whenever the key has none, not only on the first hit.
+    // If the `expire` after the very first `incr` was lost (a transient Redis
+    // error, a replica failover), the counter would otherwise live forever:
+    // once it climbs past the limit the key stays permanently over-limit and
+    // locks the caller out for good. ttl is -2 if the key vanished mid-call,
+    // -1 if it exists without a TTL; both warrant re-arming.
+    if (ttl < 0) {
       await r.expire(k, opts.windowSeconds);
+      ttl = opts.windowSeconds;
     }
-    const ttl = await r.ttl(k);
     return {
       allowed: count <= opts.limit,
       remaining: Math.max(0, opts.limit - count),

@@ -59,20 +59,29 @@ export async function handle({ request }: { request: Request }): Promise<Respons
   // bundle (see api/rpc.$.ts).
   const [
     { resolveApiKeyContext },
-    { enforceMcpRateLimit },
+    { enforceMcpRateLimit, enforceMcpIpRateLimit },
     { handleMcpRequest },
     { createContext },
     { runWithTenantKeyring },
+    { clientIp },
   ] = await Promise.all([
     import("~/server/mcp/auth"),
     import("~/server/mcp/rate-limit"),
     import("~/server/mcp/server"),
     import("~/server/orpc/context"),
     import("~/server/crypto/tenant-crypto"),
+    import("~/server/lib/client-ip"),
   ]);
   const base = await createContext(request);
   const rawKey = request.headers.get("x-api-key");
   if (!rawKey) return unauthorized();
+  // Throttle by source IP before touching the key. An invalid key resolves to
+  // null and 401s below without ever hitting the per-key limiter, so without
+  // this a flood of bogus keys could hammer the HMAC/DB verification unbounded.
+  // Keyed on IP so it catches credential stuffing that rotates the key on every
+  // request. Fails open on a Redis outage, like every other limiter here.
+  const ipLimit = await enforceMcpIpRateLimit(clientIp(request.headers));
+  if (!ipLimit.allowed) return rateLimited(ipLimit.retryAfterSeconds);
   // Im Per-Verein-Keyring: MCP-Tools lesen verschlüsselte Mitgliedsdaten (IBAN) dieses Vereins.
   return runWithTenantKeyring(base.tenant.key, async () => {
     const context = await resolveApiKeyContext(base, rawKey);

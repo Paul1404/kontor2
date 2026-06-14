@@ -17,7 +17,10 @@ export type ImportProgress = {
   updatedAt: number;
 };
 
-const KEY = (token: string) => `kontor2:import:progress:${token}`;
+// Namespaced by tenant so a client-chosen token can never collide across
+// Vereine: without the tenant segment two tenants picking the same token would
+// read or overwrite each other's import progress.
+const KEY = (tenantKey: string, token: string) => `kontor2:t:${tenantKey}:import:progress:${token}`;
 const TTL_SECONDS = 3600;
 /** Don't hammer Redis on every row; coalesce writes to this cadence. */
 const FLUSH_INTERVAL_MS = 250;
@@ -32,7 +35,10 @@ export type ProgressReporter = {
  * (never blocks the import); `finish` forces a final flush of the terminal
  * state. A blank/whitespace token disables publishing entirely.
  */
-export function createProgressReporter(token: string | undefined | null): ProgressReporter {
+export function createProgressReporter(
+  tenantKey: string,
+  token: string | undefined | null,
+): ProgressReporter {
   const active = typeof token === "string" && token.trim().length > 0;
   const state: ImportProgress = {
     phase: "Vorbereiten",
@@ -49,7 +55,7 @@ export function createProgressReporter(token: string | undefined | null): Progre
     if (!active) return;
     state.updatedAt = Date.now();
     try {
-      await redis().set(KEY(token as string), JSON.stringify(state), "EX", TTL_SECONDS);
+      await redis().set(KEY(tenantKey, token as string), JSON.stringify(state), "EX", TTL_SECONDS);
     } catch {
       /* progress is best-effort; never fail the import over Redis */
     }
@@ -79,9 +85,12 @@ export function createProgressReporter(token: string | undefined | null): Progre
   };
 }
 
-export async function readImportProgress(token: string): Promise<ImportProgress | null> {
+export async function readImportProgress(
+  tenantKey: string,
+  token: string,
+): Promise<ImportProgress | null> {
   try {
-    const raw = await redis().get(KEY(token));
+    const raw = await redis().get(KEY(tenantKey, token));
     return raw ? (JSON.parse(raw) as ImportProgress) : null;
   } catch {
     return null;
