@@ -100,12 +100,6 @@ export type BeitrittModel = {
 
 const GESCHLECHT_ANREDE: Record<string, string> = { m: "Herr", w: "Frau" };
 
-function salutation(geschlecht: string | null, fullName: string): string {
-  if (geschlecht === "m") return "Sehr geehrter Herr";
-  if (geschlecht === "w") return "Sehr geehrte Frau";
-  return `Guten Tag ${fullName}`.trim();
-}
-
 function joinName(vorname: string | null | undefined, nachname: string | null | undefined): string {
   return `${(vorname ?? "").trim()} ${(nachname ?? "").trim()}`.trim();
 }
@@ -121,9 +115,6 @@ export function buildBeitrittModel(input: BeitrittInput): BeitrittModel {
   );
   // For a Kind application the contact person is the guardian.
   const contactName = isKind && guardianFull ? guardianFull : applicantFull;
-  const contactLastName = isKind
-    ? (input.erziehungsberechtigterNachname ?? input.nachname ?? "")
-    : (input.nachname ?? "");
 
   const empfaenger = [
     GESCHLECHT_ANREDE[input.geschlecht ?? ""] ?? "",
@@ -195,7 +186,9 @@ export function buildBeitrittModel(input: BeitrittInput): BeitrittModel {
     club: input.club,
     antragsnummer: input.antragsnummer,
     titel: "Beitrittserklärung",
-    anrede: `${salutation(input.geschlecht, contactName)}${input.geschlecht === "m" || input.geschlecht === "w" ? ` ${contactLastName}` : ""},`,
+    // A Beitrittserklärung is written by the applicant TO the club ("hiermit
+    // beantrage ich…"), so the greeting addresses the Verein, not the applicant.
+    anrede: "Sehr geehrte Damen und Herren,",
     datum: formatGermanDate(input.today ?? new Date()),
     empfaenger,
     applicantRows,

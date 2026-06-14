@@ -36,7 +36,7 @@ const base = {
 };
 
 describe("buildBeitrittModel", () => {
-  it("uses a gendered salutation for Herr", () => {
+  it("addresses the club, not the applicant (the form is written to the Verein)", () => {
     const m = buildBeitrittModel({
       ...base,
       antragstyp: "einzel",
@@ -44,10 +44,12 @@ describe("buildBeitrittModel", () => {
       vorname: "Max",
       nachname: "Mustermann",
     });
-    expect(m.anrede).toBe("Sehr geehrter Herr Mustermann,");
+    // The body reads "hiermit beantrage ich…" (first person), so the greeting
+    // must not address the applicant by name. It is a letter to the Verein.
+    expect(m.anrede).toBe("Sehr geehrte Damen und Herren,");
   });
 
-  it("falls back to a neutral greeting without a gender", () => {
+  it("uses the same club greeting regardless of gender", () => {
     const m = buildBeitrittModel({
       ...base,
       antragstyp: "einzel",
@@ -55,7 +57,7 @@ describe("buildBeitrittModel", () => {
       vorname: "Alex",
       nachname: "Muster",
     });
-    expect(m.anrede).toBe("Guten Tag Alex Muster,");
+    expect(m.anrede).toBe("Sehr geehrte Damen und Herren,");
   });
 
   it("addresses the guardian on a Kind application", () => {
