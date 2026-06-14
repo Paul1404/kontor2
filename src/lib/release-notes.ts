@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.2",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Beitrittserklärung folgt jetzt ebenfalls der DIN-5008-Seitengeometrie: Rand 25 mm links und 20 mm rechts, Falz- und Lochmarken und eine bündige Fußzeile. Damit faltet und locht sie sich wie die übrigen Schreiben.",
+      },
+    ],
+  },
+  {
     version: "0.94.1",
     date: "2026-06-14",
     changes: [

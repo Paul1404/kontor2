@@ -112,7 +112,13 @@ const styles = StyleSheet.create({
   },
 });
 
-function FoldAndHoleMarks() {
+/**
+ * DIN 5008 Falz- und Lochmarken at the left paper edge: fold marks at 87 mm and
+ * 192 mm, hole mark at 148,5 mm. Exported so non-letter documents (e.g. the
+ * Beitrittserklärung form) can share the exact same filing geometry. `fixed` so
+ * they repeat on every page.
+ */
+export function FoldAndHoleMarks() {
   return (
     <>
       <View style={[styles.foldMark, { top: mm(87) }]} fixed />

@@ -1,17 +1,23 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { BeitrittDetailRow, BeitrittModel } from "~/server/pdf/beitrittserklaerung-model";
+import { FoldAndHoleMarks, mm } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
+  // The Beitrittserklärung is a form, not a window-envelope letter, so it keeps
+  // its own letterhead and content. It does follow the DIN 5008 page geometry
+  // (Schriftrand 25 mm links / 20 mm rechts, Falz- und Lochmarken, Fußzeile)
+  // so it folds, files and looks consistent with the mailed letters.
   page: {
-    paddingTop: 42,
-    paddingBottom: 54,
-    paddingHorizontal: 48,
+    paddingTop: mm(15),
+    paddingBottom: mm(18),
+    paddingLeft: mm(25),
+    paddingRight: mm(20),
     fontFamily: "Helvetica",
     fontSize: 10,
     color: "#1a1a1a",
     lineHeight: 1.4,
   },
-  header: { flexDirection: "row", alignItems: "center", marginBottom: 16, gap: 12 },
+  header: { flexDirection: "row", alignItems: "flex-start", marginBottom: 16, gap: 12 },
   logo: { width: 46, height: 46, objectFit: "contain" },
   headerText: { flex: 1 },
   clubName: { fontFamily: "Helvetica-Bold", fontSize: 13 },
@@ -51,9 +57,9 @@ const styles = StyleSheet.create({
   },
   footer: {
     position: "absolute",
-    bottom: 24,
-    left: 48,
-    right: 48,
+    bottom: mm(8),
+    left: mm(25),
+    right: mm(20),
     textAlign: "center",
     fontSize: 8,
     color: "#888",
@@ -83,7 +89,8 @@ export function BeitrittserklaerungDocument({ model }: BeitrittserklaerungProps)
   const { club } = model;
   return (
     <Document title={`Beitrittserklaerung ${model.antragsnummer}`}>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" style={styles.page} wrap>
+        <FoldAndHoleMarks />
         <View style={styles.header}>
           {club.logoDataUri ? <Image src={club.logoDataUri} style={styles.logo} /> : null}
           <View style={styles.headerText}>
