@@ -34,6 +34,18 @@ function NewDunningRunPage() {
   const [notes, setNotes] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  // The club may run fewer than 3 stages (Einstellungen > Vereinsdaten).
+  const settings = useQuery({
+    queryKey: ["organization"],
+    queryFn: () => orpc.organization.get(),
+  });
+  const maxLevel = (settings.data?.maxMahnstufe ?? 3) as 1 | 2 | 3;
+
+  // Clamp a stale selection if the configured maximum is lower.
+  useEffect(() => {
+    if (level > maxLevel) setLevel(maxLevel);
+  }, [level, maxLevel]);
+
   const preview = useQuery({
     queryKey: ["dunning.preview", level, runDate],
     queryFn: () => orpc.dunning.preview({ level, runDate }),
@@ -123,8 +135,8 @@ function NewDunningRunPage() {
               className="h-9 rounded-lg border border-input bg-card px-3 text-sm shadow-soft"
             >
               <option value="1">1: Erinnerung</option>
-              <option value="2">2: 1. Mahnung</option>
-              <option value="3">3: 2. Mahnung</option>
+              {maxLevel >= 2 ? <option value="2">2: 1. Mahnung</option> : null}
+              {maxLevel >= 3 ? <option value="3">3: 2. Mahnung</option> : null}
             </select>
           </Field>
           <Field label="Lauf-Datum">

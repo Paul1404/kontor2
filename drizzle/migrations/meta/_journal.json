@@ -456,6 +456,13 @@
       "when": 1781466989690,
       "tag": "0064_ordinary_cable",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1781467426596,
+      "tag": "0065_careful_eternity",
+      "breakpoints": true
     }
   ]
 }
