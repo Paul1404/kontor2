@@ -1,4 +1,23 @@
+import { sql } from "drizzle-orm";
 import { integer, numeric, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+
+/**
+ * Which online-application case a Beitragsart serves. When set, the public
+ * application form quotes this Beitragsart's `betrag1` (and assigns this `art`
+ * on approval) for that case, instead of the separate Beitragsstaffel. Lets the
+ * Beitragsart be the single source of the price. Null = not used for online
+ * applications. At most one Beitragsart per role (partial unique index).
+ */
+export const ANTRAGS_ROLLEN = [
+  "familie",
+  "kind",
+  "kind_eltern_mitglied",
+  "jugendlich",
+  "jugendlich_eltern_mitglied",
+  "junger_erwachsener",
+  "erwachsener",
+] as const;
+export type AntragsRolle = (typeof ANTRAGS_ROLLEN)[number];
 
 /**
  * Linear Webverein `mgart` (Beitragsarten / fee types). Keyed by the
@@ -56,10 +75,19 @@ export const feeTypesTable = pgTable(
     // Förderbeitrag), the check skips it. Configured in the Beitragsarten admin.
     minAge: integer("min_age"),
     maxAge: integer("max_age"),
+    /** Online-application role this Beitragsart serves; see ANTRAGS_ROLLEN. */
+    antragsRolle: text("antrags_rolle"),
     importBatchId: text("import_batch_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("fee_types_art_uk").on(t.art)],
+  (t) => [
+    uniqueIndex("fee_types_art_uk").on(t.art),
+    // At most one Beitragsart per online-application role; unset (null) is
+    // unconstrained so any number of Beitragsarten can stay out of the form.
+    uniqueIndex("fee_types_antrags_rolle_uk")
+      .on(t.antragsRolle)
+      .where(sql`${t.antragsRolle} is not null`),
+  ],
 );
 
 export type FeeType = typeof feeTypesTable.$inferSelect;

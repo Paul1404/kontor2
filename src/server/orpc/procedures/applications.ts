@@ -41,8 +41,8 @@ import {
   parseISODate,
   realAge,
 } from "~/server/domain/application/antragstyp";
-import { calculateFee } from "~/server/domain/application/fees";
 import { divergentKontoinhaber } from "~/server/domain/application/payer";
+import { resolveApplicationFee } from "~/server/domain/application/resolve-fee";
 import {
   fileBasename,
   mapSvumsApplication,
@@ -224,13 +224,7 @@ async function buildApprovedPdf(
     signatureDataUri = `data:${sigFile.mimeType ?? "image/png"};base64,${bytes.toString("base64")}`;
   }
 
-  if (!org.beitragsstaffel) {
-    throw new ORPCError("PRECONDITION_FAILED", {
-      message:
-        "Beitragsstaffel ist nicht konfiguriert. Bitte unter Einstellungen > Vereinsdaten die Jahresbeiträge hinterlegen.",
-    });
-  }
-  const fee = calculateFee({
+  const fee = await resolveApplicationFee(db, {
     kategorie: app.mitgliedschaftTyp,
     elternteilMitglied: app.elternteilMitglied,
     staffel: org.beitragsstaffel,
@@ -596,9 +590,9 @@ export const applicationsRouter = {
         throw new ORPCError("VALIDATION_FAILED", { message: "Ungültiges Geburtsdatum." });
       }
       const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
-      if (!org?.beitragsstaffel) {
+      if (!org) {
         throw new ORPCError("PRECONDITION_FAILED", {
-          message: "Die Jahresbeiträge für den Online-Antrag sind noch nicht hinterlegt.",
+          message: "Der Verein hat das Antragsformular noch nicht eingerichtet.",
         });
       }
       const kategorie = mitgliedschaftTypFor(
@@ -606,12 +600,14 @@ export const applicationsRouter = {
         dob,
         altersgrenzenOf(org),
       );
-      const fee = calculateFee({
+      // Quote from the Beitragsart tagged for this role; falls back to the
+      // Staffel, throws if neither is configured.
+      const fee = await resolveApplicationFee(context.db, {
         kategorie,
         elternteilMitglied: input.elternteilMitglied,
         staffel: org.beitragsstaffel,
       });
-      return { kategorie, jahresbeitrag: fee.betrag, label: fee.label };
+      return { kategorie, jahresbeitrag: fee.betrag, label: fee.label, art: fee.art };
     }),
 
   /** Validate an IBAN and look up BIC + bank name (public form helper). */
@@ -816,12 +812,7 @@ export const applicationsRouter = {
       }
     }
 
-    if (!org.beitragsstaffel) {
-      throw new ORPCError("BAD_REQUEST", {
-        message: "Der Verein hat die Jahresbeiträge noch nicht hinterlegt.",
-      });
-    }
-    const fee = calculateFee({
+    const fee = await resolveApplicationFee(context.db, {
       kategorie,
       elternteilMitglied: input.elternteilMitglied,
       staffel: org.beitragsstaffel,
@@ -867,6 +858,7 @@ export const applicationsRouter = {
           abteilungen: input.abteilungen,
           elternteilMitglied: input.elternteilMitglied,
           jahresbeitrag: fee.betrag,
+          vorgeschlageneArt: fee.art,
           kontoinhaber: input.kontoinhaber,
           iban,
           ibanLast4: lastFour(iban),

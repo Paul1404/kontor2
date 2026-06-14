@@ -5,6 +5,7 @@
  * amount and a German label. Ported from svums `services/fees.py`.
  */
 
+import type { AntragsRolle } from "~/server/db/schema/fee-types";
 import {
   type Beitragsstaffel,
   DEFAULT_BEITRAGSSTAFFEL,
@@ -12,6 +13,30 @@ import {
 import type { AntragKategorie } from "~/server/domain/application/antragstyp";
 
 export { DEFAULT_BEITRAGSSTAFFEL };
+
+/**
+ * Map an application case (age category + parent-member flag) to the
+ * online-application role a Beitragsart can be tagged with. The parent-member
+ * discount only splits `kind` and `jugendlich`; the other categories have a
+ * single role.
+ */
+export function antragsRolleFor(
+  kategorie: AntragKategorie,
+  elternteilMitglied: boolean,
+): AntragsRolle {
+  switch (kategorie) {
+    case "familie":
+      return "familie";
+    case "kind":
+      return elternteilMitglied ? "kind_eltern_mitglied" : "kind";
+    case "jugendlich":
+      return elternteilMitglied ? "jugendlich_eltern_mitglied" : "jugendlich";
+    case "junger_erwachsener":
+      return "junger_erwachsener";
+    case "erwachsener":
+      return "erwachsener";
+  }
+}
 
 export type FeeResult = { betrag: string; label: string };
 

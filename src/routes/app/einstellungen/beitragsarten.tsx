@@ -25,6 +25,7 @@ type Form = {
   nichAktiv: boolean;
   minAge: string;
   maxAge: string;
+  antragsRolle: string;
 };
 
 const EMPTY_FORM: Form = {
@@ -37,7 +38,21 @@ const EMPTY_FORM: Form = {
   nichAktiv: false,
   minAge: "",
   maxAge: "",
+  antragsRolle: "",
 };
+
+// Which online-application case this Beitragsart serves. Empty = not used by the
+// public application form (then the Beitragsstaffel applies as a fallback).
+const ANTRAGS_ROLLE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "", label: "Nicht im Online-Antrag" },
+  { value: "familie", label: "Familie" },
+  { value: "kind", label: "Kind" },
+  { value: "kind_eltern_mitglied", label: "Kind (Elternteil Mitglied)" },
+  { value: "jugendlich", label: "Jugendlich" },
+  { value: "jugendlich_eltern_mitglied", label: "Jugendlich (Elternteil Mitglied)" },
+  { value: "junger_erwachsener", label: "Junger Erwachsener" },
+  { value: "erwachsener", label: "Erwachsener" },
+];
 
 /** Parse an age input field to an integer 0-120, or null when empty/invalid. */
 function parseAge(value: string): number | null {
@@ -71,6 +86,15 @@ function BeitragsartenSettingsPage() {
       nichAktiv: form.nichAktiv ? "J" : null,
       minAge: parseAge(form.minAge),
       maxAge: parseAge(form.maxAge),
+      antragsRolle: (form.antragsRolle || null) as
+        | "familie"
+        | "kind"
+        | "kind_eltern_mitglied"
+        | "jugendlich"
+        | "jugendlich_eltern_mitglied"
+        | "junger_erwachsener"
+        | "erwachsener"
+        | null,
     };
   }
 
@@ -118,6 +142,7 @@ function BeitragsartenSettingsPage() {
       nichAktiv: row.nichAktiv === "J",
       minAge: row.minAge != null ? String(row.minAge) : "",
       maxAge: row.maxAge != null ? String(row.maxAge) : "",
+      antragsRolle: row.antragsRolle ?? "",
     });
     setError(null);
   }
@@ -234,6 +259,24 @@ function BeitragsartenSettingsPage() {
               <p className="-mt-1 text-xs text-muted-foreground">
                 Optional. Gesetzt, prüft die Datenqualität, ob das Alter der Mitglieder zur
                 Beitragsart passt. Leer lassen, wenn die Beitragsart nicht altersabhängig ist.
+              </p>
+              <FormField label="Rolle im Online-Antrag">
+                <select
+                  value={form.antragsRolle}
+                  onChange={(e) => setForm({ ...form, antragsRolle: e.target.value })}
+                  className="h-9 rounded-lg border border-input bg-card px-3 text-sm shadow-soft"
+                >
+                  {ANTRAGS_ROLLE_OPTIONS.map((o) => (
+                    <option key={o.value || "none"} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+              <p className="-mt-1 text-xs text-muted-foreground">
+                Optional. Gesetzt, nutzt der Online-Antrag für diesen Fall den Betrag dieser
+                Beitragsart und legt sie bei der Genehmigung an. Leer: es gilt die Beitragsstaffel.
+                Je Rolle ist nur eine Beitragsart möglich.
               </p>
               <label className="mt-1 flex items-center gap-2 text-sm">
                 <input

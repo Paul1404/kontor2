@@ -2,10 +2,11 @@ import { ORPCError } from "@orpc/server";
 import { and, asc, count, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
+import type { DBOrTx } from "~/server/db/client";
 import { withUniqueRetry } from "~/server/db/retry";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { feeTypePriceHistoryTable } from "~/server/db/schema/fee-type-history";
-import { feeTypesTable } from "~/server/db/schema/fee-types";
+import { ANTRAGS_ROLLEN, feeTypesTable } from "~/server/db/schema/fee-types";
 import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import { CACHE_NS, cached, invalidateFeeTypeCaches } from "~/server/search/cache";
 
@@ -26,6 +27,7 @@ const FeeTypePatch = v.object({
   nichAktiv: TextOrNull,
   minAge: AgeOrNull,
   maxAge: AgeOrNull,
+  antragsRolle: v.optional(v.nullable(v.picklist(ANTRAGS_ROLLEN))),
 });
 
 function normalizeDecimal(value: string | null | undefined): string | null {
@@ -52,7 +54,26 @@ function buildPatch(input: v.InferOutput<typeof FeeTypePatch>): Record<string, u
   if ("betrag1" in input) patch.betrag1 = normalizeDecimal(input.betrag1);
   if ("minAge" in input) patch.minAge = input.minAge ?? null;
   if ("maxAge" in input) patch.maxAge = input.maxAge ?? null;
+  if ("antragsRolle" in input) patch.antragsRolle = input.antragsRolle ?? null;
   return patch;
+}
+
+/**
+ * Guard the one-Beitragsart-per-role rule with a friendly error before the
+ * partial unique index would reject the write with a raw 23505. `selfArt` is
+ * excluded so re-saving the same Beitragsart with its existing role is fine.
+ */
+async function assertRoleFree(tx: DBOrTx, rolle: string, selfArt: number | null): Promise<void> {
+  const [other] = await tx
+    .select({ art: feeTypesTable.art })
+    .from(feeTypesTable)
+    .where(eq(feeTypesTable.antragsRolle, rolle))
+    .limit(1);
+  if (other && other.art !== selfArt) {
+    throw new ORPCError("CONFLICT", {
+      message: `Diese Rolle ist bereits Beitragsart ${other.art} zugeordnet. Bitte dort zuerst entfernen.`,
+    });
+  }
 }
 
 export const feeTypesRouter = {
@@ -75,6 +96,7 @@ export const feeTypesRouter = {
           nichAktiv: feeTypesTable.nichAktiv,
           minAge: feeTypesTable.minAge,
           maxAge: feeTypesTable.maxAge,
+          antragsRolle: feeTypesTable.antragsRolle,
           contractCount: sql<number>`(select count(*)::int from contracts c where c.art = fee_types.art)`,
         })
         .from(feeTypesTable)
@@ -113,6 +135,9 @@ export const feeTypesRouter = {
             }
           }
           const patch = buildPatch(input.patch);
+          if (typeof patch.antragsRolle === "string") {
+            await assertRoleFree(tx, patch.antragsRolle, null);
+          }
           await tx.insert(feeTypesTable).values({ ...patch, art, updatedAt: new Date() } as never);
           await appendAudit(tx, {
             entityType: "fee_type",
@@ -150,6 +175,9 @@ export const feeTypesRouter = {
         }
         const patch = buildPatch(input.patch);
         if (Object.keys(patch).length === 0) return;
+        if (typeof patch.antragsRolle === "string") {
+          await assertRoleFree(tx, patch.antragsRolle, input.art);
+        }
 
         await tx
           .update(feeTypesTable)

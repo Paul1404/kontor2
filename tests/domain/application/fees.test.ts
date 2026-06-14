@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { calculateFee, DEFAULT_BEITRAGSSTAFFEL } from "~/server/domain/application/fees";
+import {
+  antragsRolleFor,
+  calculateFee,
+  DEFAULT_BEITRAGSSTAFFEL,
+} from "~/server/domain/application/fees";
 
 // `staffel` is required now (no hardcoded fallback), so these pass the historic
 // SVU schedule explicitly to assert the per-category mapping.
@@ -50,5 +54,20 @@ describe("calculateFee (mapping over a schedule)", () => {
     expect(
       calculateFee({ kategorie: "erwachsener", elternteilMitglied: false, staffel }).label,
     ).toBe("Erwachsene");
+  });
+});
+
+describe("antragsRolleFor", () => {
+  it("splits kind and jugendlich by the parent-member flag", () => {
+    expect(antragsRolleFor("kind", false)).toBe("kind");
+    expect(antragsRolleFor("kind", true)).toBe("kind_eltern_mitglied");
+    expect(antragsRolleFor("jugendlich", false)).toBe("jugendlich");
+    expect(antragsRolleFor("jugendlich", true)).toBe("jugendlich_eltern_mitglied");
+  });
+
+  it("ignores the parent flag for the single-rate categories", () => {
+    expect(antragsRolleFor("familie", true)).toBe("familie");
+    expect(antragsRolleFor("junger_erwachsener", true)).toBe("junger_erwachsener");
+    expect(antragsRolleFor("erwachsener", true)).toBe("erwachsener");
   });
 });

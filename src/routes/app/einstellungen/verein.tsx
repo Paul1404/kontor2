@@ -637,6 +637,11 @@ function VereinsdatenPage() {
               <h4 className="mb-3 mt-5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Jahresbeiträge je Kategorie in €
               </h4>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Fallback für den Online-Antrag. Ist einer Beitragsart unter Einstellungen &gt;
+                Beitragsarten eine Rolle im Online-Antrag zugeordnet, gilt deren Betrag und diese
+                Werte werden für den Fall nicht mehr verwendet.
+              </p>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <StaffelField
                   label="Familie"
