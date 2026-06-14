@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.1",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Serienbriefe tragen jetzt eine eigene Dokumentnummer im Infoblock und in der Fußzeile, so wie die übrigen Schreiben. Damit hat jedes erzeugte Dokument eine nachvollziehbare Nummer.",
+      },
+    ],
+  },
+  {
     version: "0.94.0",
     date: "2026-06-14",
     changes: [
