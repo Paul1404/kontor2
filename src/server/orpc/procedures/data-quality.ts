@@ -260,7 +260,7 @@ export const CATEGORIES: CategoryMeta[] = [
     id: "volljaehrig_eltern_konto",
     label: "Volljährig auf Eltern-Konto",
     description:
-      "Aktives Mitglied ab 18 Jahren, dessen Lastschrift weiter über das Konto eines Zahlers (Elternteil) läuft. Erinnerung zur Umstellung auf Selbstzahler. Es wird nichts automatisch geändert.",
+      "Aktives Mitglied ab 18 Jahren, dessen Lastschrift weiter über das Konto eines Zahlers (Elternteil) läuft. Erkannt über eine formale Zahler-Verknüpfung oder, bei Altdaten ohne Verknüpfung, heuristisch über einen abweichenden Kontoinhaber oder eine IBAN, die sich mit einem älteren Mitglied gleichen Nachnamens deckt. Erinnerung zur Umstellung auf Selbstzahler. Es wird nichts automatisch geändert.",
     severity: "info",
   },
 ];
@@ -301,6 +301,34 @@ const PAYER_FOR_C = `coalesce(c.zahler_member_id, ${FAMILIE_ZAHLER}, ${VERTRETER
 const DD_CONTRACT_C =
   "c.member_id = members.id and c.is_direct_debit = true and c.gekuend_zum is null " +
   "and (c.vertrag_ende is null or c.vertrag_ende >= current_date) and c.betrag > 0";
+
+/**
+ * Heuristik (#236): ein abweichender Kontoinhaber ist hinterlegt, dessen
+ * Freitext nicht den Vornamen des Mitglieds enthält. "Abweichender
+ * Kontoinhaber" heißt per Definition, dass das Konto jemand anderem gehört;
+ * fehlt darin der eigene Vorname, zahlt mutmaßlich ein Elternteil. Auf den
+ * Vornamen statt den Nachnamen geprüft, weil ein Elternteil meist denselben
+ * Nachnamen trägt, aber einen anderen Vornamen.
+ */
+const ABW_KONTOINH_FREMD =
+  "coalesce(btrim(members.abw_konto_inh), '') <> '' " +
+  "and coalesce(btrim(members.vorname), '') <> '' " +
+  "and position(lower(btrim(members.vorname)) in lower(members.abw_konto_inh)) = 0";
+
+/**
+ * Heuristik (#236): die IBAN-Endung des Mitglieds taucht bei einem älteren
+ * Mitglied mit gleichem Nachnamen wieder auf -- klassisch das Konto eines
+ * Elternteils. Nur die letzten vier Stellen sind abfragbar (die volle IBAN ist
+ * verschlüsselt), daher zusätzlich gleicher Nachname, um zufällige
+ * Endungs-Kollisionen zwischen Fremden auszuschließen.
+ */
+const IBAN_GETEILT_MIT_AELTEREM =
+  "coalesce(btrim(members.iban1_last4), '') <> '' " +
+  "and coalesce(btrim(members.nachname), '') <> '' " +
+  "and exists (select 1 from members o where o.id <> members.id and o.deleted_at is null " +
+  "and o.iban1_last4 = members.iban1_last4 " +
+  "and lower(btrim(coalesce(o.nachname, ''))) = lower(btrim(coalesce(members.nachname, ''))) " +
+  "and o.geburtsdatum is not null and (members.geburtsdatum is null or o.geburtsdatum < members.geburtsdatum))";
 
 /** Any contract that is currently in force (not cancelled, not expired). */
 const ACTIVE_CONTRACT =
@@ -380,7 +408,7 @@ export const WHERE: Record<CategoryId, string> = {
   // Active member who is 18+ but whose active direct-debit contract is paid from
   // a different person's account (Zahler/Vertreter, typically a parent). Reminder
   // to switch to Selbstzahler; nothing is changed automatically.
-  volljaehrig_eltern_konto: `${ACTIVE} and geburtsdatum is not null and geburtsdatum <= (current_date - interval '18 years') and exists (select 1 from contracts c where ${DD_CONTRACT_C} and (${PAYER_FOR_C}) <> members.id)`,
+  volljaehrig_eltern_konto: `${ACTIVE} and geburtsdatum is not null and geburtsdatum <= (current_date - interval '18 years') and (exists (select 1 from contracts c where ${DD_CONTRACT_C} and (${PAYER_FOR_C}) <> members.id) or (${ACTIVE_DD_POS} and ((${ABW_KONTOINH_FREMD}) or (${IBAN_GETEILT_MIT_AELTEREM}))))`,
 };
 
 /**

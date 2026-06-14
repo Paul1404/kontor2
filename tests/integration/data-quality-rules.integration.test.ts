@@ -170,6 +170,36 @@ describe.skipIf(!onTestDb)("data-quality new rules (integration)", () => {
     control.mandat_abgelaufen = validM;
     control.mandat_laeuft_bald_ab = validM;
 
+    // volljaehrig_eltern_konto (#236): heuristic detection without a formal
+    // payer link. An 18+ member with an active DD contract whose abweichender
+    // Kontoinhaber names someone other than themselves is flagged; the control
+    // names the member themselves and must not be.
+    const adultParentAcct = await addMember({
+      memberNo: `${MARKER}-VEK-M`,
+      vorname: "Lisa",
+      nachname: `${MARKER}fam`,
+      geburtsdatum: new Date("2000-01-01"),
+      abwKontoInh: `${MARKER}fam, Hans`,
+    });
+    await addContract(adultParentAcct, await adrOf(adultParentAcct), {
+      isDirectDebit: true,
+      betrag: "60",
+    });
+    match.volljaehrig_eltern_konto = adultParentAcct;
+
+    const adultSelfAcct = await addMember({
+      memberNo: `${MARKER}-VEK-C`,
+      vorname: "Lisa",
+      nachname: `${MARKER}fam`,
+      geburtsdatum: new Date("2000-01-01"),
+      abwKontoInh: "Lisa (eigenes Konto)",
+    });
+    await addContract(adultSelfAcct, await adrOf(adultSelfAcct), {
+      isDirectDebit: true,
+      betrag: "60",
+    });
+    control.volljaehrig_eltern_konto = adultSelfAcct;
+
     // email_mehrfach refinement: cross-household matches, same-household does not.
     match.email_mehrfach = await addMember({ email: "cross@test.local", ort: "Bamberg" });
     await addMember({ email: "cross@test.local", ort: "Schweinfurt" });
@@ -214,6 +244,7 @@ describe.skipIf(!onTestDb)("data-quality new rules (integration)", () => {
     "mandat_abgelaufen",
     "mandat_laeuft_bald_ab",
     "email_mehrfach",
+    "volljaehrig_eltern_konto",
   ];
 
   for (const category of cases) {
