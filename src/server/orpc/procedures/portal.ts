@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { authBaseUrl } from "~/server/auth/auth";
@@ -378,7 +378,9 @@ export const portalRouter = {
       const allKeys = Object.keys(payload).filter((k) =>
         EDITABLE_FIELDS.includes(k as EditableField),
       );
-      const applied = input.applyFields.filter((k) => allKeys.includes(k));
+      // Dedupe: duplicate keys in applyFields would otherwise inflate the
+      // applied count and miscompute the status (e.g. wrongly "partial").
+      const applied = [...new Set(input.applyFields)].filter((k) => allKeys.includes(k));
       // Filled inside the transaction once we know the member's current values.
       const effectiveApplied: string[] = [];
       const staleSkipped: string[] = [];
@@ -391,10 +393,14 @@ export const portalRouter = {
           // submission (`payload[f].before`) was edited in the meantime, so
           // writing the request's stale `after` would silently lose that edit.
           // Such fields are skipped and reported back instead of overwritten.
+          // Skip a member that was soft-deleted after the request was
+          // submitted: writing change-request fields onto a deleted row would
+          // silently resurrect stale data. memberBefore is then undefined and
+          // nothing is applied (status falls through to rejected/partial).
           const [memberBefore] = await tx
             .select()
             .from(membersTable)
-            .where(eq(membersTable.id, req.memberId))
+            .where(and(eq(membersTable.id, req.memberId), isNull(membersTable.deletedAt)))
             .limit(1);
 
           if (memberBefore) {

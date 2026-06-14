@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.96.1",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Kleinere Korrekturen: Portal-Änderungsanträge werden nicht mehr auf zwischenzeitlich gelöschte Mitglieder angewandt und doppelt gewählte Felder zählen nur einmal. Der Stichtag der Bestandserhebung wird taggenau angezeigt. Der öffentliche Antrag begrenzt die Anzahl von Kindern und Abteilungen.",
+      },
+    ],
+  },
+  {
     version: "0.96.0",
     date: "2026-06-14",
     changes: [
