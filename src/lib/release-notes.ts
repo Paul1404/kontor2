@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.91.2",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Der CSV-Export der Mitgliederliste liegt jetzt im Export-Center bei den übrigen Auswertungen. Der Knopf Export in der Mitgliederliste öffnet das Export-Center und übernimmt die aktuelle Suche, den Status und die Abteilung. Im Export-Center gibt es dafür ein neues Suchfeld.",
+      },
+    ],
+  },
+  {
     version: "0.91.1",
     date: "2026-06-14",
     changes: [
