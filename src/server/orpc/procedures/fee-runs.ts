@@ -12,6 +12,7 @@ import { organizationSettingsTable } from "~/server/db/schema/organization-setti
 import { type SepaMandate, sepaMandatesTable } from "~/server/db/schema/sepa";
 import { memberDisplayName } from "~/server/domain/member";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
+import { invalidateDashboardCaches } from "~/server/search/cache";
 import { amountStrToCents, buildFeeRunPreview, centsToAmount } from "~/server/sepa/build-fee-run";
 import { recollectionBlockReason } from "~/server/sepa/build-recollection";
 import { buildPain008, type Pain008Item } from "~/server/sepa/pain008";
@@ -492,6 +493,8 @@ export const feeRunsRouter = {
       };
     });
 
+    // A committed run changes revenue and the open/Sollstellungen on the dashboard.
+    await invalidateDashboardCaches(context.tenant.key);
     return result;
   }),
 
@@ -1161,6 +1164,8 @@ export const feeRunsRouter = {
         });
       });
 
+      // Storno reverts revenue/Sollstellungen shown on the dashboard.
+      await invalidateDashboardCaches(context.tenant.key);
       return { ok: true };
     }),
 

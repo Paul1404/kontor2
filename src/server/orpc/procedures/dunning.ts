@@ -36,6 +36,7 @@ import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import { resolveClubLogo } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { MahnungDocument, type MahnungInput } from "~/server/pdf/templates/mahnung";
+import { invalidateDashboardCaches } from "~/server/search/cache";
 
 const Level = v.picklist([1, 2, 3] as const);
 
@@ -540,6 +541,8 @@ export const dunningRouter = {
         return { runId: runRow.id, itemCount: verified.length };
       });
 
+      // A Mahnlauf bumps mahnstufe, changing the dashboard's Mahnstufen-Funnel.
+      await invalidateDashboardCaches(context.tenant.key);
       return result;
     }),
 
@@ -913,6 +916,8 @@ export const dunningRouter = {
         return { changed, skipped };
       });
 
+      // Marking dunning postings paid/uncollected changes the dashboard KPIs.
+      await invalidateDashboardCaches(context.tenant.key);
       return { count: result.changed, skipped: result.skipped };
     }),
 
@@ -1009,6 +1014,8 @@ export const dunningRouter = {
         return { changed, skipped };
       });
 
+      // Marking dunning postings paid/uncollected changes the dashboard KPIs.
+      await invalidateDashboardCaches(context.tenant.key);
       return { count: result.changed, skipped: result.skipped };
     }),
 

@@ -9,6 +9,7 @@ import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { memberDisplayName, memberRef } from "~/server/domain/member";
 import { vorstandProc } from "~/server/orpc/base";
+import { invalidateDashboardCaches } from "~/server/search/cache";
 
 const cents = (n: number) => Math.round(n * 100);
 const toAmount = (c: number) => (c / 100).toFixed(2);
@@ -161,6 +162,8 @@ export const paymentsRouter = {
         }
         return { applied, skipped };
       });
+      // Payments change revenue and Zahlungsquote on the dashboard.
+      await invalidateDashboardCaches(context.tenant.key);
       return result;
     }),
 };

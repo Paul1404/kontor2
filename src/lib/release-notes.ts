@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.95.4",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die Abteilungs-Statistik zählt gelöschte Mitglieder nicht mehr mit. Außerdem werden die Kennzahlen auf dem Dashboard (Umsatz, Zahlungsquote, Mahnstufen) jetzt nach Beitragsläufen, Zahlungen und Mahnläufen sofort aktualisiert statt erst nach einigen Minuten.",
+      },
+    ],
+  },
+  {
     version: "0.95.3",
     date: "2026-06-14",
     changes: [
