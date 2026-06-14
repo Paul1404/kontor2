@@ -121,6 +121,36 @@ export type IngestResult = {
   validationReport: BatchReport;
 };
 
+/**
+ * Insert member->Abteilung links, replacing any existing membership for exactly
+ * the (member, abteilung) pairs being written. member_abteilungen's primary key
+ * is (member_id, abteilung_id, eintrittsdatum), so a re-import whose Eintritt
+ * date changed would otherwise add a SECOND row for the same pair (the
+ * onConflictDoNothing only matches the full PK). Deleting the pairs first makes
+ * a re-import replace the link; memberships for OTHER abteilungen (e.g.
+ * app-added) are not in `values` and stay untouched.
+ */
+async function replaceMemberLinks(
+  db: DB,
+  values: Record<string, unknown>[],
+  onError: (row: Record<string, unknown>, error: Error) => void,
+): Promise<void> {
+  if (values.length === 0) return;
+  const tuples = sql.join(
+    values.map((v) => sql`(${v.memberId as string}::uuid, ${v.abteilungId as string}::uuid)`),
+    sql`, `,
+  );
+  await db
+    .delete(memberAbteilungenTable)
+    .where(
+      sql`(${memberAbteilungenTable.memberId}, ${memberAbteilungenTable.abteilungId}) in (${tuples})`,
+    );
+  await batchInsert(db, memberAbteilungenTable, values, {
+    conflict: { updateKeys: [] },
+    onError,
+  });
+}
+
 export async function runIngest(
   db: DB,
   input: IngestInput,
@@ -427,10 +457,9 @@ export async function runIngest(
   // Flush the Abteilungs-Mitgliedschaften gathered from adresse.Abteilung in
   // one batch (the interes table appends more below before they're all read
   // back for the summary count).
-  await batchInsert(db, memberAbteilungenTable, memberLinkValues, {
-    conflict: { updateKeys: [] },
-    onError: (_r, e) => errors.push({ table: "adresse", message: e.message }),
-  });
+  await replaceMemberLinks(db, memberLinkValues, (_r, e) =>
+    errors.push({ table: "adresse", message: e.message }),
+  );
   memberLinkValues.length = 0;
 
   // 3. Contracts: replace all rows for AdrNrs that the dump touches.
@@ -709,10 +738,9 @@ export async function runIngest(
       }
     }
 
-    await batchInsert(db, memberAbteilungenTable, memberLinkValues, {
-      conflict: { updateKeys: [] },
-      onError: (_r, e) => errors.push({ table: "interes", message: e.message }),
-    });
+    await replaceMemberLinks(db, memberLinkValues, (_r, e) =>
+      errors.push({ table: "interes", message: e.message }),
+    );
     memberLinkValues.length = 0;
   }
   processed += len(input.interes);
