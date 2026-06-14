@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.95.8",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Beim erneuten Import entstehen keine doppelten Abteilungs-Zuordnungen mehr, wenn sich das Eintrittsdatum geändert hat. Die Zuordnung wird jetzt ersetzt statt zusätzlich angelegt; manuell ergänzte Abteilungen bleiben erhalten.",
+      },
+    ],
+  },
+  {
     version: "0.95.7",
     date: "2026-06-14",
     changes: [
