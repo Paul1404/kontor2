@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.95.2",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Das Wiederherstellen eines Mitglieds inklusive abhängiger Daten funktioniert jetzt auch für bereits abgerechnete Mitglieder. Verträge und SEPA-Mandate werden dabei aktualisiert statt gelöscht und neu angelegt, sodass verknüpfte Beitragsläufe und Sollstellungen erhalten bleiben. Vorher brach die Wiederherstellung mit einem Fehler ab.",
+      },
+    ],
+  },
+  {
     version: "0.95.1",
     date: "2026-06-14",
     changes: [

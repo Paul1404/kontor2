@@ -1,5 +1,6 @@
 import { ORPCError } from "@orpc/server";
-import { and, asc, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, lt, sql } from "drizzle-orm";
+import type { PgTable } from "drizzle-orm/pg-core";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import type { DBOrTx } from "~/server/db/client";
@@ -112,14 +113,44 @@ async function loadCurrentDependents(tx: DBOrTx, memberId: string) {
 }
 
 /**
- * Replace dependent rows for a member: delete all current rows in each
- * table where memberId matches, then re-insert the snapshot's rows after
- * coercing date strings back to Date. Skipped tables: attachments (file
- * blobs live in S3 and a restore can't materialize them back); fee_run
- * items / sollstellungen (re-insert can violate the unique
- * `(contract, year)` constraint and re-introduce postings the user may
- * have intentionally settled). We snapshot them so the data is preserved,
- * but restore is opt-in.
+ * Upsert one snapshot row by primary key (`id`): insert it, or update every
+ * non-id column from the snapshot on conflict. Used for contracts and SEPA
+ * mandates, which cannot be deleted-and-reinserted on restore: fee_run_items
+ * reference them with ON DELETE RESTRICT (the delete would abort the whole
+ * restore for any billed member), and deleting a contract cascades to its
+ * soll_stellungen. Upserting by id preserves the row identity, so referenced
+ * postings and items survive.
+ */
+async function upsertRowById(tx: DBOrTx, table: PgTable, row: Record<string, unknown>) {
+  const cols = getTableColumns(table) as Record<string, { name: string }>;
+  const idCol = cols.id;
+  if (!idCol) throw new Error("upsertRowById requires an `id` column");
+  const set: Record<string, unknown> = {};
+  for (const key of Object.keys(row)) {
+    if (key === "id" || !cols[key]) continue;
+    set[key] = sql`excluded.${sql.identifier(cols[key]!.name)}`;
+  }
+  await tx
+    .insert(table)
+    .values(row as never)
+    .onConflictDoUpdate({ target: idCol as never, set: set as never });
+}
+
+/**
+ * Restore a member's dependent rows from a snapshot.
+ *
+ * Relationships and Abteilungs-Mitgliedschaften are replaced (delete + insert):
+ * nothing references them with RESTRICT and they carry no financial postings.
+ *
+ * Contracts and SEPA mandates are UPSERTED by id, never deleted: fee_run_items
+ * reference them ON DELETE RESTRICT, so a delete would abort the restore for any
+ * billed member, and deleting a contract would cascade-delete its
+ * soll_stellungen. Upserting restores the snapshot's values for rows that still
+ * exist and re-inserts any that were removed, while leaving contracts/mandates
+ * created after the snapshot in place (removing them could orphan committed
+ * billing). soll_stellungen / fee_run_items themselves are intentionally not
+ * restored (snapshotted for the record, but a re-insert could resurrect
+ * postings the user settled).
  */
 async function restoreDependents(
   tx: DBOrTx,
@@ -131,16 +162,14 @@ async function restoreDependents(
     memberAbteilungen: Record<string, unknown>[];
   },
 ) {
-  await tx.delete(contractsTable).where(eq(contractsTable.memberId, memberId));
-  await tx.delete(sepaMandatesTable).where(eq(sepaMandatesTable.memberId, memberId));
   await tx.delete(relationshipsTable).where(eq(relationshipsTable.fromMemberId, memberId));
   await tx.delete(memberAbteilungenTable).where(eq(memberAbteilungenTable.memberId, memberId));
 
-  if (snapshot.contracts.length > 0) {
-    await tx.insert(contractsTable).values(snapshot.contracts.map((r) => coerceRow(r)) as never);
+  for (const r of snapshot.contracts) {
+    await upsertRowById(tx, contractsTable, coerceRow(r));
   }
-  if (snapshot.sepa.length > 0) {
-    await tx.insert(sepaMandatesTable).values(snapshot.sepa.map((r) => coerceRow(r)) as never);
+  for (const r of snapshot.sepa) {
+    await upsertRowById(tx, sepaMandatesTable, coerceRow(r));
   }
   if (snapshot.relationships.length > 0) {
     await tx
