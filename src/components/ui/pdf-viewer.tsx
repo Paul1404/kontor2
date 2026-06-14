@@ -56,6 +56,7 @@ export function PdfViewer({
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 title="In neuem Tab öffnen"
+                aria-label="In neuem Tab öffnen"
               >
                 <ExternalLink className="size-4" />
                 <span className="hidden sm:inline">Neuer Tab</span>

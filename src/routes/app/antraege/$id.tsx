@@ -25,6 +25,7 @@ import { Label } from "~/components/ui/label";
 import { PdfViewer } from "~/components/ui/pdf-viewer";
 import { QueryError } from "~/components/ui/query-error";
 import { Textarea } from "~/components/ui/textarea";
+import { formatCurrency, formatDate, formatDateTime, orEmpty } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 const ANTRAGSTYP_LABEL: Record<string, string> = {
@@ -61,20 +62,6 @@ function StatusBadge({ status }: { status: string }) {
 export const Route = createFileRoute("/app/antraege/$id")({
   component: AntragDetailPage,
 });
-
-function fmtDate(value: string | Date | null | undefined): string {
-  if (!value) return "—";
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("de-DE");
-}
-
-function fmtDateTime(value: string | Date | null | undefined): string {
-  if (!value) return "—";
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
-}
 
 const FILE_KIND_LABEL: Record<string, string> = {
   generated_pdf: "Beitrittserklärung (PDF)",
@@ -278,18 +265,18 @@ function AntragDetailPage() {
           <CardTitle>Antragsdaten</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-          <Row label="Geburtsdatum">{fmtDate(a.geburtsdatum)}</Row>
-          <Row label="E-Mail">{a.email ?? "—"}</Row>
-          <Row label="Telefon">{a.telefon ?? "—"}</Row>
+          <Row label="Geburtsdatum">{orEmpty(formatDate(a.geburtsdatum))}</Row>
+          <Row label="E-Mail">{orEmpty(a.email)}</Row>
+          <Row label="Telefon">{orEmpty(a.telefon)}</Row>
           <Row label="Anschrift">
             {[a.strasse, a.hausnummer].filter(Boolean).join(" ")} {a.plz} {a.ort}
           </Row>
           <Row label="Mitgliedschaft">{a.mitgliedschaftTyp}</Row>
-          <Row label="Jahresbeitrag">{a.jahresbeitrag ? `${a.jahresbeitrag} €` : "—"}</Row>
+          <Row label="Jahresbeitrag">{formatCurrency(a.jahresbeitrag)}</Row>
           <Row label="IBAN">
-            <span className="font-mono">{a.ibanFormatted ?? "—"}</span>
+            <span className="font-mono">{orEmpty(a.ibanFormatted)}</span>
           </Row>
-          <Row label="Mandatsreferenz">{a.mandatsreferenz ?? "—"}</Row>
+          <Row label="Mandatsreferenz">{orEmpty(a.mandatsreferenz)}</Row>
           {a.erziehungsberechtigterVorname ? (
             <Row label="Gesetzliche Vertretung">
               {a.erziehungsberechtigterVorname} {a.erziehungsberechtigterNachname}
@@ -315,7 +302,7 @@ function AntragDetailPage() {
                   <div className="min-w-0">
                     <p className="truncate font-medium">{FILE_KIND_LABEL[f.kind] ?? f.kind}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {f.filename ?? "—"} · {fmtDateTime(f.uploadedAt)}
+                      {orEmpty(f.filename)} · {formatDateTime(f.uploadedAt)}
                     </p>
                   </div>
                   <Button
@@ -357,7 +344,7 @@ function AntragDetailPage() {
                   <div className="min-w-0">
                     <p className="truncate font-medium">{EMAIL_KIND_LABEL[m.kind] ?? m.kind}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {m.recipient ?? "—"} · {fmtDateTime(m.createdAt)}
+                      {orEmpty(m.recipient)} · {formatDateTime(m.createdAt)}
                       {m.detail ? ` · ${EMAIL_DETAIL_LABEL[m.detail] ?? m.detail}` : ""}
                     </p>
                   </div>

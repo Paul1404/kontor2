@@ -14,7 +14,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { exportBase64File, exportCsvFile } from "~/lib/export";
-import { EMPTY_VALUE, formatDateTime } from "~/lib/format";
+import { EMPTY_VALUE, formatDate, formatDateTime, orEmpty } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/berichte/bestandserhebung")({
@@ -303,16 +303,13 @@ function BestandserhebungPage() {
                   <tr key={row.id}>
                     <td className="py-2 font-medium">{String(row.stichtag)}</td>
                     <td className="py-2 text-muted-foreground">
-                      {new Date(row.createdAt).toLocaleString("de-DE")} ·{" "}
-                      {row.createdByEmail ?? "—"}
+                      {formatDateTime(row.createdAt)} · {orEmpty(row.createdByEmail)}
                     </td>
                     <td className="py-2">
                       {row.signedOff ? (
                         <span className="inline-flex items-center gap-1 text-success">
                           <ShieldCheck className="size-3" />{" "}
-                          {row.signedOffAt
-                            ? new Date(row.signedOffAt).toLocaleDateString("de-DE")
-                            : ""}
+                          {row.signedOffAt ? formatDate(row.signedOffAt) : ""}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">offen</span>

@@ -47,7 +47,7 @@ export const Route = createRootRoute({
         { charSet: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { name: "color-scheme", content: "light dark" },
-        { title: `${b?.anzeigename?.trim() || "Kontor2"} – Vereinsverwaltung` },
+        { title: `${b?.anzeigename?.trim() || "Kontor2"}: Vereinsverwaltung` },
         { name: "theme-color", content: b?.primaryColor || "#335c99" },
       ],
       links: [
