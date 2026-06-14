@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.8",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Zahlungseingänge werden jetzt sicher verbucht, auch wenn zwei gleichzeitig auf dieselbe Sollstellung gebucht werden. Vorher konnte bei zeitgleicher Buchung eine Zahlung verloren gehen.",
+      },
+    ],
+  },
+  {
     version: "0.94.7",
     date: "2026-06-14",
     changes: [

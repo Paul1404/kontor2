@@ -104,19 +104,25 @@ export const paymentsRouter = {
       for (const it of input.items) {
         byId.set(it.sollStellungId, (byId.get(it.sollStellungId) ?? 0) + it.amount);
       }
-      const items = [...byId.entries()].map(([sollStellungId, amount]) => ({
-        sollStellungId,
-        amount,
-      }));
+      const items = [...byId.entries()]
+        .map(([sollStellungId, amount]) => ({ sollStellungId, amount }))
+        // Sort by id so concurrent requests acquire row locks in the same
+        // order, which rules out a deadlock between two overlapping batches.
+        .sort((a, b) => a.sollStellungId.localeCompare(b.sollStellungId));
       const result = await context.db.transaction(async (tx) => {
         let applied = 0;
         let skipped = 0;
         for (const item of items) {
+          // Lock the posting row (FOR UPDATE) so a concurrent apply on the same
+          // Sollstellung blocks until this transaction commits, then reads the
+          // updated openAmount. Without the lock both transactions read the same
+          // open balance and the second overwrites the first (lost payment).
           const [soll] = await tx
             .select()
             .from(sollStellungenTable)
             .where(eq(sollStellungenTable.id, item.sollStellungId))
-            .limit(1);
+            .limit(1)
+            .for("update");
           if (!soll || (soll.status !== "open" && soll.status !== "returned")) {
             skipped += 1;
             continue;
