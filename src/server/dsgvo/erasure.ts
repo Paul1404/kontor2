@@ -2,9 +2,10 @@ import { ORPCError } from "@orpc/server";
 import { and, desc, eq, ne, or, sql } from "drizzle-orm";
 import { appendAudit, type Changes } from "~/server/audit/log";
 import type { DBOrTx } from "~/server/db/client";
+import { attachmentsTable } from "~/server/db/schema/attachments";
 import { auditLogTable } from "~/server/db/schema/audit";
 import { contractsTable } from "~/server/db/schema/contracts";
-import { dsgvoRequestsTable } from "~/server/db/schema/dsgvo";
+import { dsgvoConsentLogTable, dsgvoRequestsTable } from "~/server/db/schema/dsgvo";
 import { dunningItemsTable } from "~/server/db/schema/dunning";
 import { feeRunItemsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { memberSourceRecordsTable } from "~/server/db/schema/member-source-records";
@@ -13,6 +14,8 @@ import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { memberSnapshotsTable } from "~/server/db/schema/snapshots";
 import { buildScrubRules, earliestErasureDate } from "~/server/dsgvo/policy";
+import { logger } from "~/server/lib/logger";
+import { deleteObject } from "~/server/s3/client";
 
 export type ErasureDiffEntry = {
   column: string;
@@ -150,9 +153,13 @@ export async function executeErasure(
     .where(eq(memberSnapshotsTable.memberId, memberId))
     .returning({ id: memberSnapshotsTable.id });
 
-  // 3. Dunning items embed the rendered name/address in JSON plus a Mahnung PDF.
-  const deletedDunning = await db
-    .delete(dunningItemsTable)
+  // 3. Dunning items (Mahnungen) are accounting documents and must be kept per
+  //    §147 AO (10 Jahre). Do NOT delete them; keep the financial skeleton
+  //    (docRef, amounts, sollIds, dates) and null only the embedded PII: the
+  //    rendered Mahnung PDF (name/address), its filename and the recipient.
+  const scrubbedDunning = await db
+    .update(dunningItemsTable)
+    .set({ pdfBase64: null, pdfFilename: null, sentTo: null })
     .where(eq(dunningItemsTable.memberId, memberId))
     .returning({ id: dunningItemsTable.id });
 
@@ -207,6 +214,43 @@ export async function executeErasure(
     .where(eq(contractsTable.memberId, memberId))
     .returning({ id: contractsTable.id });
 
+  // 4c. Attachments are member-uploaded documents (ID scans, signed forms) that
+  //     the Auskunft hands back as full files. Delete the S3 objects (best
+  //     effort, so one missing object never blocks the erasure) and then the
+  //     rows. The member row is only scrubbed, not deleted, so the FK cascade
+  //     would never fire on its own.
+  const memberAttachments = await db
+    .select({ id: attachmentsTable.id, s3Key: attachmentsTable.s3Key })
+    .from(attachmentsTable)
+    .where(eq(attachmentsTable.memberId, memberId));
+  for (const a of memberAttachments) {
+    try {
+      await deleteObject(a.s3Key);
+    } catch (err) {
+      logger.warn("dsgvo erasure: attachment S3 delete failed", {
+        err: err instanceof Error ? err.message : String(err),
+        s3Key: a.s3Key,
+        memberId,
+      });
+    }
+  }
+  const deletedAttachments =
+    memberAttachments.length > 0
+      ? await db
+          .delete(attachmentsTable)
+          .where(eq(attachmentsTable.memberId, memberId))
+          .returning({ id: attachmentsTable.id })
+      : [];
+
+  // 4d. Consent log: keep the structural record (type, granted, when) for
+  //     accountability, but null the free-text `evidence`, which can name the
+  //     member or describe a signed form.
+  const scrubbedConsent = await db
+    .update(dsgvoConsentLogTable)
+    .set({ evidence: null })
+    .where(eq(dsgvoConsentLogTable.memberId, memberId))
+    .returning({ id: dsgvoConsentLogTable.id });
+
   // The erasure audit entry records WHAT was cleared, never the cleared values
   // -- the before-values are exactly the PII we are removing.
   const changes: Changes = {
@@ -216,12 +260,16 @@ export async function executeErasure(
     changes.__sourceRecords = { before: `${deletedSource.length}`, after: null };
   if (deletedSnapshots.length > 0)
     changes.__snapshots = { before: `${deletedSnapshots.length}`, after: null };
-  if (deletedDunning.length > 0)
-    changes.__dunningItems = { before: `${deletedDunning.length}`, after: null };
+  if (scrubbedDunning.length > 0)
+    changes.__dunningItems = { before: `${scrubbedDunning.length} scrubbed`, after: null };
   if (scrubbedRels.length > 0)
     changes.__relationships = { before: `${scrubbedRels.length}`, after: null };
   if (scrubbedContracts.length > 0)
     changes.__contracts = { before: `${scrubbedContracts.length}`, after: null };
+  if (deletedAttachments.length > 0)
+    changes.__attachments = { before: `${deletedAttachments.length}`, after: null };
+  if (scrubbedConsent.length > 0)
+    changes.__consentEvidence = { before: `${scrubbedConsent.length} scrubbed`, after: null };
   if (opts.forceOverride && opts.overrideReason) {
     changes.__override = { before: null, after: opts.overrideReason };
   }
