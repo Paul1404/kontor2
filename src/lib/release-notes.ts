@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.96.6",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Ehrenurkunde nutzt jetzt die Markenfarbe des Vereins (Einstellungen > Vereinsdaten) statt einer festen roten Farbe. Ist keine Markenfarbe gesetzt, bleibt es beim bisherigen Rot.",
+      },
+    ],
+  },
+  {
     version: "0.96.5",
     date: "2026-06-14",
     changes: [

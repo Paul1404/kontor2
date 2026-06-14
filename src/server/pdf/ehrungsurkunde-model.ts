@@ -25,6 +25,12 @@ export type EhrungsurkundeInput = {
   verliehenAm: string;
   /** Document reference, e.g. "EU-2025-0007". */
   docRef: string;
+  /**
+   * Club brand colour as hex (#rrggbb), or null. Drives the certificate's
+   * frame, rules and headings so it matches the club's branding. Null or an
+   * invalid value falls back to the historic certificate red in the template.
+   */
+  brandColor: string | null;
 };
 
 export type EhrungsurkundeModel = {
@@ -46,9 +52,18 @@ export type EhrungsurkundeModel = {
   ortDatumZeile: string;
   unterschriftLinks: string;
   unterschriftRechts: string;
+  /** Resolved brand colour as a validated hex string, or "" to use the default. */
+  brandColor: string;
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+/** Accept only a well-formed #rrggbb hex; anything else yields "" (use default). */
+export function normalizeBrandColor(value: string | null): string {
+  const v = value?.trim() ?? "";
+  return HEX_COLOR.test(v) ? v : "";
+}
 
 /** Format an ISO date (yyyy-mm-dd) as dd.mm.yyyy. Passes other strings through. */
 export function fmtUrkundeDate(value: string): string {
@@ -81,5 +96,6 @@ export function buildEhrungsurkundeModel(input: EhrungsurkundeInput): Ehrungsurk
     ortDatumZeile,
     unterschriftLinks: "1. Vorsitzende/r",
     unterschriftRechts: "2. Vorsitzende/r",
+    brandColor: normalizeBrandColor(input.brandColor),
   };
 }

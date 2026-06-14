@@ -43,6 +43,7 @@ describe("buildEhrungsurkundeModel", () => {
     mitgliedsnummer: "98765",
     verliehenAm: "2025-03-15",
     docRef: "EU-2025-0007",
+    brandColor: null,
   };
 
   it("formats ISO dates and passes other strings through", () => {
@@ -88,5 +89,17 @@ describe("buildEhrungsurkundeModel", () => {
     expect(m.ehrungTitel).toBe("Goldene Ehrennadel");
     expect(m.wuerdigung).toContain("besonderen Verdienste");
     expect(m.ortDatumZeile).toBe("15.03.2025");
+  });
+
+  it("resolves the club brand colour, falling back to none for missing/invalid hex", () => {
+    const base2 = { ...base, kind: "sonderehrung" as const, jubilaeumJahre: null, titel: "X" };
+    // A valid hex is carried through so the certificate matches the club brand.
+    expect(buildEhrungsurkundeModel({ ...base2, brandColor: "#335c99" }).brandColor).toBe(
+      "#335c99",
+    );
+    // Null or a malformed value yields "" so the template uses its default red.
+    expect(buildEhrungsurkundeModel({ ...base2, brandColor: null }).brandColor).toBe("");
+    expect(buildEhrungsurkundeModel({ ...base2, brandColor: "navy" }).brandColor).toBe("");
+    expect(buildEhrungsurkundeModel({ ...base2, brandColor: "#fff" }).brandColor).toBe("");
   });
 });

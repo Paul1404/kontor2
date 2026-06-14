@@ -241,6 +241,7 @@ export const ehrungenRouter = {
       titel: ehrung.titel,
       verliehenAm: ehrung.verliehenAm,
       docRef,
+      brandColor: org.primaryColor,
     });
 
     const { base64 } = await renderPdfBase64(EhrungsurkundeDocument({ model }));

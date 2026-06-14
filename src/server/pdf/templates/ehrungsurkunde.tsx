@@ -9,108 +9,113 @@ import type { EhrungsurkundeModel } from "~/server/pdf/ehrungsurkunde-model";
  * lines at the foot. Kept free of em/en dashes per the house style.
  */
 
-const BRAND = "#b91c1c";
+// Fallback when the club has no brand colour configured. This is the historic
+// certificate red; clubs that set a `primaryColor` get their own colour instead
+// (see ehrungsurkunde-model.ts), so the certificate matches the rest of the app.
+const DEFAULT_BRAND = "#b91c1c";
 const INK = "#1a1a1a";
 
-const styles = StyleSheet.create({
-  page: {
-    paddingVertical: 56,
-    paddingHorizontal: 56,
-    fontFamily: "Helvetica",
-    color: INK,
-  },
-  outerFrame: {
-    position: "absolute",
-    top: 28,
-    left: 28,
-    right: 28,
-    bottom: 28,
-    borderWidth: 2,
-    borderColor: BRAND,
-  },
-  innerFrame: {
-    position: "absolute",
-    top: 34,
-    left: 34,
-    right: 34,
-    bottom: 34,
-    borderWidth: 0.75,
-    borderColor: BRAND,
-  },
-  content: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "flex-start",
-    paddingTop: 24,
-  },
-  logo: { height: 64, objectFit: "contain", marginBottom: 18 },
-  vereinKopf: {
-    fontFamily: "Helvetica-Bold",
-    fontSize: 13,
-    letterSpacing: 1,
-    textAlign: "center",
-    color: INK,
-    marginBottom: 4,
-  },
-  rule: { width: 90, height: 2, backgroundColor: BRAND, marginVertical: 18 },
-  ueberschrift: {
-    fontFamily: "Helvetica-Bold",
-    fontSize: 36,
-    letterSpacing: 3,
-    color: BRAND,
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  verleihtZeile: { fontSize: 12, color: "#444", textAlign: "center", marginTop: 14 },
-  empfaenger: {
-    fontFamily: "Helvetica-Bold",
-    fontSize: 26,
-    color: INK,
-    textAlign: "center",
-    marginTop: 14,
-    marginBottom: 14,
-  },
-  ehrungTitelLabel: { fontSize: 11, color: "#666", textAlign: "center" },
-  ehrungTitel: {
-    fontFamily: "Helvetica-Bold",
-    fontSize: 18,
-    color: BRAND,
-    textAlign: "center",
-    marginTop: 4,
-  },
-  wuerdigung: {
-    fontSize: 12,
-    lineHeight: 1.6,
-    color: "#333",
-    textAlign: "center",
-    marginTop: 22,
-    maxWidth: 360,
-  },
-  ortDatum: { fontSize: 11, color: "#444", textAlign: "center", marginTop: 36 },
-  signRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-    marginTop: 56,
-    paddingHorizontal: 8,
-  },
-  signCol: { width: 180, alignItems: "center" },
-  signLine: { width: 160, borderTopWidth: 0.75, borderColor: "#777", paddingTop: 4 },
-  signLabel: { fontSize: 9, color: "#555", textAlign: "center" },
-  footer: {
-    position: "absolute",
-    bottom: 40,
-    left: 56,
-    right: 56,
-    fontSize: 7.5,
-    color: "#999",
-    textAlign: "center",
-  },
-});
+const makeStyles = (brand: string) =>
+  StyleSheet.create({
+    page: {
+      paddingVertical: 56,
+      paddingHorizontal: 56,
+      fontFamily: "Helvetica",
+      color: INK,
+    },
+    outerFrame: {
+      position: "absolute",
+      top: 28,
+      left: 28,
+      right: 28,
+      bottom: 28,
+      borderWidth: 2,
+      borderColor: brand,
+    },
+    innerFrame: {
+      position: "absolute",
+      top: 34,
+      left: 34,
+      right: 34,
+      bottom: 34,
+      borderWidth: 0.75,
+      borderColor: brand,
+    },
+    content: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "flex-start",
+      paddingTop: 24,
+    },
+    logo: { height: 64, objectFit: "contain", marginBottom: 18 },
+    vereinKopf: {
+      fontFamily: "Helvetica-Bold",
+      fontSize: 13,
+      letterSpacing: 1,
+      textAlign: "center",
+      color: INK,
+      marginBottom: 4,
+    },
+    rule: { width: 90, height: 2, backgroundColor: brand, marginVertical: 18 },
+    ueberschrift: {
+      fontFamily: "Helvetica-Bold",
+      fontSize: 36,
+      letterSpacing: 3,
+      color: brand,
+      textAlign: "center",
+      marginBottom: 10,
+    },
+    verleihtZeile: { fontSize: 12, color: "#444", textAlign: "center", marginTop: 14 },
+    empfaenger: {
+      fontFamily: "Helvetica-Bold",
+      fontSize: 26,
+      color: INK,
+      textAlign: "center",
+      marginTop: 14,
+      marginBottom: 14,
+    },
+    ehrungTitelLabel: { fontSize: 11, color: "#666", textAlign: "center" },
+    ehrungTitel: {
+      fontFamily: "Helvetica-Bold",
+      fontSize: 18,
+      color: brand,
+      textAlign: "center",
+      marginTop: 4,
+    },
+    wuerdigung: {
+      fontSize: 12,
+      lineHeight: 1.6,
+      color: "#333",
+      textAlign: "center",
+      marginTop: 22,
+      maxWidth: 360,
+    },
+    ortDatum: { fontSize: 11, color: "#444", textAlign: "center", marginTop: 36 },
+    signRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      width: "100%",
+      marginTop: 56,
+      paddingHorizontal: 8,
+    },
+    signCol: { width: 180, alignItems: "center" },
+    signLine: { width: 160, borderTopWidth: 0.75, borderColor: "#777", paddingTop: 4 },
+    signLabel: { fontSize: 9, color: "#555", textAlign: "center" },
+    footer: {
+      position: "absolute",
+      bottom: 40,
+      left: 56,
+      right: 56,
+      fontSize: 7.5,
+      color: "#999",
+      textAlign: "center",
+    },
+  });
 
 export type EhrungsurkundeProps = { model: EhrungsurkundeModel };
 
 export function EhrungsurkundeDocument({ model }: EhrungsurkundeProps) {
+  const styles = makeStyles(model.brandColor || DEFAULT_BRAND);
   return (
     <Document
       title={`Ehrenurkunde ${model.docRef} · ${model.empfaengerName}`}
