@@ -9,7 +9,27 @@ import { toast } from "~/components/ui/toaster";
 import { triggerDownload } from "~/lib/download";
 import { orpc } from "~/lib/orpc";
 
+type ExportSearch = {
+  q?: string;
+  status?: "aktiv" | "passiv" | "ausgetreten" | "alle";
+  abteilungId?: string;
+};
+
 export const Route = createFileRoute("/app/berichte/export")({
+  validateSearch: (search: Record<string, unknown>): ExportSearch => {
+    const status = search.status;
+    return {
+      q: typeof search.q === "string" && search.q ? search.q : undefined,
+      status:
+        status === "aktiv" || status === "passiv" || status === "ausgetreten" || status === "alle"
+          ? status
+          : undefined,
+      abteilungId:
+        typeof search.abteilungId === "string" && search.abteilungId
+          ? search.abteilungId
+          : undefined,
+    };
+  },
   component: ExportCenterPage,
 });
 
@@ -36,11 +56,15 @@ const STATUS_OPTIONS = [
 ] as const;
 
 function ExportCenterPage() {
+  const search = Route.useSearch();
   const now = new Date();
   const [year, setYear] = useState(now.getUTCFullYear());
   const [month, setMonth] = useState(now.getUTCMonth() + 1);
-  const [status, setStatus] = useState<"aktiv" | "passiv" | "ausgetreten" | "alle">("aktiv");
-  const [abteilungId, setAbteilungId] = useState("");
+  const [status, setStatus] = useState<"aktiv" | "passiv" | "ausgetreten" | "alle">(
+    search.status ?? "aktiv",
+  );
+  const [abteilungId, setAbteilungId] = useState(search.abteilungId ?? "");
+  const [q, setQ] = useState(search.q ?? "");
   const [busy, setBusy] = useState<string | null>(null);
 
   const abteilungen = useQuery({
@@ -80,11 +104,12 @@ function ExportCenterPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ExportCard
           title="Mitgliederliste"
-          description="Stammdaten der Mitglieder, gefiltert nach Status und Abteilung."
+          description="Stammdaten der Mitglieder, gefiltert nach Suche, Status und Abteilung."
           busy={busy === "members"}
           onDownload={() =>
             run("members", () =>
               orpc.reports.membersExport({
+                q: q || undefined,
                 status,
                 abteilungId: abteilungId || null,
                 includeAusgetretene: status === "alle",
@@ -92,6 +117,15 @@ function ExportCenterPage() {
             )
           }
         >
+          <Field label="Suche">
+            <input
+              type="text"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Name, Nummer, Ort …"
+              className="h-10 w-48 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+            />
+          </Field>
           <Field label="Status">
             <Select value={status} onChange={(v) => setStatus(v as typeof status)}>
               {STATUS_OPTIONS.map((o) => (

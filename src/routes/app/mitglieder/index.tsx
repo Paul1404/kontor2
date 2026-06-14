@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  FileDown,
   Layers,
   Loader2,
   Plus,
@@ -456,28 +457,23 @@ function MembersListPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={async () => {
-              try {
-                const res = await orpc.reports.membersExport({
-                  q: search.q,
-                  status: search.status,
-                  abteilungId: search.abteilungId,
-                  includeAusgetretene: search.includeAusgetretene,
-                });
-                triggerDownload(res.filename, res.content, "text/csv;charset=utf-8");
-                toast.success("CSV heruntergeladen");
-              } catch (err) {
-                toast.error("Export fehlgeschlagen", {
-                  description: err instanceof Error ? err.message : String(err),
-                });
-              }
+          <Link
+            to="/app/berichte/export"
+            search={{
+              q: search.q || undefined,
+              status:
+                search.status === "aktiv" || search.status === "passiv" || search.status === "alle"
+                  ? search.status
+                  : search.includeAusgetretene
+                    ? "alle"
+                    : undefined,
+              abteilungId: search.abteilungId || undefined,
             }}
           >
-            <Download className="size-4" /> Als CSV
-          </Button>
+            <Button type="button" variant="outline">
+              <FileDown className="size-4" /> Export
+            </Button>
+          </Link>
           {canEdit ? (
             <Link to="/app/mitglieder/neu">
               <Button>
