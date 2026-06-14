@@ -49,6 +49,9 @@ export const CATEGORY_IDS = [
   "strasse_ohne_hausnummer",
   "vertrag_betrag_null",
   "dublette_name_ohne_gebdatum",
+  // --- issue #230: Tarif/Alter-Abgleich -----------------------------------
+  "tarif_passt_nicht_zum_alter",
+  "volljaehrig_eltern_konto",
 ] as const;
 
 export type CategoryId = (typeof CATEGORY_IDS)[number];
@@ -246,6 +249,20 @@ export const CATEGORIES: CategoryMeta[] = [
       "Gleicher Name auf mehreren Datensätzen, von denen mindestens einer kein Geburtsdatum hat. Die Geburtsdatums-Dublettenprüfung übersieht diese.",
     severity: "info",
   },
+  {
+    id: "tarif_passt_nicht_zum_alter",
+    label: "Beitragsart passt nicht zum Alter",
+    description:
+      "Laufender Vertrag, dessen Beitragsart eine Altersgrenze hat, in die das Mitglied nicht mehr passt (z. B. 18-Jährige noch im Jugendtarif). Die Altersgrenzen werden je Beitragsart gepflegt; Beitragsarten ohne Altersgrenze werden nicht geprüft.",
+    severity: "warn",
+  },
+  {
+    id: "volljaehrig_eltern_konto",
+    label: "Volljährig auf Eltern-Konto",
+    description:
+      "Aktives Mitglied ab 18 Jahren, dessen Lastschrift weiter über das Konto eines Zahlers (Elternteil) läuft. Erinnerung zur Umstellung auf Selbstzahler. Es wird nichts automatisch geändert.",
+    severity: "info",
+  },
 ];
 
 /** A live member: not soft-deleted, neither exited nor deceased. */
@@ -356,6 +373,14 @@ export const WHERE: Record<CategoryId, string> = {
   // Geburtsdatum, which the birthdate-based dubletten check cannot catch.
   dublette_name_ohne_gebdatum:
     "deleted_at is null and nachname is not null and btrim(nachname) <> '' and exists (select 1 from members m2 where m2.deleted_at is null and m2.id <> members.id and lower(m2.nachname) = lower(members.nachname) and lower(coalesce(m2.vorname, '')) = lower(coalesce(members.vorname, '')) and (m2.geburtsdatum is null or members.geburtsdatum is null))",
+  // Active contract whose Beitragsart carries an age range the member no longer
+  // fits. Age = completed years at today. Only fee types with a configured
+  // min/max age are checked; others are skipped (min_age/max_age null).
+  tarif_passt_nicht_zum_alter: `${ACTIVE} and geburtsdatum is not null and exists (select 1 from contracts c join fee_types ft on ft.art = c.art where c.member_id = members.id and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date) and ((ft.min_age is not null and extract(year from age(current_date, members.geburtsdatum)) < ft.min_age) or (ft.max_age is not null and extract(year from age(current_date, members.geburtsdatum)) > ft.max_age)))`,
+  // Active member who is 18+ but whose active direct-debit contract is paid from
+  // a different person's account (Zahler/Vertreter, typically a parent). Reminder
+  // to switch to Selbstzahler; nothing is changed automatically.
+  volljaehrig_eltern_konto: `${ACTIVE} and geburtsdatum is not null and geburtsdatum <= (current_date - interval '18 years') and exists (select 1 from contracts c where ${DD_CONTRACT_C} and (${PAYER_FOR_C}) <> members.id)`,
 };
 
 /**

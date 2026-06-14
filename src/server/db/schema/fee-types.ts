@@ -50,6 +50,12 @@ export const feeTypesTable = pgTable(
     betrag1: numeric("betrag1", { precision: 19, scale: 8 }),
     nichAktiv: text("nich_aktiv"),
     artType: integer("art_type"),
+    // Optional expected age range (completed years) for this Beitragsart. When
+    // set, the data-quality check flags an active contract whose member is
+    // outside [minAge, maxAge]. Both null = no age expectation (e.g. a
+    // Förderbeitrag), the check skips it. Configured in the Beitragsarten admin.
+    minAge: integer("min_age"),
+    maxAge: integer("max_age"),
     importBatchId: text("import_batch_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.95.0",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Datenqualität prüft jetzt Tarif gegen Alter. Beitragsarten können ein Alter von/bis bekommen; passt das Alter eines Mitglieds nicht zur Beitragsart, erscheint es unter Beitragsart passt nicht zum Alter. Zusätzlich zeigt Volljährig auf Eltern-Konto aktive Mitglieder ab 18, deren Lastschrift noch über ein Eltern-Konto läuft. Es wird nichts automatisch umgestellt.",
+      },
+    ],
+  },
+  {
     version: "0.94.12",
     date: "2026-06-14",
     changes: [
