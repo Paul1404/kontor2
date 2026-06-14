@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.95.1",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "KI-Zugriff: ein Schlüssel behält dauerhaft die Rechte, die bei der Ausstellung bestätigt wurden. Wird der zugehörige Benutzer später höher gestuft, gewinnt der Schlüssel keine zusätzlichen Rechte mehr. Bei einer Herabstufung gelten weiterhin die niedrigeren Rechte.",
+      },
+    ],
+  },
+  {
     version: "0.95.0",
     date: "2026-06-14",
     changes: [
