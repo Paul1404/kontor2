@@ -29,14 +29,17 @@ type Staffel = {
 
 // Local copy of the default schedule. The server schema also defines this, but
 // importing it here would pull server-only Drizzle code into the client bundle.
+// Empty starting values for a club that has not configured its schedule yet, so
+// the form never pre-fills another club's prices ready to be saved by accident.
+// An existing club's saved Beitragsstaffel always takes precedence over this.
 const DEFAULT_STAFFEL: Staffel = {
-  familie: "96.00",
-  kind: "24.00",
-  kindElternMitglied: "12.00",
-  jugendlich: "36.00",
-  jugendlichElternMitglied: "24.00",
-  jungerErwachsener: "42.00",
-  erwachsener: "54.00",
+  familie: "0.00",
+  kind: "0.00",
+  kindElternMitglied: "0.00",
+  jugendlich: "0.00",
+  jugendlichElternMitglied: "0.00",
+  jungerErwachsener: "0.00",
+  erwachsener: "0.00",
 };
 
 function VereinsdatenPage() {

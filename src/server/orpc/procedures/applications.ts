@@ -214,6 +214,12 @@ async function buildApprovedPdf(
     signatureDataUri = `data:${sigFile.mimeType ?? "image/png"};base64,${bytes.toString("base64")}`;
   }
 
+  if (!org.beitragsstaffel) {
+    throw new ORPCError("PRECONDITION_FAILED", {
+      message:
+        "Beitragsstaffel ist nicht konfiguriert. Bitte unter Einstellungen > Vereinsdaten die Jahresbeiträge hinterlegen.",
+    });
+  }
   const fee = calculateFee({
     kategorie: app.mitgliedschaftTyp,
     elternteilMitglied: app.elternteilMitglied,
@@ -581,10 +587,15 @@ export const applicationsRouter = {
       }
       const kategorie = mitgliedschaftTypFor(input.antragstyp as Antragstyp, dob);
       const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+      if (!org?.beitragsstaffel) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Die Jahresbeiträge für den Online-Antrag sind noch nicht hinterlegt.",
+        });
+      }
       const fee = calculateFee({
         kategorie,
         elternteilMitglied: input.elternteilMitglied,
-        staffel: org?.beitragsstaffel ?? null,
+        staffel: org.beitragsstaffel,
       });
       return { kategorie, jahresbeitrag: fee.betrag, label: fee.label };
     }),
@@ -792,6 +803,11 @@ export const applicationsRouter = {
       }
     }
 
+    if (!org.beitragsstaffel) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Der Verein hat die Jahresbeiträge noch nicht hinterlegt.",
+      });
+    }
     const fee = calculateFee({
       kategorie,
       elternteilMitglied: input.elternteilMitglied,

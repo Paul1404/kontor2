@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.96.7",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Die Jahresbeiträge für den Online-Antrag müssen je Verein hinterlegt sein. Ist keine Beitragsstaffel gepflegt, weist der Online-Antrag darauf hin, statt stillschweigend eine fremde Preistabelle zu verwenden. Bestehende Vereine behalten ihre bisherigen Beträge unverändert.",
+      },
+    ],
+  },
+  {
     version: "0.96.6",
     date: "2026-06-14",
     changes: [
