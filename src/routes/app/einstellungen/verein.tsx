@@ -713,7 +713,7 @@ function VereinsdatenPage() {
   );
 }
 
-const DEFAULT_BRAND = "#dc2626";
+const DEFAULT_BRAND = "#335c99";
 
 /**
  * White-Label: Anzeigename, Logo und Markenfarbe für die ganze Oberfläche.

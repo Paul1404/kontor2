@@ -1587,10 +1587,10 @@ function SignChoice({
 }
 
 const CONFETTI_COLORS = [
-  "hsl(0 78% 48%)",
+  "hsl(40 52% 54%)",
   "hsl(38 92% 50%)",
   "hsl(152 60% 36%)",
-  "hsl(220 60% 55%)",
+  "hsl(216 52% 45%)",
 ];
 
 function Confetti() {

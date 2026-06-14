@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { Building2, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { signOut } from "~/lib/auth-client";
 import { orpc } from "~/lib/orpc";
@@ -32,7 +32,7 @@ function ConsoleLayout() {
     <div className="min-h-screen bg-muted/30">
       <header className="border-b bg-background">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
-          <Building2 className="size-5 text-brand" />
+          <img src="/logo.svg" alt="Kontor2" className="size-8 rounded-lg" />
           <div className="flex flex-col leading-tight">
             <span className="text-sm font-semibold tracking-tight">Kontor2 Betreiber</span>
             <span className="text-[11px] uppercase tracking-wider text-muted-foreground">

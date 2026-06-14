@@ -12,7 +12,7 @@
   --color-popover: hsl(0 0% 100%);
   --color-popover-foreground: hsl(220 25% 10%);
 
-  --color-primary: hsl(0 78% 48%);
+  --color-primary: hsl(216 50% 40%);
   --color-primary-foreground: hsl(0 0% 100%);
 
   --color-secondary: hsl(220 14% 96%);
@@ -32,7 +32,7 @@
 
   --color-border: hsl(220 14% 91%);
   --color-input: hsl(220 14% 91%);
-  --color-ring: hsl(0 78% 48%);
+  --color-ring: hsl(216 50% 40%);
 
   --color-sidebar: hsl(220 25% 8%);
   --color-sidebar-foreground: hsl(220 14% 92%);
@@ -40,8 +40,9 @@
   --color-sidebar-accent: hsl(220 25% 14%);
   --color-sidebar-border: hsl(220 18% 18%);
 
-  --color-brand: hsl(0 78% 48%);
+  --color-brand: hsl(216 50% 40%);
   --color-brand-foreground: hsl(0 0% 100%);
+  --color-brand-accent: hsl(40 52% 54%);
 
   --radius: 0.75rem;
   --radius-sm: 0.5rem;
@@ -63,7 +64,7 @@
   --color-popover: hsl(222 22% 9%);
   --color-popover-foreground: hsl(220 14% 96%);
 
-  --color-primary: hsl(0 78% 56%);
+  --color-primary: hsl(214 58% 60%);
   --color-primary-foreground: hsl(0 0% 100%);
 
   --color-secondary: hsl(222 18% 13%);
@@ -83,7 +84,7 @@
 
   --color-border: hsl(222 18% 18%);
   --color-input: hsl(222 18% 20%);
-  --color-ring: hsl(0 78% 56%);
+  --color-ring: hsl(214 58% 60%);
 
   --color-sidebar: hsl(222 24% 5%);
   --color-sidebar-foreground: hsl(220 14% 92%);
@@ -91,8 +92,9 @@
   --color-sidebar-accent: hsl(222 22% 11%);
   --color-sidebar-border: hsl(220 18% 16%);
 
-  --color-brand: hsl(0 78% 56%);
+  --color-brand: hsl(214 58% 60%);
   --color-brand-foreground: hsl(0 0% 100%);
+  --color-brand-accent: hsl(40 58% 60%);
 
   --shadow-soft: 0 1px 2px hsl(0 0% 0% / 0.4), 0 1px 1px hsl(0 0% 0% / 0.25);
   --shadow-card: 0 1px 3px hsl(0 0% 0% / 0.4), 0 1px 2px hsl(0 0% 0% / 0.25);
@@ -445,33 +447,28 @@ body::after {
   }
 }
 
-/* Brand gradient helpers: a warm red to orange wash for hero headers and a
-   clipped variant for headlines. Theme-aware so dark mode stays vivid. */
+/* Brand gradient helpers: a deep navy to warm brass wash for hero headers and a
+   clipped variant for headlines (Kontor2: Navy & Messing). Theme-aware. */
 .brand-gradient-bg {
   background-image: linear-gradient(
     135deg,
-    hsl(0 72% 42%) 0%,
-    hsl(0 78% 48%) 45%,
-    hsl(24 95% 53%) 100%
+    hsl(216 60% 24%) 0%,
+    hsl(216 52% 40%) 55%,
+    hsl(40 50% 52%) 100%
   );
 }
 
 .dark .brand-gradient-bg {
   background-image: linear-gradient(
     135deg,
-    hsl(0 72% 46%) 0%,
-    hsl(0 78% 54%) 45%,
-    hsl(24 95% 56%) 100%
+    hsl(216 55% 30%) 0%,
+    hsl(214 56% 50%) 55%,
+    hsl(40 56% 58%) 100%
   );
 }
 
 .brand-gradient-text {
-  background-image: linear-gradient(
-    135deg,
-    hsl(0 78% 48%) 0%,
-    hsl(24 95% 53%) 55%,
-    hsl(330 81% 60%) 100%
-  );
+  background-image: linear-gradient(135deg, hsl(216 52% 42%) 0%, hsl(40 52% 50%) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
