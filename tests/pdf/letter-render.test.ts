@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { type BeitrittClub, buildBeitrittModel } from "~/server/pdf/beitrittserklaerung-model";
 import { buildCancellationModel } from "~/server/pdf/cancellation-model";
 import { buildEhrungsurkundeModel } from "~/server/pdf/ehrungsurkunde-model";
 import { buildKulanzClubModel, buildKulanzLetterModel } from "~/server/pdf/kulanz-model";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { AustrittsbestaetigungDocument } from "~/server/pdf/templates/austrittsbestaetigung";
+import { BeitrittserklaerungDocument } from "~/server/pdf/templates/beitrittserklaerung";
 import { EhrungsurkundeDocument } from "~/server/pdf/templates/ehrungsurkunde";
 import { KulanzSonderkuendigungDocument } from "~/server/pdf/templates/kulanz-sonderkuendigung";
 import { MahnungDocument } from "~/server/pdf/templates/mahnung";
@@ -209,5 +211,46 @@ describe("DIN 5008 letter templates", () => {
       docRef: "EU-2025-0008",
     });
     await expectValidPdf(EhrungsurkundeDocument({ model: sonder }));
+  });
+
+  it("renders the Beitrittserklaerung form (DIN page geometry)", async () => {
+    const beitrittClub: BeitrittClub = {
+      vereinsname: org.vereinsname,
+      ort: org.anschriftOrt,
+      anschriftStrasse: org.anschriftStrasse,
+      anschriftPlz: org.anschriftPlz,
+      anschriftOrt: org.anschriftOrt,
+      kontaktEmail: "info@verein.de",
+      kontaktTelefon: null,
+      glaeubigerId: org.glaeubigerId,
+      datenschutzUrl: null,
+      satzungUrl: null,
+      logoDataUri: null,
+    };
+    const model = buildBeitrittModel({
+      antragsnummer: "ANT-2026-7K3QF9",
+      antragstyp: "einzel",
+      geschlecht: "m",
+      vorname: "Max",
+      nachname: "Mustermann",
+      geburtsdatum: "1990-05-20",
+      strasse: "Hauptstr. 1",
+      hausnummer: "2",
+      plz: "97000",
+      ort: "Musterstadt",
+      telefon: null,
+      email: "a@b.de",
+      abteilungen: ["Fußball"],
+      mitgliedschaftLabel: "Erwachsene",
+      jahresbeitrag: "54.00",
+      kontoinhaber: "Max Mustermann",
+      ibanFormatted: "DE12 3456 7890 1234 5678 90",
+      bic: "BYLADEM1KSW",
+      kreditinstitut: "Sparkasse",
+      mandatsreferenz: "M-AB1234",
+      consentAt: new Date("2026-01-10T10:00:00Z"),
+      club: beitrittClub,
+    });
+    await expectValidPdf(BeitrittserklaerungDocument({ model }));
   });
 });
