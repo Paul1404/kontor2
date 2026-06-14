@@ -1,11 +1,35 @@
 import { eq, isNull } from "drizzle-orm";
+import type postgres from "postgres";
 import { runDataQualitySnapshot } from "~/server/data-quality/snapshot";
-import { db, sql } from "~/server/db/client";
+import { type DB, db, dbForTenant, sql, sqlForTenant } from "~/server/db/client";
 import { membersTable } from "~/server/db/schema/members";
 import { memberSnapshotsTable, snapshotRunsTable } from "~/server/db/schema/snapshots";
 import { reconcileMemberStatuses } from "~/server/domain/member-status-reconcile";
 import { logger } from "~/server/lib/logger";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
+import { loadTenants } from "~/server/tenants/load";
+import { primaryTenant } from "~/server/tenants/resolve";
+
+type TenantHandle = { key: string; handle: DB; conn: postgres.Sql };
+
+/**
+ * Resolve a DB + raw-sql handle for every tenant. The primary Verein uses the
+ * process DATABASE_URL pool (db()/sql()); every other Verein gets its own pool,
+ * mirroring the auth layer. The nightly run iterates these so all Vereine get
+ * snapshots and status reconcile, not just the primary.
+ */
+async function tenantHandles(): Promise<TenantHandle[]> {
+  const tenants = await loadTenants();
+  const primaryKey = primaryTenant().key;
+  return tenants.map((t) => {
+    const isPrimary = t.key === primaryKey;
+    return {
+      key: t.key,
+      handle: isPrimary ? db() : dbForTenant(t.databaseUrl),
+      conn: isPrimary ? sql() : sqlForTenant(t.databaseUrl),
+    };
+  });
+}
 
 // Postgres advisory-lock key. Picked at random; just needs to be the same
 // integer across replicas so only one process can hold it concurrently.
@@ -27,24 +51,64 @@ function nextRunAt(now: Date = new Date()): Date {
   return next;
 }
 
-export async function runNightlySnapshot(
-  opts: { actorEmail?: string; notes?: string; trigger?: "nightly" | "manual" | "pre_import" } = {},
-): Promise<{
+type SnapshotResult = {
   runId: string | null;
   memberCount: number;
   skippedCount: number;
   bytesTotal: number;
   acquiredLock: boolean;
-}> {
+};
+
+type SnapshotOpts = {
+  actorEmail?: string;
+  notes?: string;
+  trigger?: "nightly" | "manual" | "pre_import";
+};
+
+/**
+ * Run the member snapshot for ALL tenants, aggregating the totals. Each tenant
+ * runs against its own database under its own advisory lock (locks are
+ * per-database, so the same key never collides across tenants).
+ */
+export async function runNightlySnapshot(opts: SnapshotOpts = {}): Promise<SnapshotResult> {
+  const totals: SnapshotResult = {
+    runId: null,
+    memberCount: 0,
+    skippedCount: 0,
+    bytesTotal: 0,
+    acquiredLock: false,
+  };
+  for (const t of await tenantHandles()) {
+    try {
+      const r = await runTenantSnapshot(t.handle, t.conn, opts);
+      totals.acquiredLock = totals.acquiredLock || r.acquiredLock;
+      totals.memberCount += r.memberCount;
+      totals.skippedCount += r.skippedCount;
+      totals.bytesTotal += r.bytesTotal;
+      if (r.runId) totals.runId = r.runId;
+    } catch (err) {
+      logger.error("tenant snapshot failed", {
+        tenant: t.key,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return totals;
+}
+
+async function runTenantSnapshot(
+  handle: DB,
+  conn: postgres.Sql,
+  opts: SnapshotOpts = {},
+): Promise<SnapshotResult> {
   const trigger = opts.trigger ?? "nightly";
-  const handle = db();
 
   // Session-level advisory locks live on a specific backend connection, so
   // they must be acquired and released on the SAME connection. With a pooled
   // client the unlock would otherwise run on a different connection (no-op),
   // leaking the lock and blocking every future run. Reserve one connection
   // for the whole run and release the lock on it explicitly.
-  const lock = await sql().reserve();
+  const lock = await conn.reserve();
   const acquired = await lock`select pg_try_advisory_lock(${ADVISORY_LOCK_KEY}::bigint) as ok`;
   const ok = Boolean((acquired as unknown as Array<{ ok: boolean }>)[0]?.ok);
   if (!ok) {
@@ -137,15 +201,18 @@ export async function runNightlySnapshot(
  * snapshot run that follows it.
  */
 async function runStatusReconcile(): Promise<void> {
-  try {
-    const { exited, deceased } = await reconcileMemberStatuses(db());
-    if (exited > 0 || deceased > 0) {
-      logger.info("member status reconciled", { exited, deceased });
+  for (const t of await tenantHandles()) {
+    try {
+      const { exited, deceased } = await reconcileMemberStatuses(t.handle);
+      if (exited > 0 || deceased > 0) {
+        logger.info("member status reconciled", { tenant: t.key, exited, deceased });
+      }
+    } catch (err) {
+      logger.error("member status reconcile failed", {
+        tenant: t.key,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
-  } catch (err) {
-    logger.error("member status reconcile failed", {
-      error: err instanceof Error ? err.message : String(err),
-    });
   }
 }
 
