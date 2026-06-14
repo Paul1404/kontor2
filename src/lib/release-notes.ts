@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.98.0",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Anzahl der Mahnstufen lässt sich jetzt je Verein einstellen (Einstellungen > Vereinsdaten): nur Erinnerung, Erinnerung plus eine Mahnung, oder der bisherige dreistufige Ablauf. Voreingestellt bleiben drei Stufen, also unverändert.",
+      },
+    ],
+  },
+  {
     version: "0.97.0",
     date: "2026-06-14",
     changes: [

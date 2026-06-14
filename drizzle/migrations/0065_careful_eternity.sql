@@ -1,0 +1,1 @@
+ALTER TABLE "organization_settings" ADD COLUMN "max_mahnstufe" integer DEFAULT 3 NOT NULL;

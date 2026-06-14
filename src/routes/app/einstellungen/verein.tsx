@@ -60,6 +60,7 @@ function VereinsdatenPage() {
     vereinsBic: "",
     vereinsBankname: "",
     defaultFalligkeitTag: 15,
+    maxMahnstufe: 3,
     mahngebuhr1: "0",
     mahngebuhr2: "5",
     mahngebuhr3: "10",
@@ -100,6 +101,7 @@ function VereinsdatenPage() {
         vereinsBic: cfg.data.vereinsBic,
         vereinsBankname: cfg.data.vereinsBankname ?? "",
         defaultFalligkeitTag: cfg.data.defaultFalligkeitTag,
+        maxMahnstufe: cfg.data.maxMahnstufe ?? 3,
         mahngebuhr1: cfg.data.mahngebuhr1 ?? "0",
         mahngebuhr2: cfg.data.mahngebuhr2 ?? "5",
         mahngebuhr3: cfg.data.mahngebuhr3 ?? "10",
@@ -141,6 +143,7 @@ function VereinsdatenPage() {
         vereinsBic: form.vereinsBic,
         vereinsBankname: form.vereinsBankname || null,
         defaultFalligkeitTag: form.defaultFalligkeitTag,
+        maxMahnstufe: form.maxMahnstufe,
         mahngebuhr1: normalizeMoney(form.mahngebuhr1),
         mahngebuhr2: normalizeMoney(form.mahngebuhr2),
         mahngebuhr3: normalizeMoney(form.mahngebuhr3),
@@ -292,6 +295,22 @@ function VereinsdatenPage() {
                 Mahnwesen
               </h3>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <Field
+                  label="Anzahl Mahnstufen"
+                  hint="Wie viele Stufen das Mahnwesen nutzt: 1 nur Erinnerung, 2 plus 1. Mahnung, 3 plus 2. Mahnung."
+                >
+                  <Select
+                    value={String(form.maxMahnstufe)}
+                    onChange={(e) =>
+                      setForm({ ...form, maxMahnstufe: Number(e.target.value) || 3 })
+                    }
+                  >
+                    <option value="1">1: nur Erinnerung</option>
+                    <option value="2">2: Erinnerung + 1. Mahnung</option>
+                    <option value="3">3: Erinnerung + 1. + 2. Mahnung</option>
+                  </Select>
+                </Field>
+                <div />
                 <Field label="Mahngebühr Stufe 1 in €" hint="Wird zur Zahlungserinnerung addiert">
                   <Input
                     value={form.mahngebuhr1}

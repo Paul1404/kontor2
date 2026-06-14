@@ -222,6 +222,11 @@ export const dunningRouter = {
           message: "Vereinsdaten fehlen. Bitte unter Einstellungen > Vereinsdaten pflegen.",
         });
       }
+      if (input.level > org.maxMahnstufe) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `Dieser Verein nutzt höchstens Mahnstufe ${org.maxMahnstufe}.`,
+        });
+      }
       const runDate = input.runDate ? new Date(`${input.runDate}T00:00:00Z`) : todayUtc();
       const dueDate = addDays(runDate, org.mahnFristTage);
 
@@ -319,6 +324,11 @@ export const dunningRouter = {
       if (!org) {
         throw new ORPCError("PRECONDITION_FAILED", {
           message: "Vereinsdaten fehlen.",
+        });
+      }
+      if (input.level > org.maxMahnstufe) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `Dieser Verein nutzt höchstens Mahnstufe ${org.maxMahnstufe}.`,
         });
       }
       const runDate = input.runDate ? new Date(`${input.runDate}T00:00:00Z`) : todayUtc();

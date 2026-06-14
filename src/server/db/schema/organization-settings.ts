@@ -61,6 +61,13 @@ export const organizationSettingsTable = pgTable("organization_settings", {
   vereinsBic: text("vereins_bic").notNull(),
   vereinsBankname: text("vereins_bankname"),
   defaultFalligkeitTag: integer("default_falligkeit_tag").notNull().default(15),
+  /**
+   * Höchste genutzte Mahnstufe (1 bis 3). Ein Verein kann sein Mahnwesen auf
+   * eine reine Erinnerung (1) oder Erinnerung + eine Mahnung (2) verkürzen.
+   * Default 3 entspricht dem bisherigen dreistufigen Ablauf. Mahnläufe über
+   * dieser Stufe werden abgelehnt.
+   */
+  maxMahnstufe: integer("max_mahnstufe").notNull().default(3),
   /** Mahngebühren je Stufe in Euro. 0 = keine Gebühr. */
   mahngebuhr1: numeric("mahngebuhr1", { precision: 19, scale: 2 }).notNull().default("0"),
   mahngebuhr2: numeric("mahngebuhr2", { precision: 19, scale: 2 }).notNull().default("5"),
