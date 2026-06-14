@@ -32,6 +32,7 @@ function adminContext(): AppContext {
       session: { id: "merge-integration-test" },
     },
     headers: new Headers(),
+    tenant: { key: "svu", databaseUrl: "" },
     requestId: "merge-integration-test",
   } as unknown as AppContext;
 }
