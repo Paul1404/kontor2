@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.91.0",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Antragsansicht überarbeitet: Dokumente öffnen sich jetzt in einem eingebauten PDF-Viewer statt heruntergeladen zu werden. Die IBAN wird vollständig angezeigt (eine IBAN ist kein Geheimnis), und Status, Antragsnummer und Art sind klarer beschriftet.",
+      },
+    ],
+  },
+  {
     version: "0.90.3",
     date: "2026-06-14",
     changes: [

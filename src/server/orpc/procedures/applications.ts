@@ -1350,10 +1350,11 @@ export const applicationsRouter = {
           )
           .orderBy(desc(emailLogTable.createdAt)),
       ]);
-      const { iban, ...rest } = row;
+      // Volle IBAN für die (vorstand-gesicherte) Antragsansicht: der Vorstand
+      // braucht sie zur Mandatsprüfung. Eine IBAN ist kein Passwort -> nicht maskiert.
       return {
-        ...rest,
-        ibanMasked: row.ibanLast4 ? `**** **** **** **** ${row.ibanLast4}` : null,
+        ...row,
+        ibanFormatted: row.iban ? formatIbanGrouped(row.iban) : null,
         files,
         emails,
       };
@@ -1379,10 +1380,14 @@ export const applicationsRouter = {
       if (!file || file.kind === "signature_image") {
         throw new ORPCError("NOT_FOUND", { message: "Datei nicht gefunden." });
       }
+      // Inline-Disposition, damit der eingebaute PDF-Viewer das Dokument anzeigt
+      // statt es herunterzuladen.
       const url = await presignDownload({
         key: file.s3Key,
         filename: file.filename ?? "antrag.pdf",
         expiresSeconds: 300,
+        inline: true,
+        contentType: "application/pdf",
       });
       return { url, filename: file.filename ?? "antrag.pdf" };
     }),

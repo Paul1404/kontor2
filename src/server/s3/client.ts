@@ -36,7 +36,10 @@ export function bucket(): string {
  * filename cannot inject extra header parameters or break out of the quoted
  * string.
  */
-export function contentDisposition(filename: string): string {
+export function contentDisposition(
+  filename: string,
+  kind: "attachment" | "inline" = "attachment",
+): string {
   // Strip control characters (0x00-0x1f, 0x7f) plus the bytes that could break
   // out of the quoted parameter: double quote, backslash and forward slash.
   // biome-ignore lint/suspicious/noControlCharactersInRegex: removing control chars from a filename is the intent.
@@ -44,7 +47,7 @@ export function contentDisposition(filename: string): string {
   const cleaned = filename.replace(stripControl, "_").trim() || "download";
   const ascii = cleaned.replace(/[^ -~]+/g, "_");
   const utf8 = encodeURIComponent(cleaned);
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${utf8}`;
+  return `${kind}; filename="${ascii}"; filename*=UTF-8''${utf8}`;
 }
 
 export function presignUpload(opts: {
@@ -90,13 +93,21 @@ export function presignDownload(opts: {
   key: string;
   filename?: string;
   expiresSeconds?: number;
+  /** `inline` lässt den Browser die Datei anzeigen (PDF-Viewer) statt herunterzuladen. */
+  inline?: boolean;
+  /** Erzwingt den Content-Type der Antwort (z. B. application/pdf für inline). */
+  contentType?: string;
 }): Promise<string> {
+  const kind = opts.inline ? "inline" : "attachment";
   return getSignedUrl(
     s3Client(),
     new GetObjectCommand({
       Bucket: bucket(),
       Key: opts.key,
-      ResponseContentDisposition: opts.filename ? contentDisposition(opts.filename) : undefined,
+      ResponseContentDisposition: opts.filename
+        ? contentDisposition(opts.filename, kind)
+        : undefined,
+      ResponseContentType: opts.contentType,
     }),
     { expiresIn: opts.expiresSeconds ?? 300 },
   );
