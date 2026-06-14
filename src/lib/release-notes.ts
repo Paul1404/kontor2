@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.90.1",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Auch Browser-Symbol (Favicon), App-Symbol und das Logo in PDF-Dokumenten zeigen jetzt das neue Kontor2-Zeichen in Navy und Messing. Vereine mit eigenem Logo bleiben unverändert.",
+      },
+    ],
+  },
+  {
     version: "0.90.0",
     date: "2026-06-14",
     changes: [
