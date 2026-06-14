@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ageAt,
   categoryFromAge,
+  DEFAULT_ALTERSGRENZEN,
   detectAntragstyp,
   mitgliedschaftTypFor,
   parseISODate,
@@ -32,16 +33,24 @@ describe("ageAt", () => {
 
 describe("categoryFromAge (Stichtag = Jan 1)", () => {
   const ref2026 = stichtag(2026);
-  it("maps the age buckets", () => {
-    // Use ageAt against the Stichtag to express the boundaries clearly.
+  const g = DEFAULT_ALTERSGRENZEN;
+  it("maps the age buckets with the default 14/18/25 boundaries", () => {
     expect(ageAt(parseISODate("2013-06-01"), ref2026)).toBe(12); // < 14 -> kind
-    expect(ageAt(parseISODate("2010-06-01"), ref2026)).toBe(15); // < 18 -> jugendlich
-    expect(ageAt(parseISODate("2004-06-01"), ref2026)).toBe(21); // < 25 -> jung
-    expect(ageAt(parseISODate("1990-06-01"), ref2026)).toBe(35); // >= 25 -> erwachsen
+    expect(categoryFromAge(parseISODate("2013-06-01"), g)).toBe("kind");
+    expect(categoryFromAge(parseISODate("2010-06-01"), g)).toBe("jugendlich"); // 15
+    expect(categoryFromAge(parseISODate("2004-06-01"), g)).toBe("junger_erwachsener"); // 21
+    expect(categoryFromAge(parseISODate("1990-06-01"), g)).toBe("erwachsener"); // 35
+  });
+
+  it("honours custom boundaries", () => {
+    // A club whose Jugendtarif runs to 21: a 19-year-old is jugendlich, not jung.
+    const custom = { kindMax: 14, jugendlichMax: 21, jungerErwachsenerMax: 27 };
+    expect(categoryFromAge(parseISODate("2006-06-01"), custom)).toBe("jugendlich"); // age 19
+    expect(categoryFromAge(parseISODate("2006-06-01"), g)).toBe("junger_erwachsener"); // default
   });
 
   it("short-circuits to familie", () => {
-    expect(categoryFromAge(parseISODate("1990-01-01"), true)).toBe("familie");
+    expect(categoryFromAge(parseISODate("1990-01-01"), g, true)).toBe("familie");
   });
 });
 
@@ -95,10 +104,14 @@ describe("detectAntragstyp", () => {
 
 describe("mitgliedschaftTypFor", () => {
   it("familie wins over age", () => {
-    expect(mitgliedschaftTypFor("familie", parseISODate("1985-01-01"))).toBe("familie");
+    expect(mitgliedschaftTypFor("familie", parseISODate("1985-01-01"), DEFAULT_ALTERSGRENZEN)).toBe(
+      "familie",
+    );
   });
   it("derives the category for non-family types", () => {
-    expect(mitgliedschaftTypFor("einzel", parseISODate("1985-01-01"))).toBe("erwachsener");
+    expect(mitgliedschaftTypFor("einzel", parseISODate("1985-01-01"), DEFAULT_ALTERSGRENZEN)).toBe(
+      "erwachsener",
+    );
   });
 });
 

@@ -17,6 +17,30 @@ export type AntragKategorie =
 
 export type Antragstyp = "einzel" | "kind" | "familie";
 
+/**
+ * Exclusive upper age bounds (in years, at the Stichtag) that separate the fee
+ * categories. Per club, configured in `organization_settings`. A `kind` is
+ * younger than `kindMax`, a `jugendlich` younger than `jugendlichMax`, a
+ * `junger_erwachsener` younger than `jungerErwachsenerMax`; from there up it is
+ * `erwachsener`. So "bis 14 Jahre" means up to the 14th birthday (kindMax = 14).
+ */
+export type Altersgrenzen = {
+  kindMax: number;
+  jugendlichMax: number;
+  jungerErwachsenerMax: number;
+};
+
+/**
+ * The historic boundaries (14 / 18 / 25). Used only where no club settings are
+ * available (the deprecated svums import) and as a fixture default; live request
+ * paths pass the club's configured values.
+ */
+export const DEFAULT_ALTERSGRENZEN: Altersgrenzen = {
+  kindMax: 14,
+  jugendlichMax: 18,
+  jungerErwachsenerMax: 25,
+};
+
 /** Parse a `YYYY-MM-DD` string into a UTC date, avoiding timezone drift. */
 export function parseISODate(value: string): Date {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
@@ -46,15 +70,22 @@ export function realAge(geburtsdatum: Date, today: Date = new Date()): number {
 }
 
 /**
- * Age category at the Stichtag. `familie` short-circuits because a family
- * application is a flat tariff regardless of the applicant's age.
+ * Age category at the Stichtag, using the club's configured boundaries.
+ * `familie` short-circuits because a family application is a flat tariff
+ * regardless of the applicant's age. The bounds are exclusive: with the
+ * historic 14 / 18 / 25 this is byte-identical to the old fixed logic (a `kind`
+ * is younger than `kindMax`, i.e. up to the kindMax-th birthday).
  */
-export function categoryFromAge(geburtsdatum: Date, isFamilie = false): AntragKategorie {
+export function categoryFromAge(
+  geburtsdatum: Date,
+  grenzen: Altersgrenzen,
+  isFamilie = false,
+): AntragKategorie {
   if (isFamilie) return "familie";
   const age = ageAt(geburtsdatum, stichtag());
-  if (age < 14) return "kind";
-  if (age < 18) return "jugendlich";
-  if (age < 25) return "junger_erwachsener";
+  if (age < grenzen.kindMax) return "kind";
+  if (age < grenzen.jugendlichMax) return "jugendlich";
+  if (age < grenzen.jungerErwachsenerMax) return "junger_erwachsener";
   return "erwachsener";
 }
 
@@ -76,7 +107,11 @@ export function detectAntragstyp(opts: {
 }
 
 /** Resolve the membership category for an application type + applicant DOB. */
-export function mitgliedschaftTypFor(antragstyp: Antragstyp, geburtsdatum: Date): AntragKategorie {
+export function mitgliedschaftTypFor(
+  antragstyp: Antragstyp,
+  geburtsdatum: Date,
+  grenzen: Altersgrenzen,
+): AntragKategorie {
   if (antragstyp === "familie") return "familie";
-  return categoryFromAge(geburtsdatum, false);
+  return categoryFromAge(geburtsdatum, grenzen, false);
 }

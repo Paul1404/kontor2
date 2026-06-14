@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.97.0",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Altersgrenzen der Beitragskategorien im Online-Antrag (Kind, Jugendlich, Junger Erwachsener) lassen sich jetzt je Verein einstellen (Einstellungen > Vereinsdaten). Voreingestellt bleiben 14, 18 und 25 Jahre, also unverändert zum bisherigen Verhalten.",
+      },
+    ],
+  },
+  {
     version: "0.96.7",
     date: "2026-06-14",
     changes: [
