@@ -369,13 +369,14 @@ export const membersRouter = {
       conditions.push(memberHasPendingExit() as never);
     }
     if (!input.deletedOnly && input.status === "aktiv") {
-      // The dashboard's "Aktive Mitglieder" definition: still a member today,
-      // not deceased. Enforced directly so the result is correct even when
-      // `includeAusgetretene` is set (the explicit status wins over that broad
-      // toggle — otherwise exited members would leak into the "aktiv" list).
-      // The Linear `Aktiv` column is a free-form string and not reliable here.
+      // "Aktiv" = lebendes Mitglied MIT aktiver Mitgliedschaft in einer echten
+      // Abteilung -- spiegelt das Aktiv/Passiv-Badge (sport-aktiv vs. förderndes
+      // Mitglied). Ohne `memberHasRealAbteilung` rutschten passive Mitglieder in
+      // die Aktiv-Liste, obwohl ihr Badge "Passiv" zeigt. Aktiv + Passiv ergeben
+      // zusammen die lebenden Mitglieder, disjunkt.
       conditions.push(memberNotExited() as never);
       conditions.push(memberNotDeceased() as never);
+      conditions.push(memberHasRealAbteilung() as never);
     }
     if (!input.deletedOnly && input.status === "passiv") {
       // Passiv is derived, not stored: a live member with no active membership
@@ -803,8 +804,9 @@ export const membersRouter = {
 
   /**
    * Counts by status for the Mitglieder overview strip. Buckets mirror the
-   * list's status filter (aktiv includes passiv, exited/deceased excluded
-   * from both) so a click on a stat maps 1:1 to a filter. Soft-deleted rows
+   * list's status filter so a click on a stat maps 1:1 to a filter: "aktiv" =
+   * lebendes Mitglied MIT echter Abteilung, "passiv" = lebendes Mitglied OHNE
+   * (zusammen die Lebenden), exited/deceased getrennt. Soft-deleted rows
    * are excluded everywhere. Cached short-term in the dashboard namespace,
    * which is invalidated whenever a member changes.
    */
@@ -816,7 +818,10 @@ export const membersRouter = {
       const [[total], [aktiv], [passiv], [gekuendigt], [ausgetreten], [verstorben], [kontakte]] =
         await Promise.all([
           context.db.select({ c: count() }).from(membersTable).where(notDeleted),
-          context.db.select({ c: count() }).from(membersTable).where(lebt),
+          context.db
+            .select({ c: count() })
+            .from(membersTable)
+            .where(and(lebt, memberHasRealAbteilung())),
           context.db
             .select({ c: count() })
             .from(membersTable)

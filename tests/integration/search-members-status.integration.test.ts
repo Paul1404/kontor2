@@ -1,8 +1,9 @@
 import { call } from "@orpc/server";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Session } from "~/server/auth/auth";
 import { db } from "~/server/db/client";
+import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
 import type { AppContext } from "~/server/orpc/context";
 import { appRouter } from "~/server/orpc/router";
@@ -38,6 +39,7 @@ function vorstandContext(): AppContext {
 
 describe.skipIf(!onTestDb)("search_members status filter (integration)", () => {
   const ids: Record<string, string> = {};
+  let abteilungId = "";
 
   beforeAll(async () => {
     const [maxRow] = await db()
@@ -64,20 +66,50 @@ describe.skipIf(!onTestDb)("search_members status filter (integration)", () => {
     };
 
     await seed("aktiv", { memberNo: `${MARKER}-A`, status: "aktiv" });
+    // "passiv": lebt, hat aber keine echte Abteilung (förderndes Mitglied).
+    await seed("passiv", { memberNo: `${MARKER}-P`, status: "aktiv" });
     await seed("gekuendigt", { memberNo: `${MARKER}-G`, austritt: future, status: "aktiv" });
     await seed("ausgetreten", { memberNo: `${MARKER}-X`, austritt: past, status: "ausgetreten" });
     await seed("verstorben", { memberNo: `${MARKER}-V`, verstorbenAm: past, status: "verstorben" });
     await seed("kontakt", { kontaktNo: `${MARKER}-K` });
     await seed("deleted", { memberNo: `${MARKER}-D`, deletedAt: past, status: "aktiv" });
+
+    // Aktiv vs passiv is derived from an open membership in a real Abteilung.
+    // Give the "aktiv" member exactly that so it qualifies; "passiv" stays
+    // without one. The "gekuendigt" member also gets one to prove the lifecycle
+    // filter (pending exit) wins over the Abteilung-derived aktiv signal.
+    const [abt] = await db()
+      .insert(abteilungenTable)
+      .values({ name: `${MARKER}-Sparte`, slug: `${MARKER.toLowerCase()}-sparte` })
+      .returning({ id: abteilungenTable.id });
+    abteilungId = abt?.id ?? "";
+    await db()
+      .insert(memberAbteilungenTable)
+      .values(
+        ["aktiv", "gekuendigt"].map((key) => ({
+          memberId: ids[key] as string,
+          abteilungId,
+          eintrittsdatum: "2000-01-01",
+        })),
+      );
   });
 
   afterAll(async () => {
-    for (const id of Object.values(ids)) {
+    const memberIds = Object.values(ids);
+    if (memberIds.length) {
+      await db()
+        .delete(memberAbteilungenTable)
+        .where(inArray(memberAbteilungenTable.memberId, memberIds));
+    }
+    for (const id of memberIds) {
       await db().delete(membersTable).where(eq(membersTable.id, id));
+    }
+    if (abteilungId) {
+      await db().delete(abteilungenTable).where(eq(abteilungenTable.id, abteilungId));
     }
   });
 
-  type StatusFilter = "aktiv" | "alle" | "ausgetreten" | "verstorben" | "gekuendigt";
+  type StatusFilter = "aktiv" | "passiv" | "alle" | "ausgetreten" | "verstorben" | "gekuendigt";
   const id = (key: string): string => {
     const v = ids[key];
     if (!v) throw new Error(`missing seeded id: ${key}`);
@@ -96,23 +128,41 @@ describe.skipIf(!onTestDb)("search_members status filter (integration)", () => {
   it("returns the full union for status=alle, excluding only soft-deleted rows", async () => {
     const all = await listIds("alle");
     expect(all.has(id("aktiv"))).toBe(true);
+    expect(all.has(id("passiv"))).toBe(true);
     expect(all.has(id("gekuendigt"))).toBe(true);
     expect(all.has(id("ausgetreten"))).toBe(true);
     expect(all.has(id("verstorben"))).toBe(true);
     expect(all.has(id("kontakt"))).toBe(true);
     // Soft-deleted rows stay hidden from every normal view.
     expect(all.has(id("deleted"))).toBe(false);
-    expect(all.size).toBe(5);
+    expect(all.size).toBe(6);
   });
 
   it("alle is a strict superset of aktiv (the bug collapsed them)", async () => {
     const all = await listIds("alle");
     const aktiv = await listIds("aktiv");
-    // aktiv = living members: excludes the ausgetretenes and verstorbenes Mitglied.
+    // aktiv = lebendes Mitglied MIT echter Abteilung: excludes the
+    // ausgetretenes, verstorbenes and (newly) the passive Mitglied.
     expect(aktiv.has(id("ausgetreten"))).toBe(false);
     expect(aktiv.has(id("verstorben"))).toBe(false);
+    expect(aktiv.has(id("passiv"))).toBe(false);
     expect(aktiv.has(id("aktiv"))).toBe(true);
     expect(all.size).toBeGreaterThan(aktiv.size);
+  });
+
+  it("aktiv and passiv are disjoint and together are the living members", async () => {
+    const aktiv = await listIds("aktiv");
+    const passiv = await listIds("passiv");
+    // The Abteilung membership is the only thing separating the two seeded
+    // living members, so each lands in exactly one bucket.
+    expect(aktiv.has(id("aktiv"))).toBe(true);
+    expect(aktiv.has(id("passiv"))).toBe(false);
+    expect(passiv.has(id("passiv"))).toBe(true);
+    expect(passiv.has(id("aktiv"))).toBe(false);
+    // A pending-exit member is gekuendigt, not aktiv/passiv, even with an
+    // open Abteilung membership.
+    expect(aktiv.has(id("gekuendigt"))).toBe(false);
+    expect(passiv.has(id("gekuendigt"))).toBe(false);
   });
 
   it("count(alle) equals the sum of the disjoint lifecycle buckets", async () => {
