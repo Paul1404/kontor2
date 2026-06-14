@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.94.9",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Ein erneuter Import überschreibt Verträge und SEPA-Mandate jetzt am Platz, statt sie zu löschen und neu anzulegen. Vorher gingen dabei alle in der App erzeugten Sollstellungen samt Zahlungen und Mahnstufen verloren. Bestehende Buchungen bleiben jetzt erhalten.",
+      },
+    ],
+  },
+  {
     version: "0.94.8",
     date: "2026-06-14",
     changes: [
