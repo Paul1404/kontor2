@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 export type RecentMember = {
-  mitgliedsnummer: string;
+  /** Canonical member reference (memberRef): the current number, not the legacy one. */
+  reference: string;
   name: string;
   visitedAt: number;
 };
@@ -15,10 +16,17 @@ function readFromStorage(): RecentMember[] {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as RecentMember[];
+    const parsed = JSON.parse(raw) as Array<Partial<RecentMember> & { mitgliedsnummer?: string }>;
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .filter((r) => r && typeof r.mitgliedsnummer === "string" && typeof r.name === "string")
+      .map((r) => ({
+        // Older entries stored the legacy number under `mitgliedsnummer`; read
+        // it as the reference so existing history keeps working after the fix.
+        reference: typeof r.reference === "string" ? r.reference : (r.mitgliedsnummer ?? ""),
+        name: typeof r.name === "string" ? r.name : "",
+        visitedAt: typeof r.visitedAt === "number" ? r.visitedAt : 0,
+      }))
+      .filter((r) => r.reference && r.name)
       .slice(0, MAX_RECENT);
   } catch {
     return [];
@@ -43,7 +51,7 @@ function writeToStorage(items: RecentMember[]) {
  */
 export function useRecentMembers(): {
   recent: RecentMember[];
-  push: (item: { mitgliedsnummer: string; name: string }) => void;
+  push: (item: { reference: string; name: string }) => void;
   clear: () => void;
 } {
   const [recent, setRecent] = useState<RecentMember[]>([]);
@@ -61,12 +69,12 @@ export function useRecentMembers(): {
     };
   }, []);
 
-  const push = useCallback((item: { mitgliedsnummer: string; name: string }) => {
-    if (!item.mitgliedsnummer) return;
+  const push = useCallback((item: { reference: string; name: string }) => {
+    if (!item.reference) return;
     const current = readFromStorage();
-    const filtered = current.filter((r) => r.mitgliedsnummer !== item.mitgliedsnummer);
+    const filtered = current.filter((r) => r.reference !== item.reference);
     const next: RecentMember[] = [
-      { mitgliedsnummer: item.mitgliedsnummer, name: item.name, visitedAt: Date.now() },
+      { reference: item.reference, name: item.name, visitedAt: Date.now() },
       ...filtered,
     ].slice(0, MAX_RECENT);
     writeToStorage(next);

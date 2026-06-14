@@ -343,16 +343,16 @@ function SidebarBody({
             </div>
             {recent.slice(0, 5).map((r) => (
               <Link
-                key={r.mitgliedsnummer}
+                key={r.reference}
                 to="/app/mitglieder/$mitgliedsnummer"
-                params={{ mitgliedsnummer: r.mitgliedsnummer }}
+                params={{ mitgliedsnummer: r.reference }}
                 onClick={onNavigate}
                 className="group flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
                 title={r.name}
               >
-                <span className="truncate">{r.name || `#${r.mitgliedsnummer}`}</span>
+                <span className="truncate">{r.name || `#${r.reference}`}</span>
                 <span className="ml-auto shrink-0 text-[10px] tabular-nums text-sidebar-muted">
-                  #{r.mitgliedsnummer}
+                  #{r.reference}
                 </span>
               </Link>
             ))}

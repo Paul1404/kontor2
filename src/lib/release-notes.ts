@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.91.3",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Zuletzt angesehen zeigte die alte Mitgliedsnummer. Jetzt erscheint dort die aktuelle Nummer, passend zum Rest der Anwendung.",
+      },
+    ],
+  },
+  {
     version: "0.91.2",
     date: "2026-06-14",
     changes: [
