@@ -19,13 +19,18 @@ export type FeeResult = { betrag: string; label: string };
  * Resolve the annual fee for a category. `elternteilMitglied` only affects the
  * `kind` and `jugendlich` categories (a discounted rate when a parent is
  * already a member); the other categories ignore it.
+ *
+ * `staffel` is required: the caller must pass the club's configured schedule.
+ * There is deliberately no fallback to a hardcoded schedule, so a club that has
+ * not configured its Beitragsstaffel never silently bills another club's prices
+ * (callers refuse with a clear error instead).
  */
 export function calculateFee(opts: {
   kategorie: AntragKategorie;
   elternteilMitglied: boolean;
-  staffel?: Beitragsstaffel | null;
+  staffel: Beitragsstaffel;
 }): FeeResult {
-  const s = opts.staffel ?? DEFAULT_BEITRAGSSTAFFEL;
+  const s = opts.staffel;
   switch (opts.kategorie) {
     case "familie":
       return { betrag: s.familie, label: "Familie (2 Erwachsene + Kinder bis 18 Jahre)" };
