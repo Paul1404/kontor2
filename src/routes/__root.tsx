@@ -21,16 +21,42 @@ export const Route = createRootRoute({
     }
   },
   staleTime: 5 * 60 * 1000,
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { name: "color-scheme", content: "light dark" },
-    ],
-    // Icons + manifest werden in RootDocument aus dem Branding gesetzt (dynamisch
-    // oder gebündelter Standard), damit ein eigenes Logo das Favicon ersetzt.
-    links: [{ rel: "stylesheet", href: appCss }],
-  }),
+  // Titel, theme-color, Favicons und Manifest laufen über die head()-API (von
+  // <HeadContent/> serverseitig zuverlässig in den <head> gerendert) statt als
+  // literales JSX in RootDocument -- letzteres hing am React-Head-Hoisting und
+  // fiel für un-gebrandete Hosts (z. B. die Betreiber-Console) ganz aus.
+  // Branding kommt aus den Loader-Daten: ein Verein mit eigenem Logo ersetzt das
+  // Favicon, sonst gilt das gebündelte Kontor2-Zeichen.
+  head: ({ loaderData }) => {
+    const b = loaderData?.branding ?? null;
+    const iconUrl = b ? brandingIconUrl(b) : null;
+    const iconLinks = iconUrl
+      ? [
+          { rel: "icon", href: iconUrl },
+          { rel: "apple-touch-icon", href: iconUrl },
+        ]
+      : [
+          { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+          { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32.png" },
+          { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16.png" },
+          { rel: "shortcut icon", href: "/favicon.ico" },
+          { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
+        ];
+    return {
+      meta: [
+        { charSet: "utf-8" },
+        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { name: "color-scheme", content: "light dark" },
+        { title: `${b?.anzeigename?.trim() || "Kontor2"} – Vereinsverwaltung` },
+        { name: "theme-color", content: b?.primaryColor || "#335c99" },
+      ],
+      links: [
+        { rel: "stylesheet", href: appCss },
+        ...iconLinks,
+        { rel: "manifest", href: "/api/branding/manifest" },
+      ],
+    };
+  },
   component: RootRoute,
   // Last-resort safety net: any uncaught throw inside a route lands here
   // instead of TanStack's bare-bones default screen, which looks broken.
@@ -64,32 +90,12 @@ function RootDocument({
   branding: Branding | null;
   children?: ReactNode;
 }): ReactNode {
-  const title = `${branding?.anzeigename?.trim() || "Kontor2"} – Vereinsverwaltung`;
-  const themeColor = branding?.primaryColor || "#335c99";
   const brandCss = brandColorCss(branding?.primaryColor);
-  const iconUrl = branding ? brandingIconUrl(branding) : null;
   return (
     <html lang="de" className="h-full">
       <head>
+        {/* Titel, theme-color, Favicons, Manifest kommen aus head() via HeadContent. */}
         <HeadContent />
-        {/* Branding wird serverseitig gesetzt -> kein Aufblitzen der Standardmarke. */}
-        <title>{title}</title>
-        <meta name="theme-color" content={themeColor} />
-        {iconUrl ? (
-          <>
-            <link rel="icon" href={iconUrl} />
-            <link rel="apple-touch-icon" href={iconUrl} />
-          </>
-        ) : (
-          <>
-            <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-            <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-            <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
-            <link rel="shortcut icon" href="/favicon.ico" />
-            <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-          </>
-        )}
-        <link rel="manifest" href="/api/branding/manifest" />
         {brandCss ? (
           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted, server-built from a validated hex
           <style dangerouslySetInnerHTML={{ __html: brandCss }} />

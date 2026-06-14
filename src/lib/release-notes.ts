@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.90.2",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Browser-Symbol (Favicon), Seitentitel und Designfarbe werden jetzt auf allen Seiten zuverlässig gesetzt. Auf manchen Seiten (etwa dem Betreiber-Bereich) fehlten sie und es erschien kein Logo im Browser-Tab.",
+      },
+    ],
+  },
+  {
     version: "0.90.1",
     date: "2026-06-14",
     changes: [
