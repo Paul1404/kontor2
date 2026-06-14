@@ -924,7 +924,10 @@ export const applicationsRouter = {
       // re-embed it later next to the Vorstands-Gegenzeichnung.
       if (hasSignature && input.unterschriftBase64) {
         const sig = parseDataUri(input.unterschriftBase64);
-        if (sig) {
+        // Only store a signature with an allowlisted image mime. The mime comes
+        // from the client's data URI, so a crafted value (e.g. text/html) must
+        // never become the stored object's content-type (served on download).
+        if (sig && (sig.mime === "image/png" || sig.mime === "image/jpeg")) {
           const sigKey = `applications/${inserted.id}/signature.${sig.mime === "image/jpeg" ? "jpg" : "png"}`;
           await putObject({ key: sigKey, body: sig.body, contentType: sig.mime });
           await context.db.insert(membershipApplicationFilesTable).values({

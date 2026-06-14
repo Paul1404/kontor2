@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.95.6",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Kleinere Korrekturen: die globale Suche behandelt die Zeichen % und _ jetzt als normale Zeichen statt als Platzhalter. Die Spalte Aktiv/Passiv im Mitglieder-CSV nutzt überall denselben abgeleiteten Wert. Hochgeladene Unterschriften werden nur noch als PNG oder JPEG akzeptiert.",
+      },
+    ],
+  },
+  {
     version: "0.95.5",
     date: "2026-06-14",
     changes: [

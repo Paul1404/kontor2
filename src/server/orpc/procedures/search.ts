@@ -1,5 +1,6 @@
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { escapeLike } from "~/server/db/like";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { membersTable } from "~/server/db/schema/members";
@@ -22,7 +23,9 @@ export const searchRouter = {
   entities: authedProc.input(Input).handler(async ({ context, input }) => {
     const q = input.q;
     if (q.length < 2) return { contracts: [], mandates: [] };
-    const like = `%${q}%`;
+    // Escape LIKE wildcards so "%"/"_" in the query match literally instead of
+    // acting as patterns (Postgres uses backslash as the default LIKE escape).
+    const like = `%${escapeLike(q)}%`;
     const lim = Math.min(input.limit, 10);
 
     const memberCols = {
