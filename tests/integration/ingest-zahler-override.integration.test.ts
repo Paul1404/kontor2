@@ -87,9 +87,12 @@ describe.skipIf(!onTestDb)("ingest preserves explicit Zahler-Override (integrati
       .from(contractsTable)
       .where(eq(contractsTable.adrNr, memberAdr));
     expect(after).toHaveLength(1);
-    // The row was actually replaced (delete + insert), not skipped.
-    expect(after[0]?.id).not.toBe(before[0]?.id);
-    // …but the explicit override survived the round-trip.
+    // The contract id is PRESERVED across the re-import (upsert by natural key,
+    // not delete+reinsert). This is what keeps dependent soll_stellungen (which
+    // reference contracts.id ON DELETE CASCADE) from being wiped on every
+    // routine re-import.
+    expect(after[0]?.id).toBe(before[0]?.id);
+    // …and the explicit override survived the round-trip.
     expect(after[0]?.zahlerMemberId).toBe(zahler?.id);
   });
 

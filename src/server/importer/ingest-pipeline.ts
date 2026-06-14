@@ -519,19 +519,27 @@ export async function runIngest(
       }
     }
 
-    await db.delete(contractsTable).where(inArray(contractsTable.adrNr, allReferencedAdrNrs));
-    const contractValues: Record<string, unknown>[] = [];
+    // Upsert by the natural key (adrNr, vertragNr, art) instead of
+    // delete+reinsert. Contracts have a random uuid PK, so re-creating them
+    // would mint new ids and cascade-delete every soll_stellungen (incl. the
+    // app's own billing state: payments, mahnstufe) via contractId ON DELETE
+    // CASCADE. Upserting keeps the existing contract id, so postings survive a
+    // routine re-import. Dedupe on the conflict key so one multi-row upsert
+    // never touches the same row twice (Postgres rejects that); last wins.
+    const contractByKey = new Map<string, Record<string, unknown>>();
     for (const raw of input.contracts ?? []) {
       try {
         const row = mapContractRow(raw);
         if (!row) continue;
         const memberId = adrNrToMemberId.get(row.adrNr as number);
         if (!memberId) continue;
+        // The dump carries no Zahler override, so re-apply the one stored before
+        // this run; without it the upsert would null a manual override.
         const zahlerMemberId =
           carriedZahler.get(
             zahlerKey(row.adrNr as number, row.vertragNr as string, row.art as number),
           ) ?? null;
-        contractValues.push({
+        contractByKey.set(`${row.adrNr}|${row.vertragNr}|${row.art}`, {
           ...row,
           memberId,
           zahlerMemberId,
@@ -542,7 +550,10 @@ export async function runIngest(
         errors.push({ table: "mgvert", message: (e as Error).message });
       }
     }
-    contractsWritten = await batchInsert(db, contractsTable, contractValues, {
+    contractsWritten = await batchInsert(db, contractsTable, [...contractByKey.values()], {
+      conflict: {
+        target: [contractsTable.adrNr, contractsTable.vertragNr, contractsTable.art],
+      },
       onError: (_r, e) => errors.push({ table: "mgvert", message: e.message }),
       onProgress: (p) => {
         processed = contractBase + p;
@@ -557,20 +568,30 @@ export async function runIngest(
   const sepaBase = processed;
   let sepaWritten = 0;
   if ((input.sepa?.length ?? 0) > 0 && allReferencedAdrNrs.length > 0) {
-    await db.delete(sepaMandatesTable).where(inArray(sepaMandatesTable.adrNr, allReferencedAdrNrs));
-    const sepaValues: Record<string, unknown>[] = [];
+    // Upsert by (adrNr, mandatsNr) instead of delete+reinsert: a mandate may be
+    // referenced by a committed fee_run_item (sepaMandateId ON DELETE RESTRICT),
+    // so deleting it would abort the whole re-import for any member ever billed.
+    // Upserting keeps the mandate id and never touches fee_run_items. Dedupe on
+    // the conflict key so one upsert never touches the same row twice.
+    const sepaByKey = new Map<string, Record<string, unknown>>();
     for (const raw of input.sepa ?? []) {
       try {
         const row = mapSepaRow(raw);
         if (!row) continue;
         const memberId = adrNrToMemberId.get(row.adrNr as number);
         if (!memberId) continue;
-        sepaValues.push({ ...row, memberId, importBatchId: batch.id, updatedAt: new Date() });
+        sepaByKey.set(`${row.adrNr}|${row.mandatsNr}`, {
+          ...row,
+          memberId,
+          importBatchId: batch.id,
+          updatedAt: new Date(),
+        });
       } catch (e) {
         errors.push({ table: "adrsepa", message: (e as Error).message });
       }
     }
-    sepaWritten = await batchInsert(db, sepaMandatesTable, sepaValues, {
+    sepaWritten = await batchInsert(db, sepaMandatesTable, [...sepaByKey.values()], {
+      conflict: { target: [sepaMandatesTable.adrNr, sepaMandatesTable.mandatsNr] },
       onError: (_r, e) => errors.push({ table: "adrsepa", message: e.message }),
       onProgress: (p) => {
         processed = sepaBase + p;
