@@ -2,7 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { type AnyColumn, and, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { unzipSync } from "fflate";
 import * as v from "valibot";
-import { lookupPlz, searchStreets } from "~/server/address/nominatim";
+import { lookupPlz, searchStreets } from "~/server/address/lookup";
 import {
   buildUploadUrl,
   consumeUploadToken,

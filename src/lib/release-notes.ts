@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.99.4",
+    date: "2026-06-15",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Adressvorschläge im Online-Antrag kommen jetzt aus dem amtlichen deutschen Verzeichnis (OpenPLZ). Straßen in kleinen Orten und Ortsteilen werden dadurch zuverlässig gefunden, auch bei Teileingaben. OpenStreetMap dient nur noch als Rückfallebene.",
+      },
+    ],
+  },
+  {
     version: "0.99.3",
     date: "2026-06-14",
     changes: [
