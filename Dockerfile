@@ -45,6 +45,11 @@ RUN rm -rf \
 # everything (server, migrator, scheduler) runs under Bun.
 FROM base AS runner
 ENV NODE_ENV=production
+# Pin the runtime to UTC. Postgres "timestamp without time zone" columns
+# (geburtsdatum, eintritt, austritt) are parsed into Date in the process-local
+# zone, so a non-UTC container would shift those dates by a day. The app's date
+# math already uses UTC (Date.UTC / todayUtc), so UTC everywhere is consistent.
+ENV TZ=UTC
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/drizzle ./drizzle

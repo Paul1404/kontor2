@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.95.5",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die Anwendung läuft jetzt fest in der Zeitzone UTC. Damit verschieben sich Geburts-, Eintritts- und Austrittsdaten nicht mehr um einen Tag, falls der Server in einer anderen Zeitzone läuft.",
+      },
+    ],
+  },
+  {
     version: "0.95.4",
     date: "2026-06-14",
     changes: [

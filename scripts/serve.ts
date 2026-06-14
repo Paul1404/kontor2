@@ -12,6 +12,12 @@ import { log } from "./log";
 import { preflight } from "./preflight";
 import { createShutdownHandler } from "./shutdown";
 
+// Default the process to UTC when the environment did not pin it (the Docker
+// image sets TZ=UTC; this covers bare `bun scripts/serve.ts` runs). Postgres
+// `timestamp` columns are parsed in the process-local zone, so a non-UTC
+// runtime would shift date-only fields (geburtsdatum, eintritt, austritt).
+process.env.TZ ??= "UTC";
+
 const port = Number(process.env.PORT ?? 3000);
 const CLIENT_DIR = resolve(import.meta.dir, "..", "dist", "client");
 const PUBLIC_DIR = resolve(import.meta.dir, "..", "public");
