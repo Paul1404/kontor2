@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.96.3",
+    date: "2026-06-14",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          'Die Datenqualitäts-Prüfung „Volljährig auf Eltern-Konto" erkennt jetzt auch Altdaten ohne formale Zahler-Verknüpfung: über einen abweichenden Kontoinhaber oder eine IBAN, die sich mit einem älteren Mitglied gleichen Nachnamens deckt.',
+      },
+    ],
+  },
+  {
     version: "0.96.2",
     date: "2026-06-14",
     changes: [
