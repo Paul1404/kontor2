@@ -4,6 +4,7 @@ import * as v from "valibot";
 import { type MergeVars, renderTemplate, SAMPLE_VARS } from "~/lib/rundschreiben";
 import { getMailer } from "~/server/auth/send-invite";
 import type { DB } from "~/server/db/client";
+import { allocateDocRef } from "~/server/db/doc-ref";
 import {
   memberHasRealAbteilung,
   memberIsPassiv,
@@ -167,11 +168,16 @@ export const rundschreibenRouter = {
       ]
         .filter(Boolean)
         .join(" · ");
-      const datum = new Date().toLocaleDateString("de-DE", {
+      const now = new Date();
+      const datum = now.toLocaleDateString("de-DE", {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
       });
+      // One run-level document reference for the whole Serienbrief, shown on
+      // every page so the mailing is traceable. Random/opaque like the other
+      // document numbers (only invoices stay sequential).
+      const docRef = await allocateDocRef(context.db, "SB", now.getUTCFullYear());
 
       const letters = rows.map((r) => {
         const vars = varsFor(r);
@@ -199,6 +205,7 @@ export const rundschreibenRouter = {
       const { base64 } = await renderPdfBase64(
         SerienbriefDocument({
           club: { vereinsname, senderLine, logoDataUri: resolveClubLogo(org?.logo) },
+          docRef,
           letters,
         }),
       );

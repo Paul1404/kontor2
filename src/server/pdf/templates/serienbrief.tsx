@@ -28,7 +28,15 @@ export type SerienbriefLetter = {
   paragraphs: string[];
 };
 
-function SerienbriefPage({ club, letter }: { club: SerienbriefClub; letter: SerienbriefLetter }) {
+function SerienbriefPage({
+  club,
+  docRef,
+  letter,
+}: {
+  club: SerienbriefClub;
+  docRef: string;
+  letter: SerienbriefLetter;
+}) {
   return (
     <LetterPage
       logoDataUri={club.logoDataUri}
@@ -36,6 +44,7 @@ function SerienbriefPage({ club, letter }: { club: SerienbriefClub; letter: Seri
       returnLine={club.senderLine}
       recipientLines={letter.recipientLines}
       infoRows={[
+        { label: "Dokument", value: docRef },
         { label: letter.referenceLabel, value: letter.reference },
         ...(letter.legacyMitgliedsnummer
           ? [{ label: "Mitgliedsnummer (alt)", value: letter.legacyMitgliedsnummer }]
@@ -43,7 +52,7 @@ function SerienbriefPage({ club, letter }: { club: SerienbriefClub; letter: Seri
         { label: "Datum", value: letter.datum },
       ]}
       subject={letter.subject}
-      footerText={club.vereinsname}
+      footerText={`${club.vereinsname} · ${docRef}`}
     >
       {letter.paragraphs.map((p, i) => (
         <Text key={String(i)} style={styles.para}>
@@ -56,15 +65,20 @@ function SerienbriefPage({ club, letter }: { club: SerienbriefClub; letter: Seri
 
 export function SerienbriefDocument({
   club,
+  docRef,
   letters,
 }: {
   club: SerienbriefClub;
+  docRef: string;
   letters: SerienbriefLetter[];
 }) {
   return (
-    <Document title={`Serienbrief · ${letters.length} Schreiben`} author={club.vereinsname}>
+    <Document
+      title={`Serienbrief ${docRef} · ${letters.length} Schreiben`}
+      author={club.vereinsname}
+    >
       {letters.map((letter, i) => (
-        <SerienbriefPage key={String(i)} club={club} letter={letter} />
+        <SerienbriefPage key={String(i)} club={club} docRef={docRef} letter={letter} />
       ))}
     </Document>
   );
