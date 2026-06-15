@@ -135,179 +135,193 @@ export async function executeErasure(
   }
   updates.updatedAt = new Date();
 
-  await db.update(membersTable).set(updates).where(eq(membersTable.id, memberId));
+  // Everything below is one transaction: a mid-flight failure must not leave a
+  // half-erased member (e.g. the members row pseudonymized but the plaintext
+  // `member_source_records.raw` still present). S3 object deletes are collected
+  // here and run only after the transaction commits, so storage is never
+  // cleared for an erasure that then rolled back.
+  const s3KeysToDelete: string[] = [];
+  let auditId: string | null = null;
 
-  // Pseudonymizing the members row is not enough: the same personal data is
-  // copied into several derived stores. Clear every copy so none survives.
+  await db.transaction(async (tx) => {
+    await tx.update(membersTable).set(updates).where(eq(membersTable.id, memberId));
 
-  // 1. Verbatim Linear provenance -- `raw` holds the original dump row in
-  //    plaintext (names, address, possibly IBAN).
-  const deletedSource = await db
-    .delete(memberSourceRecordsTable)
-    .where(eq(memberSourceRecordsTable.memberId, memberId))
-    .returning({ id: memberSourceRecordsTable.id });
+    // Pseudonymizing the members row is not enough: the same personal data is
+    // copied into several derived stores. Clear every copy so none survives.
 
-  // 2. Member snapshots store a full JSONB copy of the row at every change.
-  const deletedSnapshots = await db
-    .delete(memberSnapshotsTable)
-    .where(eq(memberSnapshotsTable.memberId, memberId))
-    .returning({ id: memberSnapshotsTable.id });
+    // 1. Verbatim Linear provenance -- `raw` holds the original dump row in
+    //    plaintext (names, address, possibly IBAN).
+    const deletedSource = await tx
+      .delete(memberSourceRecordsTable)
+      .where(eq(memberSourceRecordsTable.memberId, memberId))
+      .returning({ id: memberSourceRecordsTable.id });
 
-  // 3. Dunning items (Mahnungen) are accounting documents and must be kept per
-  //    §147 AO (10 Jahre). Do NOT delete them; keep the financial skeleton
-  //    (docRef, amounts, sollIds, dates) and null only the embedded PII: the
-  //    rendered Mahnung PDF (name/address), its filename and the recipient.
-  const scrubbedDunning = await db
-    .update(dunningItemsTable)
-    .set({ pdfBase64: null, pdfFilename: null, sentTo: null })
-    .where(eq(dunningItemsTable.memberId, memberId))
-    .returning({ id: dunningItemsTable.id });
+    // 2. Member snapshots store a full JSONB copy of the row at every change.
+    const deletedSnapshots = await tx
+      .delete(memberSnapshotsTable)
+      .where(eq(memberSnapshotsTable.memberId, memberId))
+      .returning({ id: memberSnapshotsTable.id });
 
-  // 4. Relationship rows carry name/contact/notes in plaintext (the Linear
-  //    `verkn` payload). Scrub both directions: rows where this member is the
-  //    linked party (`toMemberId`) AND the member's own outgoing rows
-  //    (`fromMemberId`), which describe a third party tied to the erased member.
-  //    The rows stay so the other side keeps its structural link.
-  const scrubbedRels = await db
-    .update(relationshipsTable)
-    .set({
-      name: null,
-      nachname: null,
-      anrede: null,
-      telefon: null,
-      email: null,
-      fax: null,
-      vEmail: null,
-      funktion: null,
-      notiz: null,
-      matchcode: null,
-    })
-    .where(
-      or(
-        eq(relationshipsTable.toMemberId, memberId),
-        eq(relationshipsTable.fromMemberId, memberId),
-      ),
-    )
-    .returning({ id: relationshipsTable.id });
+    // 3. Dunning items (Mahnungen) are accounting documents and must be kept per
+    //    §147 AO (10 Jahre). Do NOT delete them; keep the financial skeleton
+    //    (docRef, amounts, sollIds, dates) and null only the embedded PII: the
+    //    rendered Mahnung PDF (name/address), its filename and the recipient.
+    const scrubbedDunning = await tx
+      .update(dunningItemsTable)
+      .set({ pdfBase64: null, pdfFilename: null, sentTo: null })
+      .where(eq(dunningItemsTable.memberId, memberId))
+      .returning({ id: dunningItemsTable.id });
 
-  // 4b. Contracts hold the alternative account holder's name, account, bank and
-  //     full postal address (the `*Kih` / `*V` columns) plus free-text purposes
-  //     that can contain names. Null them so an Art. 17 erasure leaves no
-  //     bank/third-party PII behind. The row itself stays for financial history.
-  const scrubbedContracts = await db
-    .update(contractsTable)
-    .set({
-      ktoInhV: null,
-      kontoV: null,
-      blzV: null,
-      bankV: null,
-      abwKontoInh: null,
-      strasseKih: null,
-      plzKih: null,
-      ortKih: null,
-      emailKih: null,
-      verwZw1: null,
-      verwZw2: null,
-      verwZw3: null,
-      verwZw4: null,
-    })
-    .where(eq(contractsTable.memberId, memberId))
-    .returning({ id: contractsTable.id });
+    // 4. Relationship rows carry name/contact/notes in plaintext (the Linear
+    //    `verkn` payload). Scrub both directions: rows where this member is the
+    //    linked party (`toMemberId`) AND the member's own outgoing rows
+    //    (`fromMemberId`), which describe a third party tied to the erased
+    //    member. The rows stay so the other side keeps its structural link.
+    const scrubbedRels = await tx
+      .update(relationshipsTable)
+      .set({
+        name: null,
+        nachname: null,
+        anrede: null,
+        telefon: null,
+        email: null,
+        fax: null,
+        vEmail: null,
+        funktion: null,
+        notiz: null,
+        matchcode: null,
+      })
+      .where(
+        or(
+          eq(relationshipsTable.toMemberId, memberId),
+          eq(relationshipsTable.fromMemberId, memberId),
+        ),
+      )
+      .returning({ id: relationshipsTable.id });
 
-  // 4c. Attachments are member-uploaded documents (ID scans, signed forms) that
-  //     the Auskunft hands back as full files. Delete the S3 objects (best
-  //     effort, so one missing object never blocks the erasure) and then the
-  //     rows. The member row is only scrubbed, not deleted, so the FK cascade
-  //     would never fire on its own.
-  const memberAttachments = await db
-    .select({ id: attachmentsTable.id, s3Key: attachmentsTable.s3Key })
-    .from(attachmentsTable)
-    .where(eq(attachmentsTable.memberId, memberId));
-  for (const a of memberAttachments) {
+    // 4b. Contracts hold the alternative account holder's name, account, bank
+    //     and full postal address (the `*Kih` / `*V` columns) plus free-text
+    //     purposes that can contain names. Null them so an Art. 17 erasure
+    //     leaves no bank/third-party PII behind; the row stays for history.
+    const scrubbedContracts = await tx
+      .update(contractsTable)
+      .set({
+        ktoInhV: null,
+        kontoV: null,
+        blzV: null,
+        bankV: null,
+        abwKontoInh: null,
+        strasseKih: null,
+        plzKih: null,
+        ortKih: null,
+        emailKih: null,
+        verwZw1: null,
+        verwZw2: null,
+        verwZw3: null,
+        verwZw4: null,
+      })
+      .where(eq(contractsTable.memberId, memberId))
+      .returning({ id: contractsTable.id });
+
+    // 4c. Attachments are member-uploaded documents (ID scans, signed forms)
+    //     that the Auskunft hands back as full files. Delete the rows now and
+    //     queue the S3 objects for deletion after the transaction commits. The
+    //     member row is only scrubbed, not deleted, so the FK cascade would
+    //     never fire on its own.
+    const memberAttachments = await tx
+      .select({ id: attachmentsTable.id, s3Key: attachmentsTable.s3Key })
+      .from(attachmentsTable)
+      .where(eq(attachmentsTable.memberId, memberId));
+    for (const a of memberAttachments) s3KeysToDelete.push(a.s3Key);
+    const deletedAttachments =
+      memberAttachments.length > 0
+        ? await tx
+            .delete(attachmentsTable)
+            .where(eq(attachmentsTable.memberId, memberId))
+            .returning({ id: attachmentsTable.id })
+        : [];
+
+    // 4d. Consent log: keep the structural record (type, granted, when) for
+    //     accountability, but null the free-text `evidence`, which can name the
+    //     member or describe a signed form.
+    const scrubbedConsent = await tx
+      .update(dsgvoConsentLogTable)
+      .set({ evidence: null })
+      .where(eq(dsgvoConsentLogTable.memberId, memberId))
+      .returning({ id: dsgvoConsentLogTable.id });
+
+    // The erasure audit entry records WHAT was cleared, never the cleared values
+    // -- the before-values are exactly the PII we are removing.
+    const changes: Changes = {
+      __scrubbedColumns: { before: null, after: preview.diff.map((d) => d.column).join(", ") },
+    };
+    if (deletedSource.length > 0)
+      changes.__sourceRecords = { before: `${deletedSource.length}`, after: null };
+    if (deletedSnapshots.length > 0)
+      changes.__snapshots = { before: `${deletedSnapshots.length}`, after: null };
+    if (scrubbedDunning.length > 0)
+      changes.__dunningItems = { before: `${scrubbedDunning.length} scrubbed`, after: null };
+    if (scrubbedRels.length > 0)
+      changes.__relationships = { before: `${scrubbedRels.length}`, after: null };
+    if (scrubbedContracts.length > 0)
+      changes.__contracts = { before: `${scrubbedContracts.length}`, after: null };
+    if (deletedAttachments.length > 0)
+      changes.__attachments = { before: `${deletedAttachments.length}`, after: null };
+    if (scrubbedConsent.length > 0)
+      changes.__consentEvidence = { before: `${scrubbedConsent.length} scrubbed`, after: null };
+    if (opts.forceOverride && opts.overrideReason) {
+      changes.__override = { before: null, after: opts.overrideReason };
+    }
+
+    auditId = await appendAudit(tx, {
+      entityType: "member",
+      entityId: memberId,
+      action: "dsgvo_erasure",
+      source: "dsgvo",
+      actorId: opts.actorId ?? null,
+      actorEmail: opts.actorEmail ?? null,
+      changes,
+      requestId: opts.requestId ?? null,
+    });
+
+    // 5. Redact the personal values still sitting in this member's earlier audit
+    //    entries (before/after of past edits). Keep the rows and the erasure
+    //    event for accountability; drop only the values.
+    await tx
+      .update(auditLogTable)
+      .set({ changes: {} })
+      .where(
+        and(
+          eq(auditLogTable.entityType, "member"),
+          eq(auditLogTable.entityId, memberId),
+          auditId ? ne(auditLogTable.id, auditId) : undefined,
+        ),
+      );
+
+    if (opts.requestId) {
+      await tx
+        .update(dsgvoRequestsTable)
+        .set({
+          status: "completed",
+          completedAt: new Date(),
+          completedBy: opts.actorId ?? null,
+        })
+        .where(eq(dsgvoRequestsTable.id, opts.requestId));
+    }
+  });
+
+  // Storage cleanup runs only after the DB state is durable. Best-effort: a
+  // missing object must never resurrect the erased member's data.
+  for (const s3Key of s3KeysToDelete) {
     try {
-      await deleteObject(a.s3Key);
+      await deleteObject(s3Key);
     } catch (err) {
       logger.warn("dsgvo erasure: attachment S3 delete failed", {
         err: err instanceof Error ? err.message : String(err),
-        s3Key: a.s3Key,
+        s3Key,
         memberId,
       });
     }
-  }
-  const deletedAttachments =
-    memberAttachments.length > 0
-      ? await db
-          .delete(attachmentsTable)
-          .where(eq(attachmentsTable.memberId, memberId))
-          .returning({ id: attachmentsTable.id })
-      : [];
-
-  // 4d. Consent log: keep the structural record (type, granted, when) for
-  //     accountability, but null the free-text `evidence`, which can name the
-  //     member or describe a signed form.
-  const scrubbedConsent = await db
-    .update(dsgvoConsentLogTable)
-    .set({ evidence: null })
-    .where(eq(dsgvoConsentLogTable.memberId, memberId))
-    .returning({ id: dsgvoConsentLogTable.id });
-
-  // The erasure audit entry records WHAT was cleared, never the cleared values
-  // -- the before-values are exactly the PII we are removing.
-  const changes: Changes = {
-    __scrubbedColumns: { before: null, after: preview.diff.map((d) => d.column).join(", ") },
-  };
-  if (deletedSource.length > 0)
-    changes.__sourceRecords = { before: `${deletedSource.length}`, after: null };
-  if (deletedSnapshots.length > 0)
-    changes.__snapshots = { before: `${deletedSnapshots.length}`, after: null };
-  if (scrubbedDunning.length > 0)
-    changes.__dunningItems = { before: `${scrubbedDunning.length} scrubbed`, after: null };
-  if (scrubbedRels.length > 0)
-    changes.__relationships = { before: `${scrubbedRels.length}`, after: null };
-  if (scrubbedContracts.length > 0)
-    changes.__contracts = { before: `${scrubbedContracts.length}`, after: null };
-  if (deletedAttachments.length > 0)
-    changes.__attachments = { before: `${deletedAttachments.length}`, after: null };
-  if (scrubbedConsent.length > 0)
-    changes.__consentEvidence = { before: `${scrubbedConsent.length} scrubbed`, after: null };
-  if (opts.forceOverride && opts.overrideReason) {
-    changes.__override = { before: null, after: opts.overrideReason };
-  }
-
-  const auditId = await appendAudit(db, {
-    entityType: "member",
-    entityId: memberId,
-    action: "dsgvo_erasure",
-    source: "dsgvo",
-    actorId: opts.actorId ?? null,
-    actorEmail: opts.actorEmail ?? null,
-    changes,
-    requestId: opts.requestId ?? null,
-  });
-
-  // 5. Redact the personal values still sitting in this member's earlier audit
-  //    entries (before/after of past edits). Keep the rows and the erasure
-  //    event for accountability; drop only the values.
-  await db
-    .update(auditLogTable)
-    .set({ changes: {} })
-    .where(
-      and(
-        eq(auditLogTable.entityType, "member"),
-        eq(auditLogTable.entityId, memberId),
-        auditId ? ne(auditLogTable.id, auditId) : undefined,
-      ),
-    );
-
-  if (opts.requestId) {
-    await db
-      .update(dsgvoRequestsTable)
-      .set({
-        status: "completed",
-        completedAt: new Date(),
-        completedBy: opts.actorId ?? null,
-      })
-      .where(eq(dsgvoRequestsTable.id, opts.requestId));
   }
 
   return {

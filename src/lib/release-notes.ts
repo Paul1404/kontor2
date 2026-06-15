@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.99.5",
+    date: "2026-06-15",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Drei Korrekturen unter der Haube: Ein Wiedereinzug mit mehreren Posten auf demselben Mandat erzeugt jetzt nur eine Erstlastschrift, sonst hätte die Bank die ganze Datei abgelehnt. Eine DSGVO-Löschung läuft komplett in einer Transaktion, sodass bei einem Abbruch keine halb gelöschten Daten zurückbleiben. Außerdem ein Fehler im Deploy-Skript für mehrere Vereine behoben.",
+      },
+    ],
+  },
+  {
     version: "0.99.4",
     date: "2026-06-15",
     changes: [
