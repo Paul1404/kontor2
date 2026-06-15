@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { and, desc, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { formatDate } from "~/lib/format";
 import { type MergeVars, renderTemplate, SAMPLE_VARS } from "~/lib/rundschreiben";
 import { getMailer } from "~/server/auth/send-invite";
 import type { DB } from "~/server/db/client";
@@ -169,11 +170,7 @@ export const rundschreibenRouter = {
         .filter(Boolean)
         .join(" · ");
       const now = new Date();
-      const datum = now.toLocaleDateString("de-DE", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
+      const datum = formatDate(now);
       // One run-level document reference for the whole Serienbrief, shown on
       // every page so the mailing is traceable. Random/opaque like the other
       // document numbers (only invoices stay sequential).

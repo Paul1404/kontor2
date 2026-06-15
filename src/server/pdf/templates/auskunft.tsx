@@ -1,4 +1,5 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { formatDate, formatDateTime } from "~/lib/format";
 import type { AuskunftsPackage } from "~/server/dsgvo/auskunft";
 
 const styles = StyleSheet.create({
@@ -42,7 +43,7 @@ const styles = StyleSheet.create({
 
 function fmt(value: unknown): string {
   if (value == null) return "—";
-  if (value instanceof Date) return value.toLocaleString("de-DE");
+  if (value instanceof Date) return formatDateTime(value);
   if (typeof value === "string") return value;
   if (typeof value === "object") {
     const s = JSON.stringify(value);
@@ -94,8 +95,8 @@ export function AuskunftDocument({
       <Page size="A4" style={styles.page} wrap>
         <Text style={styles.h1}>Auskunft nach Art. 15 DSGVO</Text>
         <Text style={styles.meta}>
-          Dokument {docRef} · Erstellt am {new Date(pkg.generatedAt).toLocaleString("de-DE")} ·
-          Mitglied {pkg.generatedFor.ref || "—"} · Datei-Hash siehe Begleitschreiben
+          Dokument {docRef} · Erstellt am {formatDateTime(pkg.generatedAt)} · Mitglied{" "}
+          {pkg.generatedFor.ref || "—"} · Datei-Hash siehe Begleitschreiben
         </Text>
 
         <View style={styles.notice}>
@@ -216,7 +217,7 @@ export function AuskunftDocument({
                 <Text style={styles.key}>{a.filename}</Text>
                 <Text style={styles.value}>
                   {a.mimeType} · {Math.round(a.sizeBytes / 1024)} KB · hochgeladen{" "}
-                  {new Date(a.uploadedAt).toLocaleDateString("de-DE")}
+                  {formatDate(a.uploadedAt)}
                 </Text>
               </View>
             ))}
