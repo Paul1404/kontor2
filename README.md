@@ -6,16 +6,19 @@ subscription advertised at 292,80 € a year, and grew into a single web app tha
 many clubs can run and own outright. The original Linear database was migrated
 losslessly, not re-keyed by hand.
 
-One app runs the whole back office: members, contributions, SEPA direct debit,
-dunning, a member self-service portal, DSGVO tooling, reports and an audit
-trail. Internal admin tool, German UI, React 19 on Bun.
+One app runs the entire back office: members and families, contributions and
+SEPA direct debit, open items and a dunning workflow, SEPA returns, invoices,
+honours, mass mailings, a member self-service portal, DSGVO tooling, a data
+quality cockpit, reports, snapshots and a full audit trail. There is even a
+built-in MCP endpoint so an AI assistant can read the books. Internal admin
+tool, German UI, React 19 on Bun.
 
 ## Why this exists
 
 Clubs used Linear's hosted Vereinsverwaltung. The data sat in a vendor cloud,
 every extra Vorstand seat cost money, and the underlying schema was the kind you
-can admire in the hidden `/app/museum` route: 247 columns for one address, a
-credit-card number in cleartext, the same consent field spelled two different
+can still admire in the hidden `/app/museum` route: 247 columns for one address,
+a credit-card number in cleartext, the same consent field spelled two different
 ways. So the whole thing was rebuilt as software the club controls.
 
 - **Own your data.** It lives in your own Postgres, encrypted at rest. IBANs and
@@ -33,24 +36,37 @@ ways. So the whole thing was rebuilt as software the club controls.
 
 ## At a glance
 
-Eight feature sets, one app.
+One app, the whole back office.
 
-- **Member management.** A lossless mirror of the legacy database with full
-  CRUD, attachments, relationships and vCard export.
-- **Beitragsläufe.** SEPA direct-debit billing that emits real
-  pain.008.001.02 XML.
-- **Forderungen und Mahnwesen.** Open-item tracking, SEPA return handling and a
-  three-stage dunning workflow with PDF letters.
-- **Mitgliederportal.** Magic-link self-service with a Vorstand review queue
-  for member-proposed changes.
-- **DSGVO.** Art. 15 Auskunft, Art. 17 Löschung with legal retention policy,
+- **Members and families.** A lossless mirror of the legacy database with full
+  CRUD, attachments, relationships, families and vCard export.
+- **Beiträge und SEPA.** Direct-debit billing that emits real pain.008.001.02
+  XML, plus an online application that quotes the matching Beitragsart.
+- **Forderungen und Mahnwesen.** Open-item tracking, SEPA return handling, a
+  configurable one-to-three-stage dunning workflow with PDF letters, and a
+  goodwill Kulanz path.
+- **Rechnungen.** Invoice payers get a proper Rechnung with a sequential
+  Rechnungsnummer instead of a debit.
+- **Mitgliederportal.** Magic-link self-service with a Vorstand review queue for
+  member-proposed changes.
+- **Ehrungen.** Honours by tenure or merit, with a printable Ehrenurkunde in the
+  club's own colour.
+- **Rundschreiben.** Serienbriefe to filtered recipients, by email and as a
+  postal PDF batch.
+- **Aufgaben (Wiedervorlagen).** A per-member and global to-do list with a
+  worklist and bulk actions.
+- **DSGVO.** Art. 15 Auskunft, Art. 17 Löschung with a legal retention policy,
   and an append-only consent log, all reproducible and audited.
-- **Berichte.** Birthday, honours, statistics, finance and the DOSB-style
-  Bestandserhebung, every one of them CSV- and print-ready.
+- **Datenqualität.** Two dozen read-only checks over the member base with
+  severities, drill-down, acknowledgements and XLSX export.
+- **Berichte.** Birthdays, honours, statistics, finance and the DOSB-style
+  Bestandserhebung, every one CSV- and print-ready.
 - **Import und ingest.** One pipeline for both a 50 MB Linear `mysqldump` and a
   live HMAC-signed JSON push.
 - **Snapshots und audit.** Nightly versioning with field-level restore and a
   searchable record of every change.
+- **KI-Zugriff.** A built-in remote MCP server so an assistant can query the
+  club with the role of an issued API key.
 
 ## Technical feats
 
@@ -72,9 +88,11 @@ The parts that took real engineering, not just CRUD.
   and each tenant has its own database pool, better-auth instance and encryption
   keyring. New clubs are provisioned (database, migrations, registry row, key)
   from a separate operator console with its own accounts and control database,
-  so one club can never read another's data.
+  so one club can never read another's data. An unknown or apex host resolves to
+  the operator realm, never to a club's data.
 - **Standards-correct SEPA.** The pain.008.001.02 writer splits FRST and RCUR
-  into separate `<PmtInf>` blocks per Bundesbank rules, finalising a run flips
+  into separate `<PmtInf>` blocks per Bundesbank rules, a single new mandate
+  yields exactly one FRST even across several contracts, finalising a run flips
   its mandates FRST to RCUR for the next cycle, and money is summed in integer
   cents end to end to avoid float drift.
 - **Reproducible legal documents.** DSGVO exports compute a deterministic
@@ -86,20 +104,32 @@ The parts that took real engineering, not just CRUD.
   Rechnungsnummer for invoices as German law requires.
 - **One ingest path, two front doors.** A 50 MB SQL upload and a live JSON push
   share the same mapper and write pipeline. Re-imports are idempotent: a unique
-  index on Linear's GUID dedupes runs, and historical Sollstellungen are folded
-  by summing per Vertrag and Jahr so the existing constraint holds.
+  index on Linear's GUID dedupes runs, contracts and mandates upsert by natural
+  key, and historical Sollstellungen are folded by summing per Vertrag and Jahr
+  so the existing constraint holds.
+- **Configurable where clubs differ, fixed where the law does.** The
+  Beitragsstaffel, fee-category age boundaries, the number of dunning stages and
+  the Kündigungsfrist are per-tenant settings; the SEPA XML, the §14 UStG
+  invoice numbering and the LSB age buckets are not. New clubs inherit sane
+  German defaults, existing clubs keep their exact behaviour, because every such
+  migration backfills current values rather than imposing new ones.
+- **German-directory address autocomplete.** The online application resolves PLZ
+  to Ort and completes street names from the official OpenPLZ directory, which
+  covers small Orte and Gemeindeteile that OpenStreetMap misses, with Nominatim
+  as a graceful fallback and aggressive Redis caching.
 - **Defence in depth on auth.** Every protected oRPC procedure checks its role
   server-side through a hierarchical gate (`admin` enthält `vorstand` enthält
   `readonly`). Route guards are never trusted alone. A last-admin guard
   intercepts the better-auth admin endpoints so no operator can lock everyone
-  out of the building from the inside.
+  out of the building from the inside. The MCP endpoint caps an API key at the
+  lower of its granted role and the owner's current role.
 - **Safe nightly snapshots.** Versioning runs in-process, skips unchanged rows
   and takes a Postgres advisory lock so multiple replicas never collide. It can
   be moved to an external scheduler with one env var.
 
 ## Feature sets in detail
 
-### Members
+### Members and contacts
 
 - Lossless mirror of the Linear `adresse` schema (247 columns). IBANs are
   AES-256-GCM encrypted at rest, and clients only ever see the last four digits.
@@ -107,24 +137,46 @@ The parts that took real engineering, not just CRUD.
 - Many-to-many Abteilungen with per-Abteilung Eintritts- und Austrittsdaten.
 - Verknüpfungen (Familienbeziehungen) imported from Linear and editable.
 - Kontakt entries (Zahlende ohne eigene Mitgliedschaft) are first-class. They
-  fall back to `AdrNr` when there is no Mitgliedsnummer and get a "Kontakt"
-  badge. An admin-only filter surfaces orphan Kontakte for cleanup.
+  carry their own `K-` Kontaktnummer, fall back to `AdrNr` only for legacy rows,
+  and get a "Kontakt" badge. An admin-only filter surfaces orphan Kontakte.
+- A merged, chronological member timeline: audit changes, Mahnungen,
+  Kulanz-Schreiben, Rundschreiben and SEPA-Rückläufer in one feed, with no extra
+  storage.
 - Per-member file attachments via S3. Signed URLs, PDF/PNG/JPEG only, 10 MB cap.
 - vCard 3.0 export per member. Works with iOS and macOS Contacts.
 - Clickable phone, email and address (`tel:`, `mailto:`, maps link).
 - DSGVO panel on the member detail page links straight to Auskunft, Löschung
   und Einwilligungs-Log for that person.
 
-### Beitragsläufe
+### Families
+
+- Familien group a Zahler with the members they pay for, with each membership's
+  begin and (optional) end recorded.
+- Add or end a member in a family, propose likely groupings from existing
+  Verknüpfungen, and bill the family as one fee where that is how the club runs.
+
+### Beitragsläufe und Beiträge
 
 - Wizard that selects active mandates for a billing year, picks the right
-  Beitragsart per member and assembles a draft run.
+  Beitragsart per member and assembles a draft run, with a simulate step that
+  diffs against the previous year (direct-debit and invoice payers alike).
 - Generates valid pain.008.001.02 XML, FRST and RCUR in separate `<PmtInf>`
-  blocks per Bundesbank rules.
-- Stornieren is supported. A finalised run flips its mandates from FRST to RCUR
-  for the next cycle.
-- Per-Beitragsart amounts and Sollstellung view on member detail. Proration and
-  Kündigungsfrist are configurable.
+  blocks per Bundesbank rules, with an honest Vorabankündigung.
+- Stornieren is supported and rolls back the invoice Sollstellungen it created.
+- Beitragsarten are managed in the admin with amount, Sollstellungsregel,
+  Verwendungszweck and an optional age range. Each can be tagged with an
+  online-application role so the public form quotes that Beitragsart's price and
+  approval pre-selects it. Proration and Kündigungsfrist are configurable.
+
+### Online-Aufnahmeantrag
+
+- Public multi-step Beitritts-Antrag with live address autocomplete from the
+  OpenPLZ German directory, an age-based fee quote, Abteilungs-Auswahl, a drawn
+  signature and a celebratory success screen.
+- Age categories and their amounts are per-tenant; the quote can come straight
+  from a role-tagged Beitragsart so there is one source for the price.
+- Approval creates the member (and, for a family, partner and children),
+  contract, SEPA mandate and the official Beitrittserklärung PDF, then mails it.
 
 ### Forderungen, Mahnwesen, SEPA-Rückläufer
 
@@ -133,16 +185,24 @@ The parts that took real engineering, not just CRUD.
 - SEPA-Rückläufer erfassen. Pick a committed `fee_run_item`, attach an
   R-Transaction reason code (AC04, AM04, MS03 and more) and optional
   Rücklastschriftgebühr. Reopens the matching Sollstellung as `returned`.
-- Mahnläufe in three escalation levels (Erinnerung, 1. Mahnung, 2. Mahnung).
-  Configurable Mahngebühren per Stufe, one PDF per member, `mahnstufe` bumped on
-  the touched Sollstellungen. Minors are addressed to their legal
-  representative; the run warns when none is on file. Mahnungen can also be sent
-  by email with a preview.
+- Mahnläufe in up to three escalation levels (Erinnerung, 1. Mahnung, 2.
+  Mahnung); a club can shorten the process to one or two stages. Configurable
+  Mahngebühren per Stufe, one PDF per member, `mahnstufe` bumped on the touched
+  Sollstellungen. Minors are addressed to their legal representative; the run
+  warns when none is on file. Mahnungen can also be sent by email with a preview,
+  and a re-send is blocked once an item is sent.
 - Mahnsperre auf Mitgliedsebene wird respektiert. Stornieren eines Mahnlaufs
   rollt die Mahnstufe zurück.
 - Kulanz-Brief. A payment reminder that also offers a goodwill Sonderkündigung:
   pay, or return the attached signed Kündigungsbestätigung and the open claim is
   waived.
+
+### Rechnungen und Austritt
+
+- Rechnungszahler (only `aufRechnung = 'J'`) get a proper Rechnung PDF with a
+  sequential Rechnungsnummer instead of a SEPA debit.
+- Austrittsbestätigung generation, for a single member or a whole family, with a
+  configurable Kündigungsfrist and an optional alternate recipient.
 
 ### Mitgliederportal (Self-Service)
 
@@ -154,7 +214,27 @@ The parts that took real engineering, not just CRUD.
 - Changes land as `portal_change_requests` (pending). Vorstand reviews them
   under "Portal-Anfragen" and applies the whole set, picks individual fields, or
   rejects with notes. Applied changes write through to `members` with an audit
-  entry.
+  entry, and never overwrite a value that changed in the meantime.
+
+### Ehrungen
+
+- Record an honour per member, either a Vereinsjubiläum (10/25/40/50/60/70
+  Jahre) or a Sonderehrung, with a per-year status view of who is due.
+- Generate a printable Ehrenurkunde PDF in the club's configured brand colour,
+  stored and re-downloadable.
+
+### Rundschreiben (Serienbriefe)
+
+- Compose a Serienbrief and target recipients by status and Abteilung, with a
+  live preview and a separate postal list for members without email.
+- Send a test mail, then send: each recipient gets a personalised email, and a
+  combined postal PDF batch is produced for the rest. Every document carries its
+  own reference number, and the send is recorded on each member's timeline.
+
+### Aufgaben (Wiedervorlagen)
+
+- A to-do list scoped to a member or seen globally, with open/done status,
+  bulk complete, reopen and delete, and counts surfaced on the dashboard.
 
 ### DSGVO
 
@@ -172,6 +252,18 @@ The parts that took real engineering, not just CRUD.
 - Anfragen-Ticketing. Auskunfts- und Löschanfragen zentral verwaltet; die
   30-Tage-Frist nach Art. 12 (3) DSGVO wird automatisch berechnet.
 
+### Datenqualität
+
+- Roughly two dozen read-only checks over the member base, each a single SQL
+  predicate so the summary counts all of them in one round trip and the
+  drill-down lists the affected rows with the same clause.
+- Examples: Lastschrift ohne Mandat oder ohne IBAN, abgelaufenes oder bald
+  ablaufendes SEPA-Mandat, unplausibles Geburtsdatum, Austritt vor Eintritt,
+  mögliche Dubletten, Tarif passt nicht zum Alter, Volljährige auf Eltern-Konto.
+- Severities (error / warn / info) drive the accent. Findings can be
+  acknowledged so a known exception stops nagging, and the whole list exports to
+  CSV and XLSX. Counts are captured in the nightly snapshot for a trend.
+
 ### Reports (Berichte)
 
 - Geburtstagsliste with month and runden-Geburtstag filters.
@@ -182,16 +274,19 @@ The parts that took real engineering, not just CRUD.
   LSB-Altersgruppe. Mehrfachmitgliedschaften zählen mehrfach wie vom DOSB
   vorgegeben. CSV-Export plus Unterschriften-PDF. Each run is archived with a
   SHA-256 fingerprint so reprints do not diverge.
-- Every report exports to CSV and has a print-friendly view.
+- A filterable member export that honours the current search, status and
+  Abteilung. Every report exports to CSV and has a print-friendly view.
 
 ### Import and ingest
 
 - Linear Webverein `mysqldump` upload up to 50 MB. Parsed in process, multi-row
-  inserts split, MySQL escapes decoded, written in batches with live progress.
+  inserts split, MySQL escapes decoded, written in batches with live progress
+  (published per tenant through Redis).
 - Legacy push compatibility. `POST /api/ingest/svums` accepts the same record
   shape so the mapper is shared between SQL upload and JSON push.
 - Both paths write through the same ingest pipeline. Diffs land in the audit log
-  and trigger a pre-import snapshot.
+  and trigger a pre-import snapshot. Contracts and SEPA mandates upsert in place,
+  so app-created Sollstellungen survive a re-import.
 - Historical tables are carried over, not discarded.
   - `mgsolln` becomes Sollstellungen (`source='linear_import'`), aggregated by
     summing `Betrag/Bezahlt/Offen` per Vertrag und Jahr. Linear's GUID is kept
@@ -208,21 +303,22 @@ The parts that took real engineering, not just CRUD.
 
 ### Snapshots and audit
 
-- Automatic nightly snapshot of every member at 02:30 local time. Skips
+- Automatic nightly snapshot of every member at 02:30, per tenant. Skips
   unchanged rows. Manual button plus a pre-import snapshot before any upload.
 - Granular restore. Pick a member, pick a snapshot, see the field-level diff,
   restore the whole row or individual fields. A Postgres advisory lock keeps
   replicas from colliding.
 - Audit log. Every change records actor, source (UI, import, legacy push,
-  system), before/after JSON and a human-readable summary. Full-text search over
-  actor, member number, summary and field name; filter by source, date and
-  member.
+  system, DSGVO), before/after JSON and a human-readable summary. Full-text
+  search over actor, member number, summary and field name; filter by source,
+  date and member.
 
 ### Auth and access
 
-- better-auth with `tanstackStartCookies`. Email plus password.
+- better-auth with `tanstackStartCookies`. Email plus password, per tenant.
 - Invite-only signup with single-use tokens. A partially-failed acceptance can
-  be retried instead of permanently blocking the address.
+  be retried (and reuses the password just entered) instead of permanently
+  blocking the address.
 - Three roles: Admin, Vorstand, Readonly. Every protected oRPC procedure checks
   role server-side.
 - First admin created interactively at `/setup`, reachable without auth only
@@ -230,29 +326,33 @@ The parts that took real engineering, not just CRUD.
 - Last-admin guard. The better-auth admin endpoints (`set-user-banned`,
   `remove-user`, `set-role`) are intercepted before they can leave the instance
   with zero active admins.
-- SMTP configurable from the admin UI, with SNI hostname, a self-signed-cert
-  toggle and a "Test mail" button that validates a config before it is saved.
+- SMTP configurable per tenant from the admin UI, with SNI hostname, a
+  self-signed-cert toggle and a "Test mail" button that validates a config
+  before it is saved.
 
 ### MCP endpoint (KI-Zugriff)
 
 - Remote MCP server (Model Context Protocol, Streamable HTTP) at `/api/mcp`
   for AI assistants like Claude Code and Claude Desktop.
 - Auth via admin-issued API keys (better-auth api-key plugin, hashed at rest,
-  per-key rate limit and optional expiry), sent as an `x-api-key` header. Keys
+  per-key rate limit and optional expiry), sent as an `x-api-key` header, with
+  per-IP throttling in front so invalid keys cannot hammer verification. Keys
   are managed under Einstellungen, KI-Zugriff and shown exactly once.
-- A key acts with the role of the user it is bound to. Tools call the existing
-  oRPC procedures, so role checks, audit entries and logging are identical to
-  browser requests. Readonly keys get query tools only (member search/detail,
-  dashboard, reports, dunning status); Vorstand keys additionally get curated
-  mutations (members, tasks, mark postings paid). Beitrags-/Mahnläufe, SEPA,
-  imports, settings and the danger zone are not exposed.
+- A key acts with the lower of its granted role and the owner's current role.
+  Tools call the existing oRPC procedures, so role checks, audit entries and
+  logging are identical to browser requests. Readonly keys get query tools only
+  (member search/detail, dashboard, reports, dunning status); Vorstand keys
+  additionally get curated mutations (members, tasks, mark postings paid, set a
+  Beitragsart age range). Beitrags-/Mahnläufe, SEPA, imports, settings and the
+  danger zone are not exposed.
 - Connect: `claude mcp add --transport http kontor2 https://<host>/api/mcp
   --header "x-api-key: <KEY>"` (Claude Desktop goes through `mcp-remote`; the
   settings page shows ready-to-copy snippets).
 
-### Admin
+### Admin and operator console
 
-- CRUD for Abteilungen, Beitragsarten, Benutzer, SMTP, Vereinsdaten.
+- CRUD for Abteilungen, Beitragsarten, Benutzer, SMTP, Vereinsdaten (including
+  branding: Anzeigename, Logo, Markenfarbe, white-label over the Kontor2 brand).
 - Snapshot run history with bytes, member counts and trigger reason.
 - Verschlüsselung. Inspect the active keyring and run "Daten neu verschlüsseln"
   after an `APP_SECRET` rotation. v1 ciphertexts stay readable via per-key
@@ -262,6 +362,8 @@ The parts that took real engineering, not just CRUD.
   and a double-confirm "wipe everything" that keeps users, Abteilungen,
   Beitragsarten and settings. Every execution writes a `danger_zone` audit row
   first.
+- A separate operator console (its own host, login and control database) lists,
+  provisions, suspends and removes tenant clubs without touching their data.
 
 ### UI niceties
 
@@ -273,8 +375,9 @@ The parts that took real engineering, not just CRUD.
   zoom on input focus.
 - Route-level error boundaries with retry, a NotFoundPanel for unknown routes,
   and skeleton placeholders while loading.
-- Subtle, `prefers-reduced-motion`-aware motion. Destructive actions use a
-  type-to-confirm dialog.
+- An on-brand animated aurora backdrop (Navy and Messing), glass surfaces and a
+  subtle, `prefers-reduced-motion`-aware motion vocabulary. Destructive actions
+  use a type-to-confirm dialog.
 - Version chip in the sidebar and on login/setup. One click opens a "Was ist
   neu" dialog from the curated release log, with an unread dot per new version.
 - Light and dark theme. Full favicon set built from the configured club logo.
@@ -283,27 +386,29 @@ The parts that took real engineering, not just CRUD.
 
 TanStack Start (Vite), TanStack Router, TanStack Query, TanStack Form, oRPC v1,
 better-auth, Drizzle ORM, Valibot, PostgreSQL, Redis, S3, Bun, Tailwind v4,
-shadcn-style components, lucide-react, Vitest, Biome.
+shadcn-style components, lucide-react, `@react-pdf/renderer`, Vitest, Biome.
 
 ## Architecture
 
 One TanStack Start app does both SSR and client. Vite builds it into
 `dist/server` and `dist/client`. In production `scripts/serve.ts` wraps the
 built server handler on `Bun.serve`, serves static assets from `dist/client` and
-`public` with a 1-day cache, runs a startup preflight, and adds security headers
-plus a Content-Security-Policy to every HTML response. Railway terminates TLS in
-front of it.
+`public` with a 1-day cache, runs a startup preflight, pins the process to UTC,
+301-redirects legacy hosts to the canonical one, and adds security headers plus a
+Content-Security-Policy to every HTML response. Railway terminates TLS in front
+of it.
 
 ### Request lifecycle
 
 1. A request hits the Bun server. Static files are served directly; everything
    else falls through to the SSR handler.
 2. The request host resolves to a tenant, which carries that tenant's database,
-   auth instance and encryption keyring for the rest of the request.
+   auth instance and encryption keyring for the rest of the request. An unknown
+   host resolves to the operator console realm.
 3. File-based routes in `src/routes` resolve. `__root.tsx` is the document
    shell, `app/route.tsx` is the authed app, `portal/route.tsx` is the member
-   self-service shell, `console/route.tsx` is the operator console, and
-   `api/*.ts` are server routes.
+   self-service shell, `console/route.tsx` is the operator console, `antrag/` is
+   the public application, and `api/*.ts` are server routes.
 4. Data and mutations go through oRPC, mounted at `/api/rpc/$`. The browser
    talks to it through an isomorphic `@orpc/tanstack-query` client so the same
    calls work during SSR and after hydration.
@@ -321,8 +426,12 @@ front of it.
 - **Routes** (`src/routes`). Thin. They load data via oRPC and render
   components. The route tree (`routeTree.gen.ts`) is generated.
 - **API** (`src/server/orpc`). `router.ts` composes one domain router per file
-  in `procedures/` into `appRouter`. Input and output are validated with
-  Valibot. Errors are thrown as `ORPCError` with uppercase codes.
+  in `procedures/` (members, families, contracts, fee-runs, payments, dunning,
+  sepa, sepa-returns, invoices, applications, portal, dsgvo, data-quality,
+  reports, verbandsmeldung, ehrungen, rundschreiben, tasks, timeline, snapshots,
+  audit, import, settings, console, and more) into `appRouter`. Input and output
+  are validated with Valibot. Errors are thrown as `ORPCError` with uppercase
+  codes.
 - **Domain logic** (`src/server/*`). The heavy lifting lives outside the
   procedures so it stays testable.
   - `importer/`. Linear `mysqldump` ingest. `sql-tokenizer.ts` splits the
@@ -330,16 +439,22 @@ front of it.
     historical Sollstellungen, `ingest-pipeline.ts` is the shared write path.
   - `sepa/`. `build-fee-run.ts`, `select-mandate.ts`, `pain008.ts`, `iban.ts`,
     `direct-debit.ts`.
+  - `address/`. `lookup.ts` (OpenPLZ directory, primary) over `nominatim.ts`
+    (fallback) for PLZ and street autocomplete.
+  - `domain/application/`. Age categories, fee resolution and the role-to-
+    Beitragsart mapping for the public application.
   - `dunning/`, `dsgvo/` (`auskunft`, `erasure`, `policy`), `reports/`,
-    `verbandsmeldung/` (Bestandserhebung), `snapshots/`, `audit/`.
-  - `pdf/`. `@react-pdf/renderer` templates and a render wrapper.
+    `verbandsmeldung/` (Bestandserhebung), `snapshots/`, `audit/`, `mail/`.
+  - `pdf/`. `@react-pdf/renderer` templates (Beitrittserklärung, Mahnung,
+    Rechnung, Kulanz, Ehrenurkunde, Bestandserhebung, Serienbrief,
+    Austrittsbestätigung, DSGVO-Auskunft) and a render wrapper.
 - **Data** (`src/server/db`). Drizzle over Postgres (`postgres.js`). Tables in
   `schema/`, columns snake_case mirroring Linear, table objects camelCase.
   Secret columns use the `encryptedText` type, which transparently AES-256-GCM
   encrypts on write and decrypts on read.
 - **Frontend libs** (`src/lib`). Theme, global shortcuts, saved table views,
-  vCard, CSV export, formatting, and the release-notes source of truth.
-  Components live in `src/components`, with shadcn-style primitives in
+  vCard, CSV export, formatting (timezone-pinned), and the release-notes source
+  of truth. Components live in `src/components`, with shadcn-style primitives in
   `components/ui`.
 
 ### Secrets and crypto
@@ -358,16 +473,17 @@ fails fast with a readable message.
 - **Postgres.** System of record, accessed only from server code. A control
   database holds the tenant registry and operator accounts; each tenant has its
   own database.
-- **Redis** (`ioredis`). Live member-search cache behind the command palette
-  and nonce dedupe for legacy push replay protection.
+- **Redis** (`ioredis`). Live member-search cache behind the command palette,
+  tenant-scoped address and dashboard caches, import progress, MCP and form
+  rate limiting, and nonce dedupe for legacy push replay protection.
 - **S3.** Per-member file attachments, served through short-lived signed URLs.
 
 ### Scheduling
 
-The nightly member snapshot runs in-process. It initialises lazily inside
-`createContext`, so `serve.ts` fires one self-request on boot to make sure the
-timer is installed even on a fresh container with no traffic. A Postgres advisory
-lock keeps multiple replicas from running it at once. Set
+The nightly member snapshot runs in-process for every tenant. It initialises
+lazily inside `createContext`, so `serve.ts` fires one self-request on boot to
+make sure the timer is installed even on a fresh container with no traffic. A
+Postgres advisory lock keeps multiple replicas from running it at once. Set
 `SNAPSHOT_CRON_DISABLED=1` and drive it externally via the HMAC-protected
 `POST /api/cron/snapshots` route instead.
 
@@ -375,6 +491,7 @@ lock keeps multiple replicas from running it at once. Set
 
 - `/api/rpc/$`. oRPC handler (all app data and mutations).
 - `/api/auth/$`. better-auth handler.
+- `/api/mcp`. Remote MCP server for AI assistants.
 - `/api/health`. Railway healthcheck.
 - `/api/files/$id`. Signed attachment download.
 - `/api/ingest/svums`. HMAC-signed legacy push.
@@ -402,17 +519,22 @@ without auth only while the user table is empty.
 ## Tests
 
 ```bash
-bun test
+bun run test       # fast unit suite (Vitest)
+bun run test:int   # integration suite against a throwaway Postgres + Redis
+bun run verify     # typecheck + biome ci + unit tests + build
 ```
 
-Covers the SQL importer (incl. phase-2 mgsolln aggregation and a real-dump smoke
-test against `reference/linear/datesicherung.sql`), ingest HMAC, SEPA mandate
-selection, pain.008 output, IBAN normalisation, encryption keyring round-trip
-across `APP_SECRET` rotations, last-admin guard request shape, DSGVO policy,
-Bestandserhebung age buckets, snapshot diff and restore, audit diffing, report
-calculations, vCard output, BLZ lookup, and the release-notes invariants
-(newest-first, no duplicate versions, `CURRENT_VERSION` in sync with
-`package.json`).
+Unit coverage includes the SQL importer (incl. phase-2 mgsolln aggregation and a
+real-dump smoke test against `reference/linear/datesicherung.sql`), ingest HMAC,
+SEPA mandate selection, pain.008 output, IBAN normalisation, the OpenPLZ address
+mappers, encryption keyring round-trip across `APP_SECRET` rotations, last-admin
+guard request shape, DSGVO policy, Bestandserhebung age buckets, the fee-category
+age boundaries, snapshot diff and restore, audit diffing, report calculations,
+vCard output, BLZ lookup, the MCP tool registry and role caps, and the
+release-notes invariants (newest-first, no duplicate versions, `CURRENT_VERSION`
+in sync with `package.json`). The integration suite exercises the real SQL
+clauses behind the data-quality checks, fee-run approval and the address
+resolver against a live database.
 
 ## Deploy
 
@@ -436,9 +558,9 @@ Manually set:
 - `BETTER_AUTH_URL`. Public URL of the deployment.
 
 `railway.toml` runs `bun run db:migrate:prod` before each deploy and points the
-healthcheck at `/api/health`. Migrations are applied with a runtime-only
-migrator. `drizzle-kit` stays a dev dependency and does not ship in the runtime
-image.
+healthcheck at `/api/health`. Migrations are applied to every tenant database
+with a runtime-only migrator. `drizzle-kit` stays a dev dependency and does not
+ship in the runtime image.
 
 The nightly snapshot scheduler runs in-process by default. To move it to an
 external scheduler (Railway Cron, GitHub Actions and the like), set
