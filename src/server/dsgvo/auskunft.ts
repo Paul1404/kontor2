@@ -13,6 +13,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { memberRef } from "~/server/domain/member";
+import { logger } from "~/server/lib/logger";
 import { presignDownload } from "~/server/s3/client";
 
 /**
@@ -41,8 +42,9 @@ export type AuskunftsPackage = {
     mimeType: string;
     sizeBytes: number;
     uploadedAt: string;
-    downloadUrl: string;
-    downloadUrlExpiresAt: string;
+    /** Null when the file could not be signed (e.g. S3 hiccup); the rest of the dossier still generates. */
+    downloadUrl: string | null;
+    downloadUrlExpiresAt: string | null;
   }>;
   relationships: Array<Record<string, unknown>>;
   consentLog: Array<Record<string, unknown>>;
@@ -157,11 +159,17 @@ export async function buildAuskunftsPackage(
   const downloadUrlExpiresAt = new Date(Date.now() + expiresSeconds * 1000).toISOString();
   const attachmentsWithUrls = await Promise.all(
     attachments.map(async (a) => {
-      const url = await presignDownload({
-        key: a.s3Key,
-        filename: a.filename,
-        expiresSeconds,
-      });
+      // One unsignable attachment must not fail the whole Art. 15 dossier; emit
+      // the metadata with a null URL instead.
+      let url: string | null = null;
+      try {
+        url = await presignDownload({ key: a.s3Key, filename: a.filename, expiresSeconds });
+      } catch (err) {
+        logger.warn("dsgvo auskunft: attachment presign failed", {
+          err: err instanceof Error ? err.message : String(err),
+          attachmentId: a.id,
+        });
+      }
       return {
         id: a.id,
         filename: a.filename,
@@ -169,7 +177,7 @@ export async function buildAuskunftsPackage(
         sizeBytes: a.sizeBytes,
         uploadedAt: a.uploadedAt.toISOString(),
         downloadUrl: url,
-        downloadUrlExpiresAt,
+        downloadUrlExpiresAt: url ? downloadUrlExpiresAt : null,
       };
     }),
   );

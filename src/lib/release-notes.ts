@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.99.6",
+    date: "2026-06-15",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Datumsangaben auf der DSGVO-Auskunft und im Serienbrief nutzen jetzt die feste Zeitzone und können sich nicht mehr um einen Tag verschieben. Die DSGVO-Auskunft wird außerdem auch dann vollständig erstellt, wenn ein einzelner Dateianhang gerade nicht abrufbar ist.",
+      },
+    ],
+  },
+  {
     version: "0.99.5",
     date: "2026-06-15",
     changes: [
