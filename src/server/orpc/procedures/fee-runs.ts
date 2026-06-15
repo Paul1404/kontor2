@@ -739,6 +739,10 @@ export const feeRunsRouter = {
 
         const pain008Items: Pain008Item[] = [];
         const usedMandateIds = new Set<string>();
+        // A mandate's first use in this file is FRST; every later use must be
+        // RCUR, or the pain.008 carries two FRST for one mandate and the bank
+        // rejects the whole batch. Mirrors buildFeeRunPreview's frstMandateIds.
+        const frstMandateIds = new Set<string>();
         const skipped: string[] = [];
         let runCents = 0n;
 
@@ -768,7 +772,11 @@ export const feeRunsRouter = {
 
           const amount = centsToAmount(amountStrToCents(p.amount));
           const endToEndId = crypto.randomUUID().replace(/-/g, "").slice(0, 35);
-          const sequenceType = sequenceTypeFor(chosen);
+          let sequenceType = sequenceTypeFor(chosen);
+          if (sequenceType === "FRST") {
+            if (frstMandateIds.has(chosen.id)) sequenceType = "RCUR";
+            else frstMandateIds.add(chosen.id);
+          }
           const signatureDate =
             chosen.unterschriftDatum?.toISOString().slice(0, 10) ?? input.falligkeitsdatum;
           const purpose = `Mitgliedsbeitrag ${p.billingYear} (Wiedereinzug)`;

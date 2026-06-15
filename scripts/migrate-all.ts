@@ -77,7 +77,7 @@ function controlUrl(primaryUrl: string): string {
  * Extra-Vereine aus der `tenants`-Tabelle der Control-DB -- nur über den Klartext
  * `database_name`. Läuft NACH deren Migration, die Tabelle ist also aktuell.
  */
-async function tenantsFromTable(controlDbUrl: string): Promise<TenantTarget[]> {
+async function tenantsFromTable(controlDbUrl: string, primaryUrl: string): Promise<TenantTarget[]> {
   const sql = postgres(controlDbUrl, { max: 1, onnotice: () => {} });
   try {
     const rows = (await sql`
@@ -141,7 +141,7 @@ async function main() {
   for (const t of tenantsFromJson()) {
     if (t.key !== primaryKey()) secondaries.set(t.key, t.databaseUrl);
   }
-  for (const t of await tenantsFromTable(control)) {
+  for (const t of await tenantsFromTable(control, primaryUrl)) {
     secondaries.set(t.key, t.databaseUrl);
   }
   const keys = [...secondaries.keys()];
