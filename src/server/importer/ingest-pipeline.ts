@@ -668,15 +668,28 @@ export async function runIngest(
   // 5. Relationships (verkn): replace rows touching any imported AdrNr on
   // either side, then upsert. Linear keeps reciprocal pairs as separate
   // rows, so we preserve direction.
+  //
+  // Exception: never delete a row flagged `ist_vertreter`. The legal
+  // representative is an app-side curation decision (set when nachtragend a
+  // minor's mandate); Linear has no such concept, so a re-import would
+  // otherwise silently strip every Vertreter. Kept rows that still exist in
+  // Linear get their other columns refreshed by the upsert below, but
+  // `ist_vertreter` is left untouched because the incoming rows don't carry
+  // that column. App-created Vertreter relationships (e.g. to a contact
+  // minted from the Kontoinhaber) have no Linear counterpart and simply
+  // survive intact.
   const relBase = processed;
   let relationshipsWritten = 0;
   if ((input.relationships?.length ?? 0) > 0 && allReferencedAdrNrs.length > 0) {
     await db
       .delete(relationshipsTable)
       .where(
-        or(
-          inArray(relationshipsTable.fromAdrNr, allReferencedAdrNrs),
-          inArray(relationshipsTable.toAdrNr, allReferencedAdrNrs),
+        and(
+          or(
+            inArray(relationshipsTable.fromAdrNr, allReferencedAdrNrs),
+            inArray(relationshipsTable.toAdrNr, allReferencedAdrNrs),
+          ),
+          eq(relationshipsTable.istVertreter, false),
         ),
       );
     // Dedupe on the (fromAdrNr, toAdrNr) conflict key so a single multi-row
