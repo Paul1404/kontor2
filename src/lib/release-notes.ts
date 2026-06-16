@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.101.1",
+    date: "2026-06-16",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Datenimport: Ein erneuter Linear-Import setzt einen im Kontor gepflegten Vertreter nicht mehr zurück. Vertreter-Beziehungen bleiben beim Re-Import erhalten, auch wenn Linear sie nicht kennt.",
+      },
+    ],
+  },
+  {
     version: "0.101.0",
     date: "2026-06-16",
     changes: [
