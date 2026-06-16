@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.99.7",
+    date: "2026-06-16",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Import: Ein Mitglied geht nicht mehr verloren, wenn seine Mitgliedsnummer bereits an ein anderes Mitglied vergeben ist. Das Mitglied wird jetzt trotzdem importiert, die doppelte Nummer wird entfernt und der Fall als Warnung gemeldet, damit die richtige Nummer zugewiesen werden kann. Vorher wurde der Datensatz stillschweigend übersprungen.",
+      },
+    ],
+  },
+  {
     version: "0.99.6",
     date: "2026-06-15",
     changes: [
