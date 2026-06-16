@@ -18,6 +18,7 @@ const FOKUS_FIELD: Record<string, string> = {
   telefon_nur_vorwahl: "telefon1",
   fehlende_iban: "iban1",
   geburtsdatum_unplausibel: "geburtsdatum",
+  beziehung_gleiches_geburtsdatum: "geburtsdatum",
   geschlecht_unbekannt: "geschlecht",
   eintritt_nach_austritt: "austritt",
   minderjaehrig_ohne_vertretung: "vertreterName",
