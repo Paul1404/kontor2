@@ -54,6 +54,8 @@ export const CATEGORY_IDS = [
   // --- issue #230: Tarif/Alter-Abgleich -----------------------------------
   "tarif_passt_nicht_zum_alter",
   "volljaehrig_eltern_konto",
+  // --- cloned-from-child import artifact (wrong birthdate on parent) -------
+  "beziehung_gleiches_geburtsdatum",
 ] as const;
 
 export type CategoryId = (typeof CATEGORY_IDS)[number];
@@ -251,6 +253,13 @@ export const CATEGORIES: CategoryMeta[] = [
       "Aktives Mitglied ab 18 Jahren, dessen Lastschrift weiter über das Konto eines Zahlers (Elternteil) läuft. Erkannt über eine formale Zahler-Verknüpfung oder, bei Altdaten ohne Verknüpfung, heuristisch über einen abweichenden Kontoinhaber oder eine IBAN, die sich mit einem älteren Mitglied gleichen Nachnamens deckt. Erinnerung zur Umstellung auf Selbstzahler. Es wird nichts automatisch geändert.",
     severity: "info",
   },
+  {
+    id: "beziehung_gleiches_geburtsdatum",
+    label: "Gleiches Geburtsdatum wie Beziehungspartner",
+    description:
+      "Ein verknüpftes Mitglied trägt dasselbe Geburtsdatum wie sein Beziehungspartner mit anderem Namen. Bei Eltern und Kind ist das praktisch unmöglich und stammt meist aus dem Import, der den Eltern-Satz vom Kind übernommen hat. Das falsche Datum verfälscht Mahnwesen, Altersgrenzen und Bestandserhebung. Bitte prüfen, welcher Datensatz das richtige Geburtsdatum braucht.",
+    severity: "warn",
+  },
 ];
 
 /** A live member: not soft-deleted, neither exited nor deceased. */
@@ -393,6 +402,19 @@ export const WHERE: Record<CategoryId, string> = {
   // a different person's account (Zahler/Vertreter, typically a parent). Reminder
   // to switch to Selbstzahler; nothing is changed automatically.
   volljaehrig_eltern_konto: `${ACTIVE} and geburtsdatum is not null and geburtsdatum <= (current_date - interval '18 years') and (exists (select 1 from contracts c where ${DD_CONTRACT_C} and (${PAYER_FOR_C}) <> members.id) or (${ACTIVE_DD_POS} and ((${ABW_KONTOINH_FREMD}) or (${IBAN_GETEILT_MIT_AELTEREM}))))`,
+  // Cloned-from-child import artifact: a member linked to another member shares
+  // the exact same Geburtsdatum but has a different Vorname. For parent/child
+  // (the typical relationship) an identical full birthdate is impossible, so one
+  // record carries a wrong (copied) date. Flags the relationship target; with
+  // Linear's reciprocal verkn pairs both sides surface, so the operator can pick
+  // which date is wrong.
+  beziehung_gleiches_geburtsdatum:
+    "deleted_at is null and geburtsdatum is not null and exists (" +
+    "select 1 from relationships r join members c on c.id = r.from_member_id " +
+    "where r.to_member_id = members.id and c.deleted_at is null " +
+    "and c.geburtsdatum = members.geburtsdatum " +
+    "and lower(btrim(coalesce(c.vorname, ''))) <> lower(btrim(coalesce(members.vorname, '')))" +
+    ")",
 };
 
 /**

@@ -28,6 +28,7 @@ describe("fokusFieldFor", () => {
       "telefon_nur_vorwahl",
       "fehlende_iban",
       "geburtsdatum_unplausibel",
+      "beziehung_gleiches_geburtsdatum",
       "geschlecht_unbekannt",
       "eintritt_nach_austritt",
       "minderjaehrig_ohne_vertretung",

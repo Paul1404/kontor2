@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.102.0",
+    date: "2026-06-17",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Datenqualität: Neue Prüfung „Gleiches Geburtsdatum wie Beziehungspartner“. Findet Eltern-Datensätze, die beim Import das Geburtsdatum des Kindes übernommen haben. Über „Bearbeiten“ lässt sich das richtige Datum direkt setzen.",
+      },
+    ],
+  },
+  {
     version: "0.101.3",
     date: "2026-06-17",
     changes: [
