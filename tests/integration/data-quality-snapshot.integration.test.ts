@@ -7,7 +7,6 @@ import { db } from "~/server/db/client";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { dataQualitySnapshotsTable } from "~/server/db/schema/data-quality-snapshots";
 import { membersTable } from "~/server/db/schema/members";
-import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { memberTasksTable } from "~/server/db/schema/tasks";
 import type { AppContext } from "~/server/orpc/context";
 import { appRouter } from "~/server/orpc/router";
@@ -17,16 +16,17 @@ import { appRouter } from "~/server/orpc/router";
  * day and opens an Aufgabe on each member affected by an error-severity rule,
  * idempotently. The trend is then queryable.
  *
- * The error rule exercised here is `mandat_abgelaufen` (active Lastschrift
- * contract + an expired active SEPA mandate). `mitgliedsnummer_kollision` — the
- * other error rule — cannot be set up since migration 0048 forbids the state.
+ * The error rule exercised here is `lastschrift_ohne_mandat` (an active
+ * Lastschrift contract with no SEPA mandate, so no Einzug is possible).
+ * `mitgliedsnummer_kollision` — the other error rule — cannot be set up since
+ * migration 0048 forbids the state.
  *
  * Runs only against the throwaway test database (bun run test:int).
  */
 const onTestDb = process.env.DATABASE_URL?.includes("svuwv_test") ?? false;
 const MARKER = `DQSnap-${Date.now()}`;
-const MANDAT_TITLE = "Datenqualität: SEPA-Mandat abgelaufen";
-const RULE_ID = "mandat_abgelaufen";
+const MANDAT_TITLE = "Datenqualität: Lastschrift ohne SEPA-Mandat";
+const RULE_ID = "lastschrift_ohne_mandat";
 
 function authedContext(): AppContext {
   const session = {
@@ -51,14 +51,13 @@ describe.skipIf(!onTestDb)("data-quality nightly snapshot (integration)", () => 
       .select({ max: sql<number>`coalesce(max(${membersTable.adrNr}), 0)::int` })
       .from(membersTable);
     const adr = (maxRow?.max ?? 0) + 1;
-    const past = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
-    // Live member with an active direct-debit contract and an expired, still
-    // "Aktiv" SEPA mandate => the error-severity `mandat_abgelaufen` rule flags
-    // it, so the snapshot must open a task on it.
+    // Live member with an active direct-debit contract but NO SEPA mandate =>
+    // the error-severity `lastschrift_ohne_mandat` rule flags it, so the
+    // snapshot must open a task on it.
     const [m] = await db()
       .insert(membersTable)
-      .values({ adrNr: adr, nachname: MARKER, vorname: "Expired", memberNo: `${MARKER}-M` })
+      .values({ adrNr: adr, nachname: MARKER, vorname: "NoMandate", memberNo: `${MARKER}-M` })
       .returning({ id: membersTable.id });
     if (!m) throw new Error("seed failed");
     memberIds.push(m.id);
@@ -70,19 +69,8 @@ describe.skipIf(!onTestDb)("data-quality nightly snapshot (integration)", () => 
         vertragNr: `${MARKER}-V`,
         art: 1,
         isDirectDebit: true,
-        // Positiver Betrag: 0-EUR-Verträge lösen die Mandat-Regeln bewusst
-        // nicht mehr aus.
+        // Positiver Betrag: 0-EUR-Verträge lösen die Mandat-Regel bewusst nicht aus.
         betrag: "60",
-      });
-    await db()
-      .insert(sepaMandatesTable)
-      .values({
-        memberId: m.id,
-        adrNr: adr,
-        mandatsNr: `${MARKER}-MAN`,
-        status: "Aktiv",
-        isDeleted: false,
-        gultigBis: past,
       });
   });
 
