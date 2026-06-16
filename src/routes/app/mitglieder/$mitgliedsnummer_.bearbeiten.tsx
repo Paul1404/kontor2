@@ -14,11 +14,16 @@ import { toast } from "~/components/ui/toaster";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/mitglieder/$mitgliedsnummer_/bearbeiten")({
+  // `?fokus=<field>` deep-links from a Datenqualitäts-Befund to the field to fix.
+  validateSearch: (search: Record<string, unknown>): { fokus?: string } => ({
+    fokus: typeof search.fokus === "string" ? search.fokus : undefined,
+  }),
   component: EditMemberPage,
 });
 
 function EditMemberPage() {
   const { mitgliedsnummer } = Route.useParams();
+  const { fokus } = Route.useSearch();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -139,6 +144,7 @@ function EditMemberPage() {
         // record actually changes — never mid-edit on a background refetch.
         key={(member as Record<string, unknown>).id as string}
         initial={initial}
+        focusField={fokus}
         submitting={mut.isPending}
         errorMessage={errorMessage}
         onCancel={() =>

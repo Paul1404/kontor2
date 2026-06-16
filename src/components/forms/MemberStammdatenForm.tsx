@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Save, X } from "lucide-react";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -212,6 +212,12 @@ type Props = {
    * reichen.
    */
   variant?: "member" | "kontakt";
+  /**
+   * Optional Stammdaten field to scroll to and focus on mount (e.g. opened from
+   * a Datenqualitäts-Befund). Matches the `id="mf-<field>"` on the inputs;
+   * unknown values are ignored, so the form always opens normally.
+   */
+  focusField?: string | null;
 };
 
 export function MemberStammdatenForm({
@@ -223,8 +229,19 @@ export function MemberStammdatenForm({
   submitLabel = "Speichern",
   mitglnrInput,
   variant = "member",
+  focusField,
 }: Props) {
   const isMember = variant === "member";
+
+  // Deep-link from a Datenqualitäts-Befund: scroll to and focus the field that
+  // needs attention. Best-effort; an unknown field just opens the form normally.
+  useEffect(() => {
+    if (!focusField) return;
+    const el = document.getElementById(`mf-${focusField}`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    (el as HTMLElement).focus({ preventScroll: true });
+  }, [focusField]);
   // Seed once from `initial`. The form deliberately does NOT re-sync to later
   // `initial` changes: the parent re-renders while the user types (e.g. the
   // IBAN lookup query below resolving, or a background members.get refetch),
@@ -282,6 +299,7 @@ export function MemberStammdatenForm({
             </FormField>
             <FormField label="Nachname">
               <Input
+                id="mf-nachname"
                 value={values.nachname}
                 onChange={(e) => update("nachname", e.target.value)}
                 required
@@ -291,6 +309,7 @@ export function MemberStammdatenForm({
               label={`Geburtsdatum${values.geburtsdatum ? ` · ${calcAge(values.geburtsdatum)}` : ""}`}
             >
               <Input
+                id="mf-geburtsdatum"
                 type="date"
                 value={values.geburtsdatum}
                 onChange={(e) => update("geburtsdatum", e.target.value)}
@@ -298,6 +317,7 @@ export function MemberStammdatenForm({
             </FormField>
             <FormField label="Geschlecht">
               <select
+                id="mf-geschlecht"
                 value={values.geschlecht}
                 onChange={(e) =>
                   update("geschlecht", e.target.value as StammdatenValues["geschlecht"])
@@ -315,10 +335,15 @@ export function MemberStammdatenForm({
               <Input value={values.firma1} onChange={(e) => update("firma1", e.target.value)} />
             </FormField>
             <FormField label="Straße">
-              <Input value={values.strasse} onChange={(e) => update("strasse", e.target.value)} />
+              <Input
+                id="mf-strasse"
+                value={values.strasse}
+                onChange={(e) => update("strasse", e.target.value)}
+              />
             </FormField>
             <FormField label="Hausnummer">
               <Input
+                id="mf-hausnummer"
                 value={values.hausnummer}
                 onChange={(e) => update("hausnummer", e.target.value)}
               />
@@ -331,7 +356,11 @@ export function MemberStammdatenForm({
               />
             </FormField>
             <FormField label="PLZ">
-              <Input value={values.plz} onChange={(e) => update("plz", e.target.value)} />
+              <Input
+                id="mf-plz"
+                value={values.plz}
+                onChange={(e) => update("plz", e.target.value)}
+              />
             </FormField>
             <FormField label="Ort">
               <Input value={values.ort} onChange={(e) => update("ort", e.target.value)} />
@@ -350,13 +379,18 @@ export function MemberStammdatenForm({
               </select>
             </FormField>
             <FormField label="Telefon">
-              <Input value={values.telefon1} onChange={(e) => update("telefon1", e.target.value)} />
+              <Input
+                id="mf-telefon1"
+                value={values.telefon1}
+                onChange={(e) => update("telefon1", e.target.value)}
+              />
             </FormField>
             <FormField label="Mobil">
               <Input value={values.telefon2} onChange={(e) => update("telefon2", e.target.value)} />
             </FormField>
             <FormField label="E-Mail">
               <Input
+                id="mf-email"
                 type="email"
                 value={values.email}
                 onChange={(e) => update("email", e.target.value)}
@@ -397,6 +431,7 @@ export function MemberStammdatenForm({
                 </FormField>
                 <FormField label="Austritt">
                   <Input
+                    id="mf-austritt"
                     type="date"
                     value={values.austritt}
                     onChange={(e) => update("austritt", e.target.value)}
@@ -443,6 +478,7 @@ export function MemberStammdatenForm({
           <CardContent className="flex flex-col gap-4 text-sm">
             <FormField label="IBAN">
               <Input
+                id="mf-iban1"
                 value={values.iban1}
                 onChange={(e) => update("iban1", e.target.value)}
                 placeholder="DE…"
@@ -515,6 +551,7 @@ export function MemberStammdatenForm({
             </FormField>
             <FormField label="Name">
               <Input
+                id="mf-vertreterName"
                 value={values.vertreterName}
                 onChange={(e) => update("vertreterName", e.target.value)}
                 placeholder="Vor- und Nachname"

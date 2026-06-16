@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
@@ -25,6 +25,7 @@ import { toast } from "~/components/ui/toaster";
 import { ABTEILUNG_NONE_FILTER } from "~/lib/abteilung-filter";
 import { cn } from "~/lib/cn";
 import { triggerDownload, triggerDownloadBase64 } from "~/lib/download";
+import { fokusFieldFor } from "~/lib/dq-fix-fields";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 // Type-only import (erased at build): keep the cockpit's CategoryId in lockstep
@@ -726,6 +727,18 @@ function FindingRow({
           >
             <Wrench className="size-4" />
           </Button>
+        ) : null}
+        {fokusFieldFor(id) ? (
+          <Link
+            to="/app/mitglieder/$mitgliedsnummer/bearbeiten"
+            params={{ mitgliedsnummer: item.reference }}
+            search={{ fokus: fokusFieldFor(id) ?? undefined }}
+            aria-label="Im Mitglied bearbeiten"
+            title="Im Mitglied bearbeiten"
+            className={buttonVariants({ size: "sm", variant: "ghost" })}
+          >
+            <PenLine className="size-4" />
+          </Link>
         ) : null}
         {INLINE_FIXABLE.has(id) ? (
           <Button
