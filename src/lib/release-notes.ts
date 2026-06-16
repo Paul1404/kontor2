@@ -41,13 +41,24 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.100.1",
+    date: "2026-06-16",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Letzte Reste des Mandats-Ablaufs entfernt: Auch der Mandats-Nachtrag wertet ein importiertes „gültig bis\" nicht mehr als Ablauf. Ein aktives, nie widerrufenes Mandat gilt als nutzbar, egal welches alte Datum daran hängt; nur ausdrücklich inaktiv gesetzte Mandate werden reaktiviert.",
+      },
+    ],
+  },
+  {
     version: "0.100.0",
     date: "2026-06-16",
     changes: [
       {
         category: "feature",
         description:
-          "Datenqualität: Befunde mit eindeutiger Lösung lassen sich jetzt direkt korrigieren. Den Anfang macht die vertauschte Namensreihenfolge. Ein Klick auf „Korrigieren\" tauscht Vor- und Nachname; vorher wird geprüft, ob der Befund noch besteht, und die Änderung steht in der Mitglieder-Historie und lässt sich dort zurücknehmen.",
+          'Datenqualität: Befunde mit eindeutiger Lösung lassen sich jetzt direkt korrigieren. Den Anfang macht die vertauschte Namensreihenfolge. Ein Klick auf „Korrigieren" tauscht Vor- und Nachname; vorher wird geprüft, ob der Befund noch besteht, und die Änderung steht in der Mitglieder-Historie und lässt sich dort zurücknehmen.',
       },
     ],
   },

@@ -40,9 +40,9 @@ type Kandidat = {
  * Zahler ohne nutzbares SEPA-Mandat, mit Nachtrag-Plan. Das Mandat gehört zum
  * Zahler (Familien-Zahler oder Vertreter bei Minderjährigen, sonst das
  * Mitglied selbst), nie zum Kind. Fehlende Mandate werden mit Unterschrift =
- * früheste unterschriebene Beitrittserklärung nachgetragen, scheinbar
- * abgelaufene Import-Mandate reaktiviert. Minderjährige ohne Vertreter oder
- * Familie erscheinen als Datenqualitätsfall ohne Aktion.
+ * früheste unterschriebene Beitrittserklärung nachgetragen, inaktiv gesetzte
+ * Import-Mandate reaktiviert. Minderjährige ohne Vertreter oder Familie
+ * erscheinen als Datenqualitätsfall ohne Aktion.
  */
 export function MandateNachtragCard({ canEdit }: { canEdit: boolean }) {
   const qc = useQueryClient();
@@ -93,8 +93,8 @@ export function MandateNachtragCard({ canEdit }: { canEdit: boolean }) {
           Zahler ohne nutzbares SEPA-Mandat. Das Mandat gehört zum Zahler, also dem Familien-Zahler
           oder Vertreter bei Minderjährigen, nie zum Kind selbst. Die Beitrittserklärung enthält das
           Mandat: fehlende Datensätze werden mit Unterschrift gleich frühester Beitrittserklärung
-          nachgetragen, scheinbar abgelaufene Import-Mandate reaktiviert. Minderjährige ohne
-          Vertreter oder Familie brauchen erst Datenpflege.
+          nachgetragen, inaktiv gesetzte Import-Mandate reaktiviert. Minderjährige ohne Vertreter
+          oder Familie brauchen erst Datenpflege.
         </p>
         <table className="w-full text-sm">
           <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">

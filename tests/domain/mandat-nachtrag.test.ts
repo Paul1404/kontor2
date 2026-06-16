@@ -26,28 +26,22 @@ describe("planMandatNachtrag", () => {
     });
   });
 
-  it("reaktiviert ein nur abgelaufenes Mandat statt ein zweites anzulegen", () => {
+  it("behandelt ein Mandat mit vergangenem Gültig-bis als nutzbar (kein Ablauf)", () => {
+    // A SEPA mandate does not expire on a date: an Aktiv, never-revoked mandate
+    // with a long-past gültig-bis is usable, so there is nothing to nachtragen.
     const plan = planMandatNachtrag({
       eintritt,
-      mandate: [mandat({ id: "alt", gultigBis: new Date("2023-04-08") })],
+      mandate: [mandat({ id: "alt", gultigBis: new Date("2010-04-08") })],
     });
-    expect(plan).toEqual({ kind: "reactivate", mandateId: "alt" });
+    expect(plan).toEqual({ kind: "skip", reason: "Aktives Mandat vorhanden" });
   });
 
-  it("reaktiviert das juengste von mehreren abgelaufenen", () => {
+  it("reaktiviert das juengste von mehreren inaktiven Mandaten", () => {
     const plan = planMandatNachtrag({
       eintritt,
       mandate: [
-        mandat({
-          id: "alt",
-          gultigBis: new Date("2020-01-01"),
-          angelegtAm: new Date("2017-01-01"),
-        }),
-        mandat({
-          id: "neu",
-          gultigBis: new Date("2023-01-01"),
-          angelegtAm: new Date("2021-01-01"),
-        }),
+        mandat({ id: "alt", status: "Inaktiv", angelegtAm: new Date("2017-01-01") }),
+        mandat({ id: "neu", status: "Inaktiv", angelegtAm: new Date("2021-01-01") }),
       ],
     });
     expect(plan).toEqual({ kind: "reactivate", mandateId: "neu" });
@@ -74,7 +68,7 @@ describe("planMandatNachtrag", () => {
     expect(plan.kind).toBe("skip");
   });
 
-  it("behandelt Status Inaktiv wie abgelaufen (reaktivieren)", () => {
+  it("reaktiviert ein inaktiv gesetztes (nie widerrufenes) Mandat", () => {
     const plan = planMandatNachtrag({
       eintritt,
       mandate: [mandat({ id: "inaktiv", status: "Inaktiv" })],

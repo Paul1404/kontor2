@@ -13,10 +13,13 @@
  * Daraus folgen drei Fälle:
  * - kein Mandats-Datensatz vorhanden -> Mandat mit Unterschriftsdatum =
  *   Eintrittsdatum nachtragen (`create`),
- * - nur abgelaufene, nie widerrufene Mandate -> das jüngste reaktivieren,
- *   Gültig-bis leeren, Original-Unterschrift bleibt (`reactivate`),
+ * - nur inaktiv gesetzte, nie widerrufene Mandate -> das jüngste reaktivieren,
+ *   Original-Unterschrift bleibt (`reactivate`),
  * - Widerruf vorhanden -> niemals automatisch anfassen (`skip`): ein
  *   widerrufenes Mandat braucht eine neue, echte Unterschrift.
+ *
+ * Ein Mandat gilt nicht als abgelaufen: das importierte "Gültig bis" ist kein
+ * SEPA-Konzept und wird hier nicht ausgewertet (siehe selectMandate).
  */
 
 export type MandatLite = {
@@ -37,7 +40,7 @@ function isUsable(m: MandatLite): boolean {
   if (m.isDeleted || m.widerrufenAm != null) return false;
   const status = m.status?.trim().toLowerCase();
   if (status && status !== "aktiv") return false;
-  if (m.gultigBis != null && new Date(m.gultigBis) < new Date()) return false;
+  // `gultigBis` is intentionally ignored: a SEPA mandate has no expiry date.
   return true;
 }
 
@@ -54,14 +57,13 @@ export function planMandatNachtrag(opts: {
     return { kind: "skip", reason: "Mandat widerrufen, neue Unterschrift einholen" };
   }
 
-  // Abgelaufen oder inaktiv, aber nie widerrufen: die echte Unterschrift
-  // existiert, nur das importierte Gültig-bis ist Datenmüll. Jüngstes
-  // reaktivieren statt ein zweites, widersprüchliches Mandat anzulegen.
-  const expired = live
+  // Inaktiv gesetzt, aber nie widerrufen: die echte Unterschrift existiert.
+  // Jüngstes reaktivieren statt ein zweites, widersprüchliches Mandat anzulegen.
+  const inactive = live
     .slice()
     .sort((a, b) => new Date(b.angelegtAm ?? 0).getTime() - new Date(a.angelegtAm ?? 0).getTime());
-  if (expired.length > 0) {
-    return { kind: "reactivate", mandateId: expired[0]!.id };
+  if (inactive.length > 0) {
+    return { kind: "reactivate", mandateId: inactive[0]!.id };
   }
 
   if (opts.eintritt == null) {
