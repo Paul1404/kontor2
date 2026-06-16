@@ -221,6 +221,9 @@ export async function runIngest(
   // 2. Members: upsert by `adr_nr`. Collect created/updated stats for audit.
   let membersCreated = 0;
   let membersUpdated = 0;
+  // Members imported with their legacy Mitgliedsnummer dropped because another
+  // live member already carried it (the number is ambiguous in the source).
+  const numberCollisions: Array<{ name: string; mitgliedsnummer: string }> = [];
   const adrNrToMemberId = new Map<number, string>();
   const abteilungByName = new Map<string, string>(); // name → abteilung.id
 
@@ -368,6 +371,26 @@ export async function runIngest(
               (e as { code?: string; cause?: { code?: string } }).code ??
               (e as { code?: string; cause?: { code?: string } }).cause?.code;
             if (code !== "23505") throw e;
+            // A duplicate *legacy* Mitgliedsnummer (another live member already
+            // carries it) cannot be resolved by regenerating the app number, so
+            // it would burn every retry and drop the whole member. The app's
+            // identity is `member_no`, so keep the member and null the ambiguous
+            // legacy number instead, flagged for the operator to reconcile. Any
+            // other 23505 (an app-number clash) just retries with a fresh number.
+            const constraint =
+              (e as { constraint_name?: string; cause?: { constraint_name?: string } })
+                .constraint_name ??
+              (e as { constraint_name?: string; cause?: { constraint_name?: string } }).cause
+                ?.constraint_name;
+            if (constraint === "members_mitgliedsnummer_uk" && row.mitgliedsnummer != null) {
+              numberCollisions.push({
+                name:
+                  [cleanCols.vorname, cleanCols.nachname].filter(Boolean).join(" ") ||
+                  `AdrNr ${adrNr}`,
+                mitgliedsnummer: String(row.mitgliedsnummer),
+              });
+              row.mitgliedsnummer = null;
+            }
           }
         }
         if (!inserted) throw lastError ?? new Error("Mitglied konnte nicht angelegt werden.");
@@ -453,6 +476,17 @@ export async function runIngest(
   }
   processed = membersBase + len(input.members);
   report("Mitglieder");
+
+  if (numberCollisions.length > 0) {
+    const sample = numberCollisions
+      .slice(0, 10)
+      .map((c) => `${c.name} (${c.mitgliedsnummer})`)
+      .join(", ");
+    errors.push({
+      table: "adresse",
+      message: `${numberCollisions.length} Mitglied(er) importiert, deren Mitgliedsnummer bereits an ein anderes Mitglied vergeben war. Die doppelte Nummer wurde entfernt, das Mitglied bleibt erhalten. Bitte prüfen und die richtige Nummer zuweisen: ${sample}`,
+    });
+  }
 
   // Flush the Abteilungs-Mitgliedschaften gathered from adresse.Abteilung in
   // one batch (the interes table appends more below before they're all read
