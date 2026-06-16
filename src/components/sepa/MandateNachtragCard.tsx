@@ -33,6 +33,7 @@ type Kandidat = {
     name: string;
     vorname: string;
     nachname: string;
+    viaRelationship?: boolean;
   };
 };
 
@@ -257,6 +258,10 @@ function ResolveViaKontoinhaberButton({
   if (!canEdit) {
     return <Badge variant="warning">Minderjährig: Kontoinhaber vorhanden, kein Zahler</Badge>;
   }
+  // Besteht schon eine (namens-only) Beziehung zu dieser Person, ist die Aktion
+  // ein Übernehmen als Vertreter, kein Anlegen aus dem Nichts. Server-seitig
+  // wird die vorhandene Beziehung wiederverwendet, nicht dupliziert.
+  const viaRelationship = suggestion.viaRelationship ?? false;
   return (
     <div className="flex items-center gap-2">
       <Button
@@ -264,12 +269,20 @@ function ResolveViaKontoinhaberButton({
         variant="outline"
         onClick={() => resolve.mutate()}
         disabled={resolve.isPending}
-        title={`Kontakt-Zahler ${suggestion.name} aus dem Kontoinhaber anlegen`}
+        title={
+          viaRelationship
+            ? `${suggestion.name} aus der vorhandenen Beziehung als Vertreter übernehmen`
+            : `Kontakt-Zahler ${suggestion.name} aus dem Kontoinhaber anlegen`
+        }
       >
         {resolve.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-        Kontakt {suggestion.name} anlegen
+        {viaRelationship
+          ? `${suggestion.name} als Vertreter`
+          : `Kontakt ${suggestion.name} anlegen`}
       </Button>
-      <span className="text-xs text-muted-foreground">aus Kontoinhaber</span>
+      <span className="text-xs text-muted-foreground">
+        {viaRelationship ? "Beziehung vorhanden" : "aus Kontoinhaber"}
+      </span>
     </div>
   );
 }

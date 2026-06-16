@@ -47,7 +47,7 @@ export const RELEASES: Release[] = [
       {
         category: "fix",
         description:
-          "Mandate nachtragen: „Kontakt anlegen“ erzeugt keine zweite Beziehung mehr, wenn zum Kontoinhaber schon eine besteht. Die vorhandene Beziehung wird auf den Zahler gehoben und als Vertreter gesetzt, statt eine Dublette anzulegen.",
+          "Mandate nachtragen: Besteht zum Kontoinhaber schon eine Beziehung, heißt die Aktion jetzt „… als Vertreter“ statt „Kontakt anlegen“ und übernimmt die vorhandene Beziehung, statt eine Dublette anzulegen.",
       },
     ],
   },
