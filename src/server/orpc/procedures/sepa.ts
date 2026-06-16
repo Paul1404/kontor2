@@ -256,6 +256,7 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
       toMemberId: string;
       nachname: string | null;
       vorname: string | null;
+      geburtsdatum: Date | string | null;
       reference: string;
     }>
   >();
@@ -269,6 +270,7 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
         toMemberId: relationshipsTable.toMemberId,
         nachname: target.nachname,
         vorname: target.vorname,
+        geburtsdatum: target.geburtsdatum,
         memberNo: target.memberNo,
         kontaktNo: target.kontaktNo,
         mitgliedsnummer: target.mitgliedsnummer,
@@ -279,9 +281,10 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
         and(
           inArray(relationshipsTable.fromMemberId, minorIds),
           sql`${target.deletedAt} is null`,
-          // Erwachsene Gegenseite (oder Kontakt ohne Geburtsdatum, typisch für Eltern).
-          sql`(${target.geburtsdatum} is null or ${target.geburtsdatum} <= now() - interval '18 years')`,
-          // Nur aktive Verknüpfungen.
+          // Volljährigkeit wird NICHT in SQL gefiltert: viele Eltern-Datensätze
+          // tragen (Linear-Import) das Geburtsdatum des Kindes, sähen also wie
+          // Minderjährige aus. Die Entscheidung adult-oder-Kontoinhaber-Treffer
+          // fällt unten in JS, damit ein Namens-Treffer das falsche Datum sticht.
           or(sql`${relationshipsTable.datBis} is null`, sql`${relationshipsTable.datBis} > now()`),
         ),
       );
@@ -293,6 +296,7 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
         toMemberId: r.toMemberId,
         nachname: r.nachname,
         vorname: r.vorname,
+        geburtsdatum: r.geburtsdatum,
         reference: ref(r),
       });
       candidatesByMinor.set(r.fromMemberId, list);
@@ -345,12 +349,20 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
     // gewinnt (sehr wahrscheinlich der echte Zahler), sonst die erste Beziehung.
     const konto = normalizeName(m.kontoinhaber);
     const candidates = candidatesByMinor.get(m.id) ?? [];
-    const scored = candidates.map((c) => {
-      const nn = normalizeName(c.nachname);
-      const vn = normalizeName(c.vorname);
-      const strong = !!konto && !!nn && konto.includes(nn) && (vn ? konto.includes(vn) : true);
-      return { c, strong };
-    });
+    const scored = candidates
+      .map((c) => {
+        const nn = normalizeName(c.nachname);
+        const vn = normalizeName(c.vorname);
+        const strong = !!konto && !!nn && konto.includes(nn) && (vn ? konto.includes(vn) : true);
+        // Volljährig (oder Datum unbekannt). Ein Kontoinhaber-Treffer gilt als
+        // Zahler-Beleg auch bei falschem (Kind-)Geburtsdatum im Eltern-Satz.
+        const adult = c.geburtsdatum == null || !isMinorAt(c.geburtsdatum, now);
+        return { c, strong, adult };
+      })
+      // Nur plausible Zahler: erwachsen oder Name passt zum Kontoinhaber. So
+      // bleibt ein echtes Geschwisterkind außen vor, der Elternteil mit
+      // verkorkstem Geburtsdatum aber drin.
+      .filter((s) => s.adult || s.strong);
     scored.sort((a, b) => (a.strong === b.strong ? 0 : a.strong ? -1 : 1));
     const best = scored[0];
 
