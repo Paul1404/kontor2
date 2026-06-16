@@ -51,8 +51,6 @@ type CategoryId =
   | "mahnsperre_gesetzt"
   | "moegliche_dubletten"
   | "telefon_nur_vorwahl"
-  | "mandat_abgelaufen"
-  | "mandat_laeuft_bald_ab"
   | "mitgliedsnummer_kollision"
   | "name_reihenfolge_vertauscht"
   | "mehrere_personen_im_datensatz"

@@ -8,9 +8,14 @@ export type MandateSelection = {
 
 /**
  * Pick the mandate to use for a debit. Defaults to the newest active mandate
- * (Status='Aktiv', not revoked, not deleted, not expired). If `overrideId`
- * matches one of the active options, it wins -- this lets the Vorstand
- * resolve multi-mandate conflicts from the preview UI.
+ * (Status='Aktiv', not revoked, not deleted). If `overrideId` matches one of
+ * the active options, it wins -- this lets the Vorstand resolve multi-mandate
+ * conflicts from the preview UI.
+ *
+ * A SEPA Core mandate has no fixed expiry date: it stays valid until revoked
+ * and only lapses if it goes 36 months unused. Linear's `gultigBis`
+ * ("gültig bis") is therefore deliberately NOT a usability gate -- a mandate is
+ * unusable only when deleted, revoked (`widerrufenAm`) or not Aktiv.
  *
  * `conflict = true` when more than one mandate is active; that's the signal
  * to surface the row in the preview's conflict resolver.
@@ -18,14 +23,12 @@ export type MandateSelection = {
 export function selectMandate(
   mandates: SepaMandate[],
   overrideId?: string | null,
-  today: Date = new Date(),
 ): MandateSelection {
   const active = mandates
     .filter((m) => {
       if (m.isDeleted) return false;
       if (m.widerrufenAm) return false;
       if (m.status && m.status.toLowerCase() !== "aktiv") return false;
-      if (m.gultigBis && m.gultigBis < today) return false;
       return true;
     })
     .sort((a, b) => {

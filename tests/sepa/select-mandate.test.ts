@@ -42,16 +42,16 @@ describe("selectMandate", () => {
     expect(sel.conflict).toBe(false);
   });
 
-  it("excludes revoked, deleted, and expired", () => {
-    const today = new Date("2026-05-01");
+  it("excludes revoked, deleted and inactive, but never by gültig-bis date", () => {
     const mandates = [
       makeMandate({ id: "revoked", widerrufenAm: new Date("2025-01-01") }),
       makeMandate({ id: "deleted", isDeleted: true }),
-      makeMandate({ id: "expired", gultigBis: new Date("2024-01-01") }),
       makeMandate({ id: "inaktiv", status: "Inaktiv" }),
-      makeMandate({ id: "good" }),
+      // A SEPA mandate does not expire on a date: a long-past Linear gültig-bis
+      // must NOT exclude it. This is the only active mandate, so it is chosen.
+      makeMandate({ id: "good", gultigBis: new Date("2010-01-01") }),
     ];
-    const sel = selectMandate(mandates, undefined, today);
+    const sel = selectMandate(mandates);
     expect(sel.chosen?.id).toBe("good");
     expect(sel.conflict).toBe(false);
   });

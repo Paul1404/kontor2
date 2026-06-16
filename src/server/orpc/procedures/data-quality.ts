@@ -41,8 +41,6 @@ export const CATEGORY_IDS = [
   "moegliche_dubletten",
   // --- v0.55 additions (issue #79) ---------------------------------------
   "telefon_nur_vorwahl",
-  "mandat_abgelaufen",
-  "mandat_laeuft_bald_ab",
   "mitgliedsnummer_kollision",
   "name_reihenfolge_vertauscht",
   "mehrere_personen_im_datensatz",
@@ -76,7 +74,7 @@ export const CATEGORIES: CategoryMeta[] = [
     label: "Lastschrift ohne SEPA-Mandat",
     description:
       "Beitragspflichtiger Lastschrift-Vertrag (über 0 €), aber weder das Mitglied noch sein Zahler (Familie oder Vertreter) hat ein SEPA-Mandat. Ein Einzug ist so nicht möglich.",
-    severity: "warn",
+    severity: "error",
   },
   {
     id: "fehlende_iban",
@@ -192,20 +190,6 @@ export const CATEGORIES: CategoryMeta[] = [
     description:
       "Telefonnummer enthält nach Entfernen der Sonderzeichen nur eine Vorwahl ohne Anschluss. So ist niemand erreichbar.",
     severity: "warn",
-  },
-  {
-    id: "mandat_abgelaufen",
-    label: "SEPA-Mandat abgelaufen",
-    description:
-      "Aktives Mandat, dessen Gültigkeit abgelaufen ist, während noch ein Lastschrift-Vertrag läuft. Ein Einzug ist nicht zulässig.",
-    severity: "error",
-  },
-  {
-    id: "mandat_laeuft_bald_ab",
-    label: "SEPA-Mandat läuft bald ab",
-    description:
-      "Aktives Mandat, das in den nächsten 90 Tagen abläuft, während ein Lastschrift-Vertrag besteht. Rechtzeitig erneuern.",
-    severity: "info",
   },
   {
     id: "mitgliedsnummer_kollision",
@@ -377,10 +361,6 @@ export const WHERE: Record<CategoryId, string> = {
   // remain (a German area code is 3-5 digits) with no subscriber number.
   telefon_nur_vorwahl: `${ACTIVE} and telefon1 is not null and btrim(telefon1) <> '' and char_length(regexp_replace(telefon1, '[^0-9]', '', 'g')) between 1 and 5`,
   // Active mandate whose validity has already lapsed while a Lastschrift
-  // contract still runs: the next Einzug would be unauthorized.
-  mandat_abgelaufen: `${ACTIVE} and ${ACTIVE_DD_POS} and exists (select 1 from sepa_mandates s where s.member_id = members.id and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null and lower(btrim(coalesce(s.status, ''))) = 'aktiv' and s.gultig_bis is not null and s.gultig_bis::date < current_date)`,
-  // Same, but the mandate still has up to 90 days left: a heads-up to renew.
-  mandat_laeuft_bald_ab: `${ACTIVE} and ${ACTIVE_DD_POS} and exists (select 1 from sepa_mandates s where s.member_id = members.id and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null and lower(btrim(coalesce(s.status, ''))) = 'aktiv' and s.gultig_bis is not null and s.gultig_bis::date >= current_date and s.gultig_bis::date < current_date + interval '90 days')`,
   // Same Mitgliedsnummer on more than one non-deleted record (see migration
   // 0048, which also adds a DB-level partial unique index).
   mitgliedsnummer_kollision:

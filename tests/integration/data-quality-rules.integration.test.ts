@@ -5,7 +5,6 @@ import type { Session } from "~/server/auth/auth";
 import { db } from "~/server/db/client";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { membersTable } from "~/server/db/schema/members";
-import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import type { AppContext } from "~/server/orpc/context";
 import type { CategoryId } from "~/server/orpc/procedures/data-quality";
 import { appRouter } from "~/server/orpc/router";
@@ -33,10 +32,6 @@ function vorstandContext(): AppContext {
   };
 }
 
-const past = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-const soon = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-const farFuture = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000);
-
 describe.skipIf(!onTestDb)("data-quality new rules (integration)", () => {
   const ids: string[] = [];
   let nextAdr = 0;
@@ -59,16 +54,6 @@ describe.skipIf(!onTestDb)("data-quality new rules (integration)", () => {
     await db()
       .insert(contractsTable)
       .values({ memberId, adrNr, vertragNr: `${MARKER}-${adrNr}`, art: 1, ...row });
-  };
-
-  const addMandate = async (
-    memberId: string,
-    adrNr: number,
-    row: Partial<typeof sepaMandatesTable.$inferInsert>,
-  ): Promise<void> => {
-    await db()
-      .insert(sepaMandatesTable)
-      .values({ memberId, adrNr, mandatsNr: `${MARKER}-${adrNr}`, ...row });
   };
 
   // Resolve the member's adrNr (needed for child rows keyed on it).
@@ -145,30 +130,8 @@ describe.skipIf(!onTestDb)("data-quality new rules (integration)", () => {
     await addContract(vbnCtrl, await adrOf(vbnCtrl), { betrag: "12.50" });
     control.vertrag_betrag_null = vbnCtrl;
 
-    // mandat_abgelaufen / mandat_laeuft_bald_ab (need an active DD contract
-    // with a positive Betrag: 0-EUR-Verträge lösen bewusst keinen Treffer aus)
-    const expiredM = await addMember({ memberNo: `${MARKER}-EXP-M` });
-    const expiredAdr = await adrOf(expiredM);
-    await addContract(expiredM, expiredAdr, { isDirectDebit: true, betrag: "60" });
-    await addMandate(expiredM, expiredAdr, {
-      status: "Aktiv",
-      isDeleted: false,
-      gultigBis: past,
-    });
-    match.mandat_abgelaufen = expiredM;
-
-    const soonM = await addMember({ memberNo: `${MARKER}-SOON-M` });
-    const soonAdr = await adrOf(soonM);
-    await addContract(soonM, soonAdr, { isDirectDebit: true, betrag: "60" });
-    await addMandate(soonM, soonAdr, { status: "Aktiv", isDeleted: false, gultigBis: soon });
-    match.mandat_laeuft_bald_ab = soonM;
-
-    const validM = await addMember({ memberNo: `${MARKER}-VALID-M` });
-    const validAdr = await adrOf(validM);
-    await addContract(validM, validAdr, { isDirectDebit: true, betrag: "60" });
-    await addMandate(validM, validAdr, { status: "Aktiv", isDeleted: false, gultigBis: farFuture });
-    control.mandat_abgelaufen = validM;
-    control.mandat_laeuft_bald_ab = validM;
+    // (Es gibt bewusst keine "Mandat abgelaufen"-Prüfung: ein SEPA-Mandat läuft
+    // nicht zu einem Datum ab, daher kein gültig-bis-Check mehr.)
 
     // volljaehrig_eltern_konto (#236): heuristic detection without a formal
     // payer link. An 18+ member with an active DD contract whose abweichender
@@ -241,8 +204,6 @@ describe.skipIf(!onTestDb)("data-quality new rules (integration)", () => {
     "strasse_ohne_hausnummer",
     "dublette_name_ohne_gebdatum",
     "vertrag_betrag_null",
-    "mandat_abgelaufen",
-    "mandat_laeuft_bald_ab",
     "email_mehrfach",
     "volljaehrig_eltern_konto",
   ];
