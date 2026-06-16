@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.101.1",
+    date: "2026-06-16",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Mandate nachtragen: „Kontakt anlegen“ erzeugt keine zweite Beziehung mehr, wenn zum Kontoinhaber schon eine besteht. Die vorhandene Beziehung wird auf den Zahler gehoben und als Vertreter gesetzt, statt eine Dublette anzulegen.",
+      },
+    ],
+  },
+  {
     version: "0.101.0",
     date: "2026-06-16",
     changes: [

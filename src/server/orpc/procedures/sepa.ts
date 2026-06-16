@@ -823,26 +823,68 @@ export const sepaRouter = {
                 eq(relationshipsTable.istVertreter, true),
               ),
             );
-          const [rel] = await tx
-            .insert(relationshipsTable)
-            .values({
-              fromMemberId: minor.id,
-              toMemberId: zahlerId,
-              fromAdrNr: minor.adrNr,
-              toAdrNr: zahlerAdrNr,
-              beziehung: "Zahler",
-              istVertreter: true,
+          // Bestehende Beziehung wiederverwenden statt eine Dublette anzulegen.
+          // Oft liegt schon eine namens-only Beziehung zum Zahler vor (Linear-
+          // Import ohne aufgelöstes Mitglied, im Profil als reiner Name
+          // sichtbar). Die wird auf den Zahler gehoben und als Vertreter
+          // markiert, statt ein zweites, widersprüchliches Beziehungs-Paar
+          // anzulegen.
+          const existingRels = await tx
+            .select({
+              id: relationshipsTable.id,
+              toMemberId: relationshipsTable.toMemberId,
+              nachname: relationshipsTable.nachname,
+              name: relationshipsTable.name,
             })
-            .returning({ id: relationshipsTable.id });
+            .from(relationshipsTable)
+            .where(eq(relationshipsTable.fromMemberId, minor.id));
+          const wantNach = normalizeName(parsed.nachname);
+          const reuse =
+            existingRels.find((r) => r.toMemberId === zahlerId) ??
+            existingRels.find(
+              (r) =>
+                r.toMemberId == null &&
+                !!wantNach &&
+                (normalizeName(r.nachname) === wantNach ||
+                  normalizeName(r.name).includes(wantNach)),
+            );
+
+          let relId: string;
+          if (reuse) {
+            await tx
+              .update(relationshipsTable)
+              .set({
+                toMemberId: zahlerId,
+                toAdrNr: zahlerAdrNr,
+                beziehung: "Zahler",
+                istVertreter: true,
+                updatedAt: new Date(),
+              })
+              .where(eq(relationshipsTable.id, reuse.id));
+            relId = reuse.id;
+          } else {
+            const [rel] = await tx
+              .insert(relationshipsTable)
+              .values({
+                fromMemberId: minor.id,
+                toMemberId: zahlerId,
+                fromAdrNr: minor.adrNr,
+                toAdrNr: zahlerAdrNr,
+                beziehung: "Zahler",
+                istVertreter: true,
+              })
+              .returning({ id: relationshipsTable.id });
+            relId = rel?.id ?? minor.id;
+          }
 
           const auditId = await appendAudit(tx, {
             entityType: "relationship",
-            entityId: rel?.id ?? minor.id,
-            action: "create",
+            entityId: relId,
+            action: reuse ? "update" : "create",
             source: "ui",
             actorId,
             actorEmail,
-            changes: diff(null, {
+            changes: diff(reuse ? { toMemberId: reuse.toMemberId, istVertreter: "false" } : null, {
               fromMemberId: minor.id,
               toMemberId: zahlerId,
               istVertreter: true,
