@@ -41,13 +41,24 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.101.0",
+    date: "2026-06-16",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Datenqualität: Bei vielen Befunden führt jetzt ein „Bearbeiten“ direkt in das Mitglied und springt auf das fehlerhafte Feld. Adresse, PLZ, E-Mail, IBAN, Geburtsdatum und weitere Befunde lassen sich so ohne Suchen korrigieren.",
+      },
+    ],
+  },
+  {
     version: "0.100.1",
     date: "2026-06-16",
     changes: [
       {
         category: "fix",
         description:
-          "Letzte Reste des Mandats-Ablaufs entfernt: Auch der Mandats-Nachtrag wertet ein importiertes „gültig bis\" nicht mehr als Ablauf. Ein aktives, nie widerrufenes Mandat gilt als nutzbar, egal welches alte Datum daran hängt; nur ausdrücklich inaktiv gesetzte Mandate werden reaktiviert.",
+          'Letzte Reste des Mandats-Ablaufs entfernt: Auch der Mandats-Nachtrag wertet ein importiertes „gültig bis" nicht mehr als Ablauf. Ein aktives, nie widerrufenes Mandat gilt als nutzbar, egal welches alte Datum daran hängt; nur ausdrücklich inaktiv gesetzte Mandate werden reaktiviert.',
       },
     ],
   },
