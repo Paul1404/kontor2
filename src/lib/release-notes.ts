@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.101.2",
+    date: "2026-06-17",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Mandate nachtragen: Besteht zum Kontoinhaber schon eine Beziehung, heißt die Aktion jetzt „… als Vertreter“ statt „Kontakt anlegen“ und übernimmt die vorhandene Beziehung, statt eine Dublette anzulegen.",
+      },
+    ],
+  },
+  {
     version: "0.101.1",
     date: "2026-06-16",
     changes: [

@@ -72,6 +72,13 @@ type NachtragKandidat = {
     name: string;
     vorname: string;
     nachname: string;
+    /**
+     * Es existiert bereits eine namens-only Beziehung zu dieser Person (Linear-
+     * verkn ohne aufgelöstes Mitglied). Dann ist die Aktion kein Anlegen aus
+     * dem Nichts, sondern das Übernehmen der vorhandenen Beziehung als
+     * Vertreter; die UI beschriftet sie entsprechend.
+     */
+    viaRelationship: boolean;
   };
 };
 
@@ -292,6 +299,37 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
     }
   }
 
+  // Namens-only Beziehungen (Linear-verkn ohne aufgelöstes Mitglied, im Profil
+  // nur als Name sichtbar). Die können nicht direkt als Vertreter übernommen
+  // werden (kein Mitglied dahinter), aber sie verraten, dass schon eine
+  // Beziehung zum Kontoinhaber besteht. Dann ist die Kontakt-Aktion ein
+  // Übernehmen statt einer Neuanlage aus dem Nichts.
+  const nameOnlyByMinor = new Map<
+    string,
+    Array<{ nachname: string | null; name: string | null }>
+  >();
+  if (minorIds.length > 0) {
+    const nameOnlyRows = await db
+      .select({
+        fromMemberId: relationshipsTable.fromMemberId,
+        nachname: relationshipsTable.nachname,
+        name: relationshipsTable.name,
+      })
+      .from(relationshipsTable)
+      .where(
+        and(
+          inArray(relationshipsTable.fromMemberId, minorIds),
+          sql`${relationshipsTable.toMemberId} is null`,
+          or(sql`${relationshipsTable.datBis} is null`, sql`${relationshipsTable.datBis} > now()`),
+        ),
+      );
+    for (const r of nameOnlyRows) {
+      const list = nameOnlyByMinor.get(r.fromMemberId) ?? [];
+      list.push({ nachname: r.nachname, name: r.name });
+      nameOnlyByMinor.set(r.fromMemberId, list);
+    }
+  }
+
   for (const m of minorSelf) {
     const z = zahlerById.get(m.id);
     if (!z) continue;
@@ -323,10 +361,20 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
         ? (() => {
             const parsed = parsePayerName(m.kontoinhaber, m.nachname);
             if (!parsed.nachname && !parsed.vorname) return undefined;
+            // Gibt es schon eine namens-only Beziehung zu dieser Person? Dann
+            // übernimmt die Aktion sie, statt aus dem Nichts anzulegen.
+            const wantNach = normalizeName(parsed.nachname);
+            const viaRelationship = (nameOnlyByMinor.get(m.id) ?? []).some(
+              (r) =>
+                !!wantNach &&
+                (normalizeName(r.nachname) === wantNach ||
+                  normalizeName(r.name).includes(wantNach)),
+            );
             return {
               name: [parsed.nachname, parsed.vorname].filter(Boolean).join(", "),
               vorname: parsed.vorname,
               nachname: parsed.nachname,
+              viaRelationship,
             };
           })()
         : undefined;
@@ -823,26 +871,68 @@ export const sepaRouter = {
                 eq(relationshipsTable.istVertreter, true),
               ),
             );
-          const [rel] = await tx
-            .insert(relationshipsTable)
-            .values({
-              fromMemberId: minor.id,
-              toMemberId: zahlerId,
-              fromAdrNr: minor.adrNr,
-              toAdrNr: zahlerAdrNr,
-              beziehung: "Zahler",
-              istVertreter: true,
+          // Bestehende Beziehung wiederverwenden statt eine Dublette anzulegen.
+          // Oft liegt schon eine namens-only Beziehung zum Zahler vor (Linear-
+          // Import ohne aufgelöstes Mitglied, im Profil als reiner Name
+          // sichtbar). Die wird auf den Zahler gehoben und als Vertreter
+          // markiert, statt ein zweites, widersprüchliches Beziehungs-Paar
+          // anzulegen.
+          const existingRels = await tx
+            .select({
+              id: relationshipsTable.id,
+              toMemberId: relationshipsTable.toMemberId,
+              nachname: relationshipsTable.nachname,
+              name: relationshipsTable.name,
             })
-            .returning({ id: relationshipsTable.id });
+            .from(relationshipsTable)
+            .where(eq(relationshipsTable.fromMemberId, minor.id));
+          const wantNach = normalizeName(parsed.nachname);
+          const reuse =
+            existingRels.find((r) => r.toMemberId === zahlerId) ??
+            existingRels.find(
+              (r) =>
+                r.toMemberId == null &&
+                !!wantNach &&
+                (normalizeName(r.nachname) === wantNach ||
+                  normalizeName(r.name).includes(wantNach)),
+            );
+
+          let relId: string;
+          if (reuse) {
+            await tx
+              .update(relationshipsTable)
+              .set({
+                toMemberId: zahlerId,
+                toAdrNr: zahlerAdrNr,
+                beziehung: "Zahler",
+                istVertreter: true,
+                updatedAt: new Date(),
+              })
+              .where(eq(relationshipsTable.id, reuse.id));
+            relId = reuse.id;
+          } else {
+            const [rel] = await tx
+              .insert(relationshipsTable)
+              .values({
+                fromMemberId: minor.id,
+                toMemberId: zahlerId,
+                fromAdrNr: minor.adrNr,
+                toAdrNr: zahlerAdrNr,
+                beziehung: "Zahler",
+                istVertreter: true,
+              })
+              .returning({ id: relationshipsTable.id });
+            relId = rel?.id ?? minor.id;
+          }
 
           const auditId = await appendAudit(tx, {
             entityType: "relationship",
-            entityId: rel?.id ?? minor.id,
-            action: "create",
+            entityId: relId,
+            action: reuse ? "update" : "create",
             source: "ui",
             actorId,
             actorEmail,
-            changes: diff(null, {
+            changes: diff(reuse ? { toMemberId: reuse.toMemberId, istVertreter: "false" } : null, {
               fromMemberId: minor.id,
               toMemberId: zahlerId,
               istVertreter: true,
