@@ -27,36 +27,13 @@ import { cn } from "~/lib/cn";
 import { triggerDownload, triggerDownloadBase64 } from "~/lib/download";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
+// Type-only import (erased at build): keep the cockpit's CategoryId in lockstep
+// with the server registry instead of a hand-maintained union that drifts.
+import type { CategoryId } from "~/server/orpc/procedures/data-quality";
 
 export const Route = createFileRoute("/app/datenqualitaet")({
   component: DatenqualitaetPage,
 });
-
-type CategoryId =
-  | "lastschrift_ohne_mandat"
-  | "fehlende_iban"
-  | "fehlende_adresse"
-  | "name_fehlt"
-  | "aktiv_ohne_vertrag"
-  | "minderjaehrig_ohne_vertretung"
-  | "geburtsdatum_unplausibel"
-  | "eintritt_nach_austritt"
-  | "austritt_offene_vertraege"
-  | "fehlende_email"
-  | "email_ungueltig"
-  | "email_mehrfach"
-  | "plz_ungueltig"
-  | "geschlecht_unbekannt"
-  | "vertrag_ohne_beitragsart"
-  | "mahnsperre_gesetzt"
-  | "moegliche_dubletten"
-  | "telefon_nur_vorwahl"
-  | "mitgliedsnummer_kollision"
-  | "name_reihenfolge_vertauscht"
-  | "mehrere_personen_im_datensatz"
-  | "strasse_ohne_hausnummer"
-  | "vertrag_betrag_null"
-  | "dublette_name_ohne_gebdatum";
 
 type Severity = "error" | "warn" | "info";
 type SeverityFilter = "alle" | Severity;
@@ -677,6 +654,12 @@ type FindingItem = ListItem & { id: string; reference: string; name: string };
 const INLINE_FIXABLE = new Set<CategoryId>(["vertrag_betrag_null"]);
 
 /**
+ * Categories with a deterministic one-click correction (server applies it after
+ * re-verifying the finding). Must mirror AUTO_FIX_CATEGORIES on the server.
+ */
+const AUTO_FIXABLE = new Set<CategoryId>(["name_reihenfolge_vertauscht"]);
+
+/**
  * One finding row: a link to the member plus a "Geprüft" action that opens an
  * inline reason field. Acknowledging moves the row into the "Geprüft" sublist
  * and drops it from the count.
@@ -692,6 +675,7 @@ function FindingRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [fixing, setFixing] = useState(false);
+  const [confirmFix, setConfirmFix] = useState(false);
   const [reason, setReason] = useState("");
   const ack = useMutation({
     mutationFn: () =>
@@ -708,6 +692,15 @@ function FindingRow({
     },
     onError: (e: Error) => toast.error("Konnte nicht markieren", { description: e.message }),
   });
+  const autoFix = useMutation({
+    mutationFn: () => orpc.dataQuality.applyFix({ category: id, memberId: item.id }),
+    onSuccess: (res) => {
+      setConfirmFix(false);
+      toast.success("Korrigiert", { description: `${res.before} → ${res.after}` });
+      onChanged();
+    },
+    onError: (e: Error) => toast.error("Korrektur fehlgeschlagen", { description: e.message }),
+  });
 
   return (
     <li>
@@ -723,6 +716,17 @@ function FindingRow({
             {detailFor(id, item)}
           </span>
         </Link>
+        {AUTO_FIXABLE.has(id) ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label="Automatisch korrigieren"
+            title="Automatisch korrigieren"
+            onClick={() => setConfirmFix(true)}
+          >
+            <Wrench className="size-4" />
+          </Button>
+        ) : null}
         {INLINE_FIXABLE.has(id) ? (
           <Button
             size="sm"
@@ -744,6 +748,15 @@ function FindingRow({
           <CheckCircle2 className="size-4" />
         </Button>
       </div>
+      <ConfirmDialog
+        open={confirmFix}
+        onOpenChange={setConfirmFix}
+        title="Vor- und Nachname tauschen?"
+        description={`Bei ${item.name} werden Vor- und Nachname getauscht. Die Änderung steht in der Mitglieder-Historie und lässt sich dort zurücknehmen.`}
+        confirmLabel="Tauschen"
+        loading={autoFix.isPending}
+        onConfirm={() => autoFix.mutate()}
+      />
       {fixing ? <ContractFixList memberId={item.id} onChanged={onChanged} /> : null}
       {editing ? (
         <div className="flex flex-wrap items-center gap-2 border-t border-border bg-muted/30 px-4 py-2">

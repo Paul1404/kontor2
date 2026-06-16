@@ -41,13 +41,24 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.100.0",
+    date: "2026-06-16",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Datenqualität: Befunde mit eindeutiger Lösung lassen sich jetzt direkt korrigieren. Den Anfang macht die vertauschte Namensreihenfolge. Ein Klick auf „Korrigieren\" tauscht Vor- und Nachname; vorher wird geprüft, ob der Befund noch besteht, und die Änderung steht in der Mitglieder-Historie und lässt sich dort zurücknehmen.",
+      },
+    ],
+  },
+  {
     version: "0.99.8",
     date: "2026-06-16",
     changes: [
       {
         category: "fix",
         description:
-          "SEPA-Mandate laufen nicht mehr ab. Ein Mandat gilt unbefristet (es erlischt erst nach 36 Monaten ohne Nutzung), daher wird das alte „gültig bis\"-Datum aus Linear nicht mehr als Ablauf gewertet. Wichtig: Mitglieder mit einem solchen Altmandat wurden bisher beim Beitragslauf übersprungen und werden jetzt wieder korrekt eingezogen. Die Datenqualitäts-Prüfungen „SEPA-Mandat abgelaufen\" und „läuft bald ab\" entfallen. Stattdessen ist „Lastschrift ohne SEPA-Mandat\" jetzt ein Fehler, denn nur ein fehlendes Mandat verhindert den Einzug wirklich.",
+          'SEPA-Mandate laufen nicht mehr ab. Ein Mandat gilt unbefristet (es erlischt erst nach 36 Monaten ohne Nutzung), daher wird das alte „gültig bis"-Datum aus Linear nicht mehr als Ablauf gewertet. Wichtig: Mitglieder mit einem solchen Altmandat wurden bisher beim Beitragslauf übersprungen und werden jetzt wieder korrekt eingezogen. Die Datenqualitäts-Prüfungen „SEPA-Mandat abgelaufen" und „läuft bald ab" entfallen. Stattdessen ist „Lastschrift ohne SEPA-Mandat" jetzt ein Fehler, denn nur ein fehlendes Mandat verhindert den Einzug wirklich.',
       },
     ],
   },

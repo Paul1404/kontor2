@@ -1,5 +1,7 @@
+import { ORPCError } from "@orpc/server";
 import { and, desc, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { appendAudit, diff } from "~/server/audit/log";
 import type { DB } from "~/server/db/client";
 import { dataQualityExceptionsTable } from "~/server/db/schema/data-quality-exceptions";
 import { membersTable } from "~/server/db/schema/members";
@@ -8,6 +10,8 @@ import { memberDisplayName, memberRef } from "~/server/domain/member";
 import { type CsvColumn, toCsv } from "~/server/lib/csv";
 import { buildDataQualityWorkbook } from "~/server/lib/xlsx-data-quality";
 import { vorstandProc } from "~/server/orpc/base";
+import { invalidateMemberCaches } from "~/server/search/cache";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 /**
  * Datenqualität: surfaces actionable data problems in the member base so the
@@ -409,6 +413,66 @@ export function activeWhere(category: CategoryId): string {
 /** Cap the drill-down so a pathological dataset cannot return everything. */
 const LIST_LIMIT = 500;
 
+/**
+ * Categories with a deterministic one-click fix. A category is AUTO only when
+ * the corrected value can be computed with certainty from the member's own
+ * data. Most checks need operator input (the value is missing or ambiguous) and
+ * are handled by editing the member, not here. New AUTO fixes plug into
+ * `computeAutoFix` below.
+ */
+export const AUTO_FIX_CATEGORIES = ["name_reihenfolge_vertauscht"] as const;
+
+export type AutoFixResult =
+  | { patch: Record<string, string>; before: string; after: string }
+  | { error: string };
+
+/**
+ * Pure: the field patch for a deterministic fix, or an error when the fix does
+ * not apply to the member's current values. Kept pure so the transform (and its
+ * refuse cases) are unit-testable; the procedure handles re-verify, audit and
+ * persistence.
+ */
+export function computeAutoFix(
+  category: CategoryId,
+  member: { vorname: string | null; nachname: string | null },
+): AutoFixResult {
+  switch (category) {
+    case "name_reihenfolge_vertauscht": {
+      // The detector found `nachname` is a common Vorname and `vorname` is not,
+      // so the two are almost certainly swapped. Swap them back. Both must be
+      // present, or there is nothing to reorder.
+      const vorname = member.vorname?.trim() ?? "";
+      const nachname = member.nachname?.trim() ?? "";
+      if (!vorname || !nachname) {
+        return { error: "Vor- und Nachname müssen beide gefüllt sein." };
+      }
+      return {
+        patch: { vorname: nachname, nachname: vorname },
+        before: `${vorname} ${nachname}`,
+        after: `${nachname} ${vorname}`,
+      };
+    }
+    default:
+      return { error: "Für diese Prüfung gibt es keine automatische Korrektur." };
+  }
+}
+
+/**
+ * Re-check that a finding still holds for one member by running the category's
+ * own predicate scoped to that member. `category` is a fixed picklist (safe to
+ * interpolate); `memberId` is bound as a parameter.
+ */
+async function memberStillMatches(
+  db: DB,
+  category: CategoryId,
+  memberId: string,
+): Promise<boolean> {
+  const res = (await db.execute(
+    sql`select exists(select 1 from members where id = ${memberId}::uuid and (${sql.raw(activeWhere(category))})) as ok`,
+  )) as unknown as Array<{ ok: boolean }>;
+  return res[0]?.ok === true;
+}
+
 type MemberRow = {
   id: string;
   member_no: string | null;
@@ -638,6 +702,76 @@ export const dataQualityRouter = {
           },
         });
       return { ok: true };
+    }),
+
+  /**
+   * Einen Befund automatisch korrigieren (nur die deterministischen Prüfungen
+   * in AUTO_FIX_CATEGORIES, z. B. vertauschte Namensreihenfolge). Prüft vor dem
+   * Anwenden, dass der Befund noch besteht (die Liste des Vorstands kann
+   * veraltet sein), schreibt einen Audit-Eintrag und einen Snapshot (damit die
+   * Änderung rückholbar bleibt) und leert die Caches. Gibt Vorher/Nachher für
+   * die Bestätigung zurück.
+   */
+  applyFix: vorstandProc
+    .input(
+      v.object({
+        category: v.picklist(CATEGORY_IDS),
+        memberId: v.pipe(v.string(), v.uuid()),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      if (!(AUTO_FIX_CATEGORIES as readonly string[]).includes(input.category)) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Für diese Prüfung gibt es keine automatische Korrektur.",
+        });
+      }
+      if (!(await memberStillMatches(context.db, input.category, input.memberId))) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Der Befund besteht nicht mehr. Bitte die Liste aktualisieren.",
+        });
+      }
+      const [member] = await context.db
+        .select({ vorname: membersTable.vorname, nachname: membersTable.nachname })
+        .from(membersTable)
+        .where(eq(membersTable.id, input.memberId))
+        .limit(1);
+      if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+
+      const fix = computeAutoFix(input.category, member);
+      if ("error" in fix) {
+        throw new ORPCError("PRECONDITION_FAILED", { message: fix.error });
+      }
+
+      await context.db.transaction(async (tx) => {
+        await tx
+          .update(membersTable)
+          .set({ ...fix.patch, updatedAt: new Date() } as never)
+          .where(eq(membersTable.id, input.memberId));
+        const changes = {
+          ...diff({ vorname: member.vorname, nachname: member.nachname }, fix.patch),
+          // Mark the edit as a data-quality auto-fix in the audit trail without
+          // a dedicated audit_action enum value.
+          __datenqualitaet: { before: null, after: input.category },
+        };
+        const auditId = await appendAudit(tx, {
+          entityType: "member",
+          entityId: input.memberId,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes,
+          requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, input.memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
+        });
+      });
+      await invalidateMemberCaches(context.tenant.key);
+      return { ok: true, before: fix.before, after: fix.after };
     }),
 
   /** Eine Ausnahme zurücknehmen: der Befund taucht wieder in der Liste auf. */
