@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.101.3",
+    date: "2026-06-17",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Mandate nachtragen: Ein verknüpfter Erwachsener wird auch dann als Vertreter vorgeschlagen, wenn sein Geburtsdatum (aus dem Import) fälschlich das des Kindes ist. Passt der Name zum Kontoinhaber, sticht das den Geburtsdatum-Check.",
+      },
+    ],
+  },
+  {
     version: "0.101.2",
     date: "2026-06-17",
     changes: [
