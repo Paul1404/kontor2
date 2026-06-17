@@ -55,6 +55,15 @@ const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
   import_camt_returns: "vorstand",
   fee_run_prenotify_info: "vorstand",
   send_prenotifications: "vorstand",
+  // Linear SQL archive (read)
+  archive_list_versions: "vorstand",
+  archive_overview: "vorstand",
+  archive_relationships: "vorstand",
+  archive_schema_diff: "vorstand",
+  archive_describe_table: "admin",
+  archive_table_rows: "admin",
+  archive_search: "admin",
+  archive_column_values: "admin",
 };
 
 const MUTATION_TOOLS = [

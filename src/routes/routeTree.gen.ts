@@ -35,6 +35,7 @@ import { Route as AppImportRouteImport } from './app/import'
 import { Route as AppFamilienRouteImport } from './app/familien'
 import { Route as AppDatenqualitaetRouteImport } from './app/datenqualitaet'
 import { Route as AppAuditRouteImport } from './app/audit'
+import { Route as AppArchiveRouteImport } from './app/archive'
 import { Route as ApiMcpRouteImport } from './api/mcp'
 import { Route as ApiHealthRouteImport } from './api/health'
 import { Route as AntragStatusRouteImport } from './antrag/status'
@@ -214,6 +215,11 @@ const AppDatenqualitaetRoute = AppDatenqualitaetRouteImport.update({
 const AppAuditRoute = AppAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppArchiveRoute = AppArchiveRouteImport.update({
+  id: '/archive',
+  path: '/archive',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const ApiMcpRoute = ApiMcpRouteImport.update({
@@ -497,6 +503,7 @@ export interface FileRoutesByFullPath {
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
+  '/app/archive': typeof AppArchiveRoute
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/familien': typeof AppFamilienRoute
@@ -571,6 +578,7 @@ export interface FileRoutesByTo {
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
+  '/app/archive': typeof AppArchiveRoute
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/familien': typeof AppFamilienRoute
@@ -650,6 +658,7 @@ export interface FileRoutesById {
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
+  '/app/archive': typeof AppArchiveRoute
   '/app/audit': typeof AppAuditRoute
   '/app/datenqualitaet': typeof AppDatenqualitaetRoute
   '/app/familien': typeof AppFamilienRoute
@@ -730,6 +739,7 @@ export interface FileRouteTypes {
     | '/antrag/status'
     | '/api/health'
     | '/api/mcp'
+    | '/app/archive'
     | '/app/audit'
     | '/app/datenqualitaet'
     | '/app/familien'
@@ -804,6 +814,7 @@ export interface FileRouteTypes {
     | '/antrag/status'
     | '/api/health'
     | '/api/mcp'
+    | '/app/archive'
     | '/app/audit'
     | '/app/datenqualitaet'
     | '/app/familien'
@@ -882,6 +893,7 @@ export interface FileRouteTypes {
     | '/antrag/status'
     | '/api/health'
     | '/api/mcp'
+    | '/app/archive'
     | '/app/audit'
     | '/app/datenqualitaet'
     | '/app/familien'
@@ -1153,6 +1165,13 @@ declare module '@tanstack/react-router' {
       path: '/audit'
       fullPath: '/app/audit'
       preLoaderRoute: typeof AppAuditRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/archive': {
+      id: '/app/archive'
+      path: '/archive'
+      fullPath: '/app/archive'
+      preLoaderRoute: typeof AppArchiveRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/api/mcp': {
@@ -1527,6 +1546,7 @@ const AntragRouteRouteWithChildren = AntragRouteRoute._addFileChildren(
 )
 
 interface AppRouteRouteChildren {
+  AppArchiveRoute: typeof AppArchiveRoute
   AppAuditRoute: typeof AppAuditRoute
   AppDatenqualitaetRoute: typeof AppDatenqualitaetRoute
   AppFamilienRoute: typeof AppFamilienRoute
@@ -1576,6 +1596,7 @@ interface AppRouteRouteChildren {
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
+  AppArchiveRoute: AppArchiveRoute,
   AppAuditRoute: AppAuditRoute,
   AppDatenqualitaetRoute: AppDatenqualitaetRoute,
   AppFamilienRoute: AppFamilienRoute,

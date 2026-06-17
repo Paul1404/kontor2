@@ -41,13 +41,30 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
-    version: "0.103.0",
+    version: "0.104.0",
     date: "2026-06-17",
     changes: [
       {
         category: "feature",
         description:
           "KI-Zugriff: Der Beitragslauf inklusive SEPA-Einzug ist jetzt über die Schnittstelle steuerbar. Vorschau, Lauf ausführen, pain.008 abrufen, Sollstellung stornieren, Rücklastschrift erfassen und Wiedereinzug. Jede Aktion wird wie im Programm protokolliert.",
+      },
+    ],
+  },
+  {
+    version: "0.103.0",
+    date: "2026-06-17",
+    title: "SQL-Archiv",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neues SQL-Archiv: Linear-Webverein-Dumps lassen sich versioniert hochladen, getrennt von den Live-Daten. Jeder Upload wird eine eigene Version, die höchste ist die aktuelle. Die alte Datenbank wird komplett eingelesen und ist durchsuchbar. Tabellen, Spalten, Typen und Beziehungen werden für die Analyse aufbereitet.",
+      },
+      {
+        category: "feature",
+        description:
+          "Die Archiv-Analyse ist auch über die KI-Schnittstelle (MCP) verfügbar: Versionen auflisten, Tabellen beschreiben, suchen, Werteverteilungen ansehen, Beziehungen erkennen und Schema-Versionen vergleichen.",
       },
     ],
   },

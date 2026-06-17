@@ -30,6 +30,13 @@ on Railway via Dockerfile.
 - `src/server/pdf/` -- `@react-pdf/renderer` documents (Mahnung, DSGVO-Auskunft,
   Bestandserhebung) and the `renderer.ts` wrapper.
 - `src/components/forms/` -- the big member editing surface.
+- `src/server/importer/` vs `src/server/archive/` -- two separate paths for the
+  same Linear `.sql` dump. The importer normalises a few known tables into the
+  live domain schema. The archive (`sql-analyzer.ts` + `ingest-archive.ts`,
+  procedures in `procedures/archive.ts`, tables `linear_archive_*`) ingests the
+  WHOLE dump generically and versioned, isolated from live data, for search and
+  reverse-engineering. Both reuse the tokenizer's `parseValues`. Archive analysis
+  is also exposed as `archive_*` MCP tools; archive upload is admin-only.
 
 ## Domain notes that save time
 
