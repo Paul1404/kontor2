@@ -28,6 +28,11 @@ import { appRouter } from "~/server/orpc/router";
  * import.*, settings.*, DSGVO erasure, fee/Sollstellung runs (bulk money
  * movement), and all PDF/CSV/XML download procedures (binary outputs do not
  * fit MCP text results).
+ *
+ * The versioned Linear SQL archive (archive.*) IS exposed read-only for
+ * reverse-engineering and analysis (list versions, describe tables, search,
+ * value distributions, relationships, schema diff); uploading a new archive
+ * version stays UI/admin-only, like import.*.
  */
 export type McpTool = {
   /** snake_case, English. */
@@ -67,6 +72,15 @@ const AgeInput = v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.max
  * the same key returns the first call's result instead of creating a duplicate.
  */
 const IdempotencyKeyInput = v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(200)));
+
+/**
+ * Selects an archive version for the archive_* tools. Give a `version` number
+ * (from archive_list_versions) or a `versionId`; omit both for the latest.
+ */
+const VersionSelector = {
+  versionId: v.optional(v.string()),
+  version: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+};
 
 /**
  * Subset of the member Stammdaten allow-list (members.ts StammdatenInput)
@@ -458,6 +472,90 @@ const TOOLS: McpTool[] = [
     minRole: "admin",
     input: v.object({ winnerId: v.string(), loserId: v.string(), confirm: v.literal(true) }),
     execute: (context, input) => call(appRouter.members.merge, input, { context }),
+  }),
+  // ---- Linear SQL archive (read / reverse-engineering) ----
+  defineTool({
+    name: "archive_list_versions",
+    description:
+      "List versions of the isolated Linear Webverein SQL archive, newest first. Each upload of a Linear .sql dump becomes a version; the highest version number is the latest. Returns filename, table count, row count, status and upload metadata. Use this first, then pass a `version` (or omit it for latest) to the other archive_* tools.",
+    minRole: "vorstand",
+    input: v.object({}),
+    execute: (context) => call(appRouter.archive.listVersions, undefined, { context }),
+  }),
+  defineTool({
+    name: "archive_overview",
+    description:
+      "List the tables of one archived dump version with their row and column counts and primary key. Pass `version` (number) or `versionId`, or omit both for the latest version. The entry point for reverse-engineering the legacy database.",
+    minRole: "vorstand",
+    input: v.object(VersionSelector),
+    execute: (context, input) => call(appRouter.archive.overview, input, { context }),
+  }),
+  defineTool({
+    name: "archive_relationships",
+    description:
+      "Inferred relationships in an archived dump version: columns whose name appears in more than one table (e.g. AdrNr, MITGLNR), ordered by how many tables share them, plus each table's primary key. Use to reconstruct how the legacy tables join. Pass `version`/`versionId` or omit for latest.",
+    minRole: "vorstand",
+    input: v.object(VersionSelector),
+    execute: (context, input) => call(appRouter.archive.relationships, input, { context }),
+  }),
+  defineTool({
+    name: "archive_schema_diff",
+    description:
+      "Compare the schema of two archived dump versions: tables and columns added or removed, and columns whose declared type changed. Pass fromVersion and toVersion (version numbers from archive_list_versions).",
+    minRole: "vorstand",
+    input: v.object({
+      fromVersion: v.pipe(v.number(), v.integer(), v.minValue(1)),
+      toVersion: v.pipe(v.number(), v.integer(), v.minValue(1)),
+    }),
+    execute: (context, input) => call(appRouter.archive.schemaDiff, input, { context }),
+  }),
+  defineTool({
+    name: "archive_describe_table",
+    description:
+      "Reverse-engineer one table in an archived dump version: the verbatim CREATE TABLE, every column with its declared MySQL type, nullability, default and key flags, plus per-column statistics (null count, distinct count, min/max and sample values). Pass tableName and `version`/`versionId` (omit for latest). Contains legacy personal data, so admin only.",
+    minRole: "admin",
+    input: v.object({ ...VersionSelector, tableName: v.pipe(v.string(), v.minLength(1)) }),
+    execute: (context, input) => call(appRouter.archive.describeTable, input, { context }),
+  }),
+  defineTool({
+    name: "archive_table_rows",
+    description:
+      "Read paginated rows of one table in an archived dump version, optionally filtered by a free-text query that matches any value in the row. Pass tableName, optional q, page (1-based) and pageSize (max 200), and `version`/`versionId` (omit for latest). Contains legacy personal data, so admin only.",
+    minRole: "admin",
+    input: v.object({
+      ...VersionSelector,
+      tableName: v.pipe(v.string(), v.minLength(1)),
+      q: v.optional(v.nullable(v.string())),
+      page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+      pageSize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))),
+    }),
+    execute: (context, input) => call(appRouter.archive.tableRows, input, { context }),
+  }),
+  defineTool({
+    name: "archive_search",
+    description:
+      "Free-text search across every table of an archived dump version; matches any value in any row. Optionally restrict to one tableName. Returns the matching rows with their table and row index. Pass q, optional tableName, limit (max 200), and `version`/`versionId` (omit for latest). Contains legacy personal data, so admin only.",
+    minRole: "admin",
+    input: v.object({
+      ...VersionSelector,
+      q: v.pipe(v.string(), v.trim(), v.minLength(1)),
+      tableName: v.optional(v.nullable(v.string())),
+      limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))),
+    }),
+    execute: (context, input) => call(appRouter.archive.search, input, { context }),
+  }),
+  defineTool({
+    name: "archive_column_values",
+    description:
+      "Value frequency (group-by count) of one column in an archived table, ordered by count. Reveals codes, flags and enum-like fields when reverse-engineering. Pass tableName, column, limit (max 200), and `version`/`versionId` (omit for latest). Contains legacy personal data, so admin only.",
+    minRole: "admin",
+    input: v.object({
+      ...VersionSelector,
+      tableName: v.pipe(v.string(), v.minLength(1)),
+      column: v.pipe(v.string(), v.minLength(1)),
+      limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))),
+    }),
+    execute: (context, input) => call(appRouter.archive.columnValues, input, { context }),
   }),
 ];
 
