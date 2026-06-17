@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.105.1",
+    date: "2026-06-18",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Beitragslauf: Ausführen schlug fehl, weil das Fälligkeitsdatum beim Aktualisieren der Mandatsnutzung in einem Format an die Datenbank ging, das sie ablehnte. Lauf und Wiedereinzug laufen jetzt sauber durch.",
+      },
+    ],
+  },
+  {
     version: "0.105.0",
     date: "2026-06-17",
     changes: [
