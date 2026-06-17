@@ -118,6 +118,13 @@ export type PreviewParams = {
   billingYear: number;
   falligkeitsdatum: Date;
   mandateOverrides?: Record<string, string>; // contractId -> mandateId
+  /**
+   * Restrict the run to these billed member ids. Used for a targeted
+   * re-collection (e.g. failed direct debits + members the engine missed),
+   * so the file carries exactly the chosen people and nothing else. Empty or
+   * omitted = the normal club-wide run.
+   */
+  memberIds?: string[];
 };
 
 /**
@@ -127,6 +134,7 @@ export type PreviewParams = {
  */
 export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise<Preview> {
   const { billingYear, mandateOverrides = {} } = params;
+  const memberIdFilter = params.memberIds && params.memberIds.length > 0 ? params.memberIds : null;
   const yearStart = new Date(Date.UTC(billingYear, 0, 1));
   const yearEnd = new Date(Date.UTC(billingYear, 11, 31, 23, 59, 59));
 
@@ -160,6 +168,8 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
         // Exclude soft-deleted members. The legacy Linear `geloscht` flag is
         // folded into the app's single `deletedAt`.
         memberNotDeleted(),
+        // Targeted re-collection: restrict to the chosen billed members.
+        memberIdFilter ? inArray(membersTable.id, memberIdFilter) : undefined,
         // Use Drizzle's typed operators (not raw `sql`) so the timestamp
         // columns' encoder maps the JS Date to the format postgres-js expects.
         // A raw Date interpolated into `sql` reaches the driver unconverted and
