@@ -470,6 +470,13 @@
       "when": 1781469464111,
       "tag": "0066_skinny_miss_america",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1781726337462,
+      "tag": "0067_wealthy_smiling_tiger",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Clock,
   Coins,
+  Database,
   FileBarChart,
   FileClock,
   FileLock2,
@@ -135,6 +136,12 @@ const SECTIONS: NavSection[] = [
         to: "/app/import",
         label: "Datenimport",
         icon: <FileSpreadsheet className="size-[18px]" />,
+        adminOnly: true,
+      },
+      {
+        to: "/app/archive",
+        label: "SQL-Archiv",
+        icon: <Database className="size-[18px]" />,
         adminOnly: true,
       },
       {
