@@ -449,7 +449,7 @@ export const feeRunsRouter = {
           .update(sepaMandatesTable)
           .set({
             letzteVerwendung: falligkeitsdatum,
-            ersteVerwendung: sql`coalesce(${sepaMandatesTable.ersteVerwendung}, ${falligkeitsdatum})`,
+            ersteVerwendung: sql`coalesce(${sepaMandatesTable.ersteVerwendung}, ${falligkeitsdatum.toISOString()}::timestamp)`,
             updatedAt: new Date(),
           })
           .where(inArray(sepaMandatesTable.id, [...usedMandateIdSet]));
@@ -851,7 +851,7 @@ export const feeRunsRouter = {
             .update(sepaMandatesTable)
             .set({
               letzteVerwendung: falligkeitsdatum,
-              ersteVerwendung: sql`coalesce(${sepaMandatesTable.ersteVerwendung}, ${falligkeitsdatum})`,
+              ersteVerwendung: sql`coalesce(${sepaMandatesTable.ersteVerwendung}, ${falligkeitsdatum.toISOString()}::timestamp)`,
               updatedAt: new Date(),
             })
             .where(inArray(sepaMandatesTable.id, [...usedMandateIds]));
