@@ -38,6 +38,24 @@ const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
   update_contract: "vorstand",
   create_sepa_mandate: "vorstand",
   merge_members: "admin",
+  // Beitragslauf & SEPA-Einzug
+  preview_fee_run: "vorstand",
+  simulate_fee_run: "vorstand",
+  commit_fee_run: "vorstand",
+  get_fee_run: "readonly",
+  get_fee_run_xml: "vorstand",
+  cancel_fee_run: "vorstand",
+  cancel_sollstellung: "vorstand",
+  list_return_candidates: "vorstand",
+  record_sepa_return: "vorstand",
+  list_sepa_returns: "readonly",
+  list_recollect_candidates: "vorstand",
+  recollect_returns: "vorstand",
+  preview_camt_returns: "vorstand",
+  import_camt_returns: "vorstand",
+  fee_run_prenotify_info: "vorstand",
+  send_prenotifications: "vorstand",
+  // Linear SQL archive (read)
   archive_list_versions: "vorstand",
   archive_overview: "vorstand",
   archive_relationships: "vorstand",
@@ -59,6 +77,13 @@ const MUTATION_TOOLS = [
   "update_contract",
   "create_sepa_mandate",
   "merge_members",
+  "commit_fee_run",
+  "cancel_fee_run",
+  "cancel_sollstellung",
+  "record_sepa_return",
+  "recollect_returns",
+  "import_camt_returns",
+  "send_prenotifications",
 ];
 
 describe("mcp tool registry", () => {
