@@ -21,13 +21,15 @@ import { appRouter } from "~/server/orpc/router";
  * single source for both runtime validation and the JSON Schema advertised in
  * `tools/list`.
  *
- * Bank details (IBAN/BIC), SEPA mandates, contracts and legal-representative
- * fields ARE exposed as curated write tools so the Datenqualitaet findings can
- * be fixed over MCP; each delegates to its vorstand procedure and is audited.
- * Deliberately still NOT exposed: dangerZone.* (incl. any member merge),
- * import.*, settings.*, DSGVO erasure, fee/Sollstellung runs (bulk money
- * movement), and all PDF/CSV/XML download procedures (binary outputs do not
- * fit MCP text results).
+ * Bank details (IBAN/BIC), SEPA mandates, contracts, legal-representative
+ * fields, member merge (admin) AND the full Beitragslauf / SEPA-Einzug cycle
+ * (fee-run preview/simulate/commit, pain.008 XML, Sollstellung-Storno,
+ * Rücklastschrift erfassen, Wiedereinzug, Vorabankündigung) ARE exposed as
+ * curated tools so the whole dues workflow can be driven and reconciled over
+ * MCP; each delegates to its vorstand/admin procedure and is fully audited.
+ * The pain.008 is text, so the XML download is exposed; only binary downloads
+ * (PDF/CSV/XLSX) stay UI-only. Deliberately still NOT exposed: import.*,
+ * settings.*, and DSGVO erasure.
  */
 export type McpTool = {
   /** snake_case, English. */
@@ -133,6 +135,29 @@ const McpSepaMandateInput = v.object({
   gueltigAb: v.optional(v.nullable(DateInput)),
   gultigBis: v.optional(v.nullable(DateInput)),
 });
+
+/** Decimal money string, e.g. "54.00". Mirrors sepa-returns.ts MoneyString. */
+const MoneyInput = v.pipe(v.string(), v.regex(/^-?\d+(\.\d{1,2})?$/));
+
+/** ISO 20022 SEPA return reason codes, mirroring sepa-returns.ts. */
+const ReturnReasonCode = v.picklist([
+  "AC04",
+  "AC06",
+  "AC13",
+  "AG01",
+  "AM04",
+  "AM05",
+  "BE05",
+  "FF01",
+  "MD01",
+  "MD06",
+  "MD07",
+  "MS02",
+  "MS03",
+  "RC01",
+  "RR01",
+  "SL01",
+] as const);
 
 const TOOLS: McpTool[] = [
   // ---- Members (read) ----
@@ -458,6 +483,198 @@ const TOOLS: McpTool[] = [
     minRole: "admin",
     input: v.object({ winnerId: v.string(), loserId: v.string(), confirm: v.literal(true) }),
     execute: (context, input) => call(appRouter.members.merge, input, { context }),
+  }),
+  // ---- Vorstand: Beitragslauf & SEPA-Einzug (money movement) ----
+  defineTool({
+    name: "preview_fee_run",
+    description:
+      "Vorschau eines Beitragslaufs für ein Jahr ohne zu schreiben: welche Lastschrift-Posten (mit Mandat/IBAN) und welche Rechnungs-Posten entstünden, Summen und Konflikte (fehlendes Mandat, gesperrt). `falligkeitsdatum` ist YYYY-MM-DD. Nutze dies vor commit_fee_run, um Anzahl und Summe zu bestätigen.",
+    minRole: "vorstand",
+    input: v.object({
+      billingYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
+      falligkeitsdatum: DateInput,
+      mandateOverrides: v.optional(v.record(v.string(), v.string())),
+    }),
+    execute: (context, input) => call(appRouter.feeRuns.preview, input, { context }),
+  }),
+  defineTool({
+    name: "simulate_fee_run",
+    description:
+      "Vergleicht den Beitragslauf eines Jahres mit den Posten des Vorjahres: wer ist neu, wer fällt weg, wessen Betrag ändert sich. Reine Vorschau (kein Schreiben), zur Plausibilitätsprüfung vor commit_fee_run.",
+    minRole: "vorstand",
+    input: v.object({
+      billingYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
+      falligkeitsdatum: DateInput,
+      mandateOverrides: v.optional(v.record(v.string(), v.string())),
+    }),
+    execute: (context, input) => call(appRouter.feeRuns.simulate, input, { context }),
+  }),
+  defineTool({
+    name: "commit_fee_run",
+    description:
+      'Führt den Beitragslauf aus: legt fehlende Sollstellungen für das Jahr an, erzeugt die pain.008-Lastschriftdatei und schreibt die fee_run_items. Bereits offen gestellte Verträge werden nicht doppelt gestellt (inkrementell). Sicherheits-Check: `expectedTotalAmount` (z. B. "564.00") und `expectedItemCount` müssen exakt zur Vorschau passen, sonst bricht der Lauf ab. Geld- und bankrelevant, vollständig auditiert. Die XML danach mit get_fee_run_xml abrufen.',
+    minRole: "vorstand",
+    input: v.object({
+      billingYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
+      falligkeitsdatum: DateInput,
+      mandateOverrides: v.optional(v.record(v.string(), v.string())),
+      expectedTotalAmount: v.pipe(v.string(), v.minLength(1)),
+      expectedItemCount: v.pipe(v.number(), v.integer(), v.minValue(0)),
+      notes: v.optional(v.nullable(v.string())),
+      idempotencyKey: IdempotencyKeyInput,
+    }),
+    execute: (context, { idempotencyKey, ...rest }) =>
+      withIdempotency(context.db, "commit_fee_run", idempotencyKey, () =>
+        call(appRouter.feeRuns.commit, rest, { context }),
+      ),
+  }),
+  defineTool({
+    name: "get_fee_run",
+    description:
+      "Detail eines Beitrags-/Wiedereinzugslaufs (id aus list_fee_runs): Kopf (Jahr, Fälligkeit, Status, Art, Summe, Anzahl) und die einzelnen Posten (Mitglied, Betrag, Mandat, EndToEndId, ob zurückgegangen). Die XML ist hier nicht enthalten (siehe get_fee_run_xml).",
+    minRole: "readonly",
+    input: v.object({ id: v.string() }),
+    execute: (context, input) => call(appRouter.feeRuns.get, input, { context }),
+  }),
+  defineTool({
+    name: "get_fee_run_xml",
+    description:
+      "Liefert die pain.008-Lastschriftdatei eines committeten Laufs als Text (Dateiname + XML-Inhalt) zum Bankupload. id aus list_fee_runs/commit_fee_run.",
+    minRole: "vorstand",
+    input: v.object({ id: v.string() }),
+    execute: (context, input) => call(appRouter.feeRuns.downloadXml, input, { context }),
+  }),
+  defineTool({
+    name: "cancel_fee_run",
+    description:
+      "Storniert einen Beitragslauf (id aus list_fee_runs) und macht seine Sollstellungen/XML rückgängig. Nutzen, wenn ein Lauf falsch erzeugt wurde. Auditiert.",
+    minRole: "vorstand",
+    input: v.object({ id: v.string(), reason: v.optional(v.nullable(v.string())) }),
+    execute: (context, input) => call(appRouter.feeRuns.cancel, input, { context }),
+  }),
+  defineTool({
+    name: "cancel_sollstellung",
+    description:
+      "Storniert eine einzelne Sollstellung (sollStellungId, z. B. aus get_fee_run/get_member), Status -> cancelled. Für versehentlich oder doppelt gestellte Posten. Auditiert. Eine bereits eingezogene, zurückgegangene Lastschrift wird NICHT hierüber, sondern mit record_sepa_return behandelt.",
+    minRole: "vorstand",
+    input: v.object({
+      sollStellungId: v.string(),
+      notes: v.optional(v.nullable(v.string())),
+    }),
+    execute: (context, input) => call(appRouter.feeRuns.stornoSollstellung, input, { context }),
+  }),
+  defineTool({
+    name: "list_return_candidates",
+    description:
+      "Committete Lastschrift-Posten (fee_run_items), die noch NICHT als Rückläufer erfasst sind. Quelle für record_sepa_return. Optional per Freitext (Name, Mitgliedsnummer, EndToEndId) filtern.",
+    minRole: "vorstand",
+    input: v.object({
+      query: v.optional(v.nullable(v.string())),
+      limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))),
+    }),
+    execute: (context, input) => call(appRouter.sepaReturns.candidates, input, { context }),
+  }),
+  defineTool({
+    name: "record_sepa_return",
+    description:
+      "Erfasst eine Rücklastschrift zu einem fee_run_item (aus list_return_candidates): öffnet die zugehörige Sollstellung wieder (status=returned, Mahnstufe 0) und bucht die Rücklastgebühr. `returnedOn` ist YYYY-MM-DD; `reasonCode` ist ein ISO-Grund (z. B. AM04 = nicht gedeckt, AC04 = Konto erloschen, MS03 = ohne Angabe); `rueckgebuhr` Dezimalstring, sonst Vereins-Standard. Geldrelevant, auditiert. Danach mit recollect_returns wieder einziehbar.",
+    minRole: "vorstand",
+    input: v.object({
+      feeRunItemId: v.string(),
+      returnedOn: DateInput,
+      reasonCode: v.optional(v.nullable(ReturnReasonCode)),
+      reasonText: v.optional(v.nullable(v.string())),
+      rueckgebuhr: v.optional(MoneyInput),
+      notes: v.optional(v.nullable(v.string())),
+      idempotencyKey: IdempotencyKeyInput,
+    }),
+    execute: (context, { idempotencyKey, ...rest }) =>
+      withIdempotency(context.db, "record_sepa_return", idempotencyKey, () =>
+        call(appRouter.sepaReturns.create, rest, { context }),
+      ),
+  }),
+  defineTool({
+    name: "list_sepa_returns",
+    description:
+      "Erfasste Rücklastschriften, neueste zuerst; paginiert. Optional auf ein Mitglied (memberId) eingrenzen.",
+    minRole: "readonly",
+    input: v.object({
+      page: PageInput,
+      pageSize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))),
+      memberId: v.optional(v.nullable(v.string())),
+    }),
+    execute: (context, input) => call(appRouter.sepaReturns.list, input, { context }),
+  }),
+  defineTool({
+    name: "list_recollect_candidates",
+    description:
+      "Zurückgegangene Sollstellungen (status=returned), die für einen Wiedereinzug in Frage kommen, mit Mandat, IBAN-Endung, Betrag und ob einziehbar (blockReason erklärt Sperren wie fehlendes Mandat). Quelle für recollect_returns.",
+    minRole: "vorstand",
+    input: v.object({
+      query: v.optional(v.nullable(v.string())),
+      limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))),
+    }),
+    execute: (context, input) => call(appRouter.feeRuns.recollectCandidates, input, { context }),
+  }),
+  defineTool({
+    name: "recollect_returns",
+    description:
+      "Wiedereinzug: erzeugt eine neue pain.008-Datei für ausgewählte zurückgegangene Sollstellungen (sollStellungIds aus list_recollect_candidates), ohne die Original-Sollstellung zu löschen. Jeder Posten wechselt von returned zurück auf eingezogen und bekommt ein neues fee_run_item. `falligkeitsdatum` YYYY-MM-DD. Geld- und bankrelevant, auditiert. XML danach mit get_fee_run_xml.",
+    minRole: "vorstand",
+    input: v.object({
+      sollStellungIds: v.pipe(v.array(v.string()), v.minLength(1)),
+      falligkeitsdatum: DateInput,
+      idempotencyKey: IdempotencyKeyInput,
+    }),
+    execute: (context, { idempotencyKey, ...rest }) =>
+      withIdempotency(context.db, "recollect_returns", idempotencyKey, () =>
+        call(appRouter.feeRuns.recollect, rest, { context }),
+      ),
+  }),
+  defineTool({
+    name: "preview_camt_returns",
+    description:
+      "Liest eine camt.054-Datei der Bank (Rücklastschriften) und ordnet jeden Rückläufer per EndToEndId einem committeten fee_run_item zu. Reine Vorschau (kein Schreiben): zeigt matched/already_returned/unmatched. Danach mit import_camt_returns bestätigen.",
+    minRole: "vorstand",
+    input: v.object({ xml: v.pipe(v.string(), v.minLength(1)) }),
+    execute: (context, input) => call(appRouter.sepaReturns.previewCamt, input, { context }),
+  }),
+  defineTool({
+    name: "import_camt_returns",
+    description:
+      "Übernimmt bestätigte camt.054-Treffer (items aus preview_camt_returns): erfasst je fee_run_item eine Rücklastschrift und öffnet die Sollstellung wieder. Bereits erfasste werden übersprungen. Geldrelevant, auditiert.",
+    minRole: "vorstand",
+    input: v.object({
+      items: v.pipe(
+        v.array(
+          v.object({
+            feeRunItemId: v.string(),
+            returnedOn: DateInput,
+            reasonCode: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(35)))),
+            reasonText: v.optional(v.nullable(v.string())),
+            rueckgebuhr: v.optional(v.nullable(MoneyInput)),
+          }),
+        ),
+        v.minLength(1),
+      ),
+    }),
+    execute: (context, input) => call(appRouter.sepaReturns.importCamt, input, { context }),
+  }),
+  defineTool({
+    name: "fee_run_prenotify_info",
+    description:
+      "Vorabankündigungs-Status eines Laufs (id): wie viele Mitglieder eine Pre-Notification-E-Mail erhalten würden, Fälligkeit und ob E-Mail-Adressen fehlen. Reine Info.",
+    minRole: "vorstand",
+    input: v.object({ id: v.string() }),
+    execute: (context, input) => call(appRouter.feeRuns.prenotifyInfo, input, { context }),
+  }),
+  defineTool({
+    name: "send_prenotifications",
+    description:
+      "Versendet die SEPA-Vorabankündigung (Pre-Notification) per E-Mail an die Zahler eines Laufs (id). Versendet echte E-Mails an Mitglieder, auditiert. Vorher mit fee_run_prenotify_info prüfen.",
+    minRole: "vorstand",
+    input: v.object({ id: v.string() }),
+    execute: (context, input) => call(appRouter.feeRuns.sendPrenotifications, input, { context }),
   }),
 ];
 
