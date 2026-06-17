@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.105.0",
+    date: "2026-06-17",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Beitragslauf gezielt: Eine Vorschau und ein Lauf lassen sich jetzt auf eine ausgewählte Mitgliederliste begrenzen. So entsteht eine SEPA-Datei für genau bestimmte Personen, etwa Rückläufer und übersehene Fälle, ohne den Rest des Vereins erneut einzuziehen. Auch über die KI-Schnittstelle.",
+      },
+    ],
+  },
+  {
     version: "0.104.0",
     date: "2026-06-17",
     changes: [

@@ -23,12 +23,15 @@ const PreviewInput = v.object({
   billingYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
   falligkeitsdatum: v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)),
   mandateOverrides: v.optional(v.record(v.string(), v.string()), {}),
+  /** Optional: restrict the run to these billed member ids (targeted re-collection). */
+  memberIds: v.optional(v.array(v.string())),
 });
 
 const CommitInput = v.object({
   billingYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
   falligkeitsdatum: v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)),
   mandateOverrides: v.optional(v.record(v.string(), v.string()), {}),
+  memberIds: v.optional(v.array(v.string())),
   expectedTotalAmount: v.pipe(v.string(), v.minLength(1)),
   expectedItemCount: v.pipe(v.number(), v.integer(), v.minValue(0)),
   notes: v.optional(v.nullable(v.string()), null),
@@ -64,6 +67,7 @@ export const feeRunsRouter = {
       billingYear: input.billingYear,
       falligkeitsdatum: parseFalligkeit(input.falligkeitsdatum),
       mandateOverrides: input.mandateOverrides,
+      memberIds: input.memberIds,
     });
   }),
 
@@ -77,6 +81,7 @@ export const feeRunsRouter = {
       billingYear: input.billingYear,
       falligkeitsdatum: parseFalligkeit(input.falligkeitsdatum),
       mandateOverrides: input.mandateOverrides,
+      memberIds: input.memberIds,
     });
 
     const prevRows = await context.db
@@ -166,6 +171,7 @@ export const feeRunsRouter = {
       billingYear: input.billingYear,
       falligkeitsdatum,
       mandateOverrides: input.mandateOverrides,
+      memberIds: input.memberIds,
     });
 
     // Optimistic-concurrency: if the world changed since the user clicked
