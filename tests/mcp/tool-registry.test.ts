@@ -36,6 +36,8 @@ const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
   dunning_mark_paid: "vorstand",
   create_contract: "vorstand",
   update_contract: "vorstand",
+  set_contract_zahler: "vorstand",
+  create_relationship: "vorstand",
   create_sepa_mandate: "vorstand",
   merge_members: "admin",
   // Beitragslauf & SEPA-Einzug
@@ -75,6 +77,8 @@ const MUTATION_TOOLS = [
   "dunning_mark_paid",
   "create_contract",
   "update_contract",
+  "set_contract_zahler",
+  "create_relationship",
   "create_sepa_mandate",
   "merge_members",
   "commit_fee_run",

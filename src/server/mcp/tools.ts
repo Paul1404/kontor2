@@ -481,6 +481,34 @@ const TOOLS: McpTool[] = [
     execute: (context, input) => call(appRouter.contracts.update, input, { context }),
   }),
   defineTool({
+    name: "set_contract_zahler",
+    description:
+      "Set or clear the explicit payer (Zahler) of a contract. Pass the contract id (from get_member) and zahlerMemberId = the internal member id whose account is debited, or null to clear the override (then the automatic resolution Familie -> Vertreter -> self applies again). Use to route a member's beitrag onto a partner/parent account, e.g. a spouse without an own mandate. The debit follows the Zahler. The change is audited.",
+    minRole: "vorstand",
+    input: v.object({ contractId: v.string(), zahlerMemberId: v.nullable(v.string()) }),
+    execute: (context, input) => call(appRouter.contracts.setZahler, input, { context }),
+  }),
+  defineTool({
+    name: "create_relationship",
+    description:
+      "Create a relationship (Beziehung) between two members by internal member id (fromMemberId -> toMemberId). Optional beziehung label (e.g. 'Ehepartner', 'Zahler'), notiz and datVon/datBis (YYYY-MM-DD). Set reciprocal: true to also create the mirror link. Use to connect a household (e.g. spouses) so the structure is correct. The change is audited.",
+    minRole: "vorstand",
+    input: v.object({
+      fromMemberId: v.string(),
+      toMemberId: v.string(),
+      beziehung: v.optional(v.nullable(v.string())),
+      notiz: v.optional(v.nullable(v.string())),
+      datVon: v.optional(v.nullable(DateInput)),
+      datBis: v.optional(v.nullable(DateInput)),
+      reciprocal: v.optional(v.boolean()),
+      idempotencyKey: IdempotencyKeyInput,
+    }),
+    execute: (context, { idempotencyKey, ...rest }) =>
+      withIdempotency(context.db, "create_relationship", idempotencyKey, () =>
+        call(appRouter.relationships.create, rest, { context }),
+      ),
+  }),
+  defineTool({
     name: "create_sepa_mandate",
     description:
       "Create a SEPA direct-debit mandate for a member (by internal member id), fixing 'Lastschrift ohne SEPA-Mandat'. The mandate reference is assigned automatically if omitted. Set the member's IBAN first via update_member. Bank and money relevant. The change is audited.",

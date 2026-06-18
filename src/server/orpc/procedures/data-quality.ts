@@ -56,6 +56,8 @@ export const CATEGORY_IDS = [
   "volljaehrig_eltern_konto",
   // --- cloned-from-child import artifact (wrong birthdate on parent) -------
   "beziehung_gleiches_geburtsdatum",
+  // --- inflated single-person beitrag covering a partner without a contract
+  "beitrag_deckt_partner",
 ] as const;
 
 export type CategoryId = (typeof CATEGORY_IDS)[number];
@@ -260,6 +262,13 @@ export const CATEGORIES: CategoryMeta[] = [
       "Ein verknüpftes Mitglied trägt dasselbe Geburtsdatum wie sein Beziehungspartner mit anderem Namen. Bei Eltern und Kind ist das praktisch unmöglich und stammt meist aus dem Import, der den Eltern-Satz vom Kind übernommen hat. Das falsche Datum verfälscht Mahnwesen, Altersgrenzen und Bestandserhebung. Bitte prüfen, welcher Datensatz das richtige Geburtsdatum braucht.",
     severity: "warn",
   },
+  {
+    id: "beitrag_deckt_partner",
+    label: "Beitrag deckt Partner ohne eigenen Vertrag",
+    description:
+      "Aktives Mitglied mit einem Beitrag, der mindestens doppelt so hoch ist wie der übliche Satz dieser Beitragsart, während im selben Haushalt (gleicher Nachname, gleiche Straße und PLZ) ein aktives Mitglied ohne eigenen laufenden Vertrag geführt wird. Vermutlich wurde der Beitrag erhöht, um zwei Personen abzudecken, statt für die zweite Person einen eigenen Vertrag samt Zahler-Verknüpfung anzulegen. Die Gesamtsumme stimmt, die Struktur nicht.",
+    severity: "warn",
+  },
 ];
 
 /** A live member: not soft-deleted, neither exited nor deceased. */
@@ -415,6 +424,32 @@ export const WHERE: Record<CategoryId, string> = {
     "and c.geburtsdatum = members.geburtsdatum " +
     "and lower(btrim(coalesce(c.vorname, ''))) <> lower(btrim(coalesce(members.vorname, '')))" +
     ")",
+  // A single-person beitrag inflated to cover a partner: the member has an
+  // active, positive contract whose amount is >= 2x the typical (modal) rate of
+  // that Beitragsart, AND a co-resident (same Nachname + Strasse + PLZ) active
+  // member has no active contract of their own. Ort is intentionally not
+  // compared (frequent typos). The total money is right; the structure is not.
+  beitrag_deckt_partner: `${ACTIVE} and coalesce(btrim(strasse), '') <> '' and exists (
+      select 1 from contracts c
+      where c.member_id = members.id and c.gekuend_zum is null
+        and (c.vertrag_ende is null or c.vertrag_ende >= current_date)
+        and c.betrag is not null and c.betrag > 0
+        and c.betrag >= 2 * (
+          select c2.betrag from contracts c2
+          where c2.art = c.art and c2.betrag is not null and c2.betrag > 0
+          group by c2.betrag order by count(*) desc, c2.betrag asc limit 1
+        )
+    ) and exists (
+      select 1 from members p
+      where p.id <> members.id and p.deleted_at is null and p.austritt is null and p.verstorben_am is null
+        and lower(btrim(coalesce(p.nachname, ''))) = lower(btrim(coalesce(members.nachname, '')))
+        and lower(btrim(coalesce(p.strasse, ''))) = lower(btrim(coalesce(members.strasse, '')))
+        and lower(btrim(coalesce(p.plz, ''))) = lower(btrim(coalesce(members.plz, '')))
+        and not exists (
+          select 1 from contracts pc where pc.member_id = p.id and pc.gekuend_zum is null
+            and (pc.vertrag_ende is null or pc.vertrag_ende >= current_date)
+        )
+    )`,
 };
 
 /**
