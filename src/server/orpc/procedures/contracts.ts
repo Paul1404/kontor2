@@ -45,10 +45,15 @@ const ContractInput = v.object({
   vertragEnde: v.optional(v.nullable(v.string())),
   gekuendAm: v.optional(v.nullable(v.string())),
   gekuendZum: v.optional(v.nullable(v.string())),
+  // Whether this contract is collected by SEPA direct debit. The DB column
+  // defaults to false; pass true to make a new contract billable by the
+  // Beitragslauf (e.g. a partner's own contract paid via a Zahler-Override).
+  // Omitted on update = left unchanged.
+  isDirectDebit: v.optional(v.boolean()),
 });
 
 function buildPatch(input: v.InferOutput<typeof ContractInput>): Record<string, unknown> {
-  return {
+  const patch: Record<string, unknown> = {
     vertragNr: input.vertragNr,
     art: input.art,
     artName: input.artName ?? null,
@@ -61,6 +66,10 @@ function buildPatch(input: v.InferOutput<typeof ContractInput>): Record<string, 
     gekuendZum: toDateOrNull(input.gekuendZum, "Gekündigt zum"),
     updatedAt: new Date(),
   };
+  // Only touch is_direct_debit when explicitly provided, so an update that
+  // omits it never silently flips a contract between debit and invoice.
+  if (input.isDirectDebit !== undefined) patch.isDirectDebit = input.isDirectDebit;
+  return patch;
 }
 
 export const contractsRouter = {

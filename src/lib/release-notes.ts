@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.106.1",
+    date: "2026-06-18",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Verträge lassen sich über die Schnittstelle jetzt als Lastschrift anlegen. Damit kann eine zweite Haushaltsperson einen eigenen, einziehbaren Vertrag bekommen, der über das Konto des Partners läuft.",
+      },
+    ],
+  },
+  {
     version: "0.106.0",
     date: "2026-06-18",
     changes: [
