@@ -41,6 +41,22 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.106.0",
+    date: "2026-06-18",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Datenqualität: Neue Prüfung „Beitrag deckt Partner ohne eigenen Vertrag“. Findet Fälle, in denen ein Beitrag auf das Doppelte des üblichen Satzes gesetzt wurde, während im selben Haushalt ein Mitglied ohne eigenen Vertrag geführt wird.",
+      },
+      {
+        category: "feature",
+        description:
+          "KI-Zugriff: Zahler eines Vertrags setzen und Beziehungen zwischen Mitgliedern anlegen ist jetzt über die Schnittstelle möglich. So lassen sich Haushalte sauber strukturieren, etwa eine zweite Person mit eigenem Vertrag über das Konto des Partners.",
+      },
+    ],
+  },
+  {
     version: "0.105.1",
     date: "2026-06-18",
     changes: [
