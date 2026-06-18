@@ -137,6 +137,8 @@ const McpContractInput = v.object({
   vertragEnde: v.optional(v.nullable(DateInput)),
   gekuendAm: v.optional(v.nullable(DateInput)),
   gekuendZum: v.optional(v.nullable(DateInput)),
+  /** true = per SEPA-Lastschrift einziehbar (sonst Rechnung). Beim Update weglassen lässt es unverändert. */
+  isDirectDebit: v.optional(v.boolean()),
 });
 
 /** Curated SEPA mandate input, mirroring sepa.ts CreateInput. */
