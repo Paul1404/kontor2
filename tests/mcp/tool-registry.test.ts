@@ -39,6 +39,7 @@ const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
   set_contract_zahler: "vorstand",
   create_relationship: "vorstand",
   create_sepa_mandate: "vorstand",
+  update_sepa_mandate: "vorstand",
   merge_members: "admin",
   // Beitragslauf & SEPA-Einzug
   preview_fee_run: "vorstand",
@@ -80,6 +81,7 @@ const MUTATION_TOOLS = [
   "set_contract_zahler",
   "create_relationship",
   "create_sepa_mandate",
+  "update_sepa_mandate",
   "merge_members",
   "commit_fee_run",
   "cancel_fee_run",

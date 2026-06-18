@@ -522,6 +522,25 @@ const TOOLS: McpTool[] = [
       ),
   }),
   defineTool({
+    name: "update_sepa_mandate",
+    description:
+      "Update an existing SEPA mandate by its id (from get_member's sepa[].id). Set unterschriftDatum (the mandate signature date, YYYY-MM-DD, must be a real past date, it ends up as DtOfSgntr in the pain.008), status, gueltigAb, gultigBis, widerrufenAm, lastschriftart or typ. Only the provided fields change; the rest stay as they are. Bank and money relevant. The change is audited.",
+    minRole: "vorstand",
+    input: v.object({
+      id: v.string(),
+      patch: v.object({
+        status: v.optional(v.nullable(v.string())),
+        lastschriftart: v.optional(v.nullable(v.string())),
+        typ: v.optional(v.nullable(v.string())),
+        unterschriftDatum: v.optional(v.nullable(DateInput)),
+        gueltigAb: v.optional(v.nullable(DateInput)),
+        gultigBis: v.optional(v.nullable(DateInput)),
+        widerrufenAm: v.optional(v.nullable(DateInput)),
+      }),
+    }),
+    execute: (context, input) => call(appRouter.sepa.update, input, { context }),
+  }),
+  defineTool({
     name: "merge_members",
     description:
       "Merge two duplicate member records (use after confirming a pair from data_quality_members 'moegliche_dubletten'). Moves all contracts, SEPA mandates, postings, relationships, Ehrungen, Abteilungen, tasks and documents from the loser onto the winner, then soft-deletes the loser. Pass winnerId (kept) and loserId (removed) as internal member ids, and confirm: true. Destructive and ADMIN ONLY. Rows that would break a uniqueness constraint stay on the soft-deleted loser and are reported as 'skipped'; nothing is hard-deleted. The change is audited.",

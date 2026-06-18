@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.107.0",
+    date: "2026-06-18",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "KI-Zugriff: Bestehende SEPA-Mandate lassen sich jetzt über die Schnittstelle aktualisieren, etwa das Unterschriftsdatum nachpflegen. Das verhindert ein ungültiges Unterschriftsdatum in der Lastschriftdatei.",
+      },
+    ],
+  },
+  {
     version: "0.106.2",
     date: "2026-06-18",
     changes: [
