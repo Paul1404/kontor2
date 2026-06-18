@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.106.2",
+    date: "2026-06-18",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Datenqualität: Die Prüfung „Beitrag deckt Partner ohne eigenen Vertrag“ ignoriert jetzt ausdrückliche Paar-Tarife (Beitragsart mit „dopp“), bei denen ein Vertrag für zwei Personen gewollt ist. Damit zeigt sie nur noch echte Fälle.",
+      },
+    ],
+  },
+  {
     version: "0.106.1",
     date: "2026-06-18",
     changes: [

@@ -266,7 +266,7 @@ export const CATEGORIES: CategoryMeta[] = [
     id: "beitrag_deckt_partner",
     label: "Beitrag deckt Partner ohne eigenen Vertrag",
     description:
-      "Aktives Mitglied mit einem Beitrag, der mindestens doppelt so hoch ist wie der übliche Satz dieser Beitragsart, während im selben Haushalt (gleicher Nachname, gleiche Straße und PLZ) ein aktives Mitglied ohne eigenen laufenden Vertrag geführt wird. Vermutlich wurde der Beitrag erhöht, um zwei Personen abzudecken, statt für die zweite Person einen eigenen Vertrag samt Zahler-Verknüpfung anzulegen. Die Gesamtsumme stimmt, die Struktur nicht.",
+      "Aktives Mitglied mit einem Beitrag, der mindestens doppelt so hoch ist wie der übliche Satz dieser Beitragsart, während im selben Haushalt (gleicher Nachname, gleiche Straße und PLZ) ein aktives Mitglied ohne eigenen laufenden Vertrag geführt wird. Vermutlich wurde der Beitrag erhöht, um zwei Personen abzudecken, statt für die zweite Person einen eigenen Vertrag samt Zahler-Verknüpfung anzulegen. Ausdrückliche Paar-Tarife (Beitragsart-Name enthält dopp) sind ausgenommen. Die Gesamtsumme stimmt, die Struktur nicht.",
     severity: "warn",
   },
 ];
@@ -429,11 +429,15 @@ export const WHERE: Record<CategoryId, string> = {
   // that Beitragsart, AND a co-resident (same Nachname + Strasse + PLZ) active
   // member has no active contract of their own. Ort is intentionally not
   // compared (frequent typos). The total money is right; the structure is not.
+  // Explicit couple tariffs (Beitragsart-Name enthält "dopp") sind bewusst
+  // ausgenommen: dort ist "ein Vertrag deckt zwei" der gewollte Tarif, kein
+  // aufgeblähter Einzelbeitrag.
   beitrag_deckt_partner: `${ACTIVE} and coalesce(btrim(strasse), '') <> '' and exists (
       select 1 from contracts c
       where c.member_id = members.id and c.gekuend_zum is null
         and (c.vertrag_ende is null or c.vertrag_ende >= current_date)
         and c.betrag is not null and c.betrag > 0
+        and lower(coalesce(c.art_name, '')) not like '%dopp%'
         and c.betrag >= 2 * (
           select c2.betrag from contracts c2
           where c2.art = c.art and c2.betrag is not null and c2.betrag > 0
