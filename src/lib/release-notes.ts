@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.107.1",
+    date: "2026-06-19",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Veraltete Beispiel-Umgebungsvariablen (SVUWV_BOOTSTRAP_ADMIN_*) aus der Konfigurationsvorlage entfernt. Sie werden vom Code nicht mehr verwendet.",
+      },
+    ],
+  },
+  {
     version: "0.107.0",
     date: "2026-06-18",
     changes: [
