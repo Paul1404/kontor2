@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.109.1",
+    date: "2026-06-20",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Kulanzbrief: Bei vollem Anschreiben rutschte die neue Unterschriftszeile allein auf eine zweite Seite. Abstände gestrafft, sodass das Anschreiben mit ein bis zwei offenen Posten auf einer Seite bleibt.",
+      },
+    ],
+  },
+  {
     version: "0.109.0",
     date: "2026-06-20",
     changes: [
