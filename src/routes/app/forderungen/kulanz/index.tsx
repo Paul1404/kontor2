@@ -30,6 +30,7 @@ function KulanzPage() {
   const qc = useQueryClient();
   const [onlyWithoutEmail, setOnlyWithoutEmail] = useState(true);
   const [waiveReturnFee, setWaiveReturnFee] = useState(false);
+  const [mitUnterschrift, setMitUnterschrift] = useState(true);
   const [deadline, setDeadline] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -55,6 +56,7 @@ function KulanzPage() {
         memberIds: [...selected],
         deadlineDate: deadline.trim() || null,
         waiveReturnFee,
+        mitUnterschrift,
       }),
     onSuccess: (r) => {
       triggerDownloadBase64(r.filename, r.base64, "application/pdf");
@@ -158,6 +160,13 @@ function KulanzPage() {
             description="Aus Kulanz nur den offenen Beitrag fordern."
             checked={waiveReturnFee}
             onChange={(e) => setWaiveReturnFee(e.target.checked)}
+          />
+          <Switch
+            id="mit-unterschrift"
+            label="Unterschrift einbetten"
+            description="Hinterlegte Vorstand-Unterschrift einsetzen. Sonst leere Linie zum Unterschreiben."
+            checked={mitUnterschrift}
+            onChange={(e) => setMitUnterschrift(e.target.checked)}
           />
           <Field label="Frist (Zahlung oder Kündigung)">
             <Input
