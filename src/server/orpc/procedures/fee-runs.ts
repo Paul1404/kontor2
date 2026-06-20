@@ -1085,6 +1085,86 @@ export const feeRunsRouter = {
       return { ok: true };
     }),
 
+  /**
+   * Reopen a wrongly cancelled Sollstellung back to a live, dunnable claim
+   * (status `open`, paidAmount 0, openAmount = full amount, Mahnstufe 0). The
+   * inverse of `stornoSollstellung`, for postings that were cancelled in manual
+   * run juggling but are actually still owed (e.g. a bounced debit that has to
+   * be requested by letter). A genuinely submitted-and-bounced (`eingezogen`)
+   * debit is reopened via `record_sepa_return` instead, so it carries the
+   * return fee and trail; this procedure refuses that status.
+   */
+  reopenSollstellung: vorstandProc
+    .input(
+      v.object({
+        sollStellungId: v.string(),
+        notes: v.optional(v.nullable(v.string()), null),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      await context.db.transaction(async (tx) => {
+        const [row] = await tx
+          .select({
+            id: sollStellungenTable.id,
+            status: sollStellungenTable.status,
+            amount: sollStellungenTable.amount,
+            paidAmount: sollStellungenTable.paidAmount,
+            openAmount: sollStellungenTable.openAmount,
+            mahnstufe: sollStellungenTable.mahnstufe,
+            notes: sollStellungenTable.notes,
+          })
+          .from(sollStellungenTable)
+          .where(eq(sollStellungenTable.id, input.sollStellungId))
+          .limit(1);
+        if (!row) {
+          throw new ORPCError("NOT_FOUND", { message: "Sollstellung nicht gefunden." });
+        }
+        // Already a live, dunnable claim -- nothing to do.
+        if (row.status === "open" || row.status === "returned") return;
+        if (row.status === "paid") {
+          throw new ORPCError("VALIDATION_FAILED", {
+            message: "Ein bezahlter Posten wird nicht wiedereröffnet. Erst die Zahlung klären.",
+          });
+        }
+        if (row.status === "eingezogen") {
+          throw new ORPCError("VALIDATION_FAILED", {
+            message:
+              "Eingezogene Posten als Rücklastschrift über record_sepa_return wiedereröffnen, nicht hierüber.",
+          });
+        }
+        // status === "cancelled"
+        await tx
+          .update(sollStellungenTable)
+          .set({
+            status: "open",
+            paidAmount: "0",
+            openAmount: row.amount,
+            mahnstufe: 0,
+            notes: input.notes ?? row.notes,
+            updatedAt: new Date(),
+          })
+          .where(eq(sollStellungenTable.id, input.sollStellungId));
+
+        await appendAudit(tx, {
+          entityType: "soll_stellung",
+          entityId: row.id,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            status: { before: row.status, after: "open" },
+            paidAmount: { before: row.paidAmount, after: "0" },
+            openAmount: { before: row.openAmount, after: row.amount },
+            mahnstufe: { before: row.mahnstufe, after: 0 },
+            ...(input.notes ? { notes: { before: row.notes, after: input.notes } } : {}),
+          },
+          requestId: context.requestId ?? null,
+        });
+      });
+      return { ok: true };
+    }),
+
   downloadXml: vorstandProc
     .input(v.object({ id: v.string() }))
     .handler(async ({ context, input }) => {

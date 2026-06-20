@@ -631,6 +631,31 @@ const TOOLS: McpTool[] = [
     execute: (context, input) => call(appRouter.feeRuns.stornoSollstellung, input, { context }),
   }),
   defineTool({
+    name: "reopen_sollstellung",
+    description:
+      "Öffnet eine fälschlich stornierte Sollstellung (sollStellungId aus get_member/get_fee_run) wieder als offene Forderung: status -> open, bezahlt 0, offen = voller Betrag, Mahnstufe 0. Für Posten, die in manueller Lauf-Bearbeitung storniert wurden, aber tatsächlich noch geschuldet sind (z. B. geplatzte Lastschrift, die per Brief angefordert wird). Eine eingezogene/zurückgegangene Lastschrift NICHT hierüber, sondern mit record_sepa_return. Bereits offene/zurückgegangene Posten bleiben unverändert. Auditiert.",
+    minRole: "vorstand",
+    input: v.object({
+      sollStellungId: v.string(),
+      notes: v.optional(v.nullable(v.string())),
+    }),
+    execute: (context, input) => call(appRouter.feeRuns.reopenSollstellung, input, { context }),
+  }),
+  defineTool({
+    name: "generate_kulanz",
+    description:
+      "Erzeugt den Kulanz-/Zahlungserinnerungsbrief als PDF (ein Schreiben je Empfänger) für die angegebenen Mitglieder mit OFFENEN Beiträgen. memberIds = interne IDs aus search_members/get_member. Listet die offenen Posten, Bankverbindung und ein Sonderkündigungs-Angebot; setzt KEINE Mahnstufe und keine Sollstellung. Empfänger ohne offene Forderung (status open/returned) werden abgewiesen -- ggf. vorher reopen_sollstellung. Optional: runDate, deadlineDate (YYYY-MM-DD), waiveReturnFee (SEPA-Gebühr aus Kulanz erlassen), mitUnterschrift (hinterlegte Vorstand-Unterschrift einbetten, Standard true). Gibt docRef, recipientCount, filename und das PDF als base64 zurück.",
+    minRole: "vorstand",
+    input: v.object({
+      memberIds: v.pipe(v.array(v.string()), v.minLength(1)),
+      runDate: v.optional(v.nullable(DateInput)),
+      deadlineDate: v.optional(v.nullable(DateInput)),
+      waiveReturnFee: v.optional(v.boolean()),
+      mitUnterschrift: v.optional(v.boolean()),
+    }),
+    execute: (context, input) => call(appRouter.kulanz.generate, input, { context }),
+  }),
+  defineTool({
     name: "list_return_candidates",
     description:
       "Committete Lastschrift-Posten (fee_run_items), die noch NICHT als Rückläufer erfasst sind. Quelle für record_sepa_return. Optional per Freitext (Name, Mitgliedsnummer, EndToEndId) filtern.",
