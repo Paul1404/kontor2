@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.109.0",
+    date: "2026-06-20",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "KI-Zugriff: Neue Werkzeuge, um eine versehentlich stornierte Forderung wieder als offen zu setzen und einen Kulanz-/Erinnerungsbrief direkt über die Schnittstelle zu erzeugen.",
+      },
+    ],
+  },
+  {
     version: "0.108.0",
     date: "2026-06-19",
     changes: [
