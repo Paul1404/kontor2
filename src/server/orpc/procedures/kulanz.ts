@@ -124,6 +124,12 @@ export const kulanzRouter = {
         deadlineDate: v.optional(v.nullable(ISO_DATE), null),
         /** Waive the SEPA return fee out of goodwill across the whole run. */
         waiveReturnFee: v.optional(v.boolean(), false),
+        /**
+         * Embed the stored Vorstand signature above the "Der Vorstand" line.
+         * When false (or no signature is configured) the letter prints a blank
+         * line to sign by hand.
+         */
+        mitUnterschrift: v.optional(v.boolean(), true),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -184,6 +190,7 @@ export const kulanzRouter = {
         vereinsBankname: org.vereinsBankname,
         glaeubigerId: org.glaeubigerId,
         logoDataUri: resolveClubLogo(org.logo),
+        unterschriftBild: input.mitUnterschrift ? org.antragGegenzeichnungBild : null,
       });
 
       const runDateStr = toDateString(runDate);

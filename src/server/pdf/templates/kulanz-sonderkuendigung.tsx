@@ -1,4 +1,4 @@
-import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { Fragment } from "react";
 import type { KulanzClubModel, KulanzLetterModel } from "~/server/pdf/kulanz-model";
 import { LetterPage } from "~/server/pdf/letter-layout";
@@ -61,6 +61,16 @@ const styles = StyleSheet.create({
     color: "#555",
   },
   responseEmail: { marginTop: 22, color: "#555" },
+  signatureImage: { height: 36, width: 150, marginTop: 6, objectFit: "contain" },
+  signatureSpacer: { height: 36, marginTop: 6 },
+  signatureLine: {
+    width: 170,
+    borderTopWidth: 0.5,
+    borderColor: "#555",
+    paddingTop: 3,
+    fontSize: 8,
+    color: "#555",
+  },
 });
 
 export type KulanzDocumentProps = {
@@ -184,7 +194,13 @@ function KulanzLetterPage({
 
       <View wrap={false}>
         <Text style={{ marginTop: 8 }}>Mit freundlichen Grüßen</Text>
-        <Text style={{ marginTop: 10 }}>{club.vereinsname}</Text>
+        <Text style={{ marginTop: 4 }}>{club.vereinsname}</Text>
+        {club.unterschriftBild ? (
+          <Image src={club.unterschriftBild} style={styles.signatureImage} />
+        ) : (
+          <View style={styles.signatureSpacer} />
+        )}
+        <Text style={styles.signatureLine}>Der Vorstand</Text>
       </View>
     </LetterPage>
   );

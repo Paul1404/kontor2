@@ -31,6 +31,8 @@ export type KulanzClubInput = {
   vereinsBankname: string | null;
   glaeubigerId: string;
   logoDataUri: string | null;
+  /** Vorstand signature PNG (data URI) to embed above the signature line; null/undefined = blank line. */
+  unterschriftBild?: string | null;
 };
 
 export type KulanzClubModel = {
@@ -38,6 +40,8 @@ export type KulanzClubModel = {
   senderLine: string;
   glaeubigerId: string;
   logoDataUri: string | null;
+  /** Embedded Vorstand signature (data URI), or null to print a blank signature line. */
+  unterschriftBild: string | null;
   bank: {
     empfaenger: string;
     iban: string;
@@ -213,6 +217,7 @@ export function buildKulanzClubModel(input: KulanzClubInput): KulanzClubModel {
     senderLine,
     glaeubigerId: input.glaeubigerId,
     logoDataUri: input.logoDataUri,
+    unterschriftBild: input.unterschriftBild ?? null,
     bank: {
       empfaenger: input.vereinsname,
       iban: fmtKulanzIban(input.vereinsIban),

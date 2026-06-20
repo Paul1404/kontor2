@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.108.0",
+    date: "2026-06-19",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Kulanzbrief: Unter dem Gruß steht jetzt eine Unterschriftszeile mit der Beschriftung Der Vorstand. Beim Erstellen lässt sich wählen, ob die hinterlegte Vorstand-Unterschrift eingesetzt oder eine leere Linie zum Unterschreiben gedruckt wird.",
+      },
+    ],
+  },
+  {
     version: "0.107.1",
     date: "2026-06-19",
     changes: [
