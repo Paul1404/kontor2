@@ -4,8 +4,8 @@ import type { KulanzClubModel, KulanzLetterModel } from "~/server/pdf/kulanz-mod
 import { LetterPage } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
-  para: { marginBottom: 5 },
-  table: { marginVertical: 5, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: "#999" },
+  para: { marginBottom: 4 },
+  table: { marginVertical: 4, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: "#999" },
   tableHeader: {
     flexDirection: "row",
     borderBottomWidth: 0.5,
@@ -34,21 +34,21 @@ const styles = StyleSheet.create({
   c2: { flex: 2.4 },
   c3: { flex: 1, textAlign: "right" },
   kulanzBox: {
-    marginTop: 6,
-    padding: 7,
+    marginTop: 4,
+    padding: 6,
     backgroundColor: "#f0fdf4",
     borderLeftWidth: 2,
     borderColor: "#16a34a",
     fontSize: 9,
   },
   paymentBox: {
-    marginTop: 6,
-    padding: 7,
+    marginTop: 4,
+    padding: 6,
     borderWidth: 0.5,
     borderColor: "#999",
     fontSize: 9,
   },
-  paymentRow: { flexDirection: "row", marginBottom: 1.5 },
+  paymentRow: { flexDirection: "row", marginBottom: 1 },
   paymentKey: { width: 110, color: "#555" },
   paymentValue: { flex: 1, fontFamily: "Helvetica-Bold" },
   slipFieldRow: { flexDirection: "row", marginTop: 28, gap: 18 },
@@ -61,13 +61,13 @@ const styles = StyleSheet.create({
     color: "#555",
   },
   responseEmail: { marginTop: 22, color: "#555" },
-  signatureImage: { height: 36, width: 150, marginTop: 6, objectFit: "contain" },
-  signatureSpacer: { height: 36, marginTop: 6 },
+  signatureImage: { height: 26, width: 150, marginTop: 4, objectFit: "contain" },
+  signatureSpacer: { height: 22, marginTop: 4 },
   signatureLine: {
     width: 170,
     borderTopWidth: 0.5,
     borderColor: "#555",
-    paddingTop: 3,
+    paddingTop: 2,
     fontSize: 8,
     color: "#555",
   },
@@ -193,8 +193,8 @@ function KulanzLetterPage({
       </View>
 
       <View wrap={false}>
-        <Text style={{ marginTop: 8 }}>Mit freundlichen Grüßen</Text>
-        <Text style={{ marginTop: 4 }}>{club.vereinsname}</Text>
+        <Text style={{ marginTop: 6 }}>Mit freundlichen Grüßen</Text>
+        <Text style={{ marginTop: 2 }}>{club.vereinsname}</Text>
         {club.unterschriftBild ? (
           <Image src={club.unterschriftBild} style={styles.signatureImage} />
         ) : (

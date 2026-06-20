@@ -44,6 +44,17 @@ async function expectValidPdf(element: Parameters<typeof renderPdfBase64>[0]) {
   expect(byteSize).toBeGreaterThan(1000);
 }
 
+/** Count page objects in a rendered PDF (one `/Type /Page` per page). */
+async function pdfPageCount(element: Parameters<typeof renderPdfBase64>[0]): Promise<number> {
+  const { base64 } = await renderPdfBase64(element);
+  const s = Buffer.from(base64, "base64").toString("latin1");
+  return (s.match(/\/Type\s*\/Page(?![s])/g) ?? []).length;
+}
+
+// 1x1 PNG, stands in for a configured Vorstand signature image.
+const SIGNATURE_PNG =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC";
+
 describe("DIN 5008 letter templates", () => {
   it("renders the Mahnung", async () => {
     await expectValidPdf(
@@ -181,6 +192,52 @@ describe("DIN 5008 letter templates", () => {
         docRef: "KS-2026-0001",
       }),
     );
+  });
+
+  it("keeps the Kulanz cover on one page so the signature line does not spill", async () => {
+    const club = buildKulanzClubModel({
+      vereinsname: org.vereinsname,
+      anschriftStrasse: org.anschriftStrasse,
+      anschriftPlz: org.anschriftPlz,
+      anschriftOrt: org.anschriftOrt,
+      kontaktEmail: "mitgliedschaft@untereuerheim.de",
+      vereinsIban: org.vereinsIban,
+      vereinsBic: org.vereinsBic,
+      vereinsBankname: org.vereinsBankname,
+      glaeubigerId: org.glaeubigerId,
+      logoDataUri: null,
+      unterschriftBild: SIGNATURE_PNG,
+    });
+    const letter = buildKulanzLetterModel({
+      recipient: {
+        anrede: "Herr",
+        name: "Max Mustermann",
+        strasse: "Hauptstraße",
+        hausnummer: "1",
+        plz: "97516",
+        ort: "Untereuerheim",
+        vertretungFor: null,
+      },
+      member: {
+        reference: "1234",
+        isContact: false,
+        name: "Max Mustermann",
+        mitgliedsnummer: "1234",
+      },
+      postings: [posting],
+      runDate: "2026-06-04",
+      deadlineDate: "2026-06-18",
+      vereinsname: org.vereinsname,
+      kontaktEmail: "mitgliedschaft@untereuerheim.de",
+      sepaFee: "3.00",
+      waiveReturnFee: true,
+    });
+    // Cover + Kündigungsbestätigung = 2 pages. With one open posting the embedded
+    // signature line must not push the closing onto a near-empty third page.
+    const cnt = await pdfPageCount(
+      KulanzSonderkuendigungDocument({ club, letters: [letter], docRef: "KS-2026-0002" }),
+    );
+    expect(cnt).toBe(2);
   });
 
   it("renders the Ehrungsurkunde for both honor kinds", async () => {
