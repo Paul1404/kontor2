@@ -250,13 +250,13 @@ function SidebarBody({
   return (
     <>
       <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
-        <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-soft ring-1 ring-sidebar-border">
-          <img src={branding.logoSrc} alt={branding.name} className="size-9 object-contain" />
-        </div>
-        <div className="flex flex-col leading-tight">
-          <span className="text-[15px] font-semibold tracking-tight">{branding.name}</span>
-          <span className="text-[11px] uppercase tracking-wider text-sidebar-muted">
-            Vereinsverwaltung
+        <img src="/logo-reversed.svg" alt="Kontor²" className="size-10 shrink-0" />
+        <div className="flex min-w-0 flex-col leading-tight">
+          <span className="font-display text-[17px] font-semibold tracking-tight">
+            Kontor<sup className="top-[-0.4em] text-[0.6em] font-semibold text-brand-accent">2</sup>
+          </span>
+          <span className="truncate text-[11px] uppercase tracking-wider text-sidebar-muted">
+            {branding.name || "Vereinsverwaltung"}
           </span>
         </div>
         {showCloseButton ? (
@@ -303,8 +303,8 @@ function SidebarBody({
                   >
                     <span
                       className={cn(
-                        "absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full transition-all",
-                        active ? "bg-brand" : "bg-transparent",
+                        "absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full transition-all",
+                        active ? "bg-brand-accent" : "bg-transparent",
                       )}
                       aria-hidden
                     />
@@ -312,7 +312,7 @@ function SidebarBody({
                       className={cn(
                         "transition-colors",
                         active
-                          ? "text-brand"
+                          ? "text-brand-accent"
                           : "text-sidebar-muted group-hover:text-sidebar-foreground",
                       )}
                     >
@@ -368,7 +368,7 @@ function SidebarBody({
       </nav>
       <div className="flex flex-col gap-1.5 border-t border-sidebar-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent/50 px-3 py-2 text-[11px] text-sidebar-muted">
-          <ShieldCheck className="size-3.5 text-brand" />
+          <ShieldCheck className="size-3.5 text-brand-accent" />
           <span>
             Rolle: <span className="font-medium text-sidebar-foreground">{roleLabel(role)}</span>
           </span>

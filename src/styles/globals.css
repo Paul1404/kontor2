@@ -38,8 +38,8 @@
   --color-sidebar: #14223d; /* Ink Navy */
   --color-sidebar-foreground: #f6f3ec; /* Paper */
   --color-sidebar-muted: #94a0b4;
-  --color-sidebar-accent: #1e3052;
-  --color-sidebar-border: #283a5c;
+  --color-sidebar-accent: #26426f; /* clearly lighter than the sidebar for the active item */
+  --color-sidebar-border: #2c3c5c;
 
   --color-brand: #14223d;
   --color-brand-foreground: #f6f3ec;
@@ -95,7 +95,7 @@
   --color-sidebar: #0b1322; /* deepest ink */
   --color-sidebar-foreground: #f4f1ea;
   --color-sidebar-muted: #8b94a3;
-  --color-sidebar-accent: #18243c;
+  --color-sidebar-accent: #1d3157; /* clearly lighter than the sidebar for the active item */
   --color-sidebar-border: #243352;
 
   --color-brand: #3f67ab;
