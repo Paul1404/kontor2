@@ -1,22 +1,32 @@
 #!/usr/bin/env bun
 /**
- * Rastert die Kontor2-Markenmarke (`public/logo.svg`, Navy-Squircle mit
- * Messing-Monogramm) in den vollständigen Raster-Icon-Satz. Der vektorbasierte
- * `favicon.svg` bleibt unangetastet (er ist bereits die saubere Vektorquelle).
+ * Rendert den vollständigen Raster-Icon-Satz der App aus der Kontor²-Markenmarke
+ * (`Kontor2-Brand/`, dem Markenstamm). Quelle ist das **PNG** `app-icon-1024.png`,
+ * weil die Marken-SVGs den Spectral-Webfont referenzieren, den sharp ohne Browser
+ * nicht laden kann (er würde auf Georgia ausweichen). Im PNG ist Spectral gebacken,
+ * also pixelgetreu zur Marke.
  *
- * Outputs (überschreibt die alten Wappen-Defaults):
+ * Zusätzlich werden die scalierbaren Vektoren (`symbol.svg`) als `public/logo.svg`
+ * und `public/favicon.svg` übernommen. In der App ist Spectral als Webfont geladen,
+ * dort rendert das SVG echtes Spectral; im Browser-Chrome (Favicon) ohne den
+ * Seiten-Font fällt es auf Georgia/Serif zurück (bei 16 px vernachlässigbar).
+ *
+ * Outputs (überschreibt die alten Defaults):
  *   public/logo.png  (1024, UI-Fallback + PDF-Logo)
+ *   public/logo.svg · public/favicon.svg  (Vektor)
  *   public/favicon-{16,32}.png · favicon.ico (32) · apple-touch-icon.png (180)
  *   public/icon-{192,512}.png
  *
  * Lauf: `bun run icons:brand`. Braucht sharp (Dev-Abhängigkeit).
  */
-import { readFile, writeFile } from "node:fs/promises";
+import { copyFile, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 
-const PUBLIC = join(new URL("..", import.meta.url).pathname, "public");
-const MASTER = 1024;
+const ROOT = join(new URL("..", import.meta.url).pathname);
+const PUBLIC = join(ROOT, "public");
+const BRAND = join(ROOT, "Kontor2-Brand");
+const MASTER_SIZE = 1024;
 
 const variants: Array<{ name: string; size: number }> = [
   { name: "favicon-16.png", size: 16 },
@@ -26,7 +36,7 @@ const variants: Array<{ name: string; size: number }> = [
   { name: "icon-512.png", size: 512 },
 ];
 
-/** Minimaler ICO-Container um ein einzelnes PNG (wie in generate-icons.ts). */
+/** Minimaler ICO-Container um ein einzelnes PNG. */
 function makeIco(pngBuf: Buffer, size: number): Buffer {
   const dir = Buffer.alloc(6);
   dir.writeUInt16LE(0, 0);
@@ -43,15 +53,19 @@ function makeIco(pngBuf: Buffer, size: number): Buffer {
 }
 
 async function main(): Promise<void> {
-  const svg = await readFile(join(PUBLIC, "logo.svg"));
-  // Hohe Density, damit das 512er-viewBox scharf auf 1024 rastert.
-  const master = await sharp(svg, { density: 288 }).resize(MASTER, MASTER).png().toBuffer();
+  // Vektoren übernehmen (scharf in der App, wo Spectral geladen ist).
+  await copyFile(join(BRAND, "svg/symbol.svg"), join(PUBLIC, "logo.svg"));
+  await copyFile(join(BRAND, "svg/symbol.svg"), join(PUBLIC, "favicon.svg"));
+  console.log("copied public/logo.svg + favicon.svg (brand symbol)");
+
+  // Raster aus dem Spectral-gebackenen Master.
+  const src = await readFile(join(BRAND, "png/app-icon-1024.png"));
+  const master = await sharp(src).resize(MASTER_SIZE, MASTER_SIZE).png().toBuffer();
   await writeFile(join(PUBLIC, "logo.png"), master);
   console.log("wrote public/logo.png");
 
   for (const v of variants) {
-    const out = join(PUBLIC, v.name);
-    await sharp(master).resize(v.size, v.size).png().toFile(out);
+    await sharp(master).resize(v.size, v.size).png().toFile(join(PUBLIC, v.name));
     console.log(`wrote public/${v.name}`);
   }
 

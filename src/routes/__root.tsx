@@ -48,9 +48,15 @@ export const Route = createRootRoute({
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { name: "color-scheme", content: "light dark" },
         { title: `${b?.anzeigename?.trim() || "Kontor2"}: Vereinsverwaltung` },
-        { name: "theme-color", content: b?.primaryColor || "#335c99" },
+        { name: "theme-color", content: b?.primaryColor || "#14223D" },
       ],
       links: [
+        { rel: "preconnect", href: "https://fonts.googleapis.com" },
+        { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:wght@500;600&display=swap",
+        },
         { rel: "stylesheet", href: appCss },
         ...iconLinks,
         { rel: "manifest", href: "/api/branding/manifest" },
