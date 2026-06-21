@@ -429,6 +429,109 @@ export const archiveRouter = {
       };
     }),
 
+  /**
+   * Extract the beitrag postings that were actually DEBITED in the Linear SEPA
+   * runs, by joining `lastprots` (the debit lines) -> `mgsolln` (via SollGUID)
+   * -> `adresse` (via AdrNr). This is the authoritative "who was collected" from
+   * the legacy system: the live `eingezogen` status is import-derived and has
+   * been seen to be wrong. Each entry carries a `returned` flag (Rücklastschrift
+   * via RuckLastGUID); net paid = debited and not returned. Filter by year and/or
+   * Mitgliedsnummer (an empty result for a member = that member was NOT collected).
+   */
+  collectedPostings: adminProc
+    .input(
+      v.object({
+        ...VersionSelector,
+        year: v.optional(v.nullable(v.pipe(v.number(), v.integer()))),
+        mitgliedsnummer: v.optional(v.nullable(v.string())),
+        limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(2000)), 500),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const version = await resolveVersion(context.db, input);
+      const loadAll = async (tableName: string): Promise<Array<Record<string, unknown>>> => {
+        const table = await loadTable(context.db, version.id, tableName);
+        const rows = await context.db
+          .select({ data: linearArchiveRowsTable.data })
+          .from(linearArchiveRowsTable)
+          .where(eq(linearArchiveRowsTable.tableId, table.id));
+        return rows.map((r) => r.data as Record<string, unknown>);
+      };
+
+      const [debits, solls, addresses] = await Promise.all([
+        loadAll("lastprots"),
+        loadAll("mgsolln"),
+        loadAll("adresse"),
+      ]);
+
+      const sollByGuid = new Map<string, Record<string, unknown>>();
+      for (const s of solls) {
+        if (typeof s.GUID === "string") sollByGuid.set(s.GUID, s);
+      }
+      const adrByNr = new Map<number, Record<string, unknown>>();
+      for (const a of addresses) {
+        const n = Number(a.AdrNr);
+        if (Number.isFinite(n)) adrByNr.set(n, a);
+      }
+
+      const wantMgl = input.mitgliedsnummer?.trim();
+      type Entry = {
+        mitgliedsnummer: string | null;
+        adrNr: number | null;
+        name: string | null;
+        jahr: number | null;
+        art: string | null;
+        betrag: string;
+        run: string | null;
+        returned: boolean;
+      };
+      const entries: Entry[] = [];
+      let returnedCount = 0;
+      let netPaidSum = 0;
+      for (const d of debits) {
+        const soll = typeof d.SollGUID === "string" ? sollByGuid.get(d.SollGUID) : undefined;
+        const adr = soll ? adrByNr.get(Number(soll.AdrNr)) : undefined;
+        const mgl = String(soll?.MitglNr ?? "").trim();
+        const jahr = soll?.Jahr != null ? Number(soll.Jahr) : null;
+        if (input.year != null && jahr !== input.year) continue;
+        if (wantMgl && mgl !== wantMgl) continue;
+        const betrag = Number(d.Betrag ?? soll?.Betrag ?? 0);
+        const returned = d.RuckLastGUID != null && String(d.RuckLastGUID).trim() !== "";
+        if (returned) returnedCount++;
+        else netPaidSum += Number.isFinite(betrag) ? betrag : 0;
+        const name = adr
+          ? [adr.Vorname, adr.Nachname]
+              .map((x) => String(x ?? "").trim())
+              .filter(Boolean)
+              .join(" ") || String(adr.Kurzname ?? adr.Firma1 ?? "").trim()
+          : "";
+        entries.push({
+          mitgliedsnummer: mgl || null,
+          adrNr: soll ? Number(soll.AdrNr) : null,
+          name: name || null,
+          jahr,
+          art: typeof soll?.ArtName === "string" ? soll.ArtName : null,
+          betrag: (Number.isFinite(betrag) ? betrag : 0).toFixed(2),
+          run: typeof d.SepaGUID === "string" ? d.SepaGUID : null,
+          returned,
+        });
+      }
+      entries.sort(
+        (a, b) => (a.name ?? "").localeCompare(b.name ?? "") || (a.jahr ?? 0) - (b.jahr ?? 0),
+      );
+
+      return {
+        version: version.version,
+        summary: {
+          debited: entries.length,
+          returned: returnedCount,
+          netPaid: entries.length - returnedCount,
+          netPaidSum: netPaidSum.toFixed(2),
+        },
+        postings: entries.slice(0, input.limit),
+      };
+    }),
+
   /** Schema diff between two versions: added/removed tables and columns. */
   schemaDiff: vorstandProc
     .input(

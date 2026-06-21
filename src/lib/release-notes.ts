@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.111.0",
+    date: "2026-06-21",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "SQL-Archiv: Neue Auswertung der tatsächlich eingezogenen Beiträge aus dem Linear-Dump (inkl. Kennzeichnung von Rücklastschriften), auch über die KI-Schnittstelle. Hilft, Posten zu finden, die beim Import fälschlich als bezahlt markiert wurden.",
+      },
+    ],
+  },
+  {
     version: "0.110.2",
     date: "2026-06-21",
     changes: [

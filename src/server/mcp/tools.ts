@@ -853,6 +853,19 @@ const TOOLS: McpTool[] = [
     }),
     execute: (context, input) => call(appRouter.archive.columnValues, input, { context }),
   }),
+  defineTool({
+    name: "archive_collected_postings",
+    description:
+      "Extrahiert aus dem Linear-SQL-Archiv die tatsächlich EINGEZOGENEN Beitragsposten (join lastprots -> mgsolln -> adresse). Belastbare Quelle dafür, wer im Alt-System wirklich abgebucht wurde -- die Live-'eingezogen'-Markierung ist importabgeleitet und unzuverlässig. Jeder Posten hat ein returned-Flag (Rücklastschrift); netto bezahlt = nicht returned. Optional nach `year` und `mitgliedsnummer` filtern (leeres Ergebnis für eine Mitgliedsnummer => dieser Posten wurde NICHT eingezogen). Gibt eine Zusammenfassung (debited/returned/netPaid/netPaidSum) + die Liste zurück. `version`/`versionId` weglassen = neueste. Legacy-Personendaten, daher admin only.",
+    minRole: "admin",
+    input: v.object({
+      ...VersionSelector,
+      year: v.optional(v.nullable(v.pipe(v.number(), v.integer()))),
+      mitgliedsnummer: v.optional(v.nullable(v.string())),
+      limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(2000))),
+    }),
+    execute: (context, input) => call(appRouter.archive.collectedPostings, input, { context }),
+  }),
 ];
 
 export function allTools(): readonly McpTool[] {
