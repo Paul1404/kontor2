@@ -532,6 +532,108 @@ export const archiveRouter = {
       };
     }),
 
+  /**
+   * Per-year collection audit: which beitrag postings of a year were actually
+   * put into a generated SEPA run/XML vs. never collected. The reliable signal
+   * is "was the posting ever in a run" (`mgsolln.SepaGUID` set, or its GUID
+   * appears in lastprots/lastprotsh) -- NOT `mgsolln.Offen`, which Linear never
+   * clears (no payment feedback), so it stays >0 even for debited postings.
+   * Returns a summary (debited vs uncollected, count + sum) and the list of the
+   * truly uncollected postings (the actionable arrears). Invoice payers
+   * (AufRechnung = Ja) are excluded unless includeInvoice.
+   */
+  collectionAudit: adminProc
+    .input(
+      v.object({
+        ...VersionSelector,
+        year: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
+        includeInvoice: v.optional(v.boolean(), false),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const version = await resolveVersion(context.db, input);
+      const loadAll = async (tableName: string): Promise<Array<Record<string, unknown>>> => {
+        const table = await loadTable(context.db, version.id, tableName);
+        const rows = await context.db
+          .select({ data: linearArchiveRowsTable.data })
+          .from(linearArchiveRowsTable)
+          .where(eq(linearArchiveRowsTable.tableId, table.id));
+        return rows.map((r) => r.data as Record<string, unknown>);
+      };
+
+      const [solls, addresses, lp, lph] = await Promise.all([
+        loadAll("mgsolln"),
+        loadAll("adresse"),
+        loadAll("lastprots"),
+        loadAll("lastprotsh"),
+      ]);
+      const collectedGuids = new Set<string>();
+      for (const r of [...lp, ...lph]) {
+        if (typeof r.SollGUID === "string") collectedGuids.add(r.SollGUID);
+      }
+      const adrName = new Map<number, string>();
+      for (const a of addresses) {
+        const n = Number(a.AdrNr);
+        if (!Number.isFinite(n)) continue;
+        const name =
+          [a.Vorname, a.Nachname]
+            .map((x) => String(x ?? "").trim())
+            .filter(Boolean)
+            .join(" ") || String(a.Kurzname ?? a.Firma1 ?? "").trim();
+        adrName.set(n, name);
+      }
+      const ne = (x: unknown) => x != null && String(x).trim() !== "";
+      const isInvoice = (r: Record<string, unknown>) =>
+        /^(ja|j)$/i.test(String(r.AufRechnung ?? "").trim());
+
+      type Row = {
+        mitgliedsnummer: string | null;
+        adrNr: number | null;
+        name: string | null;
+        art: string | null;
+        betrag: string;
+      };
+      const uncollected: Row[] = [];
+      let debitedCount = 0;
+      let debitedSum = 0;
+      let uncollectedSum = 0;
+      for (const r of solls) {
+        if (Number(r.Jahr) !== input.year) continue;
+        if (!input.includeInvoice && isInvoice(r)) continue;
+        const betrag = Number(r.Betrag ?? 0);
+        const amt = Number.isFinite(betrag) ? betrag : 0;
+        const debited =
+          ne(r.SepaGUID) || (typeof r.GUID === "string" && collectedGuids.has(r.GUID));
+        if (debited) {
+          debitedCount++;
+          debitedSum += amt;
+          continue;
+        }
+        uncollectedSum += amt;
+        uncollected.push({
+          mitgliedsnummer: String(r.MitglNr ?? "").trim() || null,
+          adrNr: Number.isFinite(Number(r.AdrNr)) ? Number(r.AdrNr) : null,
+          name: adrName.get(Number(r.AdrNr)) || null,
+          art: typeof r.ArtName === "string" ? r.ArtName : null,
+          betrag: amt.toFixed(2),
+        });
+      }
+      uncollected.sort(
+        (a, b) => Number(b.betrag) - Number(a.betrag) || (a.name ?? "").localeCompare(b.name ?? ""),
+      );
+
+      return {
+        version: version.version,
+        year: input.year,
+        summary: {
+          postings: debitedCount + uncollected.length,
+          debited: { count: debitedCount, sum: debitedSum.toFixed(2) },
+          uncollected: { count: uncollected.length, sum: uncollectedSum.toFixed(2) },
+        },
+        uncollected,
+      };
+    }),
+
   /** Schema diff between two versions: added/removed tables and columns. */
   schemaDiff: vorstandProc
     .input(

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   CheckCircle2,
+  Coins,
   Database,
   GitCompareArrows,
   KeyRound,
@@ -50,7 +51,7 @@ function cellText(value: unknown): string {
   return String(value);
 }
 
-type TabKey = "overview" | "table" | "search" | "relationships";
+type TabKey = "overview" | "table" | "search" | "relationships" | "audit";
 
 function ArchivePage() {
   const queryClient = useQueryClient();
@@ -126,6 +127,7 @@ function ArchivePage() {
                 { value: "table", label: "Tabelle", icon: Database },
                 { value: "search", label: "Suche", icon: Search },
                 { value: "relationships", label: "Beziehungen", icon: Link2 },
+                { value: "audit", label: "Einzug", icon: Coins },
               ]}
             />
             {tab === "overview" ? (
@@ -146,6 +148,7 @@ function ArchivePage() {
             ) : null}
             {tab === "search" ? <SearchTab version={effectiveVersion} /> : null}
             {tab === "relationships" ? <RelationshipsTab version={effectiveVersion} /> : null}
+            {tab === "audit" ? <CollectionAuditTab version={effectiveVersion} /> : null}
           </CardContent>
         </Card>
       )}
@@ -777,6 +780,113 @@ function RelationshipsTab({ version }: { version: number }) {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function eur(x: string | number): string {
+  const n = typeof x === "number" ? x : Number.parseFloat(x);
+  return `${Number.isFinite(n) ? n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0,00"} €`;
+}
+
+function AuditStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "success" | "warning";
+}) {
+  const toneClass =
+    tone === "success" ? "text-success" : tone === "warning" ? "text-warning" : "text-foreground";
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 shadow-soft">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={`mt-0.5 text-lg font-semibold tabular-nums ${toneClass}`}>{value}</div>
+    </div>
+  );
+}
+
+function CollectionAuditTab({ version }: { version: number }) {
+  const [year, setYear] = useState(2026);
+  const audit = useQuery({
+    queryKey: ["archive.collectionAudit", version, year],
+    queryFn: () => orpc.archive.collectionAudit({ version, year }),
+  });
+  const d = audit.data;
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-end gap-4">
+        <Label className="flex flex-col gap-1">
+          <span className="text-xs font-medium">Beitragsjahr</span>
+          <Input
+            type="number"
+            value={year}
+            min={2000}
+            max={2100}
+            onChange={(e) => setYear(Number(e.target.value) || year)}
+            className="w-28"
+          />
+        </Label>
+        <p className="max-w-md text-xs text-muted-foreground">
+          „Eingezogen" = der Posten war in einem SEPA-Lauf/einer generierten XML. „Nie eingezogen"
+          sind die echten offenen Beiträge. Das Offen-Feld aus Linear ist unzuverlässig (wird nie
+          zurückgesetzt) und wird hier bewusst ignoriert.
+        </p>
+      </div>
+
+      {audit.isLoading ? (
+        <p className="text-sm text-muted-foreground">Wird ausgewertet…</p>
+      ) : !d ? (
+        <p className="text-sm text-muted-foreground">Keine Daten.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <AuditStat label="Posten gesamt" value={String(d.summary.postings)} />
+            <AuditStat
+              label="Eingezogen (in XML)"
+              value={`${d.summary.debited.count} · ${eur(d.summary.debited.sum)}`}
+              tone="success"
+            />
+            <AuditStat
+              label="Nie eingezogen"
+              value={`${d.summary.uncollected.count} · ${eur(d.summary.uncollected.sum)}`}
+              tone="warning"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <Coins className="size-4" />
+              Nie eingezogen {d.year} ({d.uncollected.length})
+            </h3>
+            {d.uncollected.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Alle SEPA-Posten dieses Jahres waren in einem Lauf.
+              </p>
+            ) : (
+              <div className="flex flex-col divide-y divide-border">
+                {d.uncollected.map((r) => (
+                  <div
+                    key={`${r.adrNr}-${r.mitgliedsnummer}`}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm"
+                  >
+                    <span className="min-w-44 flex-1 font-medium">{r.name ?? "—"}</span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {r.mitgliedsnummer ?? "—"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{r.art ?? ""}</span>
+                    <span className="w-20 text-right font-medium tabular-nums">
+                      {eur(r.betrag)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

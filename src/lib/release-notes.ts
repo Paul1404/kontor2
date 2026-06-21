@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.112.0",
+    date: "2026-06-21",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "SQL-Archiv: Neuer Reiter Einzug (und KI-Schnittstelle), der je Beitragsjahr vergleicht, welche Beiträge tatsächlich in einen SEPA-Lauf kamen und welche nie eingezogen wurden. Grundlage sind die generierten Läufe, nicht das unzuverlässige Offen-Feld aus Linear. Zeigt die wirklich offenen Posten.",
+      },
+    ],
+  },
+  {
     version: "0.111.0",
     date: "2026-06-21",
     changes: [

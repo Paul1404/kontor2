@@ -866,6 +866,18 @@ const TOOLS: McpTool[] = [
     }),
     execute: (context, input) => call(appRouter.archive.collectedPostings, input, { context }),
   }),
+  defineTool({
+    name: "archive_collection_audit",
+    description:
+      "Beitrags-Einzugs-Audit pro Jahr aus dem Linear-Archiv: vergleicht, welche Posten tatsächlich in einen SEPA-Lauf/eine XML kamen vs. NIE eingezogen wurden. Verlässliches Signal ist 'war je in einem Lauf' (mgsolln.SepaGUID gesetzt oder GUID in lastprots/lastprotsh) -- NICHT mgsolln.Offen (das setzt Linear nie zurück). Pflichtfeld `year`. Gibt summary (debited vs uncollected, jeweils count+sum) + die Liste der wirklich nicht eingezogenen Posten (Name, Mitgliedsnummer, Beitragsart, Betrag) zurück. Rechnungszahler ausgeschlossen, außer includeInvoice. Legacy-Personendaten, admin only.",
+    minRole: "admin",
+    input: v.object({
+      ...VersionSelector,
+      year: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
+      includeInvoice: v.optional(v.boolean()),
+    }),
+    execute: (context, input) => call(appRouter.archive.collectionAudit, input, { context }),
+  }),
 ];
 
 export function allTools(): readonly McpTool[] {
