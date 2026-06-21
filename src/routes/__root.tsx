@@ -2,7 +2,7 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import type { ReactNode } from "react";
 import { ErrorPanel, NotFoundPanel } from "~/components/layout/ErrorPanel";
 import { Toaster } from "~/components/ui/toaster";
-import { type Branding, BrandingProvider, brandingIconUrl } from "~/lib/branding";
+import { type Branding, BrandingProvider } from "~/lib/branding";
 import { brandColorCss } from "~/lib/branding-color";
 import { orpc } from "~/lib/orpc";
 import { ThemeProvider, themeInitScript } from "~/lib/theme";
@@ -29,19 +29,16 @@ export const Route = createRootRoute({
   // Favicon, sonst gilt das gebündelte Kontor2-Zeichen.
   head: ({ loaderData }) => {
     const b = loaderData?.branding ?? null;
-    const iconUrl = b ? brandingIconUrl(b) : null;
-    const iconLinks = iconUrl
-      ? [
-          { rel: "icon", href: iconUrl },
-          { rel: "apple-touch-icon", href: iconUrl },
-        ]
-      : [
-          { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
-          { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32.png" },
-          { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16.png" },
-          { rel: "shortcut icon", href: "/favicon.ico" },
-          { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
-        ];
+    // The browser favicon is part of the app chrome and stays Kontor², not the
+    // Verein's logo. Per-Verein branding belongs on member-facing documents, not
+    // the tab icon (otherwise the club looks like the software).
+    const iconLinks = [
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32.png" },
+      { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16.png" },
+      { rel: "shortcut icon", href: "/favicon.ico" },
+      { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
+    ];
     return {
       meta: [
         { charSet: "utf-8" },
