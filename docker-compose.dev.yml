@@ -1,0 +1,67 @@
+# Local development stack: Postgres + Redis + MinIO (S3), all disposable.
+# The app itself runs on the host (`bun run start`) against these services.
+#
+#   bun run dev:up      start services + apply migrations
+#   bun run dev:down    stop services (data kept in volumes)
+#   bun run dev:reset   wipe volumes and start fresh
+#
+# See docs/local-dev.md. Credentials here are local-only throwaway values.
+name: kontor2-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kontor2
+      POSTGRES_PASSWORD: kontor2
+      POSTGRES_DB: kontor2_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kontor2 -d kontor2_dev"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console
+    volumes:
+      - miniodata:/data
+
+  # One-shot: wait for MinIO, then create the app bucket. Idempotent.
+  createbucket:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do echo 'waiting for minio'; sleep 1; done &&
+      mc mb --ignore-existing local/kontor2-dev &&
+      echo 'bucket kontor2-dev ready'
+      "
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
