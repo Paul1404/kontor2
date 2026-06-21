@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.110.1",
+    date: "2026-06-21",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Das Menü tritt jetzt durchgängig als Kontor² auf (Zeichen und Name); der Vereinsname steht als Kontext darunter, statt die Anwendung wie eine reine Vereins-App wirken zu lassen. Der aktive Menüpunkt ist durch einen Messing-Akzent klar erkennbar.",
+      },
+    ],
+  },
+  {
     version: "0.110.0",
     date: "2026-06-21",
     changes: [

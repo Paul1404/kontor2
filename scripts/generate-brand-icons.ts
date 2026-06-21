@@ -56,7 +56,9 @@ async function main(): Promise<void> {
   // Vektoren übernehmen (scharf in der App, wo Spectral geladen ist).
   await copyFile(join(BRAND, "svg/symbol.svg"), join(PUBLIC, "logo.svg"));
   await copyFile(join(BRAND, "svg/symbol.svg"), join(PUBLIC, "favicon.svg"));
-  console.log("copied public/logo.svg + favicon.svg (brand symbol)");
+  // Reversed (Outline) Variante für dunkle Flächen, z. B. die Navy-Sidebar.
+  await copyFile(join(BRAND, "svg/symbol-reversed.svg"), join(PUBLIC, "logo-reversed.svg"));
+  console.log("copied public/logo.svg + favicon.svg + logo-reversed.svg (brand symbol)");
 
   // Raster aus dem Spectral-gebackenen Master.
   const src = await readFile(join(BRAND, "png/app-icon-1024.png"));
