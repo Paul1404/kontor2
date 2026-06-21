@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.110.2",
+    date: "2026-06-21",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Das Browser-Symbol (Favicon) zeigt jetzt durchgängig das Kontor²-Zeichen statt eines Vereinslogos. Vereins-Logos bleiben auf den Briefen und im öffentlichen Antrag.",
+      },
+    ],
+  },
+  {
     version: "0.110.1",
     date: "2026-06-21",
     changes: [
