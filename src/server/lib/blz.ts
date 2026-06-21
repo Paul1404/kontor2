@@ -25,7 +25,7 @@ export function extractBankCode(iban: string): { country: string; bankCode: stri
 export function lookupBankByIban(iban: string | null | undefined): BlzEntry | null {
   if (!iban) return null;
   const extracted = extractBankCode(iban);
-  if (!extracted || extracted.country !== "DE") return null;
+  if (extracted?.country !== "DE") return null;
   return DE_BLZ[extracted.bankCode] ?? null;
 }
 

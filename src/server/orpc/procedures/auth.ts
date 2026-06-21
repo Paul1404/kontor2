@@ -9,7 +9,6 @@ import { wouldRemoveLastAdmin } from "~/server/auth/last-admin-guard";
 import { sendInviteEmail } from "~/server/auth/send-invite";
 import { completeSetup, isInSetupMode } from "~/server/auth/setup";
 import { invitations, roleEnum, users } from "~/server/db/schema/auth";
-import { env } from "~/server/env";
 import { clientIp } from "~/server/lib/client-ip";
 import { logger } from "~/server/lib/logger";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";

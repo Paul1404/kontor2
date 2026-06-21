@@ -1,5 +1,5 @@
 import { call, ORPCError } from "@orpc/server";
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Session } from "~/server/auth/auth";
 import { db } from "~/server/db/client";

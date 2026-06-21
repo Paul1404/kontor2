@@ -274,11 +274,6 @@ export const CATEGORIES: CategoryMeta[] = [
 /** A live member: not soft-deleted, neither exited nor deceased. */
 const ACTIVE = "deleted_at is null and austritt is null and verstorben_am is null";
 
-/** Active direct-debit contract that is not cancelled or expired. */
-const ACTIVE_DD =
-  "exists (select 1 from contracts c where c.member_id = members.id and c.is_direct_debit = true " +
-  "and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date))";
-
 /**
  * Active direct-debit contract with something to actually collect (betrag > 0).
  * A 0-Euro or beitragsfrei contract flagged as direct debit is noise -- there is

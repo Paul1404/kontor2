@@ -6,7 +6,6 @@ import { authBaseUrl } from "~/server/auth/auth";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { portalChangeRequestsTable, portalTokensTable } from "~/server/db/schema/portal";
-import { env } from "~/server/env";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { base, observability, vorstandProc } from "~/server/orpc/base";
 import {
