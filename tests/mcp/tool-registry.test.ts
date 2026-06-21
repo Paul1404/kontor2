@@ -69,6 +69,7 @@ const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
   archive_table_rows: "admin",
   archive_search: "admin",
   archive_column_values: "admin",
+  archive_collected_postings: "admin",
 };
 
 const MUTATION_TOOLS = [
