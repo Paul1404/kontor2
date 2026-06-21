@@ -10,6 +10,7 @@ import {
   HorizontalBars,
   PALETTE,
 } from "~/components/charts";
+import { PageHeader } from "~/components/layout/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { QueryError } from "~/components/ui/query-error";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -84,12 +85,7 @@ function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Übersicht</h1>
-        <p className="text-sm text-muted-foreground">
-          Übersicht über Mitgliederstand und Aktivität.
-        </p>
-      </div>
+      <PageHeader title="Übersicht" description="Mitgliederstand und Aktivität auf einen Blick." />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => (

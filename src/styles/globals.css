@@ -3,46 +3,52 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(220 25% 10%);
+  /* Kontor² brand palette: Ink Navy, Brass, Paper, Slate. */
+  --color-background: #f6f3ec; /* Paper */
+  --color-foreground: #14223d; /* Ink Navy */
 
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(220 25% 10%);
+  --color-card: #ffffff;
+  --color-card-foreground: #14223d;
 
-  --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(220 25% 10%);
+  --color-popover: #ffffff;
+  --color-popover-foreground: #14223d;
 
-  --color-primary: hsl(216 50% 40%);
-  --color-primary-foreground: hsl(0 0% 100%);
+  --color-primary: #14223d; /* Ink Navy */
+  --color-primary-foreground: #f6f3ec;
 
-  --color-secondary: hsl(220 14% 96%);
-  --color-secondary-foreground: hsl(220 25% 10%);
+  --color-secondary: #ece6d8;
+  --color-secondary-foreground: #14223d;
 
-  --color-muted: hsl(220 14% 96%);
-  --color-muted-foreground: hsl(220 10% 44%);
+  --color-muted: #ece6d8;
+  --color-muted-foreground: #5b6472; /* Slate */
 
-  --color-accent: hsl(220 14% 94%);
-  --color-accent-foreground: hsl(220 25% 10%);
+  --color-accent: #e6dec9;
+  --color-accent-foreground: #14223d;
 
-  --color-destructive: hsl(0 72% 45%);
-  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-destructive: hsl(0 70% 42%);
+  --color-destructive-foreground: #ffffff;
 
-  --color-success: hsl(152 60% 36%);
-  --color-warning: hsl(38 92% 50%);
+  --color-success: hsl(152 55% 30%);
+  --color-warning: hsl(35 75% 40%);
 
-  --color-border: hsl(220 14% 91%);
-  --color-input: hsl(220 14% 91%);
-  --color-ring: hsl(216 50% 40%);
+  --color-border: #ddd4c0;
+  --color-input: #ddd4c0;
+  --color-ring: #14223d;
 
-  --color-sidebar: hsl(220 25% 8%);
-  --color-sidebar-foreground: hsl(220 14% 92%);
-  --color-sidebar-muted: hsl(220 14% 60%);
-  --color-sidebar-accent: hsl(220 25% 14%);
-  --color-sidebar-border: hsl(220 18% 18%);
+  --color-sidebar: #14223d; /* Ink Navy */
+  --color-sidebar-foreground: #f6f3ec; /* Paper */
+  --color-sidebar-muted: #94a0b4;
+  --color-sidebar-accent: #1e3052;
+  --color-sidebar-border: #283a5c;
 
-  --color-brand: hsl(216 50% 40%);
-  --color-brand-foreground: hsl(0 0% 100%);
-  --color-brand-accent: hsl(40 52% 54%);
+  --color-brand: #14223d;
+  --color-brand-foreground: #f6f3ec;
+  --color-brand-accent: #a6864e; /* Brass */
+
+  --font-sans:
+    "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-display: "Spectral", Georgia, "Times New Roman", serif;
 
   --radius: 0.75rem;
   --radius-sm: 0.5rem;
@@ -55,46 +61,46 @@
 }
 
 .dark {
-  --color-background: hsl(222 22% 6%);
-  --color-foreground: hsl(220 14% 96%);
+  --color-background: #0d1524; /* deep ink */
+  --color-foreground: #f4f1ea; /* Paper */
 
-  --color-card: hsl(222 22% 9%);
-  --color-card-foreground: hsl(220 14% 96%);
+  --color-card: #14223d; /* Ink Navy */
+  --color-card-foreground: #f4f1ea;
 
-  --color-popover: hsl(222 22% 9%);
-  --color-popover-foreground: hsl(220 14% 96%);
+  --color-popover: #14223d;
+  --color-popover-foreground: #f4f1ea;
 
-  --color-primary: hsl(214 58% 60%);
-  --color-primary-foreground: hsl(0 0% 100%);
+  --color-primary: #3f67ab; /* steel-navy, readable on dark */
+  --color-primary-foreground: #ffffff;
 
-  --color-secondary: hsl(222 18% 13%);
-  --color-secondary-foreground: hsl(220 14% 96%);
+  --color-secondary: #1b2942;
+  --color-secondary-foreground: #f4f1ea;
 
-  --color-muted: hsl(222 18% 13%);
-  --color-muted-foreground: hsl(220 10% 64%);
+  --color-muted: #1b2942;
+  --color-muted-foreground: #9aa3b4;
 
-  --color-accent: hsl(222 18% 16%);
-  --color-accent-foreground: hsl(220 14% 96%);
+  --color-accent: #21314e;
+  --color-accent-foreground: #f4f1ea;
 
-  --color-destructive: hsl(0 70% 55%);
-  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-destructive: hsl(0 70% 58%);
+  --color-destructive-foreground: #ffffff;
 
-  --color-success: hsl(152 60% 46%);
-  --color-warning: hsl(38 92% 56%);
+  --color-success: hsl(152 55% 50%);
+  --color-warning: hsl(38 90% 60%);
 
-  --color-border: hsl(222 18% 18%);
-  --color-input: hsl(222 18% 20%);
-  --color-ring: hsl(214 58% 60%);
+  --color-border: #273755;
+  --color-input: #2a3c5c;
+  --color-ring: #3f67ab;
 
-  --color-sidebar: hsl(222 24% 5%);
-  --color-sidebar-foreground: hsl(220 14% 92%);
-  --color-sidebar-muted: hsl(220 14% 56%);
-  --color-sidebar-accent: hsl(222 22% 11%);
-  --color-sidebar-border: hsl(220 18% 16%);
+  --color-sidebar: #0b1322; /* deepest ink */
+  --color-sidebar-foreground: #f4f1ea;
+  --color-sidebar-muted: #8b94a3;
+  --color-sidebar-accent: #18243c;
+  --color-sidebar-border: #243352;
 
-  --color-brand: hsl(214 58% 60%);
-  --color-brand-foreground: hsl(0 0% 100%);
-  --color-brand-accent: hsl(40 58% 60%);
+  --color-brand: #3f67ab;
+  --color-brand-foreground: #ffffff;
+  --color-brand-accent: #c7a872; /* Brass on dark */
 
   --shadow-soft: 0 1px 2px hsl(0 0% 0% / 0.4), 0 1px 1px hsl(0 0% 0% / 0.25);
   --shadow-card: 0 1px 3px hsl(0 0% 0% / 0.4), 0 1px 2px hsl(0 0% 0% / 0.25);
@@ -117,11 +123,15 @@
     color-scheme: dark;
   }
   body {
-    font-family:
-      ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-      sans-serif;
+    font-family: var(--font-sans);
     background-color: var(--color-background);
     color: var(--color-foreground);
+  }
+  /* Brand display face (Spectral) for page and section titles; UI/body stays
+     IBM Plex Sans. Card titles and smaller headings keep the sans face. */
+  h1,
+  h2 {
+    font-family: var(--font-display);
   }
   *,
   *::before,

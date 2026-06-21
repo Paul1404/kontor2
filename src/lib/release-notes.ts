@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.110.0",
+    date: "2026-06-21",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Durchgängige Kontor²-Markenidentität: neues serifes K²-Zeichen samt Favicons und App-Icon, die offizielle Farbpalette (Ink Navy, Messing, Papier, Schiefer) und die Markenschriften Spectral und IBM Plex Sans. Heller Hintergrund ist jetzt warmes Papier, Schaltflächen in Ink Navy.",
+      },
+    ],
+  },
+  {
     version: "0.109.2",
     date: "2026-06-21",
     changes: [
