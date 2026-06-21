@@ -23,6 +23,12 @@ bun-debug.log*
 .idea
 .DS_Store
 
+# Claude Code: personal/machine-local config. settings.local.json is per-user;
+# launch.json is the local preview recipe (coupled to `railway run`). Shared
+# .claude/ config (e.g. settings.json, skills) can still be committed explicitly.
+.claude/settings.local.json
+.claude/launch.json
+
 # tests
 coverage
 .vitest
