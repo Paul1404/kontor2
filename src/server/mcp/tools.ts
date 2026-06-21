@@ -633,10 +633,11 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "reopen_sollstellung",
     description:
-      "Öffnet eine fälschlich stornierte Sollstellung (sollStellungId aus get_member/get_fee_run) wieder als offene Forderung: status -> open, bezahlt 0, offen = voller Betrag, Mahnstufe 0. Für Posten, die in manueller Lauf-Bearbeitung storniert wurden, aber tatsächlich noch geschuldet sind (z. B. geplatzte Lastschrift, die per Brief angefordert wird). Eine eingezogene/zurückgegangene Lastschrift NICHT hierüber, sondern mit record_sepa_return. Bereits offene/zurückgegangene Posten bleiben unverändert. Auditiert.",
+      "Öffnet eine fälschlich stornierte Sollstellung (sollStellungId aus get_member/get_fee_run) wieder als offene Forderung: status -> open, bezahlt 0, offen = voller Betrag, Mahnstufe 0. Für Posten, die in manueller Lauf-Bearbeitung storniert wurden, aber tatsächlich noch geschuldet sind (z. B. geplatzte Lastschrift, die per Brief angefordert wird). Eine eingezogene/zurückgegangene Lastschrift NICHT hierüber, sondern mit record_sepa_return. Optional falligkeitsdatum (YYYY-MM-DD), um das Fälligkeitsdatum zu korrigieren (Mahn-/Kulanz-Stichtag); wird auch auf bereits offene Posten angewandt. Ohne falligkeitsdatum bleiben offene/zurückgegangene Posten unverändert. Auditiert.",
     minRole: "vorstand",
     input: v.object({
       sollStellungId: v.string(),
+      falligkeitsdatum: v.optional(v.nullable(DateInput)),
       notes: v.optional(v.nullable(v.string())),
     }),
     execute: (context, input) => call(appRouter.feeRuns.reopenSollstellung, input, { context }),

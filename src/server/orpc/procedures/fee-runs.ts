@@ -1098,6 +1098,16 @@ export const feeRunsRouter = {
     .input(
       v.object({
         sollStellungId: v.string(),
+        /**
+         * Optionally re-date the posting (the due date / DIN cutoff that gates
+         * dunning and Kulanz letters). Applied both when reviving a cancelled
+         * posting and on an already-open one, so a wrong Fälligkeitsdatum can be
+         * corrected without cancelling first.
+         */
+        falligkeitsdatum: v.optional(
+          v.nullable(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/))),
+          null,
+        ),
         notes: v.optional(v.nullable(v.string()), null),
       }),
     )
@@ -1111,6 +1121,7 @@ export const feeRunsRouter = {
             paidAmount: sollStellungenTable.paidAmount,
             openAmount: sollStellungenTable.openAmount,
             mahnstufe: sollStellungenTable.mahnstufe,
+            falligkeitsdatum: sollStellungenTable.falligkeitsdatum,
             notes: sollStellungenTable.notes,
           })
           .from(sollStellungenTable)
@@ -1119,8 +1130,30 @@ export const feeRunsRouter = {
         if (!row) {
           throw new ORPCError("NOT_FOUND", { message: "Sollstellung nicht gefunden." });
         }
-        // Already a live, dunnable claim -- nothing to do.
-        if (row.status === "open" || row.status === "returned") return;
+        const newFaellig =
+          input.falligkeitsdatum && input.falligkeitsdatum !== row.falligkeitsdatum
+            ? input.falligkeitsdatum
+            : null;
+
+        // Already a live, dunnable claim: only re-date if asked, else nothing to do.
+        if (row.status === "open" || row.status === "returned") {
+          if (!newFaellig) return;
+          await tx
+            .update(sollStellungenTable)
+            .set({ falligkeitsdatum: newFaellig, updatedAt: new Date() })
+            .where(eq(sollStellungenTable.id, input.sollStellungId));
+          await appendAudit(tx, {
+            entityType: "soll_stellung",
+            entityId: row.id,
+            action: "update",
+            source: "ui",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            changes: { falligkeitsdatum: { before: row.falligkeitsdatum, after: newFaellig } },
+            requestId: context.requestId ?? null,
+          });
+          return;
+        }
         if (row.status === "paid") {
           throw new ORPCError("VALIDATION_FAILED", {
             message: "Ein bezahlter Posten wird nicht wiedereröffnet. Erst die Zahlung klären.",
@@ -1140,6 +1173,7 @@ export const feeRunsRouter = {
             paidAmount: "0",
             openAmount: row.amount,
             mahnstufe: 0,
+            ...(newFaellig ? { falligkeitsdatum: newFaellig } : {}),
             notes: input.notes ?? row.notes,
             updatedAt: new Date(),
           })
@@ -1157,6 +1191,9 @@ export const feeRunsRouter = {
             paidAmount: { before: row.paidAmount, after: "0" },
             openAmount: { before: row.openAmount, after: row.amount },
             mahnstufe: { before: row.mahnstufe, after: 0 },
+            ...(newFaellig
+              ? { falligkeitsdatum: { before: row.falligkeitsdatum, after: newFaellig } }
+              : {}),
             ...(input.notes ? { notes: { before: row.notes, after: input.notes } } : {}),
           },
           requestId: context.requestId ?? null,

@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.109.2",
+    date: "2026-06-21",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "KI-Zugriff: Beim Wiederöffnen einer Forderung lässt sich jetzt das Fälligkeitsdatum mitkorrigieren, damit ein Erinnerungsbrief auf das richtige Datum gestellt werden kann.",
+      },
+    ],
+  },
+  {
     version: "0.109.1",
     date: "2026-06-20",
     changes: [
