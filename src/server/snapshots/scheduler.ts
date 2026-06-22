@@ -1,5 +1,6 @@
 import { eq, isNull } from "drizzle-orm";
 import type postgres from "postgres";
+import { runWithTenantKeyring } from "~/server/crypto/tenant-crypto";
 import { runDataQualitySnapshot } from "~/server/data-quality/snapshot";
 import { type DB, db, dbForTenant, sql, sqlForTenant } from "~/server/db/client";
 import { membersTable } from "~/server/db/schema/members";
@@ -80,7 +81,7 @@ export async function runNightlySnapshot(opts: SnapshotOpts = {}): Promise<Snaps
   };
   for (const t of await tenantHandles()) {
     try {
-      const r = await runTenantSnapshot(t.handle, t.conn, opts);
+      const r = await runWithTenantKeyring(t.key, () => runTenantSnapshot(t.handle, t.conn, opts));
       totals.acquiredLock = totals.acquiredLock || r.acquiredLock;
       totals.memberCount += r.memberCount;
       totals.skippedCount += r.skippedCount;
@@ -203,7 +204,9 @@ async function runTenantSnapshot(
 async function runStatusReconcile(): Promise<void> {
   for (const t of await tenantHandles()) {
     try {
-      const { exited, deceased } = await reconcileMemberStatuses(t.handle);
+      const { exited, deceased } = await runWithTenantKeyring(t.key, () =>
+        reconcileMemberStatuses(t.handle),
+      );
       if (exited > 0 || deceased > 0) {
         logger.info("member status reconciled", { tenant: t.key, exited, deceased });
       }
