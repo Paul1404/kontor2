@@ -1,4 +1,4 @@
-import { db } from "~/server/db/client";
+import type { DB } from "~/server/db/client";
 import { authSettingsTable } from "~/server/db/schema/settings";
 import { logger } from "~/server/lib/logger";
 
@@ -28,36 +28,55 @@ export const SESSION_LIMITS = {
   updateAgeHours: { min: 1, max: 24 * 30 },
 } as const;
 
-let cache: SessionConfig = { ...SESSION_DEFAULTS };
-let loaded = false;
-let loading: Promise<void> | undefined;
+type Entry = {
+  config: SessionConfig;
+  loaded: boolean;
+  loading?: Promise<void>;
+};
+
+const entries = new Map<string, Entry>();
+
+function entryFor(tenantKey: string): Entry {
+  let entry = entries.get(tenantKey);
+  if (!entry) {
+    entry = {
+      config: { ...SESSION_DEFAULTS },
+      loaded: false,
+    };
+    entries.set(tenantKey, entry);
+  }
+  return entry;
+}
 
 /** Synchronous read of the active config. Used by `buildAuth()`. */
-export function getSessionConfig(): SessionConfig {
-  return cache;
+export function getSessionConfig(tenantKey: string): SessionConfig {
+  return entries.get(tenantKey)?.config ?? { ...SESSION_DEFAULTS };
 }
 
 /** Overwrite the cache after a persisted change so it applies immediately. */
-export function setSessionConfigCache(next: SessionConfig): void {
-  cache = { ...next };
-  loaded = true;
+export function setSessionConfigCache(tenantKey: string, next: SessionConfig): void {
+  const entry = entryFor(tenantKey);
+  entry.config = { ...next };
+  entry.loaded = true;
 }
 
-async function load(): Promise<void> {
+async function load(tenantKey: string, tenantDb: DB): Promise<void> {
+  const entry = entryFor(tenantKey);
   try {
-    const [row] = await db().select().from(authSettingsTable).limit(1);
+    const [row] = await tenantDb.select().from(authSettingsTable).limit(1);
     if (row) {
-      cache = {
+      entry.config = {
         expiresInDays: row.sessionExpiresInDays,
         updateAgeHours: row.sessionUpdateAgeHours,
       };
     }
-    loaded = true;
+    entry.loaded = true;
   } catch (err) {
     // The table may not exist yet (first boot before migrations) or the DB
     // may be briefly unreachable. Keep the defaults and let a later request
     // retry rather than failing auth bootstrap.
     logger.warn("session config load failed, using defaults", {
+      tenantKey,
       error: err instanceof Error ? err.message : String(err),
     });
   }
@@ -68,19 +87,18 @@ async function load(): Promise<void> {
  * before the first use of `auth()` so better-auth is built with the persisted
  * window rather than the defaults.
  */
-export async function ensureSessionConfigLoaded(): Promise<void> {
-  if (loaded) return;
-  if (!loading) {
-    loading = load().finally(() => {
-      loading = undefined;
+export async function ensureSessionConfigLoaded(tenantKey: string, tenantDb: DB): Promise<void> {
+  const entry = entryFor(tenantKey);
+  if (entry.loaded) return;
+  if (!entry.loading) {
+    entry.loading = load(tenantKey, tenantDb).finally(() => {
+      entry.loading = undefined;
     });
   }
-  return loading;
+  return entry.loading;
 }
 
 /** Test-only: reset the module cache so a fresh load can be exercised. */
 export function _resetSessionConfigCache(): void {
-  cache = { ...SESSION_DEFAULTS };
-  loaded = false;
-  loading = undefined;
+  entries.clear();
 }

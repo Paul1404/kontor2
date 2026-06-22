@@ -26,7 +26,7 @@ export function authBaseUrl(tenant: Tenant): string {
 }
 
 function buildAuth(tenant: Tenant) {
-  const sessionConfig = getSessionConfig();
+  const sessionConfig = getSessionConfig(tenant.key);
   const baseURL = authBaseUrl(tenant);
   const isPrimary = tenant.key === primaryTenant().key;
   // The primary Verein's database is always the process DATABASE_URL pool
