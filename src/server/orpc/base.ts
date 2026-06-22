@@ -47,17 +47,18 @@ export function errorLogFields(err: unknown): Record<string, unknown> {
 export const observability = base.middleware(async ({ context, path, next }) => {
   const proc = path.join(".");
   const { requestId } = context;
+  const tenant = context.tenant.key;
   const start = performance.now();
   try {
     const result = await next();
-    logger.info("rpc.ok", { proc, requestId, ms: Math.round(performance.now() - start) });
+    logger.info("rpc.ok", { tenant, proc, requestId, ms: Math.round(performance.now() - start) });
     return result;
   } catch (err) {
     const ms = Math.round(performance.now() - start);
     if (err instanceof ORPCError) {
-      logger.warn("rpc.rejected", { proc, requestId, ms, code: err.code });
+      logger.warn("rpc.rejected", { tenant, proc, requestId, ms, code: err.code });
     } else {
-      logger.error("rpc.failed", { proc, requestId, ms, ...errorLogFields(err) });
+      logger.error("rpc.failed", { tenant, proc, requestId, ms, ...errorLogFields(err) });
     }
     throw err;
   }

@@ -20,9 +20,11 @@
 
 import { hostname } from "node:os";
 import { lt, sql } from "drizzle-orm";
-import { db } from "~/server/db/client";
+import { type DB, db, dbForTenant } from "~/server/db/client";
 import { appLogTable } from "~/server/db/schema/app-log";
 import { type LogLevel, type LogRecord, type LogSink, registerSink } from "~/server/lib/logger";
+import { findTenantByKey, listTenants, type Tenant } from "~/server/tenants/registry";
+import { primaryTenant } from "~/server/tenants/resolve";
 
 const HOST = hostname();
 
@@ -83,6 +85,23 @@ function isSelfNoise(record: LogRecord): boolean {
   return typeof proc === "string" && proc.startsWith("logs.");
 }
 
+function tenantKeyForRecord(record: LogRecord): string | null {
+  const tenant = record.fields.tenant;
+  return typeof tenant === "string" && tenant.trim() !== "" ? tenant : null;
+}
+
+function tenantForLogRecord(record: LogRecord): Tenant {
+  const primary = primaryTenant();
+  const key = tenantKeyForRecord(record);
+  if (key === primary.key) return primary;
+  if (key) return findTenantByKey(key) ?? primary;
+  return primary;
+}
+
+function dbForLogTenant(tenant: Tenant): DB {
+  return tenant.key === primaryTenant().key ? db() : dbForTenant(tenant.databaseUrl);
+}
+
 function toRow(record: LogRecord) {
   const { requestId, proc, actorEmail, ...rest } = record.fields;
   return {
@@ -110,15 +129,24 @@ async function flush(): Promise<void> {
         console.error(`[log-sink-db] dropped ${dropped} buffered log records (buffer full)`);
         dropped = 0;
       }
-      try {
-        await db().insert(appLogTable).values(batch.map(toRow));
-      } catch (err) {
-        // The rows are gone; re-queuing risks an unbounded crash loop if the
-        // table itself is the problem. Report once, drop the batch, move on.
-        console.error(
-          `[log-sink-db] failed to persist ${batch.length} log records:`,
-          err instanceof Error ? err.message : String(err),
-        );
+      const groups = new Map<string, { tenant: Tenant; records: LogRecord[] }>();
+      for (const record of batch) {
+        const tenant = tenantForLogRecord(record);
+        const existing = groups.get(tenant.key);
+        if (existing) existing.records.push(record);
+        else groups.set(tenant.key, { tenant, records: [record] });
+      }
+      for (const { tenant, records } of groups.values()) {
+        try {
+          await dbForLogTenant(tenant).insert(appLogTable).values(records.map(toRow));
+        } catch (err) {
+          // The rows are gone; re-queuing risks an unbounded crash loop if the
+          // table itself is the problem. Report once, drop the group, move on.
+          console.error(
+            `[log-sink-db] failed to persist ${records.length} log records for tenant ${tenant.key}:`,
+            err instanceof Error ? err.message : String(err),
+          );
+        }
       }
     }
   } finally {
@@ -128,23 +156,37 @@ async function flush(): Promise<void> {
 
 async function prune(): Promise<void> {
   const { retentionDays, maxRows } = logSinkConfig();
-  try {
-    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-    await db().delete(appLogTable).where(lt(appLogTable.createdAt, cutoff));
-    // Enforce the absolute row cap regardless of age: keep the newest `maxRows`.
-    await db().execute(sql`
-      delete from ${appLogTable}
-      where ${appLogTable.id} in (
-        select id from ${appLogTable}
-        order by ${appLogTable.createdAt} desc
-        offset ${maxRows}
-      )
-    `);
-  } catch (err) {
-    console.error(
-      "[log-sink-db] retention prune failed:",
-      err instanceof Error ? err.message : String(err),
-    );
+  const tenants = (() => {
+    try {
+      return listTenants();
+    } catch (err) {
+      console.error(
+        "[log-sink-db] tenant list failed during retention prune; falling back to primary tenant:",
+        err instanceof Error ? err.message : String(err),
+      );
+      return [primaryTenant()];
+    }
+  })();
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+  for (const tenant of tenants) {
+    const tenantDb = dbForLogTenant(tenant);
+    try {
+      await tenantDb.delete(appLogTable).where(lt(appLogTable.createdAt, cutoff));
+      // Enforce the absolute row cap regardless of age: keep the newest `maxRows`.
+      await tenantDb.execute(sql`
+        delete from ${appLogTable}
+        where ${appLogTable.id} in (
+          select id from ${appLogTable}
+          order by ${appLogTable.createdAt} desc
+          offset ${maxRows}
+        )
+      `);
+    } catch (err) {
+      console.error(
+        `[log-sink-db] retention prune failed for tenant ${tenant.key}:`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
   }
 }
 
@@ -197,3 +239,9 @@ export function registerDbLogSink(): void {
   process.once("SIGINT", drain);
   process.once("beforeExit", drain);
 }
+
+export const __test = {
+  dbForLogTenant,
+  tenantForLogRecord,
+  tenantKeyForRecord,
+};
