@@ -1,18 +1,21 @@
 import { createHash } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { and, asc, desc, eq, ilike, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { ingestArchive } from "~/server/archive/ingest-archive";
 import { analyzeDump } from "~/server/archive/sql-analyzer";
 import type { DB } from "~/server/db/client";
 import { escapeLike } from "~/server/db/like";
+import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import {
   type LinearArchiveVersion,
   linearArchiveColumnsTable,
+  linearArchivePostingTriageTable,
   linearArchiveRowsTable,
   linearArchiveTablesTable,
   linearArchiveVersionsTable,
 } from "~/server/db/schema/linear-archive";
+import { membersTable } from "~/server/db/schema/members";
 import { createProgressReporter, readImportProgress } from "~/server/importer/progress";
 import { adminProc, vorstandProc } from "~/server/orpc/base";
 
@@ -548,6 +551,9 @@ export const archiveRouter = {
         ...VersionSelector,
         year: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
         includeInvoice: v.optional(v.boolean(), false),
+        /** Filter the returned list by triage status; the summary counts always
+         *  cover the full uncollected set. */
+        status: v.optional(v.picklist(["offen", "erledigt", "ignoriert"])),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -587,6 +593,7 @@ export const archiveRouter = {
         /^(ja|j)$/i.test(String(r.AufRechnung ?? "").trim());
 
       type Row = {
+        guid: string | null;
         mitgliedsnummer: string | null;
         adrNr: number | null;
         name: string | null;
@@ -611,6 +618,7 @@ export const archiveRouter = {
         }
         uncollectedSum += amt;
         uncollected.push({
+          guid: typeof r.GUID === "string" ? r.GUID : null,
           mitgliedsnummer: String(r.MitglNr ?? "").trim() || null,
           adrNr: Number.isFinite(Number(r.AdrNr)) ? Number(r.AdrNr) : null,
           name: adrName.get(Number(r.AdrNr)) || null,
@@ -622,6 +630,30 @@ export const archiveRouter = {
         (a, b) => Number(b.betrag) - Number(a.betrag) || (a.name ?? "").localeCompare(b.name ?? ""),
       );
 
+      // Attach triage state (version-independent, keyed by posting GUID).
+      const guids = uncollected.map((r) => r.guid).filter((g): g is string => g != null);
+      const triageByGuid = new Map<string, { status: string; notiz: string | null }>();
+      if (guids.length > 0) {
+        const tri = await context.db
+          .select({
+            sollGuid: linearArchivePostingTriageTable.sollGuid,
+            status: linearArchivePostingTriageTable.status,
+            notiz: linearArchivePostingTriageTable.notiz,
+          })
+          .from(linearArchivePostingTriageTable)
+          .where(inArray(linearArchivePostingTriageTable.sollGuid, guids));
+        for (const t of tri) triageByGuid.set(t.sollGuid, { status: t.status, notiz: t.notiz });
+      }
+      const withStatus = uncollected.map((r) => {
+        const t = r.guid ? triageByGuid.get(r.guid) : undefined;
+        return { ...r, status: t?.status ?? "offen", notiz: t?.notiz ?? null };
+      });
+      const byStatus = { offen: 0, erledigt: 0, ignoriert: 0 };
+      for (const r of withStatus) {
+        byStatus[r.status as keyof typeof byStatus]++;
+      }
+      const list = input.status ? withStatus.filter((r) => r.status === input.status) : withStatus;
+
       return {
         version: version.version,
         year: input.year,
@@ -629,8 +661,111 @@ export const archiveRouter = {
           postings: debitedCount + uncollected.length,
           debited: { count: debitedCount, sum: debitedSum.toFixed(2) },
           uncollected: { count: uncollected.length, sum: uncollectedSum.toFixed(2) },
+          byStatus,
         },
-        uncollected,
+        uncollected: list,
+      };
+    }),
+
+  /**
+   * Set the triage status of one archived posting (worklist bookkeeping for the
+   * collection audit). Keyed by the Linear posting GUID, version-independent, so
+   * it survives a re-import. Does NOT touch live data; for the actual live
+   * action see `resolveLivePosting` + `feeRuns.stornoSollstellung`.
+   */
+  setPostingTriage: adminProc
+    .input(
+      v.object({
+        sollGuid: v.pipe(v.string(), v.minLength(1)),
+        status: v.picklist(["offen", "erledigt", "ignoriert"]),
+        notiz: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(2000)))),
+        // Optional denormalised snapshot from the audit row, for display.
+        mitgliedsnummer: v.optional(v.nullable(v.string())),
+        adrNr: v.optional(v.nullable(v.pipe(v.number(), v.integer()))),
+        jahr: v.optional(v.nullable(v.pipe(v.number(), v.integer()))),
+        art: v.optional(v.nullable(v.string())),
+        betrag: v.optional(v.nullable(v.string())),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const now = new Date();
+      await context.db
+        .insert(linearArchivePostingTriageTable)
+        .values({
+          sollGuid: input.sollGuid,
+          status: input.status,
+          notiz: input.notiz ?? null,
+          mitgliedsnummer: input.mitgliedsnummer ?? null,
+          adrNr: input.adrNr ?? null,
+          jahr: input.jahr ?? null,
+          art: input.art ?? null,
+          betrag: input.betrag ?? null,
+          actorEmail: context.session!.user.email,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: linearArchivePostingTriageTable.sollGuid,
+          set: {
+            status: input.status,
+            notiz: input.notiz ?? null,
+            actorEmail: context.session!.user.email,
+            updatedAt: now,
+          },
+        });
+      return { ok: true as const, sollGuid: input.sollGuid, status: input.status };
+    }),
+
+  /**
+   * Resolve an archived posting (by its Linear GUID) to the matching live
+   * Sollstellung via `soll_stellungen.linear_guid`. Read-only; lets the audit UI
+   * link to the member and offer the live Storno (which runs through
+   * `feeRuns.stornoSollstellung`). Returns `{ found: false }` when no live
+   * posting carries that GUID (e.g. never imported or aggregated differently).
+   */
+  resolveLivePosting: adminProc
+    .input(v.object({ sollGuid: v.pipe(v.string(), v.minLength(1)) }))
+    .handler(async ({ context, input }) => {
+      const [row] = await context.db
+        .select({
+          sollStellungId: sollStellungenTable.id,
+          status: sollStellungenTable.status,
+          billingYear: sollStellungenTable.billingYear,
+          amount: sollStellungenTable.amount,
+          openAmount: sollStellungenTable.openAmount,
+          memberId: membersTable.id,
+          memberNo: membersTable.memberNo,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
+          vorname: membersTable.vorname,
+          nachname: membersTable.nachname,
+          kurzname: membersTable.kurzname,
+        })
+        .from(sollStellungenTable)
+        .innerJoin(membersTable, eq(membersTable.id, sollStellungenTable.memberId))
+        .where(eq(sollStellungenTable.linearGuid, input.sollGuid))
+        .limit(1);
+      if (!row) {
+        return { found: false as const };
+      }
+      const name =
+        [row.vorname, row.nachname]
+          .map((x) => String(x ?? "").trim())
+          .filter(Boolean)
+          .join(" ") ||
+        row.kurzname ||
+        null;
+      return {
+        found: true as const,
+        sollStellungId: row.sollStellungId,
+        status: row.status,
+        billingYear: row.billingYear,
+        amount: row.amount,
+        openAmount: row.openAmount,
+        member: {
+          id: row.memberId,
+          memberNo: row.memberNo,
+          mitgliedsnummer: row.mitgliedsnummer,
+          name,
+        },
       };
     }),
 

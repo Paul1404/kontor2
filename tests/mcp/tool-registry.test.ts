@@ -71,6 +71,8 @@ const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
   archive_column_values: "admin",
   archive_collected_postings: "admin",
   archive_collection_audit: "admin",
+  archive_set_posting_triage: "admin",
+  archive_resolve_live_posting: "admin",
 };
 
 const MUTATION_TOOLS = [
@@ -96,6 +98,7 @@ const MUTATION_TOOLS = [
   "recollect_returns",
   "import_camt_returns",
   "send_prenotifications",
+  "archive_set_posting_triage",
 ];
 
 describe("mcp tool registry", () => {

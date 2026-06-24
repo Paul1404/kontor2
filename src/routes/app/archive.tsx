@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   CheckCircle2,
   Coins,
@@ -25,6 +25,7 @@ import { Label } from "~/components/ui/label";
 import { Tabs } from "~/components/ui/tabs";
 import { Textarea } from "~/components/ui/textarea";
 import { EMPTY_VALUE, formatBytes, formatDateTime } from "~/lib/format";
+import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/archive")({
@@ -808,13 +809,86 @@ function AuditStat({
   );
 }
 
+const TRIAGE_FILTERS = [
+  { key: "alle", label: "Alle" },
+  { key: "offen", label: "Offen" },
+  { key: "erledigt", label: "Erledigt" },
+  { key: "ignoriert", label: "Ignoriert" },
+] as const;
+type TriageFilter = (typeof TRIAGE_FILTERS)[number]["key"];
+
+function TriageBadge({ status }: { status: string }) {
+  if (status === "erledigt") return <Badge variant="success">Erledigt</Badge>;
+  if (status === "ignoriert") return <Badge variant="secondary">Ignoriert</Badge>;
+  return <Badge variant="warning">Offen</Badge>;
+}
+
+type AuditRow = Awaited<ReturnType<typeof orpc.archive.collectionAudit>>["uncollected"][number];
+
 function CollectionAuditTab({ version }: { version: number }) {
+  const qc = useQueryClient();
   const [year, setYear] = useState(2026);
+  const [filter, setFilter] = useState<TriageFilter>("alle");
+  const [noteGuid, setNoteGuid] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [stornoRow, setStornoRow] = useState<AuditRow | null>(null);
+
   const audit = useQuery({
-    queryKey: ["archive.collectionAudit", version, year],
-    queryFn: () => orpc.archive.collectionAudit({ version, year }),
+    queryKey: ["archive.collectionAudit", version, year, filter],
+    queryFn: () =>
+      orpc.archive.collectionAudit({
+        version,
+        year,
+        ...(filter === "alle" ? {} : { status: filter }),
+      }),
   });
   const d = audit.data;
+
+  const invalidate = () =>
+    qc.invalidateQueries({ queryKey: ["archive.collectionAudit", version, year] });
+
+  const snapshot = (r: AuditRow) => ({
+    mitgliedsnummer: r.mitgliedsnummer,
+    adrNr: r.adrNr,
+    jahr: d?.year ?? year,
+    art: r.art,
+    betrag: r.betrag,
+  });
+
+  const setTriage = useMutation({
+    mutationFn: (vars: {
+      sollGuid: string;
+      status: "offen" | "erledigt" | "ignoriert";
+      notiz?: string | null;
+      mitgliedsnummer?: string | null;
+      adrNr?: number | null;
+      jahr?: number | null;
+      art?: string | null;
+      betrag?: string | null;
+    }) => orpc.archive.setPostingTriage(vars),
+    onSuccess: () => {
+      setNoteGuid(null);
+      return invalidate();
+    },
+  });
+
+  const storno = useMutation({
+    mutationFn: async (guid: string) => {
+      const live = await orpc.archive.resolveLivePosting({ sollGuid: guid });
+      if (!live.found) {
+        throw new Error(
+          "Keine passende Live-Sollstellung gefunden (linear_guid). Bitte am Mitglied prüfen.",
+        );
+      }
+      await orpc.feeRuns.stornoSollstellung({ sollStellungId: live.sollStellungId });
+      return live;
+    },
+    onSuccess: () => {
+      setStornoRow(null);
+      return invalidate();
+    },
+  });
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end gap-4">
@@ -856,37 +930,229 @@ function CollectionAuditTab({ version }: { version: number }) {
             />
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            {TRIAGE_FILTERS.map((f) => {
+              const count =
+                f.key === "alle"
+                  ? d.summary.uncollected.count
+                  : d.summary.byStatus[f.key as keyof typeof d.summary.byStatus];
+              return (
+                <Button
+                  key={f.key}
+                  type="button"
+                  size="sm"
+                  variant={filter === f.key ? "default" : "outline"}
+                  onClick={() => setFilter(f.key)}
+                >
+                  {f.label} ({count})
+                </Button>
+              );
+            })}
+          </div>
+
           <div className="flex flex-col gap-2">
             <h3 className="flex items-center gap-2 text-sm font-semibold">
               <Coins className="size-4" />
-              Nie eingezogen {d.year} ({d.uncollected.length})
+              {filter === "alle"
+                ? "Nie eingezogen"
+                : TRIAGE_FILTERS.find((f) => f.key === filter)?.label}{" "}
+              {d.year} ({d.uncollected.length})
             </h3>
             {d.uncollected.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Alle SEPA-Posten dieses Jahres waren in einem Lauf.
+                {filter === "alle"
+                  ? "Alle SEPA-Posten dieses Jahres waren in einem Lauf."
+                  : "Keine Posten mit diesem Status."}
               </p>
             ) : (
               <div className="flex flex-col divide-y divide-border">
-                {d.uncollected.map((r) => (
-                  <div
-                    key={`${r.adrNr}-${r.mitgliedsnummer}`}
-                    className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm"
-                  >
-                    <span className="min-w-44 flex-1 font-medium">{r.name ?? "—"}</span>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {r.mitgliedsnummer ?? "—"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{r.art ?? ""}</span>
-                    <span className="w-20 text-right font-medium tabular-nums">
-                      {eur(r.betrag)}
-                    </span>
-                  </div>
-                ))}
+                {d.uncollected.map((r) => {
+                  const ref = memberRef({ mitgliedsnummer: r.mitgliedsnummer, adrNr: r.adrNr });
+                  const busy =
+                    (setTriage.isPending && setTriage.variables?.sollGuid === r.guid) ||
+                    (storno.isPending && storno.variables === r.guid);
+                  return (
+                    <div key={r.guid ?? `${r.adrNr}-${r.mitgliedsnummer}`} className="py-2">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                        <TriageBadge status={r.status} />
+                        {ref ? (
+                          <Link
+                            to="/app/mitglieder/$mitgliedsnummer"
+                            params={{ mitgliedsnummer: ref }}
+                            className="min-w-44 flex-1 font-medium hover:underline"
+                          >
+                            {r.name ?? EMPTY_VALUE}
+                          </Link>
+                        ) : (
+                          <span className="min-w-44 flex-1 font-medium">
+                            {r.name ?? EMPTY_VALUE}
+                          </span>
+                        )}
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {r.mitgliedsnummer ?? EMPTY_VALUE}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{r.art ?? ""}</span>
+                        <span className="w-20 text-right font-medium tabular-nums">
+                          {eur(r.betrag)}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {busy ? (
+                            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                          ) : null}
+                          {r.guid ? (
+                            <>
+                              {r.status !== "erledigt" ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    setTriage.mutate({
+                                      sollGuid: r.guid as string,
+                                      status: "erledigt",
+                                      notiz: r.notiz,
+                                      ...snapshot(r),
+                                    })
+                                  }
+                                >
+                                  Erledigt
+                                </Button>
+                              ) : null}
+                              {r.status !== "ignoriert" ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    setTriage.mutate({
+                                      sollGuid: r.guid as string,
+                                      status: "ignoriert",
+                                      notiz: r.notiz,
+                                      ...snapshot(r),
+                                    })
+                                  }
+                                >
+                                  Ignorieren
+                                </Button>
+                              ) : null}
+                              {r.status !== "offen" ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    setTriage.mutate({
+                                      sollGuid: r.guid as string,
+                                      status: "offen",
+                                      notiz: r.notiz,
+                                      ...snapshot(r),
+                                    })
+                                  }
+                                >
+                                  Offen
+                                </Button>
+                              ) : null}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() => {
+                                  setNoteGuid(r.guid as string);
+                                  setNoteDraft(r.notiz ?? "");
+                                }}
+                              >
+                                Notiz
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={busy}
+                                onClick={() => setStornoRow(r)}
+                              >
+                                Live stornieren
+                              </Button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">keine GUID</span>
+                          )}
+                        </div>
+                      </div>
+                      {r.notiz && noteGuid !== r.guid ? (
+                        <p className="mt-1 pl-1 text-xs text-muted-foreground">{r.notiz}</p>
+                      ) : null}
+                      {noteGuid === r.guid ? (
+                        <div className="mt-2 flex flex-col gap-2">
+                          <Textarea
+                            value={noteDraft}
+                            onChange={(e) => setNoteDraft(e.target.value)}
+                            rows={2}
+                            placeholder="Notiz, z. B. gedeckt durch Reinhold, verstorben…"
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={setTriage.isPending}
+                              onClick={() =>
+                                setTriage.mutate({
+                                  sollGuid: r.guid as string,
+                                  status: r.status as "offen" | "erledigt" | "ignoriert",
+                                  notiz: noteDraft.trim() || null,
+                                  ...snapshot(r),
+                                })
+                              }
+                            >
+                              Speichern
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setNoteGuid(null)}
+                            >
+                              Abbrechen
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={stornoRow != null}
+        onOpenChange={(o) => {
+          if (!o) setStornoRow(null);
+        }}
+        title="Live-Sollstellung stornieren?"
+        description={
+          stornoRow
+            ? `${stornoRow.name ?? "Posten"} (${eur(stornoRow.betrag)}): Die Live-Sollstellung wird storniert und damit für einen erneuten Beitragslauf (Wiedereinzug) freigegeben. Der falsche Import-Status „eingezogen" wird entfernt. Geld wird dabei nicht bewegt.`
+            : undefined
+        }
+        confirmLabel="Stornieren"
+        destructive
+        loading={storno.isPending}
+        onConfirm={() => {
+          if (stornoRow?.guid) storno.mutate(stornoRow.guid);
+        }}
+      />
+      {storno.isError ? (
+        <p className="text-sm text-destructive">{(storno.error as Error).message}</p>
+      ) : null}
+      {setTriage.isError ? (
+        <p className="text-sm text-destructive">{(setTriage.error as Error).message}</p>
+      ) : null}
     </div>
   );
 }

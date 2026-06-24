@@ -869,14 +869,40 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "archive_collection_audit",
     description:
-      "Beitrags-Einzugs-Audit pro Jahr aus dem Linear-Archiv: vergleicht, welche Posten tatsächlich in einen SEPA-Lauf/eine XML kamen vs. NIE eingezogen wurden. Verlässliches Signal ist 'war je in einem Lauf' (mgsolln.SepaGUID gesetzt oder GUID in lastprots/lastprotsh) -- NICHT mgsolln.Offen (das setzt Linear nie zurück). Pflichtfeld `year`. Gibt summary (debited vs uncollected, jeweils count+sum) + die Liste der wirklich nicht eingezogenen Posten (Name, Mitgliedsnummer, Beitragsart, Betrag) zurück. Rechnungszahler ausgeschlossen, außer includeInvoice. Legacy-Personendaten, admin only.",
+      "Beitrags-Einzugs-Audit pro Jahr aus dem Linear-Archiv: vergleicht, welche Posten tatsächlich in einen SEPA-Lauf/eine XML kamen vs. NIE eingezogen wurden. Verlässliches Signal ist 'war je in einem Lauf' (mgsolln.SepaGUID gesetzt oder GUID in lastprots/lastprotsh) -- NICHT mgsolln.Offen (das setzt Linear nie zurück). Pflichtfeld `year`. Gibt summary (debited vs uncollected, jeweils count+sum, plus byStatus offen/erledigt/ignoriert) + die Liste der wirklich nicht eingezogenen Posten (guid, Name, Mitgliedsnummer, Beitragsart, Betrag, Triage-status, Notiz) zurück. Optional `status` filtert die Liste (Zusammenfassung bleibt vollständig). Rechnungszahler ausgeschlossen, außer includeInvoice. Legacy-Personendaten, admin only.",
     minRole: "admin",
     input: v.object({
       ...VersionSelector,
       year: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
       includeInvoice: v.optional(v.boolean()),
+      status: v.optional(v.picklist(["offen", "erledigt", "ignoriert"])),
     }),
     execute: (context, input) => call(appRouter.archive.collectionAudit, input, { context }),
+  }),
+  defineTool({
+    name: "archive_set_posting_triage",
+    description:
+      "Setzt den Triage-Status eines Archiv-Beitragspostens für die Abarbeitung des Einzugs-Audits: offen, erledigt oder ignoriert (z. B. gedeckt durch anderen, verstorben). Schlüssel ist die `guid` (mgsolln.GUID) aus archive_collection_audit; versionsunabhängig, übersteht einen Re-Import. Optional `notiz` und Snapshot-Felder (mitgliedsnummer, adrNr, jahr, art, betrag) zur Anzeige. Reine Buchführung, fasst KEINE Live-Forderung an (dafür archive_resolve_live_posting + cancel_sollstellung). Admin only.",
+    minRole: "admin",
+    input: v.object({
+      sollGuid: v.pipe(v.string(), v.minLength(1)),
+      status: v.picklist(["offen", "erledigt", "ignoriert"]),
+      notiz: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(2000)))),
+      mitgliedsnummer: v.optional(v.nullable(v.string())),
+      adrNr: v.optional(v.nullable(v.pipe(v.number(), v.integer()))),
+      jahr: v.optional(v.nullable(v.pipe(v.number(), v.integer()))),
+      art: v.optional(v.nullable(v.string())),
+      betrag: v.optional(v.nullable(v.string())),
+    }),
+    execute: (context, input) => call(appRouter.archive.setPostingTriage, input, { context }),
+  }),
+  defineTool({
+    name: "archive_resolve_live_posting",
+    description:
+      "Findet zu einem Archiv-Posten (per `sollGuid` = mgsolln.GUID aus archive_collection_audit) die passende Live-Sollstellung über soll_stellungen.linear_guid. Read-only. Gibt found=false, wenn keine Live-Sollstellung diese GUID trägt, sonst sollStellungId, Status, Jahr, Betrag und das Mitglied. Mit der sollStellungId lässt sich der Live-Posten z. B. über cancel_sollstellung für den Wiedereinzug vorbereiten. Admin only.",
+    minRole: "admin",
+    input: v.object({ sollGuid: v.pipe(v.string(), v.minLength(1)) }),
+    execute: (context, input) => call(appRouter.archive.resolveLivePosting, input, { context }),
   }),
 ];
 

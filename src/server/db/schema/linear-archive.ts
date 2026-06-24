@@ -5,6 +5,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -150,7 +151,48 @@ export const linearArchiveRowsTable = pgTable(
   ],
 );
 
+/**
+ * Triage state for a single archived beitrag posting (`mgsolln`), used to work
+ * the per-year collection audit (collected vs never collected) as a worklist.
+ *
+ * Keyed by the Linear posting GUID alone, deliberately NOT by archive version,
+ * so a re-import of the dump keeps the triage. It references no live tables: the
+ * archive stays isolated. The denormalised member/amount fields are a snapshot
+ * for display and survive a dump that later drops the row. A row exists only
+ * once the user sets a status away from the implicit default `offen`.
+ */
+export const archivePostingTriageStatusEnum = pgEnum("archive_posting_triage_status", [
+  "offen",
+  "erledigt",
+  "ignoriert",
+]);
+
+export const linearArchivePostingTriageTable = pgTable(
+  "linear_archive_posting_triage",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** `mgsolln.GUID` of the posting; version-independent join key. */
+    sollGuid: text("soll_guid").notNull(),
+    status: archivePostingTriageStatusEnum("status").notNull().default("offen"),
+    notiz: text("notiz"),
+    // Denormalised snapshot from the audit at the time of triage.
+    mitgliedsnummer: text("mitgliedsnummer"),
+    adrNr: integer("adr_nr"),
+    jahr: integer("jahr"),
+    art: text("art"),
+    betrag: numeric("betrag", { precision: 19, scale: 8 }),
+    actorEmail: text("actor_email"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("linear_archive_posting_triage_guid_uk").on(t.sollGuid),
+    index("linear_archive_posting_triage_status_idx").on(t.status),
+  ],
+);
+
 export type LinearArchiveVersion = typeof linearArchiveVersionsTable.$inferSelect;
 export type LinearArchiveTable = typeof linearArchiveTablesTable.$inferSelect;
 export type LinearArchiveColumn = typeof linearArchiveColumnsTable.$inferSelect;
 export type LinearArchiveRow = typeof linearArchiveRowsTable.$inferSelect;
+export type ArchivePostingTriage = typeof linearArchivePostingTriageTable.$inferSelect;
