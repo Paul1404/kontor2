@@ -477,6 +477,13 @@
       "when": 1781726337462,
       "tag": "0067_wealthy_smiling_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1782328120899,
+      "tag": "0068_ordinary_sentinel",
+      "breakpoints": true
     }
   ]
 }

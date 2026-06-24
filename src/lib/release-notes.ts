@@ -41,6 +41,22 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.113.0",
+    date: "2026-06-24",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "SQL-Archiv, Reiter Einzug: Die nie eingezogenen Posten lassen sich jetzt abarbeiten. Pro Posten Status offen, erledigt oder ignoriert setzen, mit Notiz, und nach Status filtern. Der Status übersteht einen erneuten Import des Dumps.",
+      },
+      {
+        category: "feature",
+        description:
+          "SQL-Archiv, Reiter Einzug: Direkt aus der Liste lässt sich der zugehörige Live-Posten öffnen oder stornieren. Das Stornieren entfernt den falschen Import-Status und gibt den Beitrag für einen erneuten Lauf frei. Auch über die KI-Schnittstelle verfügbar.",
+      },
+    ],
+  },
+  {
     version: "0.112.0",
     date: "2026-06-21",
     changes: [
