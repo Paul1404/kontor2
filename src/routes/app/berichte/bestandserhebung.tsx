@@ -13,6 +13,7 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { DateField } from "~/components/ui/date-field";
 import { exportBase64File, exportCsvFile } from "~/lib/export";
 import { EMPTY_VALUE, formatDate, formatDateTime, orEmpty } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -124,12 +125,11 @@ function BestandserhebungPage() {
             <label htmlFor="stichtag" className="text-xs font-medium text-muted-foreground">
               Stichtag
             </label>
-            <input
+            <DateField
               id="stichtag"
-              type="date"
               value={stichtag}
-              onChange={(e) => setStichtag(e.target.value)}
-              className="h-10 w-44 rounded-lg border border-input bg-card px-3 text-sm shadow-soft tabular-nums focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              onChange={(v) => setStichtag(v)}
+              className="w-44 tabular-nums"
             />
           </div>
           <div className="ml-auto text-sm text-muted-foreground">

@@ -16,6 +16,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
 import { SkeletonText } from "~/components/ui/skeleton";
@@ -289,7 +290,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Datum Rückgabe">
-            <Input type="date" value={returnedOn} onChange={(e) => setReturnedOn(e.target.value)} />
+            <DateField value={returnedOn} onChange={(v) => setReturnedOn(v)} />
           </Field>
           <Field label="R-Transaction-Code">
             <select

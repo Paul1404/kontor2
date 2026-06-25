@@ -6,6 +6,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
 import { SkeletonText } from "~/components/ui/skeleton";
@@ -140,7 +141,7 @@ function NewDunningRunPage() {
             </select>
           </Field>
           <Field label="Lauf-Datum">
-            <Input type="date" value={runDate} onChange={(e) => setRunDate(e.target.value)} />
+            <DateField value={runDate} onChange={(v) => setRunDate(v)} />
           </Field>
           <Field label="Frist">
             <Input

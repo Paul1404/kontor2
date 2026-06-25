@@ -37,6 +37,7 @@ import { IbanField } from "~/components/antrag/iban-field";
 import { SignaturePad } from "~/components/antrag/signature-pad";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { cn } from "~/lib/cn";
@@ -627,11 +628,10 @@ function AntragForm() {
                     error={errors.geburtsdatum}
                     pulseNonce={pulseNonce}
                   >
-                    <Input
-                      type="date"
+                    <DateField
                       value={geburtsdatum}
-                      onChange={(e) => {
-                        setGeburtsdatum(e.target.value);
+                      onChange={(v) => {
+                        setGeburtsdatum(v);
                         clearError("geburtsdatum");
                       }}
                     />
@@ -827,10 +827,9 @@ function AntragForm() {
                         />
                       </Field>
                       <Field label="Partner Geburtsdatum">
-                        <Input
-                          type="date"
+                        <DateField
                           value={partnerGeburtsdatum}
-                          onChange={(e) => setPartnerGeburtsdatum(e.target.value)}
+                          onChange={(v) => setPartnerGeburtsdatum(v)}
                         />
                       </Field>
                     </div>
@@ -913,12 +912,9 @@ function AntragForm() {
                                       updateKind(setKinder, i, { nachname: e.target.value })
                                     }
                                   />
-                                  <Input
-                                    type="date"
+                                  <DateField
                                     value={k.geburtsdatum}
-                                    onChange={(e) =>
-                                      updateKind(setKinder, i, { geburtsdatum: e.target.value })
-                                    }
+                                    onChange={(v) => updateKind(setKinder, i, { geburtsdatum: v })}
                                   />
                                 </div>
                                 <AbteilungPicker

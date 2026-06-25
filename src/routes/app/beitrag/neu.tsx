@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { QueryError } from "~/components/ui/query-error";
@@ -204,10 +205,9 @@ function SetupStep(props: {
           </Label>
           <Label className="flex flex-col gap-1.5">
             <span>Fälligkeitsdatum</span>
-            <Input
-              type="date"
+            <DateField
               value={props.falligkeitsdatum}
-              onChange={(e) => props.setFalligkeitsdatum(e.target.value)}
+              onChange={(v) => props.setFalligkeitsdatum(v)}
             />
             <span className="text-xs font-normal text-muted-foreground">
               Datum, zu dem die Bank die Lastschrift einreichen soll.

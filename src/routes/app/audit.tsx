@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
+import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { PageSizeSelect, usePersistentPageSize } from "~/components/ui/page-size-select";
 import { QueryError } from "~/components/ui/query-error";
@@ -160,19 +161,17 @@ function AuditPage() {
           />
           <div className="flex flex-col gap-1">
             <span className="text-xs uppercase tracking-wide text-muted-foreground">Von</span>
-            <Input
-              type="date"
+            <DateField
               value={search.from}
-              onChange={(e) => updateSearch({ from: e.target.value })}
+              onChange={(v) => updateSearch({ from: v })}
               className="h-9 w-40"
             />
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-xs uppercase tracking-wide text-muted-foreground">Bis</span>
-            <Input
-              type="date"
+            <DateField
               value={search.to}
-              onChange={(e) => updateSearch({ to: e.target.value })}
+              onChange={(v) => updateSearch({ to: v })}
               className="h-9 w-40"
             />
           </div>

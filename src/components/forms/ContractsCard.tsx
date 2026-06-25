@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toast } from "~/components/ui/toaster";
@@ -328,12 +329,7 @@ function AddContractForm({
           >
             Beginn
           </Label>
-          <Input
-            id={beginId}
-            type="date"
-            value={vertragBegin}
-            onChange={(e) => setVertragBegin(e.target.value)}
-          />
+          <DateField id={beginId} value={vertragBegin} onChange={(v) => setVertragBegin(v)} />
         </div>
       </div>
 
@@ -646,23 +642,13 @@ function EditContractForm({
           >
             Beginn
           </Label>
-          <Input
-            id={beginId}
-            type="date"
-            value={vertragBegin}
-            onChange={(e) => setVertragBegin(e.target.value)}
-          />
+          <DateField id={beginId} value={vertragBegin} onChange={(v) => setVertragBegin(v)} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={endeId} className="text-xs uppercase tracking-wide text-muted-foreground">
             Ende
           </Label>
-          <Input
-            id={endeId}
-            type="date"
-            value={vertragEnde}
-            onChange={(e) => setVertragEnde(e.target.value)}
-          />
+          <DateField id={endeId} value={vertragEnde} onChange={(v) => setVertragEnde(v)} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label
@@ -671,12 +657,7 @@ function EditContractForm({
           >
             Gekündigt am
           </Label>
-          <Input
-            id={gekuendAmId}
-            type="date"
-            value={gekuendAm}
-            onChange={(e) => setGekuendAm(e.target.value)}
-          />
+          <DateField id={gekuendAmId} value={gekuendAm} onChange={(v) => setGekuendAm(v)} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label
@@ -685,12 +666,7 @@ function EditContractForm({
           >
             Gekündigt zum
           </Label>
-          <Input
-            id={gekuendZumId}
-            type="date"
-            value={gekuendZum}
-            onChange={(e) => setGekuendZum(e.target.value)}
-          />
+          <DateField id={gekuendZumId} value={gekuendZum} onChange={(v) => setGekuendZum(v)} />
         </div>
       </div>
 

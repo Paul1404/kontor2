@@ -15,6 +15,7 @@ import { useMemo, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { QueryError } from "~/components/ui/query-error";
@@ -349,12 +350,11 @@ export function AustrittsbestaetigungCard({
             <div className="flex flex-wrap gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="austritt-datum">Austritt zum</Label>
-                <Input
+                <DateField
                   id="austritt-datum"
-                  type="date"
                   required
                   value={austrittDatum}
-                  onChange={(e) => setAustrittDatum(e.target.value)}
+                  onChange={(v) => setAustrittDatum(v)}
                   className="w-44"
                 />
               </div>
@@ -628,15 +628,12 @@ export function AustrittsbestaetigungCard({
                       </div>
                       <div className="flex w-40 flex-col gap-1.5">
                         <Label htmlFor={`fam-geb-${i}`}>Geburtsdatum</Label>
-                        <Input
+                        <DateField
                           id={`fam-geb-${i}`}
-                          type="date"
                           value={row.geburtsdatum}
-                          onChange={(e) =>
+                          onChange={(v) =>
                             setFamily(
-                              family.map((r, j) =>
-                                j === i ? { ...r, geburtsdatum: e.target.value } : r,
-                              ),
+                              family.map((r, j) => (j === i ? { ...r, geburtsdatum: v } : r)),
                             )
                           }
                         />

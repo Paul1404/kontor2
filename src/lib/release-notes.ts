@@ -41,13 +41,24 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
-    version: "0.114.2",
+    version: "0.115.1",
     date: "2026-06-25",
     changes: [
       {
         category: "fix",
         description:
           "Mitgliederliste und Detailseite: Neu aufgenommene Mitglieder ohne alte Linear-Mitgliedsnummer wurden fälschlich als Kontakt angezeigt. Die Einstufung richtet sich jetzt nach der Mitgliedsnummer (M) bzw. Kontaktnummer (K).",
+      },
+    ],
+  },
+  {
+    version: "0.115.0",
+    date: "2026-06-25",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Datumsfelder neu: Datum direkt eintippen oder einfügen (15.01.2020), oder im Kalender auswählen. Der Kalender ist überall gleich, statt des Datumsfelds vom Browser. Monat und Jahr lassen sich über Auswahllisten springen.",
       },
     ],
   },
