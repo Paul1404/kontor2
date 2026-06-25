@@ -21,10 +21,11 @@ const handle = async ({ request }: { request: Request }) => {
     import("~/server/auth/session-config"),
     import("~/server/crypto/tenant-crypto"),
   ]);
-  await ensureSessionConfigLoaded();
   const tenant = resolveTenantFromHost(
     request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
   );
+  const tenantDb = dbForTenant(tenant.databaseUrl);
+  await ensureSessionConfigLoaded(tenant.key, tenantDb);
   // Im Per-Verein-Keyring: better-auth sendet Invite-/Reset-Mails, die die
   // SMTP-Konfig dieses Vereins (verschlüsseltes Passwort) lesen.
   return runWithTenantKeyring(tenant.key, async () => {
@@ -33,7 +34,7 @@ const handle = async ({ request }: { request: Request }) => {
     // the plugin's handler. This is the catch-all for the catch-22 where an
     // admin could ban or remove themselves and leave the instance unreachable.
     // Checks this Verein's admins (per-tenant db).
-    const guard = await guardAdminPluginRequest(dbForTenant(tenant.databaseUrl), request);
+    const guard = await guardAdminPluginRequest(tenantDb, request);
     if (guard) return guard;
     return auth(tenant).handler(request);
   });

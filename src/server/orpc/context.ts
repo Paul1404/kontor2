@@ -56,20 +56,20 @@ export async function createContext(request: Request): Promise<AppContext> {
       });
     }
   }
-  // Load the persisted session window before the first `auth()` build so
-  // better-auth is configured with the admin-set lifetime, not the defaults.
-  await ensureSessionConfigLoaded();
   // Resolve the Verein from the request host (e.g. svu.kontor2.com -> "svu").
   // The reverse proxy forwards the original host; fall back to `host`. With a
   // single tenant this always resolves to the primary, so `context.db` is
-  // unchanged. NOTE: auth() is still a single instance (the primary's); making
-  // it per-tenant is Stage 2.
+  // unchanged.
   const tenant = resolveTenantFromHost(
     request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
   );
+  const tenantDb = dbForTenant(tenant.databaseUrl);
+  // Load this tenant's persisted session window before the first `auth()`
+  // build so better-auth is configured with the admin-set lifetime.
+  await ensureSessionConfigLoaded(tenant.key, tenantDb);
   const session = await auth(tenant).api.getSession({ headers: request.headers });
   return {
-    db: dbForTenant(tenant.databaseUrl),
+    db: tenantDb,
     tenant,
     session: session ?? null,
     headers: request.headers,

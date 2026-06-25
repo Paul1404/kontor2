@@ -87,7 +87,7 @@ export const settingsRouter = {
       });
       // Apply live: refresh the in-memory cache and drop the memoized auth
       // instance so the next request rebuilds better-auth with the new window.
-      setSessionConfigCache({
+      setSessionConfigCache(context.tenant.key, {
         expiresInDays: input.sessionExpiresInDays,
         updateAgeHours: input.sessionUpdateAgeHours,
       });

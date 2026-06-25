@@ -149,6 +149,7 @@ export const logsRouter = {
     await context.db.delete(appLogTable).where(where);
     const deleted = before?.c ?? 0;
     logger.warn("logs.purged", {
+      tenant: context.tenant.key,
       actorEmail: context.session?.user.email ?? null,
       olderThanDays: input.olderThanDays,
       deleted,
