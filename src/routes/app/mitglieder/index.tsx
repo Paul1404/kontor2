@@ -945,7 +945,10 @@ function MembersListPage() {
                 </tr>
               ) : (
                 rows.map((m, index) => {
-                  const isKontakt = !m.mitgliedsnummer;
+                  // Kontakt = a payer/contact (kontaktNo, no memberNo). Keying on
+                  // the legacy Mitgliedsnummer mislabels app-created members (which
+                  // have an M-number but no legacy number) as Kontakt.
+                  const isKontakt = !m.memberNo;
                   const isSelected = selected.has(m.id);
                   const isCursor = index === cursor;
                   return (
