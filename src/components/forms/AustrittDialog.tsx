@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
-import { Input } from "~/components/ui/input";
+import { DateField } from "~/components/ui/date-field";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "~/components/ui/toaster";
@@ -105,11 +105,10 @@ export function AustrittDialog({
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="austritt-datum">Austritt zum</Label>
-          <Input
+          <DateField
             id="austritt-datum"
-            type="date"
             value={austrittDatum}
-            onChange={(e) => setAustrittDatum(e.target.value)}
+            onChange={(v) => setAustrittDatum(v)}
             className="max-w-44"
           />
         </div>

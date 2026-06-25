@@ -3,6 +3,7 @@ import { Check, ClipboardList, Loader2, Plus, RotateCcw, Trash2 } from "lucide-r
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { toast } from "~/components/ui/toaster";
 import { cn } from "~/lib/cn";
@@ -79,10 +80,9 @@ export function WiedervorlagenCard({ memberId, canEdit }: { memberId: string; ca
               placeholder="z. B. IBAN nachfordern"
               className="flex-1"
             />
-            <Input
-              type="date"
+            <DateField
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              onChange={(v) => setDueDate(v)}
               className="sm:w-40"
               aria-label="Fällig am"
             />

@@ -5,6 +5,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { EMPTY_VALUE, formatDate, toDateInput } from "~/lib/format";
@@ -271,11 +272,10 @@ function AddMandateForm({
           >
             Unterschrift
           </Label>
-          <Input
+          <DateField
             id={unterschriftId}
-            type="date"
             value={unterschriftDatum}
-            onChange={(e) => setUnterschriftDatum(e.target.value)}
+            onChange={(v) => setUnterschriftDatum(v)}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -285,12 +285,7 @@ function AddMandateForm({
           >
             Gültig ab
           </Label>
-          <Input
-            id={gueltigAbId}
-            type="date"
-            value={gueltigAb}
-            onChange={(e) => setGueltigAb(e.target.value)}
-          />
+          <DateField id={gueltigAbId} value={gueltigAb} onChange={(v) => setGueltigAb(v)} />
         </div>
       </div>
 
@@ -406,11 +401,10 @@ function EditMandateForm({
           >
             Unterschrift
           </Label>
-          <Input
+          <DateField
             id={unterschriftId}
-            type="date"
             value={unterschriftDatum}
-            onChange={(e) => setUnterschriftDatum(e.target.value)}
+            onChange={(v) => setUnterschriftDatum(v)}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -420,12 +414,7 @@ function EditMandateForm({
           >
             Gültig ab
           </Label>
-          <Input
-            id={gueltigAbId}
-            type="date"
-            value={gueltigAb}
-            onChange={(e) => setGueltigAb(e.target.value)}
-          />
+          <DateField id={gueltigAbId} value={gueltigAb} onChange={(v) => setGueltigAb(v)} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label
@@ -434,12 +423,7 @@ function EditMandateForm({
           >
             Gültig bis
           </Label>
-          <Input
-            id={gultigBisId}
-            type="date"
-            value={gultigBis}
-            onChange={(e) => setGultigBis(e.target.value)}
-          />
+          <DateField id={gultigBisId} value={gultigBis} onChange={(v) => setGultigBis(v)} />
         </div>
       </div>
 

@@ -3,6 +3,7 @@ import { Award, Download, Loader2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { toast } from "~/components/ui/toaster";
 import { triggerDownloadBase64 } from "~/lib/download";
@@ -119,11 +120,7 @@ export function EhrungenCard({ memberId, canEdit }: { memberId: string; canEdit:
             {/* biome-ignore lint/a11y/noLabelWithoutControl: the label wraps its Input control as children, which the rule does not detect. */}
             <label className="flex flex-col gap-1 sm:w-40">
               <span className="text-xs font-medium text-muted-foreground">Verliehen am</span>
-              <Input
-                type="date"
-                value={verliehenAm}
-                onChange={(e) => setVerliehenAm(e.target.value)}
-              />
+              <DateField value={verliehenAm} onChange={(v) => setVerliehenAm(v)} />
             </label>
             <Button type="submit" disabled={!canSubmit || create.isPending}>
               {create.isPending ? (

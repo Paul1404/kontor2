@@ -3,6 +3,7 @@ import { Loader2, Save, X } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { LAND_OPTIONS } from "~/lib/country";
@@ -308,11 +309,10 @@ export function MemberStammdatenForm({
             <FormField
               label={`Geburtsdatum${values.geburtsdatum ? ` · ${calcAge(values.geburtsdatum)}` : ""}`}
             >
-              <Input
+              <DateField
                 id="mf-geburtsdatum"
-                type="date"
                 value={values.geburtsdatum}
-                onChange={(e) => update("geburtsdatum", e.target.value)}
+                onChange={(v) => update("geburtsdatum", v)}
               />
             </FormField>
             <FormField label="Geschlecht">
@@ -423,18 +423,13 @@ export function MemberStammdatenForm({
                   </select>
                 </FormField>
                 <FormField label="Eintritt">
-                  <Input
-                    type="date"
-                    value={values.eintritt}
-                    onChange={(e) => update("eintritt", e.target.value)}
-                  />
+                  <DateField value={values.eintritt} onChange={(v) => update("eintritt", v)} />
                 </FormField>
                 <FormField label="Austritt">
-                  <Input
+                  <DateField
                     id="mf-austritt"
-                    type="date"
                     value={values.austritt}
-                    onChange={(e) => update("austritt", e.target.value)}
+                    onChange={(v) => update("austritt", v)}
                   />
                 </FormField>
                 <FormField label="Beitrag">

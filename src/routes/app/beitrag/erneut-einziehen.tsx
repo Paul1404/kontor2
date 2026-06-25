@@ -6,6 +6,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { DateField } from "~/components/ui/date-field";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
@@ -230,10 +231,9 @@ function RecollectPage() {
               <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Fälligkeitsdatum
               </span>
-              <Input
-                type="date"
+              <DateField
                 value={falligkeitsdatum}
-                onChange={(e) => setFalligkeitsdatum(e.target.value)}
+                onChange={(v) => setFalligkeitsdatum(v)}
                 className="w-44"
               />
             </label>

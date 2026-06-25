@@ -6,6 +6,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { formatDate } from "~/lib/format";
@@ -175,20 +176,18 @@ export function BeziehungenCard({
                         <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                           Von
                         </Label>
-                        <Input
-                          type="date"
+                        <DateField
                           value={editDraft.datVon}
-                          onChange={(e) => setEditDraft({ ...editDraft, datVon: e.target.value })}
+                          onChange={(v) => setEditDraft({ ...editDraft, datVon: v })}
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                           Bis
                         </Label>
-                        <Input
-                          type="date"
+                        <DateField
                           value={editDraft.datBis}
-                          onChange={(e) => setEditDraft({ ...editDraft, datBis: e.target.value })}
+                          onChange={(v) => setEditDraft({ ...editDraft, datBis: v })}
                         />
                       </div>
                     </div>

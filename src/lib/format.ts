@@ -91,6 +91,59 @@ export function toDateInput(value: string | Date | null | undefined): string {
   return Number.isFinite(value.getTime()) ? utcDateString(value) : "";
 }
 
+/**
+ * Format a stored ISO date (YYYY-MM-DD) as German DD.MM.YYYY for display in a
+ * text field. Takes the calendar parts verbatim, so no timezone shift. Blank
+ * in, blank out.
+ */
+export function formatDateInput(value: string | null | undefined): string {
+  if (!value) return "";
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : "";
+}
+
+/**
+ * Parse a hand-typed or pasted date into an ISO YYYY-MM-DD string. Accepts the
+ * German form DD.MM.YYYY (also D.M.YY and `.`/`/`/`-` separators) and ISO
+ * YYYY-MM-DD. Two-digit years pivot on the current year (00..yy -> 2000s, the
+ * rest -> 1900s). Returns "" for blank input and null for anything that is not
+ * a real calendar date, so callers can tell "cleared" from "still typing".
+ */
+export function parseDateInput(text: string | null | undefined): string | null {
+  if (text == null) return "";
+  const s = text.trim();
+  if (s === "") return "";
+  let y: number;
+  let mo: number;
+  let d: number;
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  const de = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2}|\d{4})$/);
+  if (iso) {
+    y = Number(iso[1]);
+    mo = Number(iso[2]);
+    d = Number(iso[3]);
+  } else if (de) {
+    const yStr = de[3] ?? "";
+    d = Number(de[1]);
+    mo = Number(de[2]);
+    y = Number(yStr);
+    if (yStr.length === 2) {
+      const cy = new Date().getFullYear() % 100;
+      y = y <= cy ? 2000 + y : 1900 + y;
+    }
+  } else {
+    return null;
+  }
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  // Build at UTC midnight and read back to reject impossible dates (e.g. 31.02).
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) {
+    return null;
+  }
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${y}-${pad(mo)}-${pad(d)}`;
+}
+
 export function formatIbanMask(last4: string | null | undefined): string {
   if (!last4) return "";
   // Note: this mask assumes a DE IBAN (22 chars). Non-DE members would

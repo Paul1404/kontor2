@@ -3,6 +3,7 @@ import { Calendar, Loader2, LogOut, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { DateField } from "~/components/ui/date-field";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -142,11 +143,10 @@ function Row({
         <div className="flex items-center gap-1">
           {editingAustritt ? (
             <>
-              <input
-                type="date"
+              <DateField
                 value={austrittDraft}
-                onChange={(e) => setAustrittDraft(e.target.value)}
-                className="h-8 rounded-md border border-input bg-card px-2 text-xs"
+                onChange={(v) => setAustrittDraft(v)}
+                className="h-8 text-xs"
               />
               <Button
                 size="sm"
@@ -286,12 +286,11 @@ function AddForm({
         >
           Eintritt
         </label>
-        <input
+        <DateField
           id="add-abteilung-eintritt"
-          type="date"
           value={eintrittsdatum}
-          onChange={(e) => setEintrittsdatum(e.target.value)}
-          className="h-9 rounded-md border border-input bg-card px-3 text-sm"
+          onChange={(v) => setEintrittsdatum(v)}
+          className="h-9"
         />
       </div>
       <div className="flex items-center gap-2">

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_VALUE, formatPhone, orEmpty, telHref } from "~/lib/format";
+import {
+  EMPTY_VALUE,
+  formatDateInput,
+  formatPhone,
+  orEmpty,
+  parseDateInput,
+  telHref,
+} from "~/lib/format";
 
 describe("orEmpty", () => {
   it("returns the value when present", () => {
@@ -38,5 +45,59 @@ describe("telHref", () => {
   it("returns null when there are too few digits", () => {
     expect(telHref("12")).toBeNull();
     expect(telHref(null)).toBeNull();
+  });
+});
+
+describe("formatDateInput", () => {
+  it("turns an ISO date into German DD.MM.YYYY", () => {
+    expect(formatDateInput("2020-01-15")).toBe("15.01.2020");
+    expect(formatDateInput("1999-12-31")).toBe("31.12.1999");
+  });
+
+  it("returns blank for empty or malformed input", () => {
+    expect(formatDateInput("")).toBe("");
+    expect(formatDateInput(null)).toBe("");
+    expect(formatDateInput(undefined)).toBe("");
+    expect(formatDateInput("nonsense")).toBe("");
+  });
+});
+
+describe("parseDateInput", () => {
+  it("parses German dates to ISO", () => {
+    expect(parseDateInput("15.01.2020")).toBe("2020-01-15");
+    expect(parseDateInput("1.2.2020")).toBe("2020-02-01");
+    expect(parseDateInput("31.12.1999")).toBe("1999-12-31");
+  });
+
+  it("accepts ISO and slash or dash separators", () => {
+    expect(parseDateInput("2020-01-15")).toBe("2020-01-15");
+    expect(parseDateInput("15/01/2020")).toBe("2020-01-15");
+    expect(parseDateInput("15-01-2020")).toBe("2020-01-15");
+  });
+
+  it("pivots two-digit years on the current year", () => {
+    // Today (per the test environment) is well past 2000, so a low two-digit
+    // year reads as 20xx and a high one as 19xx.
+    expect(parseDateInput("15.01.05")).toBe("2005-01-15");
+    expect(parseDateInput("15.01.85")).toBe("1985-01-15");
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(parseDateInput("  15.01.2020  ")).toBe("2020-01-15");
+  });
+
+  it("returns blank for empty input", () => {
+    expect(parseDateInput("")).toBe("");
+    expect(parseDateInput("   ")).toBe("");
+    expect(parseDateInput(null)).toBe("");
+    expect(parseDateInput(undefined)).toBe("");
+  });
+
+  it("returns null for impossible or unparseable dates", () => {
+    expect(parseDateInput("31.02.2020")).toBeNull();
+    expect(parseDateInput("32.01.2020")).toBeNull();
+    expect(parseDateInput("15.13.2020")).toBeNull();
+    expect(parseDateInput("hello")).toBeNull();
+    expect(parseDateInput("15.01")).toBeNull();
   });
 });

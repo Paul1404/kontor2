@@ -6,8 +6,8 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { DateField } from "~/components/ui/date-field";
 import { InfoBox } from "~/components/ui/info-box";
-import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
 import { SkeletonText } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
@@ -169,12 +169,7 @@ function KulanzPage() {
             onChange={(e) => setMitUnterschrift(e.target.checked)}
           />
           <Field label="Frist (Zahlung oder Kündigung)">
-            <Input
-              type="date"
-              min={today}
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-            />
+            <DateField min={today} value={deadline} onChange={(v) => setDeadline(v)} />
             <span className="text-xs text-muted-foreground">
               Leer lassen, um die Standardfrist aus den Vereinsdaten zu verwenden.
             </span>
