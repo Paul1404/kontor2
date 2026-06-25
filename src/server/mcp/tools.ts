@@ -409,6 +409,71 @@ const TOOLS: McpTool[] = [
     execute: (context, input) => call(appRouter.members.update, input, { context }),
   }),
   defineTool({
+    name: "onboard_member",
+    description:
+      "Legt ein Mitglied (oder kind=kontakt) in einem Schritt vollständig an: Stammdaten + Abteilung(en) + optional erster Vertrag (Beitrag) + optional SEPA-Mandat. Das deckt eine komplette Vereinsaufnahme ab, inkl. Abteilungszuordnung (anders als create_member, das keine Abteilung kann). Abteilungs-IDs über list_departments, Beitragsart (`art`) über list_fee_types auflösen. Mitglieds-/Mandatsnummer werden vergeben, falls weggelassen. Geld- und bankrelevant, auditiert.",
+    minRole: "vorstand",
+    input: v.object({
+      kind: v.optional(v.picklist(["member", "kontakt"])),
+      patch: McpStammdatenInput,
+      abteilungen: v.optional(
+        v.array(
+          v.object({
+            abteilungId: v.pipe(v.string(), v.uuid()),
+            eintrittsdatum: v.optional(v.nullable(DateInput)),
+          }),
+        ),
+      ),
+      contract: v.optional(
+        v.nullable(
+          v.object({
+            art: v.pipe(v.number(), v.integer()),
+            artName: v.optional(v.nullable(v.string())),
+            vertragNr: v.optional(v.nullable(v.string())),
+            betrag: v.optional(v.nullable(v.string())),
+            vertragBegin: v.optional(v.nullable(DateInput)),
+            sollstellung: v.optional(v.nullable(v.string())),
+          }),
+        ),
+      ),
+      sepa: v.optional(
+        v.nullable(
+          v.object({
+            mandatsNr: v.optional(v.nullable(v.string())),
+            unterschriftDatum: v.optional(v.nullable(DateInput)),
+            gueltigAb: v.optional(v.nullable(DateInput)),
+          }),
+        ),
+      ),
+      idempotencyKey: IdempotencyKeyInput,
+    }),
+    execute: (context, input) =>
+      withIdempotency(context.db, "onboard_member", input.idempotencyKey, () =>
+        call(
+          appRouter.members.onboard,
+          {
+            kind: input.kind,
+            patch: input.patch,
+            abteilungen: input.abteilungen,
+            contract: input.contract,
+            sepa: input.sepa,
+          },
+          { context },
+        ),
+      ),
+  }),
+  defineTool({
+    name: "set_member_abteilungen",
+    description:
+      "Setzt die aktiven Abteilungen eines bestehenden Mitglieds (interne member id) auf genau die angegebene Liste: nicht mehr gelistete aktive Mitgliedschaften werden beendet, neue hinzugefügt. Leere Liste = aus allen Abteilungen nehmen. Abteilungs-IDs über list_departments. Auditiert.",
+    minRole: "vorstand",
+    input: v.object({
+      memberId: v.pipe(v.string(), v.uuid()),
+      abteilungIds: v.array(v.pipe(v.string(), v.uuid())),
+    }),
+    execute: (context, input) => call(appRouter.members.setAbteilungen, input, { context }),
+  }),
+  defineTool({
     name: "create_task",
     description:
       "Create a task (Aufgabe) on a member, with optional notes and due date (YYYY-MM-DD).",
