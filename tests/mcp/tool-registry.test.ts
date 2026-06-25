@@ -30,6 +30,8 @@ const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
   data_quality_members: "vorstand",
   create_member: "vorstand",
   update_member: "vorstand",
+  onboard_member: "vorstand",
+  set_member_abteilungen: "vorstand",
   create_task: "vorstand",
   set_task_status: "vorstand",
   set_fee_type_age_range: "vorstand",
@@ -78,6 +80,8 @@ const EXPECTED_MIN_ROLES: Record<string, "readonly" | "vorstand" | "admin"> = {
 const MUTATION_TOOLS = [
   "create_member",
   "update_member",
+  "onboard_member",
+  "set_member_abteilungen",
   "create_task",
   "set_task_status",
   "set_fee_type_age_range",

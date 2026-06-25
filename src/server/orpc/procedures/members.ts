@@ -968,6 +968,107 @@ export const membersRouter = {
       return { ok: true, mitgliedsnummer: result.mitgliedsnummer };
     }),
 
+  /**
+   * Replace a member's active Abteilungen with the given set. Currently active
+   * memberships (austrittsdatum null) that are not in the set get closed
+   * (austrittsdatum = today); ids not yet active are added (eintrittsdatum =
+   * today). Lets a member be moved between departments without the full
+   * onboarding wizard. Audited and snapshotted.
+   */
+  setAbteilungen: vorstandProc
+    .input(
+      v.object({
+        memberId: v.pipe(v.string(), v.uuid()),
+        abteilungIds: v.array(v.pipe(v.string(), v.uuid())),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const desired = [...new Set(input.abteilungIds)];
+      const result = await context.db.transaction(async (tx) => {
+        const [member] = await tx
+          .select({ id: membersTable.id, mitgliedsnummer: membersTable.mitgliedsnummer })
+          .from(membersTable)
+          .where(eq(membersTable.id, input.memberId))
+          .limit(1);
+        if (!member) {
+          throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        }
+        if (desired.length > 0) {
+          const found = await tx
+            .select({ id: abteilungenTable.id })
+            .from(abteilungenTable)
+            .where(inArray(abteilungenTable.id, desired));
+          if (found.length !== desired.length) {
+            throw new ORPCError("NOT_FOUND", { message: "Abteilung nicht gefunden." });
+          }
+        }
+
+        const current = await tx
+          .select({ abteilungId: memberAbteilungenTable.abteilungId })
+          .from(memberAbteilungenTable)
+          .where(
+            and(
+              eq(memberAbteilungenTable.memberId, input.memberId),
+              isNull(memberAbteilungenTable.austrittsdatum),
+            ),
+          );
+        const currentIds = new Set(current.map((r) => r.abteilungId));
+        const desiredSet = new Set(desired);
+        const toClose = [...currentIds].filter((id) => !desiredSet.has(id));
+        const toAdd = desired.filter((id) => !currentIds.has(id));
+
+        const today = new Date().toISOString().slice(0, 10);
+        if (toClose.length > 0) {
+          await tx
+            .update(memberAbteilungenTable)
+            .set({ austrittsdatum: today })
+            .where(
+              and(
+                eq(memberAbteilungenTable.memberId, input.memberId),
+                isNull(memberAbteilungenTable.austrittsdatum),
+                inArray(memberAbteilungenTable.abteilungId, toClose),
+              ),
+            );
+        }
+        for (const abteilungId of toAdd) {
+          await tx
+            .insert(memberAbteilungenTable)
+            .values({ memberId: input.memberId, abteilungId, eintrittsdatum: today })
+            .onConflictDoNothing();
+        }
+
+        if (toClose.length > 0 || toAdd.length > 0) {
+          const auditId = await appendAudit(tx, {
+            entityType: "member",
+            entityId: input.memberId,
+            action: "update",
+            source: "ui",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            changes: {
+              abteilungenAdded: { before: null, after: toAdd.length },
+              abteilungenClosed: { before: null, after: toClose.length },
+            },
+            requestId: context.requestId ?? null,
+          });
+          await takeMemberSnapshot(tx, input.memberId, {
+            trigger: "mutation",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            auditId,
+          });
+        }
+
+        return {
+          mitgliedsnummer: member.mitgliedsnummer,
+          added: toAdd.length,
+          closed: toClose.length,
+        };
+      });
+      await invalidateMemberCaches(context.tenant.key);
+      return { ok: true as const, ...result };
+    }),
+
   create: vorstandProc
     .input(
       v.object({

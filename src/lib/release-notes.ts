@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.114.0",
+    date: "2026-06-25",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "KI-Schnittstelle: Neue Mitglieder lassen sich jetzt komplett über die KI aufnehmen, inklusive Abteilung, Vertrag und SEPA-Mandat in einem Schritt. Zusätzlich lassen sich die Abteilungen bestehender Mitglieder über die KI setzen.",
+      },
+    ],
+  },
+  {
     version: "0.113.0",
     date: "2026-06-24",
     changes: [
