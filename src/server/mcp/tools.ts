@@ -617,7 +617,7 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "preview_fee_run",
     description:
-      "Vorschau eines Beitragslaufs für ein Jahr ohne zu schreiben: welche Lastschrift-Posten (mit Mandat/IBAN) und welche Rechnungs-Posten entstünden, Summen und Konflikte (fehlendes Mandat, gesperrt). `falligkeitsdatum` ist YYYY-MM-DD. Optional `memberIds`: nur diese (abgerechneten) Mitglieder berücksichtigen, für einen gezielten (Wieder-)Einzug. Nutze dies vor commit_fee_run, um Anzahl und Summe zu bestätigen.",
+      "Vorschau eines Beitragslaufs für ein Jahr ohne zu schreiben: welche Lastschrift-Posten (mit Mandat/IBAN) und welche Rechnungs-Posten entstünden, Summen und Konflikte (fehlendes Mandat, gesperrt). `falligkeitsdatum` ist YYYY-MM-DD. Optional `memberIds`: nur diese (abgerechneten) Mitglieder berücksichtigen, für einen gezielten (Wieder-)Einzug. Nutze dies vor commit_fee_run und übergib dort `totals.grandTotal`/`totals.count` als erwartete Summe/Anzahl (das sind die Lastschrift-Posten ohne Rechnungsposten).",
     minRole: "vorstand",
     input: v.object({
       billingYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
@@ -643,7 +643,7 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "commit_fee_run",
     description:
-      'Führt den Beitragslauf aus: legt fehlende Sollstellungen für das Jahr an, erzeugt die pain.008-Lastschriftdatei und schreibt die fee_run_items. Bereits offen gestellte Verträge werden nicht doppelt gestellt (inkrementell). Optional `memberIds`: nur diese (abgerechneten) Mitglieder einziehen, für einen gezielten (Wieder-)Einzug ohne den Rest des Vereins. Sicherheits-Check: `expectedTotalAmount` (z. B. "510.00") und `expectedItemCount` müssen exakt zur Vorschau passen, sonst bricht der Lauf ab. Geld- und bankrelevant, vollständig auditiert. Die XML danach mit get_fee_run_xml abrufen.',
+      'Führt den Beitragslauf aus: legt fehlende Sollstellungen für das Jahr an, erzeugt die pain.008-Lastschriftdatei nur für Lastschrift-Posten und schreibt dafür die fee_run_items; Rechnungsposten bleiben offene Sollstellungen ohne XML. Bereits offen gestellte Verträge werden nicht doppelt gestellt (inkrementell). Optional `memberIds`: nur diese (abgerechneten) Mitglieder einziehen, für einen gezielten (Wieder-)Einzug ohne den Rest des Vereins. Sicherheits-Check: `expectedTotalAmount` muss `preview.totals.grandTotal` (z. B. "510.00") sein und `expectedItemCount` muss `preview.totals.count` sein, sonst bricht der Lauf ab. Geld- und bankrelevant, vollständig auditiert. Eine XML gibt es nur bei Lastschrift-Posten und kann danach mit get_fee_run_xml abgerufen werden.',
     minRole: "vorstand",
     input: v.object({
       billingYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
