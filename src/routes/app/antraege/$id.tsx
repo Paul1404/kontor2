@@ -445,15 +445,14 @@ function AntragDetailPage() {
                     Mögliche Dubletten gefunden ({dupes.data.candidates.length})
                   </div>
                   <p className="text-xs text-amber-800/80 dark:text-amber-300/80">
-                    Bitte prüfen: neues Mitglied anlegen oder mit einem bestehenden verknüpfen.
-                    {a.antragstyp !== "einzel"
-                      ? " Verknüpfen ist nur bei Einzelanträgen möglich."
-                      : null}
+                    Bitte prüfen: neues Mitglied anlegen oder mit einem bestehenden verknüpfen. Bei
+                    Familien- und Kinderanträgen wird der Hauptantragsteller verknüpft, die übrigen
+                    Personen werden neu angelegt.
                   </p>
                   <div className="flex flex-col gap-1">
                     {dupes.data.candidates.map((c) => {
                       const selected = linkTo === c.id && c.kind === "member";
-                      const linkable = c.kind === "member" && a.antragstyp === "einzel";
+                      const linkable = c.kind === "member";
                       return (
                         <div
                           key={`${c.kind}-${c.id}`}

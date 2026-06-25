@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.117.0",
+    date: "2026-06-25",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Online-Anträge: Das Verknüpfen mit einem bestehenden Mitglied funktioniert jetzt auch für Familien- und Kinderanträge. Der Hauptantragsteller wird verknüpft, Partner, Kinder und Erziehungsberechtigte werden wie gewohnt angelegt. Bei Kindern bleibt die Bankverbindung beim Erziehungsberechtigten.",
+      },
+    ],
+  },
+  {
     version: "0.116.0",
     date: "2026-06-25",
     changes: [
