@@ -555,13 +555,173 @@ async function runSvumsImport(opts: {
   };
 }
 
+/** SEPA mandate input derived from an application, or null without an IBAN. */
+function applicationSepaInput(app: MembershipApplication, ibanPlain: string | null) {
+  return ibanPlain
+    ? { mandatsNr: app.mandatsreferenz, unterschriftDatum: app.consentAt, gueltigAb: new Date() }
+    : null;
+}
+
+/** Guardian name: explicit fields first, else from the Kontoinhaber, else a
+ *  fallback under the child's family name so the IBAN is not dropped. */
+function applicationGuardianName(app: MembershipApplication, ibanPlain: string | null) {
+  const vor = app.erziehungsberechtigterVorname?.trim() || "";
+  const nach = app.erziehungsberechtigterNachname?.trim() || "";
+  if (nach || vor) return { vorname: vor, nachname: nach };
+  if (app.kontoinhaber) return parsePayerName(app.kontoinhaber, app.nachname);
+  if (ibanPlain) return { vorname: "", nachname: app.nachname?.trim() || "Erziehungsberechtigt" };
+  return { vorname: "", nachname: "" };
+}
+
+/**
+ * Create the secondary members of an application around an already-existing
+ * primary: the guardian (kontakt + payer + Vertreter, mandate on the guardian)
+ * for a minor, or the partner, children and the Familie record (primary = payer)
+ * for a family. Shared by both the create-new and the link-to-existing approval
+ * paths so family/minor linking reuses the exact same modelling. Returns the
+ * refs of the members it created.
+ */
+async function createApplicationSecondaries(
+  tx: DBOrTx,
+  opts: {
+    app: MembershipApplication;
+    primary: { id: string; adrNr: number };
+    ibanPlain: string | null;
+    fallbackEintritt: string;
+    actorId: string;
+    actorEmail: string;
+    requestId: string | null;
+  },
+): Promise<string[]> {
+  const { app, primary, ibanPlain } = opts;
+  const sepa = applicationSepaInput(app, ibanPlain);
+  const base = {
+    fallbackEintritt: opts.fallbackEintritt,
+    actorId: opts.actorId,
+    actorEmail: opts.actorEmail,
+    requestId: opts.requestId,
+  };
+  const refs: string[] = [];
+
+  if (app.antragstyp === "kind") {
+    const guardianName = applicationGuardianName(app, ibanPlain);
+    if (guardianName.nachname || guardianName.vorname) {
+      const guardian = await onboardMember(tx, {
+        patch: {
+          vorname: guardianName.vorname || null,
+          nachname: guardianName.nachname || null,
+          strasse: app.strasse,
+          hausnummer: app.hausnummer,
+          plz: app.plz,
+          ort: app.ort,
+          ...(ibanPlain
+            ? {
+                iban1: ibanPlain,
+                iban1Last4: app.ibanLast4 ?? lastFour(ibanPlain),
+                bic1: app.bic,
+                abwKontoInh: app.kontoinhaber ?? null,
+              }
+            : {}),
+        },
+        isKontakt: true,
+        status: "aktiv",
+        abteilungen: [],
+        contract: null,
+        sepa,
+        ...base,
+      });
+      refs.push(guardian.ref);
+      await tx.insert(relationshipsTable).values({
+        fromMemberId: primary.id,
+        toMemberId: guardian.id,
+        fromAdrNr: primary.adrNr,
+        toAdrNr: guardian.adrNr,
+        beziehung: "Erziehungsberechtigt",
+        istVertreter: true,
+      });
+    }
+  }
+
+  if (app.antragstyp === "familie") {
+    let partnerId: string | null = null;
+    if (app.partnerVorname && app.partnerNachname) {
+      const p = await onboardMember(tx, {
+        patch: {
+          vorname: app.partnerVorname,
+          nachname: app.partnerNachname,
+          geburtsdatum: app.partnerGeburtsdatum,
+          strasse: app.strasse,
+          hausnummer: app.hausnummer,
+          plz: app.plz,
+          ort: app.ort,
+          eintritt: new Date(),
+        },
+        isKontakt: false,
+        status: "aktiv",
+        abteilungen: (app.partnerAbteilungen ?? []).map((id) => ({ abteilungId: id })),
+        contract: null,
+        sepa: null,
+        ...base,
+      });
+      partnerId = p.id;
+      refs.push(p.ref);
+    }
+    const childIds: string[] = [];
+    for (const k of app.kinder ?? []) {
+      const c = await onboardMember(tx, {
+        patch: {
+          vorname: k.vorname,
+          nachname: k.nachname,
+          geburtsdatum: k.geburtsdatum ? parseISODate(k.geburtsdatum) : null,
+          strasse: app.strasse,
+          hausnummer: app.hausnummer,
+          plz: app.plz,
+          ort: app.ort,
+          eintritt: new Date(),
+        },
+        isKontakt: false,
+        status: "aktiv",
+        abteilungen: (k.abteilungen ?? []).map((id) => ({ abteilungId: id })),
+        contract: null,
+        sepa: null,
+        ...base,
+      });
+      childIds.push(c.id);
+      refs.push(c.ref);
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const [fam] = await tx
+      .insert(familienTable)
+      .values({ name: `Familie ${app.nachname}`, zahlerMemberId: primary.id })
+      .returning({ id: familienTable.id });
+    if (fam) {
+      await tx.insert(familienMitgliederTable).values([
+        { familieId: fam.id, memberId: primary.id, rolle: "zahler", von: today },
+        ...(partnerId
+          ? [{ familieId: fam.id, memberId: partnerId, rolle: "partner" as const, von: today }]
+          : []),
+        ...childIds.map((id) => ({
+          familieId: fam.id,
+          memberId: id,
+          rolle: "kind" as const,
+          von: today,
+        })),
+      ]);
+    }
+  }
+
+  return refs;
+}
+
 /**
  * Approve an application by linking it to an EXISTING member instead of creating
  * a new one (the dedup gate's "verknüpfen" choice). Enriches only missing or
- * placeholder fields (never overwrites good data), adds a contract/mandate only
- * when the member has none, adds the application's Abteilungen, and marks the
- * application genehmigt. This is the Fischer cleanup as one button. Only for
- * einzel applications; family/minor stay on the create-new path.
+ * placeholder fields on the primary (never overwrites good data), adds a
+ * contract/mandate only when the member has none, adds the Abteilungen, then
+ * builds the same secondary members (guardian / partner / children / Familie) as
+ * the create path. Works for einzel, kind and familie; for a minor the bank
+ * details stay on the guardian, not the linked child.
  */
 async function approveByLinking(
   db: DB,
@@ -577,6 +737,9 @@ async function approveByLinking(
 ): Promise<{ primaryId: string; refs: string[] }> {
   const { app } = opts;
   const ibanPlain = app.iban?.trim() ? app.iban.trim() : null;
+  // A minor's bank details belong on the guardian (created as a secondary), not
+  // on the linked child, so the child primary is not enriched with IBAN/mandate.
+  const isMinor = app.antragstyp === "kind";
   const today = new Date().toISOString().slice(0, 10);
   const isPlaceholderDob = (d: Date | string | null) => {
     if (!d) return true;
@@ -622,7 +785,7 @@ async function approveByLinking(
     fill("hausnummer", app.hausnummer, !member.hausnummer);
     fill("plz", app.plz, !member.plz);
     fill("ort", app.ort, !member.ort);
-    if (ibanPlain && !member.iban1) {
+    if (!isMinor && ibanPlain && !member.iban1) {
       patch.iban1 = ibanPlain;
       patch.iban1Last4 = app.ibanLast4 ?? lastFour(ibanPlain);
       patch.bic1 = app.bic;
@@ -667,7 +830,7 @@ async function approveByLinking(
       .from(sepaMandatesTable)
       .where(and(eq(sepaMandatesTable.memberId, member.id), eq(sepaMandatesTable.isDeleted, false)))
       .limit(1);
-    if (existingMandate.length === 0 && ibanPlain) {
+    if (!isMinor && existingMandate.length === 0 && ibanPlain) {
       await tx.insert(sepaMandatesTable).values({
         memberId: member.id,
         adrNr: member.adrNr,
@@ -691,12 +854,28 @@ async function approveByLinking(
     }
     if (abtAdded > 0) changes.abteilungenAdded = { before: null, after: abtAdded };
 
+    // Build the secondary members (guardian / partner / children / Familie)
+    // around the linked primary, exactly as the create path does.
+    const secondaryRefs = await createApplicationSecondaries(tx, {
+      app,
+      primary: { id: member.id, adrNr: member.adrNr },
+      ibanPlain,
+      fallbackEintritt: today,
+      actorId: opts.actorId,
+      actorEmail: opts.actorEmail,
+      requestId: opts.requestId,
+    });
+    const allRefs = [ref, ...secondaryRefs];
+    if (secondaryRefs.length > 0) {
+      changes.weitereMitglieder = { before: null, after: secondaryRefs.join(", ") };
+    }
+
     await tx
       .update(membershipApplicationsTable)
       .set({
         status: "genehmigt",
         memberId: member.id,
-        mitgliedsnummer: ref,
+        mitgliedsnummer: allRefs.join(", "),
         updatedAt: new Date(),
       })
       .where(eq(membershipApplicationsTable.id, app.id));
@@ -726,7 +905,7 @@ async function approveByLinking(
       requestId: opts.requestId,
     });
 
-    return { primaryId: member.id, refs: [ref] };
+    return { primaryId: member.id, refs: allRefs };
   });
 }
 
@@ -1911,12 +2090,6 @@ export const applicationsRouter = {
       if (app.status === "genehmigt" || app.memberId) {
         throw new ORPCError("CONFLICT", { message: "Antrag ist bereits genehmigt." });
       }
-      if (input.linkToMemberId && app.antragstyp !== "einzel") {
-        throw new ORPCError("VALIDATION_FAILED", {
-          message:
-            "Verknüpfen mit einem bestehenden Mitglied ist nur für Einzelanträge möglich. Familien- und Kinderanträge bitte neu anlegen.",
-        });
-      }
 
       const actorId = context.session!.user.id;
       const actorEmail = context.session!.user.email;
@@ -1989,22 +2162,6 @@ export const applicationsRouter = {
           }
         : null;
 
-      // Name des Erziehungsberechtigten: explizite Felder zuerst, sonst aus dem
-      // Kontoinhaber abgeleitet (Nachname des Kindes als Anker).
-      const guardianName = (() => {
-        const vor = app.erziehungsberechtigterVorname?.trim() || "";
-        const nach = app.erziehungsberechtigterNachname?.trim() || "";
-        if (nach || vor) return { vorname: vor, nachname: nach };
-        if (app.kontoinhaber) return parsePayerName(app.kontoinhaber, app.nachname);
-        // No guardian name and no Kontoinhaber, but a bank account is on file:
-        // still create a payer contact (under the child's family name) so the
-        // IBAN and SEPA mandate are not silently dropped on approval.
-        if (ibanPlain) {
-          return { vorname: "", nachname: app.nachname?.trim() || "Erziehungsberechtigt" };
-        }
-        return { vorname: "", nachname: "" };
-      })();
-
       const result = input.linkToMemberId
         ? await approveByLinking(context.db, {
             app,
@@ -2044,134 +2201,18 @@ export const applicationsRouter = {
                 actorEmail,
                 requestId: context.requestId ?? null,
               });
-              const refs = [primary.ref];
-
-              // Minderjährig: Erziehungsberechtigten als Zahler-Kontakt anlegen,
-              // Bankverbindung und Mandat dort, als Vertreter verknüpfen. Damit löst
-              // sich der Zahler von Anfang an sauber auf, ohne späteres Nachräumen.
-              if (isMinor && (guardianName.nachname || guardianName.vorname)) {
-                const guardian = await onboardMember(tx, {
-                  patch: {
-                    vorname: guardianName.vorname || null,
-                    nachname: guardianName.nachname || null,
-                    strasse: app.strasse,
-                    hausnummer: app.hausnummer,
-                    plz: app.plz,
-                    ort: app.ort,
-                    ...(ibanPlain
-                      ? {
-                          iban1: ibanPlain,
-                          iban1Last4: app.ibanLast4 ?? lastFour(ibanPlain),
-                          bic1: app.bic,
-                          abwKontoInh: app.kontoinhaber ?? null,
-                        }
-                      : {}),
-                  },
-                  isKontakt: true,
-                  status: "aktiv",
-                  abteilungen: [],
+              const refs = [
+                primary.ref,
+                ...(await createApplicationSecondaries(tx, {
+                  app,
+                  primary: { id: primary.id, adrNr: primary.adrNr },
+                  ibanPlain,
                   fallbackEintritt,
-                  contract: null,
-                  sepa,
                   actorId,
                   actorEmail,
                   requestId: context.requestId ?? null,
-                });
-                refs.push(guardian.ref);
-                await tx.insert(relationshipsTable).values({
-                  fromMemberId: primary.id,
-                  toMemberId: guardian.id,
-                  fromAdrNr: primary.adrNr,
-                  toAdrNr: guardian.adrNr,
-                  beziehung: "Erziehungsberechtigt",
-                  istVertreter: true,
-                });
-              }
-
-              if (app.antragstyp === "familie") {
-                let partnerId: string | null = null;
-                if (app.partnerVorname && app.partnerNachname) {
-                  const p = await onboardMember(tx, {
-                    patch: {
-                      vorname: app.partnerVorname,
-                      nachname: app.partnerNachname,
-                      geburtsdatum: app.partnerGeburtsdatum,
-                      strasse: app.strasse,
-                      hausnummer: app.hausnummer,
-                      plz: app.plz,
-                      ort: app.ort,
-                      eintritt: new Date(),
-                    },
-                    isKontakt: false,
-                    status: "aktiv",
-                    abteilungen: (app.partnerAbteilungen ?? []).map((id) => ({ abteilungId: id })),
-                    fallbackEintritt,
-                    contract: null,
-                    sepa: null,
-                    actorId,
-                    actorEmail,
-                    requestId: context.requestId ?? null,
-                  });
-                  partnerId = p.id;
-                  refs.push(p.ref);
-                }
-                const childIds: string[] = [];
-                for (const k of app.kinder ?? []) {
-                  const c = await onboardMember(tx, {
-                    patch: {
-                      vorname: k.vorname,
-                      nachname: k.nachname,
-                      geburtsdatum: k.geburtsdatum ? parseISODate(k.geburtsdatum) : null,
-                      strasse: app.strasse,
-                      hausnummer: app.hausnummer,
-                      plz: app.plz,
-                      ort: app.ort,
-                      eintritt: new Date(),
-                    },
-                    isKontakt: false,
-                    status: "aktiv",
-                    abteilungen: (k.abteilungen ?? []).map((id) => ({ abteilungId: id })),
-                    fallbackEintritt,
-                    contract: null,
-                    sepa: null,
-                    actorId,
-                    actorEmail,
-                    requestId: context.requestId ?? null,
-                  });
-                  childIds.push(c.id);
-                  refs.push(c.ref);
-                }
-
-                // Familie explizit anlegen: der primäre Antragsteller zahlt, Partner
-                // und Kinder als Familienmitglieder. So ist der Zahler der Kinder
-                // sauber gemodellt (statt nur über Adresse/Verknüpfung).
-                const today = new Date().toISOString().slice(0, 10);
-                const [fam] = await tx
-                  .insert(familienTable)
-                  .values({ name: `Familie ${app.nachname}`, zahlerMemberId: primary.id })
-                  .returning({ id: familienTable.id });
-                if (fam) {
-                  await tx.insert(familienMitgliederTable).values([
-                    { familieId: fam.id, memberId: primary.id, rolle: "zahler", von: today },
-                    ...(partnerId
-                      ? [
-                          {
-                            familieId: fam.id,
-                            memberId: partnerId,
-                            rolle: "partner" as const,
-                            von: today,
-                          },
-                        ]
-                      : []),
-                    ...childIds.map((id) => ({
-                      familieId: fam.id,
-                      memberId: id,
-                      rolle: "kind" as const,
-                      von: today,
-                    })),
-                  ]);
-                }
-              }
+                })),
+              ];
 
               await tx
                 .update(t)
