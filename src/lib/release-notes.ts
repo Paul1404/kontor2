@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.114.1",
+    date: "2026-06-25",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "KI-Schnittstelle: Beschreibungen von preview_fee_run und commit_fee_run präzisiert (erwartete Summe und Anzahl aus totals.grandTotal und totals.count, XML nur für Lastschrift-Posten).",
+      },
+    ],
+  },
+  {
     version: "0.114.0",
     date: "2026-06-25",
     changes: [
