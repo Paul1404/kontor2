@@ -178,12 +178,13 @@ function MemberDetailPage() {
     incomingBeziehungenCount,
     sollstellungen,
   } = detail.data;
-  // Kontakt = no Mitgliedsnummer. The data-model rule is that every
-  // such row exists *because* something/someone references it. Zero
-  // relationships in either direction means this row is leftover from
-  // the Linear import and should either get linked up or deleted.
+  // Kontakt = a payer/contact (kontaktNo, no memberNo). The data-model rule is
+  // that every such row exists *because* something/someone references it. Zero
+  // relationships in either direction means this row is leftover from the Linear
+  // import and should either get linked up or deleted. Keying on memberNo (not
+  // the legacy Mitgliedsnummer) so app-created members are never flagged orphan.
   const isOrphanKontakt =
-    !member.mitgliedsnummer && beziehungen.length === 0 && incomingBeziehungenCount === 0;
+    !member.memberNo && beziehungen.length === 0 && incomingBeziehungenCount === 0;
   const isDeleted = (member as { deletedAt?: string | Date | null }).deletedAt != null;
 
   // aktiv vs passiv is derived: a live member counts as aktiv only while they
