@@ -17,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
@@ -117,9 +118,17 @@ function AntragDetailPage() {
     queryKey: ["feeTypes.list"],
     queryFn: () => orpc.feeTypes.list(),
   });
+  const dupes = useQuery({
+    queryKey: ["applications.duplicateCandidates", id],
+    queryFn: () => orpc.applications.duplicateCandidates({ applicationId: id }),
+    enabled:
+      !!detail.data && detail.data.status !== "genehmigt" && detail.data.status !== "abgelehnt",
+  });
 
   const [art, setArt] = useState<number | "">("");
   const [betrag, setBetrag] = useState("");
+  // Dedup gate: member id to link to instead of creating new (einzel only).
+  const [linkTo, setLinkTo] = useState<string | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -163,9 +172,14 @@ function AntragDetailPage() {
         id,
         art: art === "" ? null : Number(art),
         betrag: betrag.trim() || null,
+        linkToMemberId: linkTo,
       }),
     onSuccess: (res) => {
-      setMsg(`Genehmigt. Mitgliedsnummer: ${res.mitgliedsnummer}`);
+      setMsg(
+        linkTo
+          ? `Mit bestehendem Mitglied verknüpft: ${res.mitgliedsnummer}`
+          : `Genehmigt. Mitgliedsnummer: ${res.mitgliedsnummer}`,
+      );
       invalidate();
     },
     onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Genehmigung fehlgeschlagen."),
@@ -421,6 +435,74 @@ function AntragDetailPage() {
                 Legt ein Mitglied an (bei Familie inklusive Partner und Kindern) und übernimmt die
                 Bankverbindung als SEPA-Mandat. Optional wird ein Beitragsvertrag erstellt.
               </p>
+
+              {dupes.isLoading ? (
+                <p className="text-sm text-muted-foreground">Prüfe auf mögliche Dubletten…</p>
+              ) : dupes.data && dupes.data.candidates.length > 0 ? (
+                <div className="flex flex-col gap-2 rounded-lg border border-amber-300/60 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+                  <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300">
+                    <AlertTriangle className="size-4" />
+                    Mögliche Dubletten gefunden ({dupes.data.candidates.length})
+                  </div>
+                  <p className="text-xs text-amber-800/80 dark:text-amber-300/80">
+                    Bitte prüfen: neues Mitglied anlegen oder mit einem bestehenden verknüpfen.
+                    {a.antragstyp !== "einzel"
+                      ? " Verknüpfen ist nur bei Einzelanträgen möglich."
+                      : null}
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {dupes.data.candidates.map((c) => {
+                      const selected = linkTo === c.id && c.kind === "member";
+                      const linkable = c.kind === "member" && a.antragstyp === "einzel";
+                      return (
+                        <div
+                          key={`${c.kind}-${c.id}`}
+                          className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-card px-2 py-1.5 text-sm"
+                        >
+                          <Badge variant={c.kind === "member" ? "secondary" : "outline"}>
+                            {c.kind === "member"
+                              ? (c.memberNo ?? c.kontaktNo ?? "Mitglied")
+                              : "Antrag"}
+                          </Badge>
+                          <span className="font-medium">{c.name || "—"}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {[c.geburtsdatum, c.ort].filter(Boolean).join(" · ")}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {c.reasons.join(", ")}
+                          </span>
+                          {linkable ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={selected ? "default" : "outline"}
+                              className="ml-auto"
+                              onClick={() => setLinkTo(selected ? null : c.id)}
+                            >
+                              {selected ? "Verknüpft" : "Verknüpfen"}
+                            </Button>
+                          ) : c.kind === "application" ? (
+                            <Link
+                              to="/app/antraege/$id"
+                              params={{ id: c.id }}
+                              className="ml-auto text-xs text-primary hover:underline"
+                            >
+                              Antrag öffnen
+                            </Link>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {linkTo ? (
+                    <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
+                      Beim Genehmigen wird kein neues Mitglied angelegt, sondern das gewählte
+                      bestehende aktualisiert (fehlende Daten, Vertrag und Mandat falls nötig,
+                      Antrag verknüpft).
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Label className="flex flex-col gap-1.5">
                   <span>Beitragsart (optional)</span>
@@ -470,7 +552,7 @@ function AntragDetailPage() {
                 ) : (
                   <CheckCircle2 className="size-4" />
                 )}
-                Genehmigen und Mitglied anlegen
+                {linkTo ? "Genehmigen und verknüpfen" : "Genehmigen und Mitglied anlegen"}
               </Button>
             </CardContent>
           </Card>

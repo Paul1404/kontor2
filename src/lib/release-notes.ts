@@ -41,6 +41,22 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.116.0",
+    date: "2026-06-25",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Online-Anträge: Beim Genehmigen prüft Kontor² jetzt auf mögliche Dubletten (Name, Geburtsdatum, IBAN, E-Mail, Adresse) und zeigt Treffer an. Ein Einzelantrag lässt sich mit einem bestehenden Mitglied verknüpfen, statt es doppelt anzulegen. Dabei werden fehlende Daten ergänzt und Vertrag bzw. Mandat nur bei Bedarf angelegt.",
+      },
+      {
+        category: "feature",
+        description:
+          "Online-Anträge: Beim Genehmigen werden der unterschriebene Scan und die genehmigte Beitrittserklärung zusätzlich als Dokument am Mitglied abgelegt, nicht mehr nur am Antrag.",
+      },
+    ],
+  },
+  {
     version: "0.115.1",
     date: "2026-06-25",
     changes: [

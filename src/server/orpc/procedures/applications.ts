@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { type AnyColumn, and, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { unzipSync } from "fflate";
 import * as v from "valibot";
 import { lookupPlz, searchStreets } from "~/server/address/lookup";
@@ -17,7 +17,9 @@ import type { DB, DBOrTx } from "~/server/db/client";
 import { allocateDocRef } from "~/server/db/doc-ref";
 import { escapeLike } from "~/server/db/like";
 import { withUniqueRetry } from "~/server/db/retry";
-import { abteilungenTable } from "~/server/db/schema/abteilungen";
+import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
+import { attachmentsTable } from "~/server/db/schema/attachments";
+import { contractsTable } from "~/server/db/schema/contracts";
 import { emailLogTable } from "~/server/db/schema/email-log";
 import { familienMitgliederTable, familienTable } from "~/server/db/schema/familien";
 import { membersTable } from "~/server/db/schema/members";
@@ -33,6 +35,7 @@ import {
   organizationSettingsTable,
 } from "~/server/db/schema/organization-settings";
 import { relationshipsTable } from "~/server/db/schema/relationships";
+import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import {
   type Altersgrenzen,
   type Antragstyp,
@@ -53,6 +56,10 @@ import {
   type SvumsMappedApplication,
   svumsDedupeKey,
 } from "~/server/domain/application/svums-import";
+import {
+  type DuplicateCandidate,
+  findDuplicateCandidates,
+} from "~/server/domain/member/duplicate-detection";
 import { onboardMember } from "~/server/domain/member/onboard";
 import { lookupBankByIban } from "~/server/lib/blz";
 import { toCsv } from "~/server/lib/csv";
@@ -548,6 +555,240 @@ async function runSvumsImport(opts: {
   };
 }
 
+/**
+ * Approve an application by linking it to an EXISTING member instead of creating
+ * a new one (the dedup gate's "verknüpfen" choice). Enriches only missing or
+ * placeholder fields (never overwrites good data), adds a contract/mandate only
+ * when the member has none, adds the application's Abteilungen, and marks the
+ * application genehmigt. This is the Fischer cleanup as one button. Only for
+ * einzel applications; family/minor stay on the create-new path.
+ */
+async function approveByLinking(
+  db: DB,
+  opts: {
+    app: MembershipApplication;
+    memberId: string;
+    art: number | null;
+    betrag: string | null;
+    actorId: string;
+    actorEmail: string;
+    requestId: string | null;
+  },
+): Promise<{ primaryId: string; refs: string[] }> {
+  const { app } = opts;
+  const ibanPlain = app.iban?.trim() ? app.iban.trim() : null;
+  const today = new Date().toISOString().slice(0, 10);
+  const isPlaceholderDob = (d: Date | string | null) => {
+    if (!d) return true;
+    return (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10).endsWith("-01-01");
+  };
+
+  return db.transaction(async (tx) => {
+    const [locked] = await tx
+      .select({
+        status: membershipApplicationsTable.status,
+        memberId: membershipApplicationsTable.memberId,
+      })
+      .from(membershipApplicationsTable)
+      .where(eq(membershipApplicationsTable.id, app.id))
+      .limit(1)
+      .for("update");
+    if (!locked || locked.status === "genehmigt" || locked.memberId) {
+      throw new ORPCError("CONFLICT", { message: "Antrag ist bereits genehmigt." });
+    }
+
+    const [member] = await tx
+      .select()
+      .from(membersTable)
+      .where(and(eq(membersTable.id, opts.memberId), isNull(membersTable.deletedAt)))
+      .limit(1);
+    if (!member) {
+      throw new ORPCError("NOT_FOUND", { message: "Verknüpftes Mitglied nicht gefunden." });
+    }
+
+    // Enrich only missing / placeholder fields; never overwrite good data.
+    const patch: Record<string, unknown> = {};
+    const changes: Record<string, { before: unknown; after: unknown }> = {};
+    const fill = (key: keyof typeof member, value: unknown, missing: boolean) => {
+      if (missing && value != null && String(value).trim() !== "") {
+        patch[key as string] = value;
+        changes[key as string] = { before: member[key] ?? null, after: value };
+      }
+    };
+    fill("email", app.email, !member.email);
+    fill("telefon1", app.telefon, !member.telefon1);
+    fill("geburtsdatum", app.geburtsdatum, isPlaceholderDob(member.geburtsdatum));
+    fill("strasse", app.strasse, !member.strasse);
+    fill("hausnummer", app.hausnummer, !member.hausnummer);
+    fill("plz", app.plz, !member.plz);
+    fill("ort", app.ort, !member.ort);
+    if (ibanPlain && !member.iban1) {
+      patch.iban1 = ibanPlain;
+      patch.iban1Last4 = app.ibanLast4 ?? lastFour(ibanPlain);
+      patch.bic1 = app.bic;
+      changes.iban1 = { before: null, after: app.ibanLast4 ?? lastFour(ibanPlain) };
+    }
+    if (Object.keys(patch).length > 0) {
+      patch.updatedAt = new Date();
+      await tx
+        .update(membersTable)
+        .set(patch as never)
+        .where(eq(membersTable.id, member.id));
+    }
+
+    const ref = (member.memberNo ??
+      member.kontaktNo ??
+      member.mitgliedsnummer ??
+      `A${member.adrNr}`) as string;
+
+    // Contract only when the member has none and the reviewer picked a Beitragsart.
+    const existingContract = await tx
+      .select({ id: contractsTable.id })
+      .from(contractsTable)
+      .where(and(eq(contractsTable.memberId, member.id), isNull(contractsTable.vertragEnde)))
+      .limit(1);
+    if (existingContract.length === 0 && opts.art != null) {
+      await tx.insert(contractsTable).values({
+        memberId: member.id,
+        adrNr: member.adrNr,
+        mitglNr: ref,
+        vertragNr: "1",
+        art: opts.art,
+        betrag: opts.betrag ?? app.jahresbeitrag ?? null,
+        vertragBegin: new Date(),
+        isDirectDebit: ibanPlain != null,
+      } as never);
+      changes.vertragAngelegt = { before: null, after: 1 };
+    }
+
+    // SEPA mandate only when none exists and an IBAN is on file.
+    const existingMandate = await tx
+      .select({ id: sepaMandatesTable.id })
+      .from(sepaMandatesTable)
+      .where(and(eq(sepaMandatesTable.memberId, member.id), eq(sepaMandatesTable.isDeleted, false)))
+      .limit(1);
+    if (existingMandate.length === 0 && ibanPlain) {
+      await tx.insert(sepaMandatesTable).values({
+        memberId: member.id,
+        adrNr: member.adrNr,
+        mandatsNr: app.mandatsreferenz ?? "M1",
+        angelegtAm: new Date(),
+        unterschriftDatum: app.consentAt,
+        gueltigAb: new Date(),
+      } as never);
+      changes.mandatAngelegt = { before: null, after: 1 };
+    }
+
+    // Abteilungen: additive.
+    let abtAdded = 0;
+    for (const abteilungId of app.abteilungen ?? []) {
+      const r = await tx
+        .insert(memberAbteilungenTable)
+        .values({ memberId: member.id, abteilungId, eintrittsdatum: today })
+        .onConflictDoNothing()
+        .returning({ memberId: memberAbteilungenTable.memberId });
+      if (r.length) abtAdded++;
+    }
+    if (abtAdded > 0) changes.abteilungenAdded = { before: null, after: abtAdded };
+
+    await tx
+      .update(membershipApplicationsTable)
+      .set({
+        status: "genehmigt",
+        memberId: member.id,
+        mitgliedsnummer: ref,
+        updatedAt: new Date(),
+      })
+      .where(eq(membershipApplicationsTable.id, app.id));
+
+    changes.verknuepfterAntrag = { before: null, after: app.antragsnummer };
+    await appendAudit(tx, {
+      entityType: "member",
+      entityId: member.id,
+      action: "update",
+      source: "ui",
+      actorId: opts.actorId,
+      actorEmail: opts.actorEmail,
+      changes,
+      requestId: opts.requestId,
+    });
+    await appendAudit(tx, {
+      entityType: "membership_application",
+      entityId: app.id,
+      action: "update",
+      source: "ui",
+      actorId: opts.actorId,
+      actorEmail: opts.actorEmail,
+      changes: {
+        status: { before: app.status, after: "genehmigt" },
+        memberId: { before: null, after: member.id },
+      },
+      requestId: opts.requestId,
+    });
+
+    return { primaryId: member.id, refs: [ref] };
+  });
+}
+
+/**
+ * Copy an approved application's documents (signed scan + the generated
+ * Beitrittserklärung) into the member's attachments, so they are findable on the
+ * member, not only on the application. The attachments `s3_key` is unique, so we
+ * copy the S3 object to a per-member key. Idempotent and best-effort: a failure
+ * is logged but never undoes the approval.
+ */
+async function attachApplicationFilesToMember(
+  db: DB,
+  applicationId: string,
+  memberId: string,
+  uploadedBy: string,
+): Promise<void> {
+  const files = await db
+    .select()
+    .from(membershipApplicationFilesTable)
+    .where(
+      and(
+        eq(membershipApplicationFilesTable.applicationId, applicationId),
+        inArray(membershipApplicationFilesTable.kind, ["signed_scan", "approved_pdf"]),
+      ),
+    );
+  for (const f of files) {
+    const destKey = `members/${memberId}/antrag-${f.kind}-${f.id}`;
+    try {
+      const [existing] = await db
+        .select({ id: attachmentsTable.id })
+        .from(attachmentsTable)
+        .where(eq(attachmentsTable.s3Key, destKey))
+        .limit(1);
+      if (existing) continue;
+      const bytes = await getObject(f.s3Key);
+      const mime =
+        f.mimeType ?? (f.kind === "approved_pdf" ? "application/pdf" : "application/octet-stream");
+      await putObject({ key: destKey, body: bytes, contentType: mime });
+      const filename =
+        f.filename ??
+        (f.kind === "approved_pdf"
+          ? "Beitrittserklaerung-genehmigt.pdf"
+          : "Beitrittserklaerung-Scan");
+      await db.insert(attachmentsTable).values({
+        memberId,
+        filename,
+        mimeType: mime,
+        sizeBytes: f.sizeBytes ?? bytes.length,
+        s3Key: destKey,
+        uploadedBy,
+      });
+    } catch (err) {
+      logger.error("application.approve.attach_failed", {
+        applicationId,
+        memberId,
+        fileId: f.id,
+        ...errorLogFields(err),
+      });
+    }
+  }
+}
+
 export const applicationsRouter = {
   /**
    * Public club info for the application form: name, active Abteilungen, the
@@ -667,37 +908,53 @@ export const applicationsRouter = {
   checkDuplicate: publicProc
     .input(v.object({ vorname: v.string(), nachname: v.string(), geburtsdatum: ISODate }))
     .handler(async ({ context, input }) => {
-      const dob = parseISODate(input.geburtsdatum);
-      const vor = input.vorname.trim().toLowerCase();
-      const nach = input.nachname.trim().toLowerCase();
-      if (!vor || !nach || Number.isNaN(dob.getTime())) return { duplicate: false };
-      // Match name + DOB against both existing members and open applications.
-      const nameMatch = (vorCol: AnyColumn, nachCol: AnyColumn) =>
-        and(sql`lower(${vorCol}) = ${vor}`, sql`lower(${nachCol}) = ${nach}`);
-      const [apps, members] = await Promise.all([
-        context.db
-          .select({ id: membershipApplicationsTable.id })
-          .from(membershipApplicationsTable)
-          .where(
-            and(
-              eq(membershipApplicationsTable.geburtsdatum, dob),
-              nameMatch(membershipApplicationsTable.vorname, membershipApplicationsTable.nachname),
-            ),
-          )
-          .limit(1),
-        context.db
-          .select({ id: membersTable.id })
-          .from(membersTable)
-          .where(
-            and(
-              eq(membersTable.geburtsdatum, dob),
-              isNull(membersTable.deletedAt),
-              nameMatch(membersTable.vorname, membersTable.nachname),
-            ),
-          )
-          .limit(1),
-      ]);
-      return { duplicate: apps.length > 0 || members.length > 0 };
+      // Public, so return only a boolean: no member PII may leak to an anonymous
+      // applicant. The Vorstand gets the scored candidates via duplicateCandidates.
+      const candidates = await findDuplicateCandidates(context.db, {
+        vorname: input.vorname,
+        nachname: input.nachname,
+        geburtsdatum: input.geburtsdatum,
+      });
+      return { duplicate: candidates.length > 0 };
+    }),
+
+  /**
+   * Scored duplicate candidates (existing members + other open applications) for
+   * one application, for the approval screen's dedup gate. Vorstand only, so it
+   * may return identifying details. The IBAN is the strongest signal.
+   */
+  duplicateCandidates: vorstandProc
+    .input(v.object({ applicationId: v.pipe(v.string(), v.uuid()) }))
+    .handler(async ({ context, input }) => {
+      const [app] = await context.db
+        .select({
+          id: membershipApplicationsTable.id,
+          vorname: membershipApplicationsTable.vorname,
+          nachname: membershipApplicationsTable.nachname,
+          geburtsdatum: membershipApplicationsTable.geburtsdatum,
+          iban: membershipApplicationsTable.iban,
+          ibanLast4: membershipApplicationsTable.ibanLast4,
+          email: membershipApplicationsTable.email,
+          plz: membershipApplicationsTable.plz,
+        })
+        .from(membershipApplicationsTable)
+        .where(eq(membershipApplicationsTable.id, input.applicationId))
+        .limit(1);
+      if (!app) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+      const candidates = await findDuplicateCandidates(
+        context.db,
+        {
+          vorname: app.vorname,
+          nachname: app.nachname,
+          geburtsdatum: app.geburtsdatum,
+          iban: app.iban,
+          ibanLast4: app.ibanLast4,
+          email: app.email,
+          plz: app.plz,
+        },
+        { applicationId: app.id },
+      );
+      return { candidates };
     }),
 
   /** Public status lookup by Antragsnummer; returns only status, no PII. */
@@ -1643,6 +1900,8 @@ export const applicationsRouter = {
         id: v.pipe(v.string(), v.uuid()),
         art: v.optional(v.nullable(v.pipe(v.number(), v.integer())), null),
         betrag: v.optional(v.nullable(v.string()), null),
+        /** Dedup gate: link to this existing member instead of creating a new one. */
+        linkToMemberId: v.optional(v.nullable(v.pipe(v.string(), v.uuid())), null),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -1651,6 +1910,12 @@ export const applicationsRouter = {
       if (!app) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
       if (app.status === "genehmigt" || app.memberId) {
         throw new ORPCError("CONFLICT", { message: "Antrag ist bereits genehmigt." });
+      }
+      if (input.linkToMemberId && app.antragstyp !== "einzel") {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message:
+            "Verknüpfen mit einem bestehenden Mitglied ist nur für Einzelanträge möglich. Familien- und Kinderanträge bitte neu anlegen.",
+        });
       }
 
       const actorId = context.session!.user.id;
@@ -1740,191 +2005,201 @@ export const applicationsRouter = {
         return { vorname: "", nachname: "" };
       })();
 
-      const result = await withUniqueRetry(() =>
-        context.db.transaction(async (tx) => {
-          // Lock the application row and re-check inside the transaction. The
-          // status check above runs outside any lock, so two concurrent approve
-          // calls could both pass it and each create a full set of members. The
-          // FOR UPDATE lock serializes them; the second sees genehmigt/memberId
-          // and aborts (rolling back its just-created members).
-          const [locked] = await tx
-            .select({ status: t.status, memberId: t.memberId })
-            .from(t)
-            .where(eq(t.id, app.id))
-            .limit(1)
-            .for("update");
-          if (!locked || locked.status === "genehmigt" || locked.memberId) {
-            throw new ORPCError("CONFLICT", { message: "Antrag ist bereits genehmigt." });
-          }
-          const primary = await onboardMember(tx, {
-            patch: primaryPatch,
-            isKontakt: false,
-            status: "aktiv",
-            abteilungen: (app.abteilungen ?? []).map((id) => ({ abteilungId: id })),
-            fallbackEintritt,
-            contract,
-            // Das Mandat eines Kindes liegt beim Vertreter (unten), nicht beim Kind.
-            sepa: isMinor ? null : sepa,
+      const result = input.linkToMemberId
+        ? await approveByLinking(context.db, {
+            app,
+            memberId: input.linkToMemberId,
+            art: input.art,
+            betrag: input.betrag,
             actorId,
             actorEmail,
             requestId: context.requestId ?? null,
-          });
-          const refs = [primary.ref];
-
-          // Minderjährig: Erziehungsberechtigten als Zahler-Kontakt anlegen,
-          // Bankverbindung und Mandat dort, als Vertreter verknüpfen. Damit löst
-          // sich der Zahler von Anfang an sauber auf, ohne späteres Nachräumen.
-          if (isMinor && (guardianName.nachname || guardianName.vorname)) {
-            const guardian = await onboardMember(tx, {
-              patch: {
-                vorname: guardianName.vorname || null,
-                nachname: guardianName.nachname || null,
-                strasse: app.strasse,
-                hausnummer: app.hausnummer,
-                plz: app.plz,
-                ort: app.ort,
-                ...(ibanPlain
-                  ? {
-                      iban1: ibanPlain,
-                      iban1Last4: app.ibanLast4 ?? lastFour(ibanPlain),
-                      bic1: app.bic,
-                      abwKontoInh: app.kontoinhaber ?? null,
-                    }
-                  : {}),
-              },
-              isKontakt: true,
-              status: "aktiv",
-              abteilungen: [],
-              fallbackEintritt,
-              contract: null,
-              sepa,
-              actorId,
-              actorEmail,
-              requestId: context.requestId ?? null,
-            });
-            refs.push(guardian.ref);
-            await tx.insert(relationshipsTable).values({
-              fromMemberId: primary.id,
-              toMemberId: guardian.id,
-              fromAdrNr: primary.adrNr,
-              toAdrNr: guardian.adrNr,
-              beziehung: "Erziehungsberechtigt",
-              istVertreter: true,
-            });
-          }
-
-          if (app.antragstyp === "familie") {
-            let partnerId: string | null = null;
-            if (app.partnerVorname && app.partnerNachname) {
-              const p = await onboardMember(tx, {
-                patch: {
-                  vorname: app.partnerVorname,
-                  nachname: app.partnerNachname,
-                  geburtsdatum: app.partnerGeburtsdatum,
-                  strasse: app.strasse,
-                  hausnummer: app.hausnummer,
-                  plz: app.plz,
-                  ort: app.ort,
-                  eintritt: new Date(),
-                },
+          })
+        : await withUniqueRetry(() =>
+            context.db.transaction(async (tx) => {
+              // Lock the application row and re-check inside the transaction. The
+              // status check above runs outside any lock, so two concurrent approve
+              // calls could both pass it and each create a full set of members. The
+              // FOR UPDATE lock serializes them; the second sees genehmigt/memberId
+              // and aborts (rolling back its just-created members).
+              const [locked] = await tx
+                .select({ status: t.status, memberId: t.memberId })
+                .from(t)
+                .where(eq(t.id, app.id))
+                .limit(1)
+                .for("update");
+              if (!locked || locked.status === "genehmigt" || locked.memberId) {
+                throw new ORPCError("CONFLICT", { message: "Antrag ist bereits genehmigt." });
+              }
+              const primary = await onboardMember(tx, {
+                patch: primaryPatch,
                 isKontakt: false,
                 status: "aktiv",
-                abteilungen: (app.partnerAbteilungen ?? []).map((id) => ({ abteilungId: id })),
+                abteilungen: (app.abteilungen ?? []).map((id) => ({ abteilungId: id })),
                 fallbackEintritt,
-                contract: null,
-                sepa: null,
+                contract,
+                // Das Mandat eines Kindes liegt beim Vertreter (unten), nicht beim Kind.
+                sepa: isMinor ? null : sepa,
                 actorId,
                 actorEmail,
                 requestId: context.requestId ?? null,
               });
-              partnerId = p.id;
-              refs.push(p.ref);
-            }
-            const childIds: string[] = [];
-            for (const k of app.kinder ?? []) {
-              const c = await onboardMember(tx, {
-                patch: {
-                  vorname: k.vorname,
-                  nachname: k.nachname,
-                  geburtsdatum: k.geburtsdatum ? parseISODate(k.geburtsdatum) : null,
-                  strasse: app.strasse,
-                  hausnummer: app.hausnummer,
-                  plz: app.plz,
-                  ort: app.ort,
-                  eintritt: new Date(),
-                },
-                isKontakt: false,
-                status: "aktiv",
-                abteilungen: (k.abteilungen ?? []).map((id) => ({ abteilungId: id })),
-                fallbackEintritt,
-                contract: null,
-                sepa: null,
+              const refs = [primary.ref];
+
+              // Minderjährig: Erziehungsberechtigten als Zahler-Kontakt anlegen,
+              // Bankverbindung und Mandat dort, als Vertreter verknüpfen. Damit löst
+              // sich der Zahler von Anfang an sauber auf, ohne späteres Nachräumen.
+              if (isMinor && (guardianName.nachname || guardianName.vorname)) {
+                const guardian = await onboardMember(tx, {
+                  patch: {
+                    vorname: guardianName.vorname || null,
+                    nachname: guardianName.nachname || null,
+                    strasse: app.strasse,
+                    hausnummer: app.hausnummer,
+                    plz: app.plz,
+                    ort: app.ort,
+                    ...(ibanPlain
+                      ? {
+                          iban1: ibanPlain,
+                          iban1Last4: app.ibanLast4 ?? lastFour(ibanPlain),
+                          bic1: app.bic,
+                          abwKontoInh: app.kontoinhaber ?? null,
+                        }
+                      : {}),
+                  },
+                  isKontakt: true,
+                  status: "aktiv",
+                  abteilungen: [],
+                  fallbackEintritt,
+                  contract: null,
+                  sepa,
+                  actorId,
+                  actorEmail,
+                  requestId: context.requestId ?? null,
+                });
+                refs.push(guardian.ref);
+                await tx.insert(relationshipsTable).values({
+                  fromMemberId: primary.id,
+                  toMemberId: guardian.id,
+                  fromAdrNr: primary.adrNr,
+                  toAdrNr: guardian.adrNr,
+                  beziehung: "Erziehungsberechtigt",
+                  istVertreter: true,
+                });
+              }
+
+              if (app.antragstyp === "familie") {
+                let partnerId: string | null = null;
+                if (app.partnerVorname && app.partnerNachname) {
+                  const p = await onboardMember(tx, {
+                    patch: {
+                      vorname: app.partnerVorname,
+                      nachname: app.partnerNachname,
+                      geburtsdatum: app.partnerGeburtsdatum,
+                      strasse: app.strasse,
+                      hausnummer: app.hausnummer,
+                      plz: app.plz,
+                      ort: app.ort,
+                      eintritt: new Date(),
+                    },
+                    isKontakt: false,
+                    status: "aktiv",
+                    abteilungen: (app.partnerAbteilungen ?? []).map((id) => ({ abteilungId: id })),
+                    fallbackEintritt,
+                    contract: null,
+                    sepa: null,
+                    actorId,
+                    actorEmail,
+                    requestId: context.requestId ?? null,
+                  });
+                  partnerId = p.id;
+                  refs.push(p.ref);
+                }
+                const childIds: string[] = [];
+                for (const k of app.kinder ?? []) {
+                  const c = await onboardMember(tx, {
+                    patch: {
+                      vorname: k.vorname,
+                      nachname: k.nachname,
+                      geburtsdatum: k.geburtsdatum ? parseISODate(k.geburtsdatum) : null,
+                      strasse: app.strasse,
+                      hausnummer: app.hausnummer,
+                      plz: app.plz,
+                      ort: app.ort,
+                      eintritt: new Date(),
+                    },
+                    isKontakt: false,
+                    status: "aktiv",
+                    abteilungen: (k.abteilungen ?? []).map((id) => ({ abteilungId: id })),
+                    fallbackEintritt,
+                    contract: null,
+                    sepa: null,
+                    actorId,
+                    actorEmail,
+                    requestId: context.requestId ?? null,
+                  });
+                  childIds.push(c.id);
+                  refs.push(c.ref);
+                }
+
+                // Familie explizit anlegen: der primäre Antragsteller zahlt, Partner
+                // und Kinder als Familienmitglieder. So ist der Zahler der Kinder
+                // sauber gemodellt (statt nur über Adresse/Verknüpfung).
+                const today = new Date().toISOString().slice(0, 10);
+                const [fam] = await tx
+                  .insert(familienTable)
+                  .values({ name: `Familie ${app.nachname}`, zahlerMemberId: primary.id })
+                  .returning({ id: familienTable.id });
+                if (fam) {
+                  await tx.insert(familienMitgliederTable).values([
+                    { familieId: fam.id, memberId: primary.id, rolle: "zahler", von: today },
+                    ...(partnerId
+                      ? [
+                          {
+                            familieId: fam.id,
+                            memberId: partnerId,
+                            rolle: "partner" as const,
+                            von: today,
+                          },
+                        ]
+                      : []),
+                    ...childIds.map((id) => ({
+                      familieId: fam.id,
+                      memberId: id,
+                      rolle: "kind" as const,
+                      von: today,
+                    })),
+                  ]);
+                }
+              }
+
+              await tx
+                .update(t)
+                .set({
+                  status: "genehmigt",
+                  memberId: primary.id,
+                  mitgliedsnummer: refs.join(", "),
+                  updatedAt: new Date(),
+                })
+                .where(eq(t.id, app.id));
+
+              await appendAudit(tx, {
+                entityType: "membership_application",
+                entityId: app.id,
+                action: "update",
+                source: "ui",
                 actorId,
                 actorEmail,
+                changes: {
+                  status: { before: app.status, after: "genehmigt" },
+                  mitgliedsnummer: { before: null, after: refs.join(", ") },
+                },
                 requestId: context.requestId ?? null,
               });
-              childIds.push(c.id);
-              refs.push(c.ref);
-            }
 
-            // Familie explizit anlegen: der primäre Antragsteller zahlt, Partner
-            // und Kinder als Familienmitglieder. So ist der Zahler der Kinder
-            // sauber gemodellt (statt nur über Adresse/Verknüpfung).
-            const today = new Date().toISOString().slice(0, 10);
-            const [fam] = await tx
-              .insert(familienTable)
-              .values({ name: `Familie ${app.nachname}`, zahlerMemberId: primary.id })
-              .returning({ id: familienTable.id });
-            if (fam) {
-              await tx.insert(familienMitgliederTable).values([
-                { familieId: fam.id, memberId: primary.id, rolle: "zahler", von: today },
-                ...(partnerId
-                  ? [
-                      {
-                        familieId: fam.id,
-                        memberId: partnerId,
-                        rolle: "partner" as const,
-                        von: today,
-                      },
-                    ]
-                  : []),
-                ...childIds.map((id) => ({
-                  familieId: fam.id,
-                  memberId: id,
-                  rolle: "kind" as const,
-                  von: today,
-                })),
-              ]);
-            }
-          }
-
-          await tx
-            .update(t)
-            .set({
-              status: "genehmigt",
-              memberId: primary.id,
-              mitgliedsnummer: refs.join(", "),
-              updatedAt: new Date(),
-            })
-            .where(eq(t.id, app.id));
-
-          await appendAudit(tx, {
-            entityType: "membership_application",
-            entityId: app.id,
-            action: "update",
-            source: "ui",
-            actorId,
-            actorEmail,
-            changes: {
-              status: { before: app.status, after: "genehmigt" },
-              mitgliedsnummer: { before: null, after: refs.join(", ") },
-            },
-            requestId: context.requestId ?? null,
-          });
-
-          return { primaryId: primary.id, refs };
-        }),
-      );
+              return { primaryId: primary.id, refs };
+            }),
+          );
 
       await invalidateMemberCaches(context.tenant.key);
 
@@ -1945,6 +2220,11 @@ export const applicationsRouter = {
           ...errorLogFields(err),
         });
       }
+
+      // Copy the signed scan and the generated Beitrittserklärung onto the member,
+      // so the documents are findable on the member (new or linked), not only on
+      // the application. Best-effort, never undoes the approval.
+      await attachApplicationFilesToMember(context.db, app.id, result.primaryId, actorId);
 
       if (app.email) {
         const sent = await sendApplicationDocumentMail(context.db, {
