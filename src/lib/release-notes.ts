@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.119.0",
+    date: "2026-06-26",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Beitragsläufe: Das Fälligkeitsdatum eines erzeugten Laufs lässt sich jetzt mit einem Klick anpassen, ohne den Lauf neu zu bauen. Liegt die Fälligkeit in der Vergangenheit oder zu knapp, warnt die Detailseite und setzt das Datum auf den nächsten Bankarbeitstag (oder ein gewähltes). Die SEPA-Datei wird neu erzeugt, sonst bleibt alles gleich (gleiche Posten und Nachrichten-ID), einfach erneut herunterladen.",
+      },
+    ],
+  },
+  {
     version: "0.118.0",
     date: "2026-06-26",
     changes: [
