@@ -15,6 +15,7 @@ import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { invalidateDashboardCaches } from "~/server/search/cache";
 import { amountStrToCents, buildFeeRunPreview, centsToAmount } from "~/server/sepa/build-fee-run";
 import { recollectionBlockReason } from "~/server/sepa/build-recollection";
+import { isTargetBusinessDay, nextCollectionDate } from "~/server/sepa/business-days";
 import { buildPain008, type Pain008Item } from "~/server/sepa/pain008";
 import { buildPrenotificationEmail } from "~/server/sepa/prenotification";
 import { mandateSignatureDate, selectMandate, sequenceTypeFor } from "~/server/sepa/select-mandate";
@@ -1229,6 +1230,97 @@ export const feeRunsRouter = {
       });
 
       return { filename: run.xmlFilename, content: run.xmlContent };
+    }),
+
+  /**
+   * Re-date a committed run without rebuilding it: a generated file goes stale
+   * once its collection date passes the lead time. This swaps `ReqdColltnDt`
+   * (and `CreDtTm`) in the stored XML, keeps everything else identical, and
+   * syncs the postings' due date. Without `falligkeitsdatum` it picks the next
+   * valid TARGET2 business day. The MsgId stays, so re-download and submit.
+   */
+  updateCollectionDate: vorstandProc
+    .input(
+      v.object({
+        id: v.string(),
+        falligkeitsdatum: v.optional(
+          v.nullable(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/))),
+          null,
+        ),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const [run] = await context.db
+        .select()
+        .from(feeRunsTable)
+        .where(eq(feeRunsTable.id, input.id))
+        .limit(1);
+      if (!run) throw new ORPCError("NOT_FOUND", { message: "Lauf nicht gefunden." });
+      if (run.status !== "committed")
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: "Nur erzeugte (nicht stornierte) Läufe können umdatiert werden.",
+        });
+      if (!run.xmlContent)
+        throw new ORPCError("VALIDATION_FAILED", { message: "Dieser Lauf hat keine SEPA-Datei." });
+
+      const today = new Date().toISOString().slice(0, 10);
+      const earliest = nextCollectionDate(today, 1);
+      const target = input.falligkeitsdatum ?? earliest;
+      if (!isTargetBusinessDay(target))
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: `${target} ist kein Bankarbeitstag (TARGET2).`,
+        });
+      if (target < earliest)
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: `Fälligkeit muss frühestens ${earliest} sein (ein Bankarbeitstag Vorlauf).`,
+        });
+
+      const now = new Date();
+      const nowStamp = now.toISOString().slice(0, 19);
+      const newXml = run.xmlContent
+        .replace(/<ReqdColltnDt>[^<]*<\/ReqdColltnDt>/g, `<ReqdColltnDt>${target}</ReqdColltnDt>`)
+        .replace(/<CreDtTm>[^<]*<\/CreDtTm>/, `<CreDtTm>${nowStamp}</CreDtTm>`);
+      const newFilename = buildXmlFilename(now);
+
+      await context.db.transaction(async (tx) => {
+        await tx
+          .update(feeRunsTable)
+          .set({
+            falligkeitsdatum: target,
+            xmlContent: newXml,
+            xmlFilename: newFilename,
+            xmlGeneratedAt: now,
+          })
+          .where(eq(feeRunsTable.id, run.id));
+
+        const items = await tx
+          .select({ sollStellungId: feeRunItemsTable.sollStellungId })
+          .from(feeRunItemsTable)
+          .where(eq(feeRunItemsTable.feeRunId, run.id));
+        const sollIds = items.map((i) => i.sollStellungId).filter((x): x is string => !!x);
+        if (sollIds.length > 0) {
+          await tx
+            .update(sollStellungenTable)
+            .set({ falligkeitsdatum: target, updatedAt: now })
+            .where(inArray(sollStellungenTable.id, sollIds));
+        }
+
+        await appendAudit(tx, {
+          entityType: "fee_run",
+          entityId: run.id,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            falligkeitsdatum: { before: run.falligkeitsdatum, after: target },
+            xmlFilename: { before: run.xmlFilename, after: newFilename },
+          },
+          requestId: context.requestId ?? null,
+        });
+      });
+
+      return { ok: true as const, falligkeitsdatum: target, xmlFilename: newFilename };
     }),
 
   cancel: vorstandProc

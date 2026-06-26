@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { BellRing, Coins, Download, Loader2, XCircle } from "lucide-react";
+import { BellRing, CalendarClock, Coins, Download, Loader2, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -149,6 +149,10 @@ function FeeRunDetailPage() {
         <InfoTile label="Nachrichten-ID" value={r.xmlMessageId ?? EMPTY_VALUE} mono />
       </div>
 
+      {r.status === "committed" && canEdit ? (
+        <FaelligkeitCard id={id} current={r.falligkeitsdatum} />
+      ) : null}
+
       {r.status === "committed" && canEdit ? <PrenotificationCard id={id} /> : null}
 
       {r.notes ? (
@@ -227,6 +231,95 @@ function FeeRunDetailPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function FaelligkeitCard({ id, current }: { id: string; current: string }) {
+  const qc = useQueryClient();
+  const [date, setDate] = useState(current);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const isPast = current < todayIso;
+  const isToday = current === todayIso;
+
+  const update = useMutation({
+    mutationFn: (falligkeitsdatum: string | null) =>
+      orpc.feeRuns.updateCollectionDate({ id, falligkeitsdatum }),
+    onSuccess: (res) => {
+      toast.success(
+        `Fälligkeit auf ${formatDate(res.falligkeitsdatum)} gesetzt. Datei neu erzeugt, bitte erneut herunterladen.`,
+      );
+      qc.invalidateQueries({ queryKey: ["feeRuns.get", id] });
+    },
+    onError: (e: Error) => toast.error("Umdatieren fehlgeschlagen", { description: e.message }),
+  });
+
+  return (
+    <Card
+      className={
+        isPast
+          ? "border-destructive/40 bg-destructive/5"
+          : isToday
+            ? "border-warning/40 bg-warning/5"
+            : undefined
+      }
+    >
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <CalendarClock className="size-4 text-brand" /> Fälligkeit
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <div className="text-sm">
+          Aktuell fällig am <span className="font-medium">{formatDate(current)}</span>.
+          {isPast ? (
+            <span className="text-destructive">
+              {" "}
+              Liegt in der Vergangenheit, so nicht mehr einreichbar.
+            </span>
+          ) : null}
+          {isToday ? (
+            <span className="text-warning">
+              {" "}
+              Heute, sehr knapp, eventuell zu kurz für Vorlauf und Vorabankündigung.
+            </span>
+          ) : null}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Beim Umdatieren wird nur das Fälligkeitsdatum in der SEPA-Datei getauscht, sonst bleibt
+          alles gleich (gleiche Posten, gleiche Nachrichten-ID). Danach die Datei erneut
+          herunterladen.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <Button type="button" onClick={() => update.mutate(null)} disabled={update.isPending}>
+            {update.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <CalendarClock className="size-4" />
+            )}
+            Auf nächsten Bankarbeitstag setzen
+          </Button>
+          <div className="flex flex-col gap-1 text-xs">
+            <span className="text-muted-foreground">Anderes Datum</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => update.mutate(date)}
+                disabled={update.isPending || !date}
+              >
+                Setzen
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
