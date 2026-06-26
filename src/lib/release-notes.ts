@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.117.1",
+    date: "2026-06-26",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "SEPA-Lastschrift: Fehlt bei einem Mandat das Unterschriftsdatum (z. B. aus dem Linear-Import), nimmt die pain.008 jetzt das Mandatsdatum (gültig ab, sonst Anlagedatum) statt fälschlich das Fälligkeitsdatum. Damit kann kein Mandatsdatum in der Zukunft mehr in der Datei stehen, das die Bank ablehnen würde.",
+      },
+    ],
+  },
+  {
     version: "0.117.0",
     date: "2026-06-25",
     changes: [

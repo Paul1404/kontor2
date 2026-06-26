@@ -17,7 +17,7 @@ import { amountStrToCents, buildFeeRunPreview, centsToAmount } from "~/server/se
 import { recollectionBlockReason } from "~/server/sepa/build-recollection";
 import { buildPain008, type Pain008Item } from "~/server/sepa/pain008";
 import { buildPrenotificationEmail } from "~/server/sepa/prenotification";
-import { selectMandate, sequenceTypeFor } from "~/server/sepa/select-mandate";
+import { mandateSignatureDate, selectMandate, sequenceTypeFor } from "~/server/sepa/select-mandate";
 
 const PreviewInput = v.object({
   billingYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
@@ -237,6 +237,8 @@ export const feeRunsRouter = {
               id: sepaMandatesTable.id,
               mandatsNr: sepaMandatesTable.mandatsNr,
               unterschriftDatum: sepaMandatesTable.unterschriftDatum,
+              gueltigAb: sepaMandatesTable.gueltigAb,
+              angelegtAm: sepaMandatesTable.angelegtAm,
               ersteVerwendung: sepaMandatesTable.ersteVerwendung,
             })
             .from(sepaMandatesTable)
@@ -399,8 +401,7 @@ export const feeRunsRouter = {
         if (!mandate) continue;
 
         const endToEndId = crypto.randomUUID().replace(/-/g, "").slice(0, 35);
-        const signatureDate =
-          mandate.unterschriftDatum?.toISOString().slice(0, 10) ?? input.falligkeitsdatum;
+        const signatureDate = mandateSignatureDate(mandate);
 
         itemValues.push({
           feeRunId: run.id,
@@ -783,8 +784,7 @@ export const feeRunsRouter = {
             if (frstMandateIds.has(chosen.id)) sequenceType = "RCUR";
             else frstMandateIds.add(chosen.id);
           }
-          const signatureDate =
-            chosen.unterschriftDatum?.toISOString().slice(0, 10) ?? input.falligkeitsdatum;
+          const signatureDate = mandateSignatureDate(chosen);
           const purpose = `Mitgliedsbeitrag ${p.billingYear} (Wiedereinzug)`;
 
           const item = (
