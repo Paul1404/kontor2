@@ -58,3 +58,20 @@ export function selectMandate(
 export function sequenceTypeFor(mandate: SepaMandate): "FRST" | "RCUR" {
   return mandate.ersteVerwendung ? "RCUR" : "FRST";
 }
+
+/**
+ * The mandate date for the pain.008 `DtOfSgntr`. There is only one mandate date
+ * (Linear's "Datum Sepa-Mandat"); Kontor2 stores it as `unterschriftDatum` and,
+ * for imported rows that lacked it, the value lives in `gueltigAb`, with
+ * `angelegtAm` as a last resort. We fall back through these real, past dates and
+ * NEVER to the collection date: a `DtOfSgntr` in the future is invalid and banks
+ * reject it. `angelegtAm` is non-null, so a value is always returned.
+ */
+export function mandateSignatureDate(mandate: {
+  unterschriftDatum: Date | null;
+  gueltigAb: Date | null;
+  angelegtAm: Date | null;
+}): string {
+  const d = mandate.unterschriftDatum ?? mandate.gueltigAb ?? mandate.angelegtAm ?? new Date();
+  return d.toISOString().slice(0, 10);
+}
