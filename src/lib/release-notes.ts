@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.120.1",
+    date: "2026-06-26",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "SEPA-Lastschrift: Fehlt bei einem Zahler die BIC, wird sie jetzt wie in der Anzeige aus der IBAN abgeleitet (Bundesbank-BLZ) und in die pain.008 geschrieben, statt NOTPROVIDED. Nur bei wirklich unbekannten Banken bleibt es IBAN-only.",
+      },
+    ],
+  },
+  {
     version: "0.120.0",
     date: "2026-06-26",
     changes: [

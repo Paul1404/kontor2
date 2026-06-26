@@ -9,6 +9,7 @@
  * pre-grouped by sequence type.
  */
 
+import { lookupBankByIban } from "~/server/lib/blz";
 import { normalizeIban } from "~/server/sepa/iban";
 
 export type Pain008Creditor = {
@@ -122,8 +123,12 @@ ${txns}
 }
 
 function txInfo(it: Pain008Item): string {
-  const dbtrAgt = it.debtorBic
-    ? `<DbtrAgt><FinInstnId><BIC>${esc(it.debtorBic)}</BIC></FinInstnId></DbtrAgt>`
+  // Prefer the stored BIC; otherwise derive it from the IBAN (same Bundesbank
+  // BLZ source the UI shows), so a debtor without a stored BIC still carries a
+  // real BIC instead of NOTPROVIDED. Only truly unknown banks stay IBAN-only.
+  const bic = it.debtorBic ?? lookupBankByIban(it.debtorIban)?.bic ?? null;
+  const dbtrAgt = bic
+    ? `<DbtrAgt><FinInstnId><BIC>${esc(bic)}</BIC></FinInstnId></DbtrAgt>`
     : `<DbtrAgt><FinInstnId><Othr><Id>NOTPROVIDED</Id></Othr></FinInstnId></DbtrAgt>`;
   return `      <DrctDbtTxInf>
         <PmtId><EndToEndId>${esc(it.endToEndId)}</EndToEndId></PmtId>
