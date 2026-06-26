@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerOnlyFn } from "@tanstack/react-start";
 
 // Server imports (incl. drizzle-orm) loaded lazily inside the handler so the
 // server graph never reaches the client bundle. See `api/rpc.$.ts`.
-async function handle({ request }: { request: Request }) {
+const handle = createServerOnlyFn(async ({ request }: { request: Request }) => {
   const [{ eq }, { dbForTenant }, { resolveTenantFromHost }, { portalSessionsTable }, portalAuth] =
     await Promise.all([
       import("drizzle-orm"),
@@ -38,7 +39,7 @@ async function handle({ request }: { request: Request }) {
       "Set-Cookie": clearPortalCookieHeader(isSecure),
     },
   });
-}
+});
 
 export const Route = createFileRoute("/api/portal/logout")({
   server: { handlers: { GET: handle, POST: handle } },

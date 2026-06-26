@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerOnlyFn } from "@tanstack/react-start";
 
 /**
  * MCP endpoint (Model Context Protocol, Streamable HTTP) for AI assistants
@@ -54,45 +55,47 @@ function rateLimited(retryAfterSeconds: number): Response {
   );
 }
 
-export async function handle({ request }: { request: Request }): Promise<Response> {
-  // Server imports loaded lazily so the server graph stays out of the client
-  // bundle (see api/rpc.$.ts).
-  const [
-    { resolveApiKeyContext },
-    { enforceMcpRateLimit, enforceMcpIpRateLimit },
-    { handleMcpRequest },
-    { createContext },
-    { runWithTenantKeyring },
-    { clientIp },
-  ] = await Promise.all([
-    import("~/server/mcp/auth"),
-    import("~/server/mcp/rate-limit"),
-    import("~/server/mcp/server"),
-    import("~/server/orpc/context"),
-    import("~/server/crypto/tenant-crypto"),
-    import("~/server/lib/client-ip"),
-  ]);
-  const base = await createContext(request);
-  const rawKey = request.headers.get("x-api-key");
-  if (!rawKey) return unauthorized();
-  // Throttle by source IP before touching the key. An invalid key resolves to
-  // null and 401s below without ever hitting the per-key limiter, so without
-  // this a flood of bogus keys could hammer the HMAC/DB verification unbounded.
-  // Keyed on IP so it catches credential stuffing that rotates the key on every
-  // request. Fails open on a Redis outage, like every other limiter here.
-  const ipLimit = await enforceMcpIpRateLimit(clientIp(request.headers));
-  if (!ipLimit.allowed) return rateLimited(ipLimit.retryAfterSeconds);
-  // Im Per-Verein-Keyring: MCP-Tools lesen verschlüsselte Mitgliedsdaten (IBAN) dieses Vereins.
-  return runWithTenantKeyring(base.tenant.key, async () => {
-    const context = await resolveApiKeyContext(base, rawKey);
-    // null means a genuine auth failure (unknown/disabled/expired key or banned
-    // owner) — never a rate limit, which is handled below with a 429.
-    if (!context) return unauthorized();
-    const limit = await enforceMcpRateLimit(rawKey);
-    if (!limit.allowed) return rateLimited(limit.retryAfterSeconds);
-    return handleMcpRequest(request, context);
-  });
-}
+export const handle = createServerOnlyFn(
+  async ({ request }: { request: Request }): Promise<Response> => {
+    // Server imports loaded lazily so the server graph stays out of the client
+    // bundle (see api/rpc.$.ts).
+    const [
+      { resolveApiKeyContext },
+      { enforceMcpRateLimit, enforceMcpIpRateLimit },
+      { handleMcpRequest },
+      { createContext },
+      { runWithTenantKeyring },
+      { clientIp },
+    ] = await Promise.all([
+      import("~/server/mcp/auth"),
+      import("~/server/mcp/rate-limit"),
+      import("~/server/mcp/server"),
+      import("~/server/orpc/context"),
+      import("~/server/crypto/tenant-crypto"),
+      import("~/server/lib/client-ip"),
+    ]);
+    const base = await createContext(request);
+    const rawKey = request.headers.get("x-api-key");
+    if (!rawKey) return unauthorized();
+    // Throttle by source IP before touching the key. An invalid key resolves to
+    // null and 401s below without ever hitting the per-key limiter, so without
+    // this a flood of bogus keys could hammer the HMAC/DB verification unbounded.
+    // Keyed on IP so it catches credential stuffing that rotates the key on every
+    // request. Fails open on a Redis outage, like every other limiter here.
+    const ipLimit = await enforceMcpIpRateLimit(clientIp(request.headers));
+    if (!ipLimit.allowed) return rateLimited(ipLimit.retryAfterSeconds);
+    // Im Per-Verein-Keyring: MCP-Tools lesen verschlüsselte Mitgliedsdaten (IBAN) dieses Vereins.
+    return runWithTenantKeyring(base.tenant.key, async () => {
+      const context = await resolveApiKeyContext(base, rawKey);
+      // null means a genuine auth failure (unknown/disabled/expired key or banned
+      // owner) — never a rate limit, which is handled below with a 429.
+      if (!context) return unauthorized();
+      const limit = await enforceMcpRateLimit(rawKey);
+      if (!limit.allowed) return rateLimited(limit.retryAfterSeconds);
+      return handleMcpRequest(request, context);
+    });
+  },
+);
 
 export const Route = createFileRoute("/api/mcp")({
   server: {

@@ -14,6 +14,7 @@
  * the `svums_push` ingest source and the `SVUMS_PUSH_SECRET` env var.
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerOnlyFn } from "@tanstack/react-start";
 
 // Mirror the 50 MB cap the interactive SQL-dump import enforces, so a
 // compromised or buggy SVUMS sender can't exhaust memory with an unbounded
@@ -27,7 +28,7 @@ function tooLarge(): Response {
   });
 }
 
-async function handle({ request }: { request: Request }): Promise<Response> {
+const handle = createServerOnlyFn(async ({ request }: { request: Request }): Promise<Response> => {
   // Server imports loaded lazily so the server graph stays out of the client
   // bundle (see api/rpc.$.ts).
   const [
@@ -166,7 +167,7 @@ async function handle({ request }: { request: Request }): Promise<Response> {
     legacySepaItemsImported: result.legacySepaItemsImported,
     errors: result.errors,
   });
-}
+});
 
 export const Route = createFileRoute("/api/ingest/svums")({
   server: { handlers: { POST: handle } },

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerOnlyFn } from "@tanstack/react-start";
 
 /**
  * Dynamisches Web-App-Manifest: Name, Theme-Farbe und Icon kommen aus dem
@@ -7,7 +8,7 @@ import { createFileRoute } from "@tanstack/react-router";
  *
  * Servercode lazy im Handler (siehe api/rpc.$.ts).
  */
-async function handle({ request }: { request: Request }): Promise<Response> {
+const handle = createServerOnlyFn(async ({ request }: { request: Request }): Promise<Response> => {
   let name = "Kontor2";
   let themeColor = "#335c99";
   // Default: the Kontor2 logo as a scalable SVG (covers all sizes). The
@@ -68,7 +69,7 @@ async function handle({ request }: { request: Request }): Promise<Response> {
       "cache-control": "public, max-age=300",
     },
   });
-}
+});
 
 export const Route = createFileRoute("/api/branding/manifest")({
   server: { handlers: { GET: handle } },

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerOnlyFn } from "@tanstack/react-start";
 
 /**
  * Liefert das konfigurierte Logo als Bilddatei -- für Favicon, Apple-Touch-Icon
@@ -9,7 +10,7 @@ import { createFileRoute } from "@tanstack/react-router";
  * Servercode wird lazy im Handler geladen (siehe api/rpc.$.ts), damit der
  * Servergraph nicht ins Browser-Bundle wandert.
  */
-async function handle({ request }: { request: Request }): Promise<Response> {
+const handle = createServerOnlyFn(async ({ request }: { request: Request }): Promise<Response> => {
   const [{ dbForTenant }, { resolveTenantFromHost }, { organizationSettingsTable }] =
     await Promise.all([
       import("~/server/db/client"),
@@ -37,7 +38,7 @@ async function handle({ request }: { request: Request }): Promise<Response> {
       "cache-control": "public, max-age=86400, immutable",
     },
   });
-}
+});
 
 export const Route = createFileRoute("/api/branding/icon")({
   server: { handlers: { GET: handle } },

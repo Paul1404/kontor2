@@ -57,7 +57,7 @@ function isoDay(value: string | Date | null | undefined): string | null {
 
 /** A Jan-1 date is the Linear/import placeholder, so treat it as unreliable. */
 function isPlaceholderDob(iso: string | null): boolean {
-  return iso != null && iso.endsWith("-01-01");
+  return iso?.endsWith("-01-01") ?? false;
 }
 
 export type DuplicateRow = {
@@ -136,7 +136,6 @@ export async function findDuplicateCandidates(
   input: DuplicateSignalInput,
   exclude?: { applicationId?: string; memberId?: string },
 ): Promise<DuplicateCandidate[]> {
-  const vor = norm(input.vorname);
   const nach = norm(input.nachname);
   const email = norm(input.email);
   const last4 = (input.iban ? normIban(input.iban).slice(-4) : input.ibanLast4) ?? null;

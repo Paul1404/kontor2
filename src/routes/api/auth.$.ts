@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerOnlyFn } from "@tanstack/react-start";
 
 // Server imports are loaded lazily inside the handler, never at module top
 // level: this route module is part of the client route tree, and a static
 // `import { auth }` would drag the whole better-auth + mail + db graph
 // (nodemailer touches the Node-only `Buffer`) into the browser bundle and
 // break hydration. See the note in `api/rpc.$.ts`.
-const handle = async ({ request }: { request: Request }) => {
+const handle = createServerOnlyFn(async ({ request }: { request: Request }) => {
   const [
     { auth },
     { dbForTenant },
@@ -38,7 +39,7 @@ const handle = async ({ request }: { request: Request }) => {
     if (guard) return guard;
     return auth(tenant).handler(request);
   });
-};
+});
 
 export const Route = createFileRoute("/api/auth/$")({
   server: {

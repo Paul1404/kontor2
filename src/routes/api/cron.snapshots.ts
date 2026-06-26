@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerOnlyFn } from "@tanstack/react-start";
 
 /**
  * External trigger for the nightly snapshot run. Use this when the
@@ -8,7 +9,7 @@ import { createFileRoute } from "@tanstack/react-router";
  * The body is unused; we sign over the empty string so the request still
  * has integrity (and the timestamp guards against replay).
  */
-async function handle({ request }: { request: Request }): Promise<Response> {
+const handle = createServerOnlyFn(async ({ request }: { request: Request }): Promise<Response> => {
   // Server imports loaded lazily so the server graph stays out of the client
   // bundle (see api/rpc.$.ts).
   const [{ verifySignature }, { env }, { logger }, { rateLimit }, { runNightlySnapshot }] =
@@ -70,7 +71,7 @@ async function handle({ request }: { request: Request }): Promise<Response> {
       headers: { "content-type": "application/json" },
     });
   }
-}
+});
 
 export const Route = createFileRoute("/api/cron/snapshots")({
   server: { handlers: { POST: handle } },

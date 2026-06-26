@@ -56,10 +56,7 @@ import {
   type SvumsMappedApplication,
   svumsDedupeKey,
 } from "~/server/domain/application/svums-import";
-import {
-  type DuplicateCandidate,
-  findDuplicateCandidates,
-} from "~/server/domain/member/duplicate-detection";
+import { findDuplicateCandidates } from "~/server/domain/member/duplicate-detection";
 import { onboardMember } from "~/server/domain/member/onboard";
 import { lookupBankByIban } from "~/server/lib/blz";
 import { toCsv } from "~/server/lib/csv";

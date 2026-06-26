@@ -7,10 +7,15 @@ import { envOnlyMacros } from "vite-env-only";
 
 const routerOptions = {
   target: "react" as const,
-  autoCodeSplitting: false,
+  autoCodeSplitting: true,
   routesDirectory: "./src/routes",
   generatedRouteTree: "./src/routes/routeTree.gen.ts",
   routeFileIgnorePattern: "routeTree\\.gen\\.ts",
+};
+const startOptions = {
+  router: {
+    routeFileIgnorePattern: "routeTree\\.gen\\.ts",
+  },
 };
 
 // The production build (command === "build") keeps the original, verified plugin
@@ -28,6 +33,11 @@ export default defineConfig(({ command }) => ({
   },
   plugins:
     command === "serve"
-      ? [tailwindcss(), envOnlyMacros(), tanstackStart(), viteReact()]
-      : [tanstackRouter(routerOptions), tailwindcss(), envOnlyMacros(), tanstackStart()],
+      ? [tailwindcss(), envOnlyMacros(), tanstackStart(startOptions), viteReact()]
+      : [
+          tanstackRouter(routerOptions),
+          tailwindcss(),
+          envOnlyMacros(),
+          tanstackStart(startOptions),
+        ],
 }));
