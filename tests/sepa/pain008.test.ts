@@ -81,8 +81,29 @@ describe("buildPain008", () => {
     expect(blocks.find((b) => b.includes("<SeqTp>RCUR</SeqTp>"))).toBeTruthy();
   });
 
-  it("falls back to NOTPROVIDED when debtor BIC is null", () => {
+  it("derives the debtor BIC from a German IBAN when none is stored", () => {
+    // baseInput's second item has a DE IBAN and no BIC -> derived from the BLZ.
     const xml = buildPain008(baseInput);
+    expect(xml).toContain("<BIC>BYLADEM1KSW</BIC>");
+  });
+
+  it("falls back to NOTPROVIDED for an unknown (non-DE) bank when no BIC is stored", () => {
+    const xml = buildPain008({
+      ...baseInput,
+      items: [
+        {
+          endToEndId: "E2E-X",
+          amount: "10.00",
+          mandateRef: "M-X",
+          mandateSignatureDate: "2024-01-15",
+          debtorName: "Auslandskonto",
+          debtorIban: "AT611904300234573201",
+          debtorBic: null,
+          purpose: "Test",
+          sequenceType: "RCUR" as const,
+        },
+      ],
+    });
     expect(xml).toContain("NOTPROVIDED");
   });
 
