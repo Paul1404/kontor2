@@ -10,10 +10,11 @@ import {
   Upload,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { InfoBox } from "~/components/ui/info-box";
 import { Textarea } from "~/components/ui/textarea";
 import { EMPTY_VALUE } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -34,6 +35,14 @@ export const Route = createFileRoute("/app/admin/sepa-pruefung")({
 type Result = Awaited<ReturnType<typeof orpc.sepaTools.validateXml>>;
 
 const eur = (s: string) => `${s} €`;
+
+const SEQ_LABEL: Record<string, string> = {
+  FRST: "Erstlastschrift",
+  RCUR: "Folgelastschrift",
+  OOFF: "Einmallastschrift",
+  FNAL: "Letzte Lastschrift",
+};
+const seqLabel = (code: string) => SEQ_LABEL[code] ?? code;
 
 function SepaPruefungPage() {
   const [xml, setXml] = useState("");
@@ -116,7 +125,71 @@ function SepaPruefungPage() {
       </Card>
 
       {res ? <ResultView res={res} /> : null}
+
+      <Glossar />
     </div>
+  );
+}
+
+function GlossarRow({ term, children }: { term: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-[12rem_1fr] sm:gap-3">
+      <dt className="font-mono text-xs font-medium text-foreground">{term}</dt>
+      <dd className="text-sm text-muted-foreground">{children}</dd>
+    </div>
+  );
+}
+
+function Glossar() {
+  return (
+    <InfoBox title="Was bedeuten die Felder? (Glossar)" collapsible defaultOpen={false}>
+      <dl className="flex flex-col gap-2">
+        <GlossarRow term="Sequenz">
+          Art der Lastschrift je Mandat. <strong>FRST</strong> = Erstlastschrift (erste Nutzung
+          eines Mandats), <strong>RCUR</strong> = Folgelastschrift (jede weitere),{" "}
+          <strong>OOFF</strong> = Einmallastschrift (einmalig), <strong>FNAL</strong> = letzte
+          Lastschrift. Seit 2016 darf auch die erste Abbuchung als RCUR laufen, deutsche Banken
+          akzeptieren das.
+        </GlossarRow>
+        <GlossarRow term="Fälligkeit">
+          Tag, an dem die Bank das Geld tatsächlich von den Konten einzieht (ReqdColltnDt). Muss ein
+          Bankarbeitstag sein und etwas Vorlauf haben.
+        </GlossarRow>
+        <GlossarRow term="Nachrichten-ID">
+          Eindeutige Kennung der Datei (MsgId). Die Bank erkennt daran eine doppelt eingereichte
+          Datei.
+        </GlossarRow>
+        <GlossarRow term="Gläubiger-ID">
+          Die Gläubiger-Identifikationsnummer des Vereins (CdtrSchmeId), z. B. DE71ZZZ…. Sie weist
+          den Verein als berechtigten Einreicher aus, geprüft per Prüfziffer.
+        </GlossarRow>
+        <GlossarRow term="Mandat">
+          Mandatsreferenz (MndtId): die eindeutige Nummer der Einzugsermächtigung, die das Mitglied
+          unterschrieben hat.
+        </GlossarRow>
+        <GlossarRow term="Mandatsdatum">
+          Datum, an dem das SEPA-Mandat unterschrieben wurde (DtOfSgntr). Muss in der Vergangenheit
+          liegen.
+        </GlossarRow>
+        <GlossarRow term="IBAN / BIC">
+          Konto und Bank des Zahlungspflichtigen. Bei deutschen IBANs ist die BIC optional
+          („IBAN-only", in der Datei NOTPROVIDED), die Bank leitet sie aus der IBAN ab.
+        </GlossarRow>
+        <GlossarRow term="CORE / SEPA">
+          CORE = SEPA-Basislastschrift (für Privatpersonen), SvcLvl SEPA = Standard-SEPA-Verfahren.
+          B2B wäre die Firmenlastschrift.
+        </GlossarRow>
+        <GlossarRow term="Betrag / Summe">
+          Einzelbetrag je Posten und die Kontrollsumme (CtrlSum). Der Prüfstand rechnet nach, ob die
+          deklarierte Summe und Anzahl zu den tatsächlichen Posten passen.
+        </GlossarRow>
+        <GlossarRow term="Befunde">
+          <span className="text-destructive">Fehler</span> verhindern die Einreichung,{" "}
+          <span className="text-warning">Warnungen</span> solltest du prüfen,{" "}
+          <span className="text-muted-foreground">Hinweise</span> sind nur zur Information.
+        </GlossarRow>
+      </dl>
+    </InfoBox>
   );
 }
 
@@ -159,7 +232,7 @@ function ResultView({ res }: { res: Result }) {
           label="Sequenzen"
           value={
             Object.entries(res.summary.bySequence)
-              .map(([k, v]) => `${k}: ${v.count}/${eur(v.sum)}`)
+              .map(([k, v]) => `${seqLabel(k)} (${k}): ${v.count}/${eur(v.sum)}`)
               .join(" · ") || EMPTY_VALUE
           }
         />
@@ -234,7 +307,10 @@ function ResultView({ res }: { res: Result }) {
                   <td className="py-2 pr-3 font-mono text-xs">{t.debtorIban || EMPTY_VALUE}</td>
                   <td className="py-2 pr-3 font-mono text-xs">{t.mandateId || EMPTY_VALUE}</td>
                   <td className="py-2 pr-3 tabular-nums">{t.signatureDate || EMPTY_VALUE}</td>
-                  <td className="py-2 pr-3">{t.sequenceType}</td>
+                  <td className="py-2 pr-3">
+                    {t.sequenceType}
+                    <div className="text-xs text-muted-foreground">{seqLabel(t.sequenceType)}</div>
+                  </td>
                   <td className="py-2 pr-3 text-right font-medium tabular-nums">{eur(t.amount)}</td>
                 </tr>
               ))}
