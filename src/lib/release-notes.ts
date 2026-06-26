@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.118.0",
+    date: "2026-06-26",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Adminbereich: Neuer SEPA-Prüfstand. pain.008-Lastschriftdateien einlesen und nach deutschem Standard prüfen: Summen, IBAN-, BIC- und Gläubiger-ID-Prüfziffern, Mandatsdaten, Fälligkeit und Zeichensatz. Zeigt genau, was abgebucht würde, mit Fehlern, Warnungen und Hinweisen. Reine Analyse, es wird nichts gespeichert.",
+      },
+    ],
+  },
+  {
     version: "0.117.1",
     date: "2026-06-26",
     changes: [
