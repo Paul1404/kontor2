@@ -74,6 +74,13 @@ describe("validatePain008", () => {
     expect(codes(bad)).toContain("COLLTN_PAST");
   });
 
+  it("warns (not errors) on a collection date that is not a business day", () => {
+    const sunday = VALID.replace("2026-06-30", "2026-06-28"); // Sunday
+    const r = validatePain008(sunday, TODAY);
+    expect(r.findings.map((f) => f.code)).toContain("COLLTN_NONBUSINESS");
+    expect(r.ok).toBe(true);
+  });
+
   it("rejects non-pain.008 input", () => {
     const r = validatePain008("<foo>bar</foo>", TODAY);
     expect(r.ok).toBe(false);

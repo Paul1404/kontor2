@@ -1,3 +1,4 @@
+import { isTargetBusinessDay, nextCollectionDate } from "~/server/sepa/business-days";
 import { normalizeIban, validateIban } from "~/server/sepa/iban";
 
 /**
@@ -245,21 +246,28 @@ export function validatePain008(xml: string, today: string): Pain008Result {
       );
     } else {
       collectionDates.add(reqdColltnDt);
-      if (reqdColltnDt < today)
+      if (reqdColltnDt < today) {
         add(
           "error",
           "COLLTN_PAST",
-          `Fälligkeit ${reqdColltnDt} liegt in der Vergangenheit.`,
+          `Fälligkeit ${reqdColltnDt} liegt in der Vergangenheit, so nicht mehr einreichbar.`,
           where,
         );
-      const dow = new Date(`${reqdColltnDt}T00:00:00Z`).getUTCDay();
-      if (dow === 0 || dow === 6)
+      } else if (!isTargetBusinessDay(reqdColltnDt)) {
         add(
           "warning",
-          "COLLTN_WEEKEND",
-          `Fälligkeit ${reqdColltnDt} ist ein Wochenende (kein Bankarbeitstag).`,
+          "COLLTN_NONBUSINESS",
+          `Fälligkeit ${reqdColltnDt} ist kein Bankarbeitstag (Wochenende oder TARGET2-Feiertag).`,
           where,
         );
+      } else if (reqdColltnDt < nextCollectionDate(today, 1)) {
+        add(
+          "warning",
+          "COLLTN_LEAD",
+          `Fälligkeit ${reqdColltnDt} ist sehr knapp, eventuell zu wenig Vorlauf für Einreichung und Vorabankündigung.`,
+          where,
+        );
+      }
     }
 
     creditorName ||= txt(pmtInf, "Cdtr", "Nm");

@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.120.0",
+    date: "2026-06-26",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "SEPA-Prüfstand: erklärt jetzt die Felder. Sequenztypen (FRST, RCUR und weitere) erscheinen im Klartext, und ein ausklappbares Glossar erläutert alle Begriffe (Fälligkeit, Gläubiger-ID, Mandat, IBAN-only, CORE und mehr). Zusätzlich warnt der Prüfstand, wenn die Fälligkeit kein Bankarbeitstag ist (inklusive Feiertage) oder zu wenig Vorlauf hat.",
+      },
+    ],
+  },
+  {
     version: "0.119.0",
     date: "2026-06-26",
     changes: [
