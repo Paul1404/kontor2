@@ -69,6 +69,7 @@ import { Route as AppBeitragIdRouteImport } from './app/beitrag/$id'
 import { Route as AppAntraegeIdRouteImport } from './app/antraege/$id'
 import { Route as AppAdminVersandprotokollRouteImport } from './app/admin/versandprotokoll'
 import { Route as AppAdminSnapshotsRouteImport } from './app/admin/snapshots'
+import { Route as AppAdminSepaPruefungRouteImport } from './app/admin/sepa-pruefung'
 import { Route as AppAdminProtokollRouteImport } from './app/admin/protokoll'
 import { Route as AppAdminErweitertRouteImport } from './app/admin/erweitert'
 import { Route as ApiRpcSplatRouteImport } from './api/rpc.$'
@@ -398,6 +399,11 @@ const AppAdminSnapshotsRoute = AppAdminSnapshotsRouteImport.update({
   path: '/admin/snapshots',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppAdminSepaPruefungRoute = AppAdminSepaPruefungRouteImport.update({
+  id: '/admin/sepa-pruefung',
+  path: '/admin/sepa-pruefung',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppAdminProtokollRoute = AppAdminProtokollRouteImport.update({
   id: '/admin/protokoll',
   path: '/admin/protokoll',
@@ -532,6 +538,7 @@ export interface FileRoutesByFullPath {
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/protokoll': typeof AppAdminProtokollRoute
+  '/app/admin/sepa-pruefung': typeof AppAdminSepaPruefungRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
   '/app/admin/versandprotokoll': typeof AppAdminVersandprotokollRoute
   '/app/antraege/$id': typeof AppAntraegeIdRoute
@@ -607,6 +614,7 @@ export interface FileRoutesByTo {
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/protokoll': typeof AppAdminProtokollRoute
+  '/app/admin/sepa-pruefung': typeof AppAdminSepaPruefungRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
   '/app/admin/versandprotokoll': typeof AppAdminVersandprotokollRoute
   '/app/antraege/$id': typeof AppAntraegeIdRoute
@@ -687,6 +695,7 @@ export interface FileRoutesById {
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
   '/app/admin/protokoll': typeof AppAdminProtokollRoute
+  '/app/admin/sepa-pruefung': typeof AppAdminSepaPruefungRoute
   '/app/admin/snapshots': typeof AppAdminSnapshotsRoute
   '/app/admin/versandprotokoll': typeof AppAdminVersandprotokollRoute
   '/app/antraege/$id': typeof AppAntraegeIdRoute
@@ -768,6 +777,7 @@ export interface FileRouteTypes {
     | '/api/rpc/$'
     | '/app/admin/erweitert'
     | '/app/admin/protokoll'
+    | '/app/admin/sepa-pruefung'
     | '/app/admin/snapshots'
     | '/app/admin/versandprotokoll'
     | '/app/antraege/$id'
@@ -843,6 +853,7 @@ export interface FileRouteTypes {
     | '/api/rpc/$'
     | '/app/admin/erweitert'
     | '/app/admin/protokoll'
+    | '/app/admin/sepa-pruefung'
     | '/app/admin/snapshots'
     | '/app/admin/versandprotokoll'
     | '/app/antraege/$id'
@@ -922,6 +933,7 @@ export interface FileRouteTypes {
     | '/api/rpc/$'
     | '/app/admin/erweitert'
     | '/app/admin/protokoll'
+    | '/app/admin/sepa-pruefung'
     | '/app/admin/snapshots'
     | '/app/admin/versandprotokoll'
     | '/app/antraege/$id'
@@ -1405,6 +1417,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminSnapshotsRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/admin/sepa-pruefung': {
+      id: '/app/admin/sepa-pruefung'
+      path: '/admin/sepa-pruefung'
+      fullPath: '/app/admin/sepa-pruefung'
+      preLoaderRoute: typeof AppAdminSepaPruefungRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/admin/protokoll': {
       id: '/app/admin/protokoll'
       path: '/admin/protokoll'
@@ -1559,6 +1578,7 @@ interface AppRouteRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppAdminErweitertRoute: typeof AppAdminErweitertRoute
   AppAdminProtokollRoute: typeof AppAdminProtokollRoute
+  AppAdminSepaPruefungRoute: typeof AppAdminSepaPruefungRoute
   AppAdminSnapshotsRoute: typeof AppAdminSnapshotsRoute
   AppAdminVersandprotokollRoute: typeof AppAdminVersandprotokollRoute
   AppAntraegeIdRoute: typeof AppAntraegeIdRoute
@@ -1609,6 +1629,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppAdminErweitertRoute: AppAdminErweitertRoute,
   AppAdminProtokollRoute: AppAdminProtokollRoute,
+  AppAdminSepaPruefungRoute: AppAdminSepaPruefungRoute,
   AppAdminSnapshotsRoute: AppAdminSnapshotsRoute,
   AppAdminVersandprotokollRoute: AppAdminVersandprotokollRoute,
   AppAntraegeIdRoute: AppAntraegeIdRoute,

@@ -205,6 +205,12 @@ const SECTIONS: NavSection[] = [
         adminOnly: true,
       },
       {
+        to: "/app/admin/sepa-pruefung",
+        label: "SEPA-Prüfstand",
+        icon: <ShieldCheck className="size-[18px]" />,
+        adminOnly: true,
+      },
+      {
         to: "/app/admin/erweitert",
         label: "Adminbereich",
         icon: <AlertTriangle className="size-[18px]" />,

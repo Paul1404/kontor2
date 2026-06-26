@@ -33,6 +33,7 @@ import { rundschreibenRouter } from "~/server/orpc/procedures/rundschreiben";
 import { searchRouter } from "~/server/orpc/procedures/search";
 import { sepaRouter } from "~/server/orpc/procedures/sepa";
 import { sepaReturnsRouter } from "~/server/orpc/procedures/sepa-returns";
+import { sepaToolsRouter } from "~/server/orpc/procedures/sepa-tools";
 import { settingsRouter } from "~/server/orpc/procedures/settings";
 import { snapshotsRouter } from "~/server/orpc/procedures/snapshots";
 import { tasksRouter } from "~/server/orpc/procedures/tasks";
@@ -51,6 +52,7 @@ export const appRouter = {
   feeTypes: feeTypesRouter,
   sepa: sepaRouter,
   sepaReturns: sepaReturnsRouter,
+  sepaTools: sepaToolsRouter,
   dunning: dunningRouter,
   ehrungen: ehrungenRouter,
   kulanz: kulanzRouter,
