@@ -1,6 +1,7 @@
 import { auth, type Session } from "~/server/auth/auth";
 import { ensureSessionConfigLoaded } from "~/server/auth/session-config";
 import { type DB, dbForTenant } from "~/server/db/client";
+import { startLfioReporter } from "~/server/lfio/reporter";
 import { installShutdownBridge } from "~/server/lib/lifecycle";
 import { registerDbLogSink } from "~/server/lib/log-sink-db";
 import { logger } from "~/server/lib/logger";
@@ -42,6 +43,13 @@ export async function createContext(request: Request): Promise<AppContext> {
       startSnapshotScheduler();
     } catch (err) {
       logger.error("failed to start snapshot scheduler", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    try {
+      startLfioReporter();
+    } catch (err) {
+      logger.error("failed to start lfio reporter", {
         error: err instanceof Error ? err.message : String(err),
       });
     }

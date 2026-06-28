@@ -10,6 +10,7 @@
  */
 
 import { closeDb } from "~/server/db/client";
+import { stopLfioReporter } from "~/server/lfio/reporter";
 import { flushSinks, logger } from "~/server/lib/logger";
 import { closeRedis } from "~/server/redis/client";
 import { stopSnapshotScheduler } from "~/server/snapshots/scheduler";
@@ -31,6 +32,7 @@ export function closeResources(): Promise<void> {
   if (inFlight) return inFlight;
   inFlight = (async () => {
     stopSnapshotScheduler();
+    stopLfioReporter();
 
     try {
       await flushSinks();
