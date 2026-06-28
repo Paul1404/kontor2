@@ -60,6 +60,7 @@ const DEFAULT_CSP = [
 ].join("; ");
 
 const CSP = process.env.CONTENT_SECURITY_POLICY ?? DEFAULT_CSP;
+let activeRequests = 0;
 
 // Host canonicalization. The app's canonical home is `svu.kontor2.com`; requests
 // arriving on a legacy Verein domain are 301-redirected so old bookmarks and
@@ -117,27 +118,45 @@ function tryStaticFile(pathname: string): { path: string; mime: string } | null 
 }
 
 async function handle(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  const host = (request.headers.get("host") ?? "").split(":")[0];
-  if (host && LEGACY_HOSTS.has(host) && url.pathname !== "/api/health") {
-    return new Response(null, {
-      status: 301,
-      headers: { location: `https://${CANONICAL_HOST}${url.pathname}${url.search}` },
+  const started = performance.now();
+  activeRequests += 1;
+  let status = 500;
+  try {
+    const url = new URL(request.url);
+    const host = (request.headers.get("host") ?? "").split(":")[0];
+    if (host && LEGACY_HOSTS.has(host) && url.pathname !== "/api/health") {
+      const response = new Response(null, {
+        status: 301,
+        headers: { location: `https://${CANONICAL_HOST}${url.pathname}${url.search}` },
+      });
+      status = response.status;
+      return response;
+    }
+    const hit = tryStaticFile(url.pathname);
+    if (hit) {
+      const file = Bun.file(hit.path);
+      const response = withSecurityHeaders(
+        new Response(file.stream(), {
+          headers: {
+            "content-type": hit.mime,
+            "cache-control": "public, max-age=86400, immutable",
+          },
+        }),
+      );
+      status = response.status;
+      return response;
+    }
+    const response = withSecurityHeaders(await handler.fetch(request));
+    status = response.status;
+    return response;
+  } finally {
+    activeRequests = Math.max(0, activeRequests - 1);
+    globalThis.__kontor2RecordHttpRequest?.({
+      status,
+      latencyMs: Math.round(performance.now() - started),
+      activeRequests,
     });
   }
-  const hit = tryStaticFile(url.pathname);
-  if (hit) {
-    const file = Bun.file(hit.path);
-    return withSecurityHeaders(
-      new Response(file.stream(), {
-        headers: {
-          "content-type": hit.mime,
-          "cache-control": "public, max-age=86400, immutable",
-        },
-      }),
-    );
-  }
-  return withSecurityHeaders(await handler.fetch(request));
 }
 
 try {

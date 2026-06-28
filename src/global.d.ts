@@ -11,6 +11,10 @@
 // release the DB pool, Redis client, and buffered log sink on shutdown.
 declare var __kontor2CloseResources: (() => Promise<void>) | undefined;
 
+declare var __kontor2RecordHttpRequest:
+  | ((input: { status: number; latencyMs: number; activeRequests?: number }) => void)
+  | undefined;
+
 declare module "*.css?url" {
   const url: string;
   export default url;
