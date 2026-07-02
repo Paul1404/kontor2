@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.120.2",
+    date: "2026-07-02",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Austritt: Das Eintragen einer Kündigung brach mit einem Datenbankfehler ab, wenn der Vertrag noch kein Kündigungsdatum hatte. Behoben, Austritt und Vertragsende lassen sich jetzt wieder speichern.",
+      },
+    ],
+  },
+  {
     version: "0.120.1",
     date: "2026-06-26",
     changes: [

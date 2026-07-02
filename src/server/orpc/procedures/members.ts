@@ -1839,7 +1839,9 @@ export const membersRouter = {
           .set({
             gekuendZum: austrittTs,
             vertragEnde: austrittTs,
-            gekuendAm: sql`coalesce(${contractsTable.gekuendAm}, ${austrittTs})`,
+            // Raw SQL bypasses the `date` column mapper, so pass the ISO string
+            // (input.austrittDatum), not the Date -- a Date crashes the driver.
+            gekuendAm: sql`coalesce(${contractsTable.gekuendAm}, ${input.austrittDatum})`,
             updatedAt: today,
           } as never)
           .where(inArray(contractsTable.id, plan.contractClose));
