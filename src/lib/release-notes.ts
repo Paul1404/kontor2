@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.120.3",
+    date: "2026-07-02",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Austrittsbestätigung: Passt jetzt sauber auf eine Seite statt auf Seite zwei überzulaufen. Zusätzlich der Hinweis, dass das Dokument maschinell erstellt und ohne Unterschrift gültig ist.",
+      },
+    ],
+  },
+  {
     version: "0.120.2",
     date: "2026-07-02",
     changes: [

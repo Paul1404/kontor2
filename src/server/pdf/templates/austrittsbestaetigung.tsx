@@ -3,25 +3,26 @@ import type { CancellationModel } from "~/server/pdf/cancellation-model";
 import { LetterPage } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
-  para: { marginBottom: 12, textAlign: "left" },
+  para: { marginBottom: 7, textAlign: "left" },
   detailBox: {
     borderWidth: 0.5,
     borderColor: "#ddd",
     borderRadius: 4,
     backgroundColor: "#fafafa",
-    padding: 12,
-    marginVertical: 14,
+    padding: 8,
+    marginVertical: 8,
   },
-  detailRow: { flexDirection: "row", marginBottom: 3 },
+  detailRow: { flexDirection: "row", marginBottom: 2 },
   detailLabel: { width: 130, fontFamily: "Helvetica-Bold", fontSize: 9.5 },
   detailValue: { flex: 1, fontSize: 9.5 },
   bold: { fontFamily: "Helvetica-Bold" },
-  infoBlock: { marginTop: 22, fontSize: 8.5, color: "#444", lineHeight: 1.45 },
-  hr: { borderTopWidth: 0.5, borderColor: "#ccc", marginBottom: 12 },
-  infoHeading: { fontFamily: "Helvetica-Bold", fontSize: 9.5, color: "#1a1a1a", marginBottom: 6 },
-  infoPara: { marginBottom: 6 },
-  closing: { marginTop: 28 },
-  signLine: { marginTop: 18, fontSize: 9 },
+  infoBlock: { marginTop: 10, fontSize: 8.5, color: "#444", lineHeight: 1.35 },
+  hr: { borderTopWidth: 0.5, borderColor: "#ccc", marginBottom: 6 },
+  infoHeading: { fontFamily: "Helvetica-Bold", fontSize: 9.5, color: "#1a1a1a", marginBottom: 4 },
+  infoPara: { marginBottom: 4 },
+  closing: { marginTop: 10 },
+  signLine: { marginTop: 6, fontSize: 9 },
+  machineNote: { marginTop: 6, fontSize: 7.5, color: "#999" },
 });
 
 export type AustrittsbestaetigungProps = { model: CancellationModel; docRef: string };
@@ -68,6 +69,7 @@ export function AustrittsbestaetigungDocument({ model, docRef }: Austrittsbestae
         infoRows={infoRows}
         subject={model.subject}
         footerText={`${club.vereinsname} · Dokument ${docRef}`}
+        bodyStartMm={78}
       >
         <Text style={styles.para}>{model.anrede}</Text>
         <Text style={styles.para}>{model.bodyIntro}</Text>
@@ -166,6 +168,9 @@ export function AustrittsbestaetigungDocument({ model, docRef }: Austrittsbestae
         <View style={styles.closing} wrap={false}>
           <Text>{model.closing}</Text>
           <Text style={styles.signLine}>Mitgliederverwaltung, {club.vereinsname}</Text>
+          <Text style={styles.machineNote}>
+            Dieses Dokument wurde maschinell erstellt und ist ohne Unterschrift gültig.
+          </Text>
         </View>
       </LetterPage>
     </Document>
