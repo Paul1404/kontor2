@@ -12,7 +12,8 @@ import type { ReactNode } from "react";
  *     kleiner Rücksendeangabe darüber.
  *   - Informationsblock rechts (Datum, Dokument, Mitgliedsnummer).
  *   - Betreffzeile fett, Textbereich ab 98,46 mm.
- *   - Falzmarken bei 87 mm und 192 mm, Lochmarke bei 148,5 mm.
+ *   - Falzmarken (Form B, passend zum Anschriftfeld bei 45 mm) bei 105 mm und
+ *     210 mm, Lochmarke bei 148,5 mm (Blattmitte).
  *   - Fußzeile auf jeder Seite.
  *
  * Document-specific content (tables, payment boxes, slips) lives in the callers
@@ -113,17 +114,18 @@ const styles = StyleSheet.create({
 });
 
 /**
- * DIN 5008 Falz- und Lochmarken at the left paper edge: fold marks at 87 mm and
- * 192 mm, hole mark at 148,5 mm. Exported so non-letter documents (e.g. the
+ * DIN 5008 Falz- und Lochmarken at the left paper edge. Form B (address field at
+ * 45 mm): fold marks at 105 mm and 210 mm, hole mark at 148,5 mm (page middle).
+ * Exported so non-letter documents (e.g. the
  * Beitrittserklärung form) can share the exact same filing geometry. `fixed` so
  * they repeat on every page.
  */
 export function FoldAndHoleMarks() {
   return (
     <>
-      <View style={[styles.foldMark, { top: mm(87) }]} fixed />
+      <View style={[styles.foldMark, { top: mm(105) }]} fixed />
       <View style={[styles.holeMark, { top: mm(148.5) }]} fixed />
-      <View style={[styles.foldMark, { top: mm(192) }]} fixed />
+      <View style={[styles.foldMark, { top: mm(210) }]} fixed />
     </>
   );
 }

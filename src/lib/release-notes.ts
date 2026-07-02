@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.120.4",
+    date: "2026-07-02",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Briefe (Austrittsbestätigung, Mahnung, Kulanz): Die Falzmarken am linken Rand lagen falsch (Form A statt Form B). Sie sitzen jetzt bei 105 und 210 mm passend zum Anschriftfeld, sodass der gefaltete Brief korrekt ins Fensterkuvert passt. Die Lochmarke bleibt mittig bei 148,5 mm.",
+      },
+    ],
+  },
+  {
     version: "0.120.3",
     date: "2026-07-02",
     changes: [
