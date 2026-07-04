@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.120.5",
+    date: "2026-07-04",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Mandate nachtragen: Gekündigte Mitglieder tauchen nicht mehr auf. Bisher landete ein Mitglied mit Austritt zum Jahresende trotzdem in der Liste, obwohl das Mandat beim Austritt schon widerrufen wurde. Wer den Verein verlässt, wird nicht mehr zu einer neuen Unterschrift aufgefordert.",
+      },
+    ],
+  },
+  {
     version: "0.120.4",
     date: "2026-07-02",
     changes: [
