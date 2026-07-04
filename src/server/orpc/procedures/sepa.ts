@@ -144,8 +144,13 @@ async function loadNachtragKandidaten(db: DB): Promise<NachtragKandidat[]> {
     })
     .from(membersTable)
     .where(
+      // Ausgetretene UND gekündigte (Austritt in der Zukunft) fallen raus: wer
+      // den Verein verlässt, wird nicht zu einer neuen Beitrittserklärung
+      // gedrängt. Beim Austritt wird das Mandat ohnehin widerrufen, sonst stünde
+      // hier "neue Unterschrift einholen" für jemanden, den man gerade gekündigt
+      // hat.
       sql`${membersTable.deletedAt} is null
-        and (${membersTable.austritt} is null or ${membersTable.austritt}::date > current_date)
+        and ${membersTable.austritt} is null
         and exists (
           select 1 from contracts c
           where c.member_id = ${membersTable.id} and c.is_direct_debit = true
