@@ -27,31 +27,39 @@ type ReturnItemRef = { id: string; memberId: string; sollStellungId: string | nu
  * the Mahnwesen at the Erinnerung, not jump in at whatever level the posting
  * happened to carry before.
  */
-async function recordReturn(
-  tx: Tx,
-  actor: { actorId: string; actorEmail: string; requestId: string | null; source: "ui" | "import" },
-  item: ReturnItemRef,
-  data: {
-    returnedOn: string;
-    reasonCode: string | null;
-    reasonText: string | null;
-    rueckgebuhr: string;
-    notes: string | null;
-  },
-): Promise<string | null> {
-  const claimed = await tx
-    .update(feeRunItemsTable)
-    .set({ returnedAt: new Date(), returnReasonCode: data.reasonCode ?? null })
-    .where(and(eq(feeRunItemsTable.id, item.id), isNull(feeRunItemsTable.returnedAt)))
-    .returning({ id: feeRunItemsTable.id });
-  if (claimed.length === 0) return null;
+type ReturnActor = {
+  actorId: string;
+  actorEmail: string;
+  requestId: string | null;
+  source: "ui" | "import";
+};
+type ReturnData = {
+  returnedOn: string;
+  reasonCode: string | null;
+  reasonText: string | null;
+  rueckgebuhr: string;
+  notes: string | null;
+};
 
+/**
+ * Insert the sepa_returns row, reopen the linked Sollstellung to a live claim,
+ * and write the audit entry. Shared by both anchors: an app-collected debit
+ * (`feeRunItemId` set) and an imported posting (`feeRunItemId` null,
+ * `sollStellungId` the only link). Reopening resets `mahnstufe` to 0 so a
+ * freshly failed collection restarts the Mahnwesen at the Erinnerung.
+ */
+async function insertReturnAndReopen(
+  tx: Tx,
+  actor: ReturnActor,
+  ref: { feeRunItemId: string | null; memberId: string; sollStellungId: string | null },
+  data: ReturnData,
+): Promise<string> {
   const [row] = await tx
     .insert(sepaReturnsTable)
     .values({
-      feeRunItemId: item.id,
-      sollStellungId: item.sollStellungId,
-      memberId: item.memberId,
+      feeRunItemId: ref.feeRunItemId,
+      sollStellungId: ref.sollStellungId,
+      memberId: ref.memberId,
       returnedOn: data.returnedOn,
       reasonCode: data.reasonCode,
       reasonText: data.reasonText,
@@ -61,9 +69,7 @@ async function recordReturn(
     } as never)
     .returning({ id: sepaReturnsTable.id });
 
-  // Reopen the Sollstellung: paid back to 0, status=returned, openAmount=full,
-  // and the dunning ladder reset to 0.
-  if (item.sollStellungId) {
+  if (ref.sollStellungId) {
     await tx
       .update(sollStellungenTable)
       .set({
@@ -73,7 +79,7 @@ async function recordReturn(
         mahnstufe: 0,
         updatedAt: new Date(),
       })
-      .where(eq(sollStellungenTable.id, item.sollStellungId));
+      .where(eq(sollStellungenTable.id, ref.sollStellungId));
   }
 
   await appendAudit(tx, {
@@ -84,13 +90,41 @@ async function recordReturn(
     actorId: actor.actorId,
     actorEmail: actor.actorEmail,
     changes: {
-      feeRunItemId: { before: null, after: item.id },
+      feeRunItemId: { before: null, after: ref.feeRunItemId },
+      sollStellungId: { before: null, after: ref.sollStellungId },
       reasonCode: { before: null, after: data.reasonCode },
       rueckgebuhr: { before: null, after: data.rueckgebuhr },
     },
     requestId: actor.requestId ?? null,
   });
   return row!.id;
+}
+
+/**
+ * Record one SEPA return for an app-collected debit: claim the fee_run_item (so
+ * a double-submit cannot reopen the same posting twice), then delegate to
+ * `insertReturnAndReopen`. Returns the new return id, or null when the item had
+ * already been returned.
+ */
+async function recordReturn(
+  tx: Tx,
+  actor: ReturnActor,
+  item: ReturnItemRef,
+  data: ReturnData,
+): Promise<string | null> {
+  const claimed = await tx
+    .update(feeRunItemsTable)
+    .set({ returnedAt: new Date(), returnReasonCode: data.reasonCode ?? null })
+    .where(and(eq(feeRunItemsTable.id, item.id), isNull(feeRunItemsTable.returnedAt)))
+    .returning({ id: feeRunItemsTable.id });
+  if (claimed.length === 0) return null;
+
+  return insertReturnAndReopen(
+    tx,
+    actor,
+    { feeRunItemId: item.id, memberId: item.memberId, sollStellungId: item.sollStellungId },
+    data,
+  );
 }
 
 const KnownReasonCodes = v.picklist([
@@ -116,6 +150,17 @@ const MoneyString = v.pipe(v.string(), v.regex(/^-?\d+(\.\d{1,2})?$/));
 
 const CreateInput = v.object({
   feeRunItemId: v.string(),
+  returnedOn: v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)),
+  reasonCode: v.optional(v.nullable(KnownReasonCodes), null),
+  reasonText: v.optional(v.nullable(v.string()), null),
+  rueckgebuhr: v.optional(MoneyString, "0"),
+  notes: v.optional(v.nullable(v.string()), null),
+});
+
+// Same shape, but anchored on a Sollstellung instead of a fee_run_item -- the
+// advanced path for imported postings that never went through an app run.
+const CreateForPostingInput = v.object({
+  sollStellungId: v.string(),
   returnedOn: v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)),
   reasonCode: v.optional(v.nullable(KnownReasonCodes), null),
   reasonText: v.optional(v.nullable(v.string()), null),
@@ -151,9 +196,11 @@ export const sepaReturnsRouter = {
             rueckgebuhr: sepaReturnsTable.rueckgebuhr,
             notes: sepaReturnsTable.notes,
             createdAt: sepaReturnsTable.createdAt,
-            amount: feeRunItemsTable.amount,
+            // For an imported-posting return there is no fee_run_item / fee_run,
+            // so amount and Beitragsjahr come from the Sollstellung instead.
+            amount: sql<string>`coalesce(${feeRunItemsTable.amount}, ${sollStellungenTable.amount})`,
             sequenceType: feeRunItemsTable.sequenceType,
-            billingYear: feeRunsTable.billingYear,
+            billingYear: sql<number>`coalesce(${feeRunsTable.billingYear}, ${sollStellungenTable.billingYear})`,
             memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
             memberNo: membersTable.memberNo,
             kontaktNo: membersTable.kontaktNo,
@@ -161,8 +208,12 @@ export const sepaReturnsRouter = {
             adrNr: membersTable.adrNr,
           })
           .from(sepaReturnsTable)
-          .innerJoin(feeRunItemsTable, eq(sepaReturnsTable.feeRunItemId, feeRunItemsTable.id))
-          .innerJoin(feeRunsTable, eq(feeRunItemsTable.feeRunId, feeRunsTable.id))
+          .leftJoin(feeRunItemsTable, eq(sepaReturnsTable.feeRunItemId, feeRunItemsTable.id))
+          .leftJoin(feeRunsTable, eq(feeRunItemsTable.feeRunId, feeRunsTable.id))
+          .leftJoin(
+            sollStellungenTable,
+            eq(sepaReturnsTable.sollStellungId, sollStellungenTable.id),
+          )
           .innerJoin(membersTable, eq(sepaReturnsTable.memberId, membersTable.id))
           .where(where)
           .orderBy(desc(sepaReturnsTable.returnedOn), desc(sepaReturnsTable.createdAt))
@@ -230,6 +281,64 @@ export const sepaReturnsRouter = {
       return rows;
     }),
 
+  /**
+   * Advanced path: eingezogene Sollstellungen that never went through an app
+   * SEPA run, so they have no fee_run_item and never appear in `candidates`.
+   * These are imported (Linear) postings marked collected. The hidden option in
+   * "Rückläufer erfassen" uses this to let the operator still book a return.
+   */
+  postingCandidates: vorstandProc
+    .input(
+      v.optional(
+        v.object({
+          query: v.optional(v.nullable(v.string()), null),
+          limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
+        }),
+        {},
+      ),
+    )
+    .handler(async ({ context, input }) => {
+      const q = (input.query ?? "").trim();
+      const like = `%${escapeLike(q)}%`;
+      const rows = await context.db
+        .select({
+          sollStellungId: sollStellungenTable.id,
+          billingYear: sollStellungenTable.billingYear,
+          amount: sollStellungenTable.amount,
+          falligkeitsdatum: sollStellungenTable.falligkeitsdatum,
+          memberId: sollStellungenTable.memberId,
+          memberName: sql<string>`coalesce(${membersTable.vorname} || ' ' || ${membersTable.nachname}, ${membersTable.kurzname}, ${membersTable.firma1}, 'AdrNr ' || ${membersTable.adrNr})`,
+          memberNo: membersTable.memberNo,
+          kontaktNo: membersTable.kontaktNo,
+          mitgliedsnummer: membersTable.mitgliedsnummer,
+          adrNr: membersTable.adrNr,
+        })
+        .from(sollStellungenTable)
+        .innerJoin(membersTable, eq(sollStellungenTable.memberId, membersTable.id))
+        .where(
+          and(
+            eq(sollStellungenTable.status, "eingezogen"),
+            memberNotDeleted(),
+            // No app debit points at this posting -> it is import-only.
+            sql`not exists (
+              select 1 from ${feeRunItemsTable}
+              where ${feeRunItemsTable.sollStellungId} = ${sollStellungenTable.id}
+            )`,
+            q
+              ? sql`(
+                  ${membersTable.mitgliedsnummer} ilike ${like} or
+                  ${membersTable.nachname} ilike ${like} or
+                  ${membersTable.vorname} ilike ${like} or
+                  ${membersTable.firma1} ilike ${like}
+                )`
+              : sql`true`,
+          ),
+        )
+        .orderBy(desc(sollStellungenTable.billingYear), membersTable.nachname)
+        .limit(input.limit);
+      return rows;
+    }),
+
   create: vorstandProc.input(CreateInput).handler(async ({ context, input }) => {
     const [item] = await context.db
       .select({
@@ -286,6 +395,89 @@ export const sepaReturnsRouter = {
 
     return { id: result };
   }),
+
+  /**
+   * Advanced counterpart to `create`: record a return for an imported posting
+   * that has no fee_run_item. Anchors on the Sollstellung alone. Only for
+   * `eingezogen` postings without an app debit; app-collected postings must go
+   * through `create` so the fee_run_item gets its returned marker.
+   */
+  createForPosting: vorstandProc
+    .input(CreateForPostingInput)
+    .handler(async ({ context, input }) => {
+      const [soll] = await context.db
+        .select({
+          id: sollStellungenTable.id,
+          memberId: sollStellungenTable.memberId,
+          status: sollStellungenTable.status,
+          amount: sollStellungenTable.amount,
+        })
+        .from(sollStellungenTable)
+        .where(eq(sollStellungenTable.id, input.sollStellungId))
+        .limit(1);
+      if (!soll) {
+        throw new ORPCError("NOT_FOUND", { message: "Sollstellung nicht gefunden." });
+      }
+      if (soll.status !== "eingezogen") {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: "Nur eingezogene Posten lassen sich als Rückläufer erfassen.",
+        });
+      }
+
+      // Guard: a posting collected by an app run has a debit; that path belongs
+      // to `create` so the fee_run_item is marked returned. Refuse it here.
+      const [item] = await context.db
+        .select({ id: feeRunItemsTable.id })
+        .from(feeRunItemsTable)
+        .where(eq(feeRunItemsTable.sollStellungId, soll.id))
+        .limit(1);
+      if (item) {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message:
+            "Dieser Posten stammt aus einem App-Beitragslauf. Über die normale Auswahl der Lastschrift erfassen.",
+        });
+      }
+
+      // Guard: already returned once.
+      const [existing] = await context.db
+        .select({ id: sepaReturnsTable.id })
+        .from(sepaReturnsTable)
+        .where(eq(sepaReturnsTable.sollStellungId, soll.id))
+        .limit(1);
+      if (existing) {
+        throw new ORPCError("CONFLICT", {
+          message: "Für diesen Posten ist bereits ein Rückläufer erfasst.",
+        });
+      }
+
+      let gebuhr = input.rueckgebuhr;
+      if (!gebuhr || gebuhr === "0") {
+        const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+        if (org?.sepaReturnFee && org.sepaReturnFee !== "0") gebuhr = org.sepaReturnFee;
+      }
+
+      const id = await context.db.transaction((tx) =>
+        insertReturnAndReopen(
+          tx,
+          {
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            requestId: context.requestId ?? null,
+            source: "ui",
+          },
+          { feeRunItemId: null, memberId: soll.memberId, sollStellungId: soll.id },
+          {
+            returnedOn: input.returnedOn,
+            reasonCode: input.reasonCode,
+            reasonText: input.reasonText,
+            rueckgebuhr: gebuhr,
+            notes: input.notes,
+          },
+        ),
+      );
+
+      return { id };
+    }),
 
   /**
    * Parse an uploaded camt.054 (Rücklastschrift) file and match each returned
@@ -449,16 +641,20 @@ export const sepaReturnsRouter = {
 
     await context.db.transaction(async (tx) => {
       await tx.delete(sepaReturnsTable).where(eq(sepaReturnsTable.id, input.id));
-      // Best effort: clear the returned marker if no other returns reference this item.
-      const [stillReturned] = await tx
-        .select({ c: count() })
-        .from(sepaReturnsTable)
-        .where(eq(sepaReturnsTable.feeRunItemId, row.feeRunItemId));
-      if ((stillReturned?.c ?? 0) === 0) {
-        await tx
-          .update(feeRunItemsTable)
-          .set({ returnedAt: null, returnReasonCode: null })
-          .where(eq(feeRunItemsTable.id, row.feeRunItemId));
+      // Best effort: clear the returned marker if no other returns reference
+      // this item. Only for app-collected returns -- an imported-posting return
+      // has no fee_run_item.
+      if (row.feeRunItemId) {
+        const [stillReturned] = await tx
+          .select({ c: count() })
+          .from(sepaReturnsTable)
+          .where(eq(sepaReturnsTable.feeRunItemId, row.feeRunItemId));
+        if ((stillReturned?.c ?? 0) === 0) {
+          await tx
+            .update(feeRunItemsTable)
+            .set({ returnedAt: null, returnReasonCode: null })
+            .where(eq(feeRunItemsTable.id, row.feeRunItemId));
+        }
       }
 
       // Restore the Sollstellung the return had reopened. Creating a return

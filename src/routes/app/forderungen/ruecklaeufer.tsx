@@ -187,7 +187,12 @@ function RuecklaeuferPage() {
 function CreateForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<{ id: string; label: string } | null>(null);
+  const [selected, setSelected] = useState<{
+    kind: "item" | "posting";
+    id: string;
+    label: string;
+  } | null>(null);
+  const [advanced, setAdvanced] = useState(false);
   const [returnedOn, setReturnedOn] = useState(() => new Date().toISOString().slice(0, 10));
   const [reasonCode, setReasonCode] = useState<string>("");
   const [reasonText, setReasonText] = useState("");
@@ -198,21 +203,38 @@ function CreateForm({ onDone }: { onDone: () => void }) {
     queryKey: ["sepaReturns.candidates", query],
     queryFn: () => orpc.sepaReturns.candidates({ query, limit: 30 }),
   });
+  // Advanced: imported postings without an app debit. Only fetched when the
+  // hidden option is switched on.
+  const postingCandidates = useQuery({
+    queryKey: ["sepaReturns.postingCandidates", query],
+    queryFn: () => orpc.sepaReturns.postingCandidates({ query, limit: 30 }),
+    enabled: advanced,
+  });
 
   const create = useMutation({
     mutationFn: () =>
-      orpc.sepaReturns.create({
-        feeRunItemId: selected!.id,
-        returnedOn,
-        reasonCode: reasonCode ? (reasonCode as "AM04") : null,
-        reasonText: reasonText.trim() || null,
-        rueckgebuhr: rueckgebuhr.trim() || "0",
-        notes: notes.trim() || null,
-      }),
+      selected!.kind === "posting"
+        ? orpc.sepaReturns.createForPosting({
+            sollStellungId: selected!.id,
+            returnedOn,
+            reasonCode: reasonCode ? (reasonCode as "AM04") : null,
+            reasonText: reasonText.trim() || null,
+            rueckgebuhr: rueckgebuhr.trim() || "0",
+            notes: notes.trim() || null,
+          })
+        : orpc.sepaReturns.create({
+            feeRunItemId: selected!.id,
+            returnedOn,
+            reasonCode: reasonCode ? (reasonCode as "AM04") : null,
+            reasonText: reasonText.trim() || null,
+            rueckgebuhr: rueckgebuhr.trim() || "0",
+            notes: notes.trim() || null,
+          }),
     onSuccess: () => {
       toast.success("Rückläufer erfasst.");
       qc.invalidateQueries({ queryKey: ["sepaReturns.list"] });
       qc.invalidateQueries({ queryKey: ["sepaReturns.candidates"] });
+      qc.invalidateQueries({ queryKey: ["sepaReturns.postingCandidates"] });
       qc.invalidateQueries({ queryKey: ["dunning.open"] });
       onDone();
     },
@@ -263,6 +285,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
                           className="w-full cursor-pointer p-3 text-left text-sm hover:bg-accent"
                           onClick={() =>
                             setSelected({
+                              kind: "item",
                               id: c.itemId,
                               label: `${c.memberName} · ${c.billingYear} · ${formatCurrency(c.amount)} · ${c.sequenceType} · ****${c.debtorIbanLast4}`,
                             })
@@ -284,6 +307,64 @@ function CreateForm({ onDone }: { onDone: () => void }) {
                   </ul>
                 )}
               </div>
+
+              {advanced ? (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Importierte Posten (ohne App-Lastschrift)
+                  </span>
+                  <div className="max-h-72 overflow-y-auto rounded-lg border border-dashed">
+                    {postingCandidates.isLoading ? (
+                      <div className="p-3">
+                        <SkeletonText lines={3} />
+                      </div>
+                    ) : !postingCandidates.data || postingCandidates.data.length === 0 ? (
+                      <p className="p-3 text-sm text-muted-foreground">
+                        Keine eingezogenen Importposten.
+                      </p>
+                    ) : (
+                      <ul className="divide-y">
+                        {postingCandidates.data.map((c) => (
+                          <li key={c.sollStellungId}>
+                            <button
+                              type="button"
+                              className="w-full cursor-pointer p-3 text-left text-sm hover:bg-accent"
+                              onClick={() =>
+                                setSelected({
+                                  kind: "posting",
+                                  id: c.sollStellungId,
+                                  label: `${c.memberName} · ${c.billingYear} · ${formatCurrency(c.amount)} · Importposten`,
+                                })
+                              }
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">{c.memberName}</span>
+                                <span className="text-xs text-muted-foreground tabular-nums">
+                                  #{memberRef(c)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Beitragsjahr {c.billingYear} · {formatCurrency(c.amount)} · aus
+                                Import
+                              </p>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
+                onClick={() => setAdvanced((v) => !v)}
+              >
+                {advanced
+                  ? "Importierte Posten ausblenden"
+                  : "Erweitert: importierte Posten einbeziehen"}
+              </button>
             </>
           )}
         </div>

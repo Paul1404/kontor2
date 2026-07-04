@@ -40,11 +40,15 @@ export const sepaReturnsTable = pgTable(
   "sepa_returns",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    feeRunItemId: uuid("fee_run_item_id")
-      .notNull()
-      .references(() => feeRunItemsTable.id, { onDelete: "restrict" }),
+    // Null for a return recorded against an imported posting that never went
+    // through an app SEPA run (no pain.008 line). Such returns anchor on the
+    // Sollstellung alone; app-collected returns still reference their debit.
+    feeRunItemId: uuid("fee_run_item_id").references(() => feeRunItemsTable.id, {
+      onDelete: "restrict",
+    }),
     // Soft pointer -- if the Sollstellung is later removed (cancelled run)
-    // we keep the historical Rückläufer for compliance.
+    // we keep the historical Rückläufer for compliance. For an imported-posting
+    // return this is the only anchor to the posting.
     sollStellungId: uuid("soll_stellung_id"),
     memberId: uuid("member_id")
       .notNull()
