@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.121.0",
+    date: "2026-07-04",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Sollstellung: Der Status jedes Postens lässt sich jetzt direkt in der Mitgliederansicht setzen (offen, eingezogen, bezahlt, storniert). Damit lässt sich auch ein bezahlter Posten wieder auf eingezogen oder offen zurücksetzen. Offener und bezahlter Betrag werden passend nachgezogen, jede Änderung steht im Verlauf.",
+      },
+    ],
+  },
+  {
     version: "0.120.5",
     date: "2026-07-04",
     changes: [

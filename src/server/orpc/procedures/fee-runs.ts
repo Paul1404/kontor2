@@ -11,6 +11,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { type SepaMandate, sepaMandatesTable } from "~/server/db/schema/sepa";
 import { memberDisplayName } from "~/server/domain/member";
+import { OVERRIDABLE_STATUSES, planSollstellungStatus } from "~/server/domain/sollstellung-status";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { invalidateDashboardCaches } from "~/server/search/cache";
 import { amountStrToCents, buildFeeRunPreview, centsToAmount } from "~/server/sepa/build-fee-run";
@@ -1201,6 +1202,79 @@ export const feeRunsRouter = {
         });
       });
       return { ok: true };
+    }),
+
+  /**
+   * Manueller Status-Override für eine einzelne Sollstellung. Der bewusste
+   * Escape-Hatch für Korrekturen von Hand: einen falsch gebuchten Posten auf
+   * `open`, `eingezogen`, `paid` oder `cancelled` setzen. Im Gegensatz zu
+   * `stornoSollstellung`/`reopenSollstellung` gibt es hier keine Vorbedingungen
+   * auf den Ausgangsstatus. Die Beträge werden über `planSollstellungStatus`
+   * konsistent nachgezogen und jede Änderung landet im Audit-Log. `returned`
+   * ist kein Ziel: dieser Status kommt nur über den Rücklastschrift-Weg.
+   */
+  setSollstellungStatus: vorstandProc
+    .input(
+      v.object({
+        sollStellungId: v.string(),
+        status: v.picklist(OVERRIDABLE_STATUSES),
+        notes: v.optional(v.nullable(v.string()), null),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      return await context.db.transaction(async (tx) => {
+        const [row] = await tx
+          .select({
+            id: sollStellungenTable.id,
+            status: sollStellungenTable.status,
+            amount: sollStellungenTable.amount,
+            paidAmount: sollStellungenTable.paidAmount,
+            openAmount: sollStellungenTable.openAmount,
+            mahnstufe: sollStellungenTable.mahnstufe,
+            notes: sollStellungenTable.notes,
+          })
+          .from(sollStellungenTable)
+          .where(eq(sollStellungenTable.id, input.sollStellungId))
+          .limit(1);
+        if (!row) {
+          throw new ORPCError("NOT_FOUND", { message: "Sollstellung nicht gefunden." });
+        }
+        if (row.status === input.status && input.notes == null) {
+          return { ok: true as const, changed: false };
+        }
+
+        const plan = planSollstellungStatus(row, input.status);
+        const nextNotes = input.notes ?? row.notes;
+        await tx
+          .update(sollStellungenTable)
+          .set({
+            status: plan.status,
+            paidAmount: plan.paidAmount,
+            openAmount: plan.openAmount,
+            mahnstufe: plan.mahnstufe,
+            notes: nextNotes,
+            updatedAt: new Date(),
+          })
+          .where(eq(sollStellungenTable.id, row.id));
+
+        await appendAudit(tx, {
+          entityType: "soll_stellung",
+          entityId: row.id,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            status: { before: row.status, after: plan.status },
+            paidAmount: { before: row.paidAmount, after: plan.paidAmount },
+            openAmount: { before: row.openAmount, after: plan.openAmount },
+            mahnstufe: { before: row.mahnstufe, after: plan.mahnstufe },
+            ...(input.notes ? { notes: { before: row.notes, after: input.notes } } : {}),
+          },
+          requestId: context.requestId ?? null,
+        });
+        return { ok: true as const, changed: true };
+      });
     }),
 
   downloadXml: vorstandProc
