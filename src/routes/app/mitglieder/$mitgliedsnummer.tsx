@@ -820,6 +820,23 @@ type SollstellungRow = {
   status: string;
 };
 
+/** Manuelle Zielstatus für eine Sollstellung (deckt sich mit OVERRIDABLE_STATUSES). */
+const SOLLSTELLUNG_STATUS_OPTIONS = [
+  { value: "open", label: "Offen" },
+  { value: "eingezogen", label: "Eingezogen" },
+  { value: "paid", label: "Bezahlt" },
+  { value: "cancelled", label: "Storniert" },
+] as const;
+type OverridableStatus = (typeof SOLLSTELLUNG_STATUS_OPTIONS)[number]["value"];
+
+const STATUS_CHANGE_EFFECT: Record<OverridableStatus, string> = {
+  open: "Der Posten gilt als offen und nicht bezahlt. Er erscheint in den Forderungen und kann gemahnt werden.",
+  eingezogen: "Der Posten gilt als per Lastschrift eingezogen. Offener Betrag 0, nicht mahnbar.",
+  paid: "Der Posten gilt als bezahlt. Offener Betrag 0.",
+  cancelled:
+    "Der Posten wird storniert. Weder offen noch bezahlt. Der Vertrag wird beim nächsten Beitragslauf wieder berücksichtigt.",
+};
+
 function SollstellungenCard({
   rows,
   memberId,
@@ -841,42 +858,23 @@ function SollstellungenCard({
     },
     onError: (e: Error) => toast.error("Rechnung fehlgeschlagen", { description: e.message }),
   });
-  const [target, setTarget] = useState<SollstellungRow | null>(null);
-  const [stornoTarget, setStornoTarget] = useState<SollstellungRow | null>(null);
+  const [statusChange, setStatusChange] = useState<{
+    row: SollstellungRow;
+    target: OverridableStatus;
+  } | null>(null);
 
-  const markNichtEingezogen = useMutation({
-    mutationFn: (id: string) => orpc.dunning.markNichtEingezogen({ sollStellungIds: [id] }),
+  const setStatus = useMutation({
+    mutationFn: (vars: { id: string; status: OverridableStatus }) =>
+      orpc.feeRuns.setSollstellungStatus({ sollStellungId: vars.id, status: vars.status }),
     onSuccess: (r) => {
-      if (r.count > 0) {
-        toast.success("Als nicht eingezogen markiert. Erscheint jetzt in den Forderungen.");
-      } else {
-        toast.info("Keine Änderung. Posten war nicht im Status „Eingezogen“.");
-      }
-      setTarget(null);
+      toast.success(r.changed ? "Status geändert." : "Status war bereits gesetzt.");
+      setStatusChange(null);
       qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
       qc.invalidateQueries({ queryKey: ["dunning.open"] });
     },
     onError: (e: Error) => {
-      setTarget(null);
-      toast.error("Konnte nicht aktualisiert werden", { description: e.message });
-    },
-  });
-
-  const storno = useMutation({
-    mutationFn: (id: string) =>
-      orpc.feeRuns.stornoSollstellung({
-        sollStellungId: id,
-        notes: "Storniert über die Mitgliederansicht",
-      }),
-    onSuccess: () => {
-      toast.success("Storniert. Der nächste Beitragslauf berücksichtigt den Vertrag wieder.");
-      setStornoTarget(null);
-      qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
-      qc.invalidateQueries({ queryKey: ["dunning.open"] });
-    },
-    onError: (e: Error) => {
-      setStornoTarget(null);
-      toast.error("Storno fehlgeschlagen", { description: e.message });
+      setStatusChange(null);
+      toast.error("Status konnte nicht geändert werden", { description: e.message });
     },
   });
 
@@ -894,7 +892,7 @@ function SollstellungenCard({
       </Card>
     );
   }
-  const showActions = canEdit && rows.some((r) => r.status === "eingezogen" || r.status === "open");
+  const showActions = canEdit;
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -948,26 +946,24 @@ function SollstellungenCard({
                 </td>
                 {showActions ? (
                   <td className="px-4 py-2 text-right">
-                    {r.status === "eingezogen" ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setTarget(r)}
-                        disabled={markNichtEingezogen.isPending}
-                      >
-                        Nicht eingezogen
-                      </Button>
-                    ) : null}
-                    {r.status === "eingezogen" || r.status === "open" ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setStornoTarget(r)}
-                        disabled={storno.isPending}
-                      >
-                        Stornieren
-                      </Button>
-                    ) : null}
+                    <select
+                      aria-label={`Status für ${r.billingYear} ändern`}
+                      className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+                      value=""
+                      disabled={setStatus.isPending}
+                      onChange={(e) => {
+                        const next = e.target.value as OverridableStatus | "";
+                        e.currentTarget.selectedIndex = 0;
+                        if (next && next !== r.status) setStatusChange({ row: r, target: next });
+                      }}
+                    >
+                      <option value="">Status ändern…</option>
+                      {SOLLSTELLUNG_STATUS_OPTIONS.filter((o) => o.value !== r.status).map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                 ) : null}
               </tr>
@@ -977,39 +973,23 @@ function SollstellungenCard({
       </CardContent>
 
       <ConfirmDialog
-        open={target !== null}
+        open={statusChange !== null}
         onOpenChange={(o) => {
-          if (!o && !markNichtEingezogen.isPending) setTarget(null);
+          if (!o && !setStatus.isPending) setStatusChange(null);
         }}
-        title="Als nicht eingezogen markieren"
+        title="Status ändern"
         description={
-          target
-            ? `Sollstellung ${target.billingYear} (${formatCurrency(target.amount)}) als nicht eingezogen markieren? Der Posten wird wieder geöffnet und erscheint in den Forderungen, sodass er gemahnt werden kann.`
+          statusChange
+            ? `Sollstellung ${statusChange.row.billingYear} (${formatCurrency(statusChange.row.amount)}) auf „${SOLLSTELLUNG_STATUS_OPTIONS.find((o) => o.value === statusChange.target)?.label}" setzen? ${STATUS_CHANGE_EFFECT[statusChange.target]}`
             : ""
         }
-        confirmLabel="Nicht eingezogen"
-        loading={markNichtEingezogen.isPending}
+        confirmLabel="Status ändern"
+        destructive={statusChange?.target === "cancelled"}
+        loading={setStatus.isPending}
         onConfirm={() => {
-          if (target) markNichtEingezogen.mutate(target.id);
-        }}
-      />
-
-      <ConfirmDialog
-        open={stornoTarget !== null}
-        onOpenChange={(o) => {
-          if (!o && !storno.isPending) setStornoTarget(null);
-        }}
-        title="Sollstellung stornieren"
-        description={
-          stornoTarget
-            ? `Sollstellung ${stornoTarget.billingYear} (${formatCurrency(stornoTarget.amount)}) stornieren? Der Posten wird ungültig und der Vertrag wird beim nächsten Beitragslauf für ${stornoTarget.billingYear} wieder eingezogen. Für Posten aus einem App-Beitragslauf stattdessen den Rückläufer erfassen.`
-            : ""
-        }
-        confirmLabel="Stornieren"
-        destructive
-        loading={storno.isPending}
-        onConfirm={() => {
-          if (stornoTarget) storno.mutate(stornoTarget.id);
+          if (statusChange) {
+            setStatus.mutate({ id: statusChange.row.id, status: statusChange.target });
+          }
         }}
       />
     </Card>
