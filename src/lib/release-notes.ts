@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.122.0",
+    date: "2026-07-04",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "SEPA-Rückläufer: Über die erweiterte Option lässt sich jetzt auch für importierte Posten ein Rückläufer erfassen, die nie über einen App-Beitragslauf liefen. Einblenden über „Erweitert: importierte Posten einbeziehen“. Der Posten wird wie gewohnt wieder zur offenen Forderung, mit R-Code und Rücklastgebühr.",
+      },
+    ],
+  },
+  {
     version: "0.121.0",
     date: "2026-07-04",
     changes: [

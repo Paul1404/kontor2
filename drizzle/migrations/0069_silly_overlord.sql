@@ -1,0 +1,1 @@
+ALTER TABLE "sepa_returns" ALTER COLUMN "fee_run_item_id" DROP NOT NULL;
