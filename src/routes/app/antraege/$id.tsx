@@ -7,16 +7,20 @@ import {
   ArrowLeft,
   Ban,
   CheckCircle2,
+  Copy,
   Eye,
   Loader2,
   Mail,
   MailCheck,
   MailWarning,
   MailX,
+  RefreshCw,
   Save,
+  ScanText,
   Trash2,
+  Upload,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -105,6 +109,18 @@ const WORKFLOW_STATUS = [
 ] as const;
 type WorkflowStatus = (typeof WORKFLOW_STATUS)[number];
 
+function readAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result);
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 function AntragDetailPage() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
@@ -135,6 +151,14 @@ function AntragDetailPage() {
   const [notes, setNotes] = useState("");
   const [workStatus, setWorkStatus] = useState<WorkflowStatus>("neu");
   const [viewer, setViewer] = useState<{ url: string; filename: string } | null>(null);
+  const [ocr, setOcr] = useState<{
+    fileId: string;
+    filename: string;
+    available: boolean;
+    text: string | null;
+    error: string | null;
+  } | null>(null);
+  const signedUploadRef = useRef<HTMLInputElement>(null);
   // Seed the editor from the loaded application; re-seed whenever a different
   // application is opened (id change) so stale edits don't leak across rows.
   useEffect(() => {
@@ -198,6 +222,53 @@ function AntragDetailPage() {
     mutationFn: (fileId: string) => orpc.applications.fileUrl({ id: fileId }),
     onSuccess: (res) => setViewer({ url: res.url, filename: res.filename }),
     onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Öffnen fehlgeschlagen."),
+  });
+
+  const readText = useMutation({
+    mutationFn: (file: { id: string; filename: string | null }) =>
+      orpc.applications.fileText({ id: file.id }).then((res) => ({ ...res, file })),
+    onSuccess: (res) =>
+      setOcr({
+        fileId: res.file.id,
+        filename: res.file.filename ?? "Scan",
+        available: res.available,
+        text: res.text,
+        error: res.error,
+      }),
+    onError: (e: unknown) =>
+      setMsg(e instanceof Error ? e.message : "Texterkennung fehlgeschlagen."),
+  });
+
+  const resend = useMutation({
+    mutationFn: () => orpc.applications.resendInitialMail({ id }),
+    onSuccess: (res) => {
+      setMsg(
+        res.applicantSent || res.clubSent
+          ? "E-Mail erneut gesendet."
+          : "E-Mail wurde nicht versendet. Bitte Versandprotokoll prüfen.",
+      );
+      invalidate();
+    },
+    onError: (e: unknown) =>
+      setMsg(e instanceof Error ? e.message : "E-Mail-Versand fehlgeschlagen."),
+  });
+
+  const adminUploadSigned = useMutation({
+    mutationFn: async (file: File) => {
+      if (file.size > 20 * 1024 * 1024) throw new Error("Datei zu groß (max. 20 MB).");
+      const contentBase64 = await readAsBase64(file);
+      return orpc.applications.adminUploadSigned({
+        id,
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        contentBase64,
+      });
+    },
+    onSuccess: () => {
+      setMsg("Unterschriebenes Dokument hochgeladen.");
+      invalidate();
+    },
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Upload fehlgeschlagen."),
   });
 
   const setArchived = useMutation({
@@ -303,7 +374,38 @@ function AntragDetailPage() {
       {a.files.filter((f) => f.kind !== "signature_image").length > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>Dokumente</CardTitle>
+            <CardTitle className="flex items-center justify-between gap-3">
+              <span>Dokumente</span>
+              {!terminal ? (
+                <>
+                  <input
+                    ref={signedUploadRef}
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.heic,.heif"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (f) adminUploadSigned.mutate(f);
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={adminUploadSigned.isPending}
+                    onClick={() => signedUploadRef.current?.click()}
+                  >
+                    {adminUploadSigned.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Upload className="size-4" />
+                    )}
+                    Scan hochladen
+                  </Button>
+                </>
+              ) : null}
+            </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             {a.files
@@ -333,8 +435,65 @@ function AntragDetailPage() {
                     )}
                     Öffnen
                   </Button>
+                  {f.kind === "signed_scan" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={readText.isPending}
+                      onClick={() => readText.mutate({ id: f.id, filename: f.filename })}
+                    >
+                      {readText.isPending && readText.variables?.id === f.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <ScanText className="size-4" />
+                      )}
+                      Text
+                    </Button>
+                  ) : null}
                 </div>
               ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {ocr ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2">
+                <ScanText className="size-5" /> Texterkennung: {ocr.filename}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!ocr.text}
+                  onClick={async () => {
+                    if (!ocr.text) return;
+                    await navigator.clipboard.writeText(ocr.text);
+                  }}
+                >
+                  <Copy className="size-4" />
+                  Kopieren
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setOcr(null)}>
+                  Schließen
+                </Button>
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {ocr.available && ocr.text ? (
+              <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/30 p-3 text-xs">
+                {ocr.text}
+              </pre>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {ocr.error ?? "Texterkennung ist für diesen Scan nicht verfügbar."}
+              </p>
+            )}
           </CardContent>
         </Card>
       ) : null}
@@ -342,8 +501,29 @@ function AntragDetailPage() {
       {a.emails.length > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Mail className="size-5" /> E-Mail-Verlauf
+            <CardTitle className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2">
+                <Mail className="size-5" /> E-Mail-Verlauf
+              </span>
+              {!terminal ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={resend.isPending}
+                  onClick={() => {
+                    setMsg(null);
+                    resend.mutate();
+                  }}
+                >
+                  {resend.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-4" />
+                  )}
+                  Erneut senden
+                </Button>
+              ) : null}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
@@ -369,6 +549,74 @@ function AntragDetailPage() {
                 </div>
               );
             })}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {!terminal && a.emails.length === 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2">
+                <Mail className="size-5" /> E-Mail-Verlauf
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={resend.isPending}
+                onClick={() => {
+                  setMsg(null);
+                  resend.mutate();
+                }}
+              >
+                {resend.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-4" />
+                )}
+                Erneut senden
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Für diesen Antrag wurde noch kein E-Mail-Versand protokolliert.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {!terminal && a.files.filter((f) => f.kind !== "signature_image").length === 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Dokumente</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <input
+              ref={signedUploadRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.heic,.heif"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) adminUploadSigned.mutate(f);
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={adminUploadSigned.isPending}
+              onClick={() => signedUploadRef.current?.click()}
+            >
+              {adminUploadSigned.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Upload className="size-4" />
+              )}
+              Unterschriebenes Dokument hochladen
+            </Button>
           </CardContent>
         </Card>
       ) : null}

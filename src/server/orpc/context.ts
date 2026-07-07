@@ -8,6 +8,7 @@ import { logger } from "~/server/lib/logger";
 import { startSnapshotScheduler } from "~/server/snapshots/scheduler";
 import { ensureTenantRegistryLoader } from "~/server/tenants/load";
 import type { Tenant } from "~/server/tenants/registry";
+import { requestHost } from "~/server/tenants/request-host";
 import { resolveTenantFromHost } from "~/server/tenants/resolve";
 
 export type AppContext = {
@@ -68,9 +69,7 @@ export async function createContext(request: Request): Promise<AppContext> {
   // The reverse proxy forwards the original host; fall back to `host`. With a
   // single tenant this always resolves to the primary, so `context.db` is
   // unchanged.
-  const tenant = resolveTenantFromHost(
-    request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
-  );
+  const tenant = resolveTenantFromHost(requestHost(request.headers));
   const tenantDb = dbForTenant(tenant.databaseUrl);
   // Load this tenant's persisted session window before the first `auth()`
   // build so better-auth is configured with the admin-set lifetime.

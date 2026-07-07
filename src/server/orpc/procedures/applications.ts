@@ -1,8 +1,28 @@
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { unzipSync } from "fflate";
 import * as v from "valibot";
+import {
+  realAgeFromIso,
+  validateBicMessage,
+  validateIbanMessage,
+  validateNameMessage,
+  validatePastDateMessage,
+  validatePhoneMessage,
+  validatePlzMessage,
+} from "~/lib/application-validation";
 import { lookupPlz, searchStreets } from "~/server/address/lookup";
+import {
+  decodeBase64Upload,
+  extensionForMimeType,
+  MIB,
+  maxBase64Length,
+} from "~/server/application/upload-bytes";
 import {
   buildUploadUrl,
   consumeUploadToken,
@@ -78,6 +98,12 @@ import { invalidateMemberCaches } from "~/server/search/cache";
 import { formatIbanGrouped, normalizeIban, validateIban } from "~/server/sepa/iban";
 import type { Tenant } from "~/server/tenants/registry";
 
+const execFileAsync = promisify(execFile);
+const MAX_SIGNED_UPLOAD_BYTES = 10 * MIB;
+const MAX_ADMIN_UPLOAD_BYTES = 20 * MIB;
+const MAX_IMPORT_JSON_BYTES = 20 * MIB;
+const MAX_IMPORT_ZIP_BYTES = 100 * MIB;
+
 const ANRede = v.picklist(["Herr", "Frau", "keine Angabe"]);
 const ISODate = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
 const Name = v.pipe(v.string(), v.trim(), v.minLength(2), v.maxLength(100));
@@ -104,6 +130,7 @@ const SubmitInput = v.object({
   plz: v.optional(v.nullable(v.string()), null),
   ort: v.optional(v.nullable(v.string()), null),
   telefon: v.optional(v.nullable(v.string()), null),
+  telefonOptOut: v.optional(v.boolean(), false),
   email: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.email())), null),
   abteilungen: AbteilungIds,
   erziehungsberechtigterVorname: v.optional(v.nullable(v.string()), null),
@@ -162,6 +189,61 @@ function parseDataUri(uri: string): { mime: string; body: Buffer } | null {
   const m = /^data:([^;]+);base64,(.+)$/s.exec(uri);
   if (!m) return null;
   return { mime: m[1]!, body: Buffer.from(m[2]!, "base64") };
+}
+
+async function extractTextBestEffort(opts: {
+  bytes: Buffer;
+  filename: string | null;
+  mimeType: string | null;
+}): Promise<{ available: boolean; text: string | null; error: string | null }> {
+  const ext = (opts.filename?.split(".").pop() ?? "").toLowerCase();
+  const mime = opts.mimeType ?? "";
+  const dir = await mkdtemp(join(tmpdir(), "kontor2-ocr-"));
+  try {
+    const input = join(dir, `scan.${ext || (mime.includes("pdf") ? "pdf" : "bin")}`);
+    await writeFile(input, opts.bytes);
+    if (mime === "application/pdf" || ext === "pdf") {
+      try {
+        const { stdout } = await execFileAsync("pdftotext", ["-layout", input, "-"], {
+          timeout: 30_000,
+          maxBuffer: 2 * 1024 * 1024,
+        });
+        return { available: true, text: stdout.trim(), error: null };
+      } catch {
+        return {
+          available: false,
+          text: null,
+          error:
+            "pdftotext ist auf diesem Server nicht installiert oder konnte den Scan nicht lesen.",
+        };
+      }
+    }
+    if (mime.startsWith("image/") || ["jpg", "jpeg", "png", "tif", "tiff"].includes(ext)) {
+      const outBase = join(dir, "out");
+      try {
+        await execFileAsync("tesseract", [input, outBase, "-l", "deu+eng"], {
+          timeout: 60_000,
+          maxBuffer: 2 * 1024 * 1024,
+        });
+        const text = await readFile(`${outBase}.txt`, "utf8");
+        return { available: true, text: text.trim(), error: null };
+      } catch {
+        return {
+          available: false,
+          text: null,
+          error:
+            "Tesseract ist auf diesem Server nicht installiert oder konnte das Bild nicht lesen.",
+        };
+      }
+    }
+    return {
+      available: false,
+      text: null,
+      error: "OCR für dieses Dateiformat ist nicht verfügbar.",
+    };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 async function loadActiveAbteilungen(db: DBOrTx, ids: string[]): Promise<Map<string, string>> {
@@ -1191,6 +1273,19 @@ export const applicationsRouter = {
       });
     }
 
+    const fail = (message: string) => {
+      throw new ORPCError("VALIDATION_FAILED", { message });
+    };
+    const mainNameErrors = [
+      validateNameMessage(input.vorname, "Vorname"),
+      validateNameMessage(input.nachname, "Nachname"),
+    ].filter(Boolean);
+    if (mainNameErrors[0]) fail(mainNameErrors[0]);
+    const dobMessage = validatePastDateMessage(input.geburtsdatum, "Geburtsdatum", {
+      maxAge: 120,
+    });
+    if (dobMessage) fail(dobMessage);
+
     const dob = parseISODate(input.geburtsdatum);
     if (Number.isNaN(dob.getTime()) || dob >= new Date()) {
       throw new ORPCError("VALIDATION_FAILED", { message: "Geburtsdatum ungültig." });
@@ -1213,21 +1308,66 @@ export const applicationsRouter = {
     const kategorie = mitgliedschaftTypFor(antragstyp, dob, altersgrenzenOf(org));
 
     if (antragstyp === "kind") {
-      if (
-        !(input.erziehungsberechtigterVorname ?? "").trim() ||
-        !(input.erziehungsberechtigterNachname ?? "").trim()
-      ) {
-        throw new ORPCError("VALIDATION_FAILED", {
-          message: "Für Minderjährige ist eine gesetzliche Vertretung erforderlich.",
-        });
-      }
+      const gv = validateNameMessage(
+        input.erziehungsberechtigterVorname ?? "",
+        "Vorname der gesetzlichen Vertretung",
+      );
+      if (gv) fail(gv);
+      const gn = validateNameMessage(
+        input.erziehungsberechtigterNachname ?? "",
+        "Nachname der gesetzlichen Vertretung",
+      );
+      if (gn) fail(gn);
     }
 
+    if (!input.strasse?.trim() || input.strasse.trim().length < 3) {
+      fail("Bitte eine vollständige Straße angeben.");
+    }
+    const plzMessage = validatePlzMessage(input.plz ?? "");
+    if (plzMessage) fail(plzMessage);
+    if (!input.ort?.trim() || input.ort.trim().length < 2) fail("Ort ist erforderlich.");
+    const phoneMessage = validatePhoneMessage(input.telefon ?? "", input.telefonOptOut);
+    if (phoneMessage) fail(phoneMessage);
+
     const iban = normalizeIban(input.iban);
-    if (!validateIban(iban)) {
-      throw new ORPCError("VALIDATION_FAILED", {
-        message: "IBAN ungültig (Prüfsumme fehlerhaft).",
-      });
+    const ibanMessage = validateIbanMessage(iban);
+    if (ibanMessage || !validateIban(iban)) fail(ibanMessage ?? "IBAN ungültig.");
+    const bicMessage = validateBicMessage(input.bic);
+    if (bicMessage) fail(bicMessage);
+
+    if (hasChildren) {
+      if (!hasPartner) {
+        fail(
+          "Für die Familienmitgliedschaft ist ein Partner oder zweites Elternteil erforderlich.",
+        );
+      }
+      const pv = validateNameMessage(input.partnerVorname ?? "", "Vorname des Partners");
+      if (pv) fail(pv);
+      const pn = validateNameMessage(input.partnerNachname ?? "", "Nachname des Partners");
+      if (pn) fail(pn);
+      const pd = validatePastDateMessage(
+        input.partnerGeburtsdatum ?? "",
+        "Geburtsdatum des Partners",
+        { maxAge: 120 },
+      );
+      if (pd) fail(pd);
+      if ((realAgeFromIso(input.partnerGeburtsdatum ?? "") ?? 0) < 18) {
+        fail("Partner oder zweites Elternteil muss volljährig sein.");
+      }
+      for (const [idx, kind] of (input.kinder ?? []).entries()) {
+        const kv = validateNameMessage(kind.vorname, `Vorname von Kind ${idx + 1}`);
+        if (kv) fail(kv);
+        const kn = validateNameMessage(kind.nachname, `Nachname von Kind ${idx + 1}`);
+        if (kn) fail(kn);
+        const kd = validatePastDateMessage(kind.geburtsdatum, `Geburtsdatum von Kind ${idx + 1}`);
+        if (kd) fail(kd);
+        if ((realAgeFromIso(kind.geburtsdatum) ?? 99) > 18) {
+          fail(`Kind ${idx + 1} muss 18 Jahre oder jünger sein.`);
+        }
+        if (kind.abteilungen.length === 0) {
+          fail(`Für Kind ${idx + 1} muss mindestens eine Abteilung gewählt werden.`);
+        }
+      }
     }
 
     // Resolve + validate Abteilungen (active only). Snapshot names for the PDF.
@@ -1242,6 +1382,18 @@ export const applicationsRouter = {
     for (const id of input.abteilungen) {
       if (!abtNames.has(id)) {
         throw new ORPCError("VALIDATION_FAILED", { message: "Ungültige Abteilung." });
+      }
+    }
+    for (const id of input.partnerAbteilungen) {
+      if (!abtNames.has(id)) {
+        throw new ORPCError("VALIDATION_FAILED", { message: "Ungültige Partner-Abteilung." });
+      }
+    }
+    for (const kind of input.kinder ?? []) {
+      for (const id of kind.abteilungen) {
+        if (!abtNames.has(id)) {
+          throw new ORPCError("VALIDATION_FAILED", { message: "Ungültige Kinder-Abteilung." });
+        }
       }
     }
 
@@ -1492,7 +1644,11 @@ export const applicationsRouter = {
         token: v.string(),
         filename: v.pipe(v.string(), v.minLength(1)),
         mimeType: v.pipe(v.string(), v.minLength(1)),
-        contentBase64: v.pipe(v.string(), v.minLength(1)),
+        contentBase64: v.pipe(
+          v.string(),
+          v.minLength(1),
+          v.maxLength(maxBase64Length(MAX_SIGNED_UPLOAD_BYTES)),
+        ),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -1508,13 +1664,11 @@ export const applicationsRouter = {
       if (!allowed.includes(input.mimeType)) {
         throw new ORPCError("VALIDATION_FAILED", { message: "Nicht erlaubtes Dateiformat." });
       }
-      const body = Buffer.from(input.contentBase64, "base64");
-      if (body.byteLength === 0) {
-        throw new ORPCError("VALIDATION_FAILED", { message: "Leere Datei." });
-      }
-      if (body.byteLength > 10 * 1024 * 1024) {
-        throw new ORPCError("VALIDATION_FAILED", { message: "Datei zu groß (max. 10 MB)." });
-      }
+      const body = decodeBase64Upload(
+        input.contentBase64,
+        MAX_SIGNED_UPLOAD_BYTES,
+        "Datei zu groß (max. 10 MB).",
+      );
       // Resolve the token WITHOUT consuming it, store the file in S3, and only
       // then consume the token. Consuming first meant a transient S3 failure
       // burned the single-use link forever with no file stored. peek->store->
@@ -1526,7 +1680,7 @@ export const applicationsRouter = {
           message: "Der Upload-Link ist ungültig, abgelaufen oder bereits benutzt.",
         });
       }
-      const ext = input.filename.split(".").pop()?.toLowerCase() ?? "bin";
+      const ext = extensionForMimeType(input.mimeType) ?? "bin";
       const s3Key = `applications/${peek.applicationId}/signed-${Date.now()}.${ext}`;
       await putObject({ key: s3Key, body, contentType: input.mimeType });
 
@@ -1570,7 +1724,11 @@ export const applicationsRouter = {
       v.object({
         filename: v.pipe(v.string(), v.minLength(1)),
         mimeType: v.pipe(v.string(), v.minLength(1)),
-        contentBase64: v.pipe(v.string(), v.minLength(1)),
+        contentBase64: v.pipe(
+          v.string(),
+          v.minLength(1),
+          v.maxLength(maxBase64Length(MAX_ADMIN_UPLOAD_BYTES)),
+        ),
         email: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.email())), null),
       }),
     )
@@ -1589,13 +1747,11 @@ export const applicationsRouter = {
       if (!allowed.includes(input.mimeType)) {
         throw new ORPCError("VALIDATION_FAILED", { message: "Nicht erlaubtes Dateiformat." });
       }
-      const body = Buffer.from(input.contentBase64, "base64");
-      if (body.byteLength === 0) {
-        throw new ORPCError("VALIDATION_FAILED", { message: "Leere Datei." });
-      }
-      if (body.byteLength > 20 * 1024 * 1024) {
-        throw new ORPCError("VALIDATION_FAILED", { message: "Datei zu groß (max. 20 MB)." });
-      }
+      const body = decodeBase64Upload(
+        input.contentBase64,
+        MAX_ADMIN_UPLOAD_BYTES,
+        "Datei zu groß (max. 20 MB).",
+      );
       const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
       if (!org) {
         throw new ORPCError("BAD_REQUEST", {
@@ -1636,7 +1792,7 @@ export const applicationsRouter = {
       // Store the scan and notify, both best-effort so a storage/SMTP blip
       // never loses the intake.
       try {
-        const ext = input.filename.split(".").pop()?.toLowerCase() ?? "bin";
+        const ext = extensionForMimeType(input.mimeType) ?? "bin";
         const s3Key = `applications/${inserted.id}/paper-${Date.now()}.${ext}`;
         await putObject({ key: s3Key, body, contentType: input.mimeType });
         await context.db.insert(membershipApplicationFilesTable).values({
@@ -1856,6 +2012,7 @@ export const applicationsRouter = {
         .select({
           s3Key: membershipApplicationFilesTable.s3Key,
           filename: membershipApplicationFilesTable.filename,
+          mimeType: membershipApplicationFilesTable.mimeType,
           kind: membershipApplicationFilesTable.kind,
         })
         .from(membershipApplicationFilesTable)
@@ -1871,9 +2028,187 @@ export const applicationsRouter = {
         filename: file.filename ?? "antrag.pdf",
         expiresSeconds: 300,
         inline: true,
-        contentType: "application/pdf",
+        contentType: file.mimeType ?? "application/pdf",
       });
       return { url, filename: file.filename ?? "antrag.pdf" };
+    }),
+
+  /** Best-effort OCR/text extraction for an uploaded signed scan. */
+  fileText: vorstandProc
+    .input(v.object({ id: v.pipe(v.string(), v.uuid()) }))
+    .handler(async ({ context, input }) => {
+      const [file] = await context.db
+        .select({
+          s3Key: membershipApplicationFilesTable.s3Key,
+          filename: membershipApplicationFilesTable.filename,
+          mimeType: membershipApplicationFilesTable.mimeType,
+          kind: membershipApplicationFilesTable.kind,
+        })
+        .from(membershipApplicationFilesTable)
+        .where(eq(membershipApplicationFilesTable.id, input.id))
+        .limit(1);
+      if (file?.kind !== "signed_scan") {
+        throw new ORPCError("NOT_FOUND", { message: "Scan nicht gefunden." });
+      }
+      const bytes = await getObject(file.s3Key);
+      return extractTextBestEffort({
+        bytes,
+        filename: file.filename,
+        mimeType: file.mimeType,
+      });
+    }),
+
+  /** Vorstand: resend the initial application confirmation/club notification. */
+  resendInitialMail: vorstandProc
+    .input(v.object({ id: v.pipe(v.string(), v.uuid()) }))
+    .handler(async ({ context, input }) => {
+      const [app] = await context.db
+        .select()
+        .from(membershipApplicationsTable)
+        .where(eq(membershipApplicationsTable.id, input.id))
+        .limit(1);
+      if (!app) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+      const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+      if (!org)
+        throw new ORPCError("PRECONDITION_FAILED", { message: "Verein nicht eingerichtet." });
+
+      const [file] = await context.db
+        .select()
+        .from(membershipApplicationFilesTable)
+        .where(
+          and(
+            eq(membershipApplicationFilesTable.applicationId, app.id),
+            inArray(membershipApplicationFilesTable.kind, ["generated_pdf", "signed_scan"]),
+          ),
+        )
+        .orderBy(desc(membershipApplicationFilesTable.uploadedAt))
+        .limit(1);
+      if (!file) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Für diesen Antrag gibt es kein versendbares PDF.",
+        });
+      }
+
+      let uploadUrl: string | null = null;
+      if (app.status === "neu") {
+        const token = await issueUploadToken(context.db, { applicationId: app.id });
+        uploadUrl = buildUploadUrl(baseUrl(context.tenant), token.rawToken);
+      }
+      const pdf = await getObject(file.s3Key);
+      const applicantName =
+        app.antragstyp === "kind"
+          ? `${app.erziehungsberechtigterVorname ?? ""} ${app.erziehungsberechtigterNachname ?? ""}`.trim()
+          : `${app.vorname} ${app.nachname}`.trim();
+      const clubEmail = org.antragVorstandEmail ?? org.mitgliedschaftEmail ?? org.kontaktEmail;
+      const res = await sendApplicationMails(context.db, {
+        vereinsname: org.vereinsname,
+        applicantEmail: app.email,
+        applicantName,
+        clubEmail,
+        notifyClub: org.antragBenachrichtigungAktiv,
+        antragsnummer: app.antragsnummer,
+        statusUrl: statusUrlFor(context.tenant, app.antragsnummer),
+        uploadUrl,
+        pdf: {
+          filename: file.filename ?? `Beitrittserklaerung-${app.antragsnummer}.pdf`,
+          content: pdf,
+          contentType: file.mimeType ?? "application/pdf",
+        },
+      });
+      if (res.applicantSent || res.clubSent) {
+        await context.db
+          .update(membershipApplicationsTable)
+          .set({ emailSent: true, updatedAt: new Date() })
+          .where(eq(membershipApplicationsTable.id, app.id));
+      }
+      await recordEmail(
+        res.records.map((r) => ({
+          ...r,
+          entityType: "membership_application",
+          entityId: app.id,
+          actorEmail: context.session!.user.email,
+          requestId: context.requestId ?? null,
+        })),
+        context.db,
+      );
+      return { applicantSent: res.applicantSent, clubSent: res.clubSent };
+    }),
+
+  /** Vorstand: upload or replace the signed application document. */
+  adminUploadSigned: vorstandProc
+    .input(
+      v.object({
+        id: v.pipe(v.string(), v.uuid()),
+        filename: v.pipe(v.string(), v.minLength(1)),
+        mimeType: v.pipe(v.string(), v.minLength(1)),
+        contentBase64: v.pipe(
+          v.string(),
+          v.minLength(1),
+          v.maxLength(maxBase64Length(MAX_ADMIN_UPLOAD_BYTES)),
+        ),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const [app] = await context.db
+        .select({ id: membershipApplicationsTable.id, status: membershipApplicationsTable.status })
+        .from(membershipApplicationsTable)
+        .where(eq(membershipApplicationsTable.id, input.id))
+        .limit(1);
+      if (!app) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
+      if (app.status === "genehmigt" || app.status === "abgelehnt") {
+        throw new ORPCError("CONFLICT", {
+          message:
+            "Bei abgeschlossenen Anträgen kann das unterschriebene Dokument nicht ersetzt werden.",
+        });
+      }
+      const allowed = ["application/pdf", "image/jpeg", "image/png", "image/heic", "image/heif"];
+      if (!allowed.includes(input.mimeType)) {
+        throw new ORPCError("VALIDATION_FAILED", { message: "Nicht erlaubtes Dateiformat." });
+      }
+      const body = decodeBase64Upload(
+        input.contentBase64,
+        MAX_ADMIN_UPLOAD_BYTES,
+        "Datei zu groß (max. 20 MB).",
+      );
+      const ext = extensionForMimeType(input.mimeType) ?? "bin";
+      const s3Key = `applications/${input.id}/admin-signed-${Date.now()}.${ext}`;
+      await putObject({ key: s3Key, body, contentType: input.mimeType });
+      await context.db.insert(membershipApplicationFilesTable).values({
+        applicationId: input.id,
+        kind: "signed_scan",
+        s3Key,
+        filename: input.filename,
+        mimeType: input.mimeType,
+        sizeBytes: body.byteLength,
+      });
+      await context.db
+        .update(membershipApplicationsTable)
+        .set({
+          status:
+            app.status === "neu" || app.status === "scan_eingegangen"
+              ? "dokument_hochgeladen"
+              : app.status,
+          updatedAt: new Date(),
+        })
+        .where(eq(membershipApplicationsTable.id, input.id));
+      const nextStatus =
+        app.status === "neu" || app.status === "scan_eingegangen"
+          ? "dokument_hochgeladen"
+          : app.status;
+      await appendAudit(context.db, {
+        entityType: "membership_application",
+        entityId: input.id,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: {
+          signedScan: { before: null, after: input.filename },
+          status: { before: app.status, after: nextStatus },
+        },
+        requestId: context.requestId ?? null,
+      });
+      return { ok: true };
     }),
 
   /** Edit notes and move the application through the non-terminal statuses. */
@@ -2358,32 +2693,37 @@ export const applicationsRouter = {
     .input(
       v.object({
         filename: v.string(),
-        contentBase64: v.pipe(v.string(), v.minLength(1)),
+        contentBase64: v.pipe(
+          v.string(),
+          v.minLength(1),
+          v.maxLength(maxBase64Length(MAX_IMPORT_JSON_BYTES)),
+        ),
         includeTest: v.optional(v.boolean(), false),
         /** Optional ZIP of the svums storage bucket (documents). */
-        filesZipBase64: v.optional(v.nullable(v.pipe(v.string(), v.minLength(1))), null),
+        filesZipBase64: v.optional(
+          v.nullable(
+            v.pipe(v.string(), v.minLength(1), v.maxLength(maxBase64Length(MAX_IMPORT_ZIP_BYTES))),
+          ),
+          null,
+        ),
       }),
     )
     .handler(async ({ context, input }) => {
-      const buf = Buffer.from(input.contentBase64, "base64");
-      if (buf.length === 0) {
-        throw new ORPCError("BAD_REQUEST", { message: "Leere Datei." });
-      }
-      if (buf.length > 20 * 1024 * 1024) {
-        throw new ORPCError("PAYLOAD_TOO_LARGE", { message: "Datei zu groß. Maximum: 20 MB." });
-      }
+      const buf = decodeBase64Upload(
+        input.contentBase64,
+        MAX_IMPORT_JSON_BYTES,
+        "Datei zu groß. Maximum: 20 MB.",
+      );
 
       // Unpack the optional documents ZIP into basename -> bytes. Folder
       // prefixes inside the ZIP do not matter, svums keys are flat.
       const zipEntries = new Map<string, Uint8Array>();
       if (input.filesZipBase64) {
-        const zipBuf = Buffer.from(input.filesZipBase64, "base64");
-        if (zipBuf.length > 100 * 1024 * 1024) {
-          throw new ORPCError("PAYLOAD_TOO_LARGE", {
-            message:
-              "Dokumente-ZIP zu groß. Maximum: 100 MB. Das ZIP kann aufgeteilt und in mehreren Durchläufen hochgeladen werden.",
-          });
-        }
+        const zipBuf = decodeBase64Upload(
+          input.filesZipBase64,
+          MAX_IMPORT_ZIP_BYTES,
+          "Dokumente-ZIP zu groß. Maximum: 100 MB. Das ZIP kann aufgeteilt und in mehreren Durchläufen hochgeladen werden.",
+        );
         let unzipped: Record<string, Uint8Array>;
         try {
           unzipped = unzipSync(new Uint8Array(zipBuf));

@@ -11,16 +11,19 @@ import { createServerOnlyFn } from "@tanstack/react-start";
  * Servergraph nicht ins Browser-Bundle wandert.
  */
 const handle = createServerOnlyFn(async ({ request }: { request: Request }): Promise<Response> => {
-  const [{ dbForTenant }, { resolveTenantFromHost }, { organizationSettingsTable }] =
-    await Promise.all([
-      import("~/server/db/client"),
-      import("~/server/tenants/resolve"),
-      import("~/server/db/schema/organization-settings"),
-    ]);
+  const [
+    { dbForTenant },
+    { requestHost },
+    { resolveTenantFromHost },
+    { organizationSettingsTable },
+  ] = await Promise.all([
+    import("~/server/db/client"),
+    import("~/server/tenants/request-host"),
+    import("~/server/tenants/resolve"),
+    import("~/server/db/schema/organization-settings"),
+  ]);
   // Logo des Vereins DIESES Hosts, nicht der Primär-DB.
-  const tenant = resolveTenantFromHost(
-    request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
-  );
+  const tenant = resolveTenantFromHost(requestHost(request.headers));
   const [row] = await dbForTenant(tenant.databaseUrl)
     .select({ logo: organizationSettingsTable.logo })
     .from(organizationSettingsTable)

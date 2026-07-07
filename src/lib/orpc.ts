@@ -30,7 +30,7 @@ const rpcUrl = createIsomorphicFn()
   .client(() => `${window.location.origin}/api/rpc`)
   .server(() => {
     const h = getRequestHeaders();
-    const host = h.get("x-forwarded-host") ?? h.get("host");
+    const host = h.get("host") ?? h.get("x-forwarded-host")?.split(",")[0]?.trim();
     if (host) {
       const proto = h.get("x-forwarded-proto") ?? "https";
       return `${proto}://${host}/api/rpc`;

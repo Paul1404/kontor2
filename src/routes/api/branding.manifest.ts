@@ -21,19 +21,19 @@ const handle = createServerOnlyFn(async ({ request }: { request: Request }): Pro
   try {
     const [
       { dbForTenant },
+      { requestHost },
       { resolveTenantFromHost },
       { organizationSettingsTable },
       { normalizeHex },
     ] = await Promise.all([
       import("~/server/db/client"),
+      import("~/server/tenants/request-host"),
       import("~/server/tenants/resolve"),
       import("~/server/db/schema/organization-settings"),
       import("~/lib/branding-color"),
     ]);
     // Branding des Vereins DIESES Hosts, nicht der Primär-DB.
-    const tenant = resolveTenantFromHost(
-      request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
-    );
+    const tenant = resolveTenantFromHost(requestHost(request.headers));
     const [row] = await dbForTenant(tenant.databaseUrl)
       .select({
         vereinsname: organizationSettingsTable.vereinsname,

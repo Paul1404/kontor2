@@ -10,6 +10,7 @@ const handle = createServerOnlyFn(async ({ request }: { request: Request }) => {
   const [
     { auth },
     { dbForTenant },
+    { requestHost },
     { resolveTenantFromHost },
     { guardAdminPluginRequest },
     { ensureSessionConfigLoaded },
@@ -17,14 +18,13 @@ const handle = createServerOnlyFn(async ({ request }: { request: Request }) => {
   ] = await Promise.all([
     import("~/server/auth/auth"),
     import("~/server/db/client"),
+    import("~/server/tenants/request-host"),
     import("~/server/tenants/resolve"),
     import("~/server/auth/last-admin-guard"),
     import("~/server/auth/session-config"),
     import("~/server/crypto/tenant-crypto"),
   ]);
-  const tenant = resolveTenantFromHost(
-    request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
-  );
+  const tenant = resolveTenantFromHost(requestHost(request.headers));
   const tenantDb = dbForTenant(tenant.databaseUrl);
   await ensureSessionConfigLoaded(tenant.key, tenantDb);
   // Im Per-Verein-Keyring: better-auth sendet Invite-/Reset-Mails, die die

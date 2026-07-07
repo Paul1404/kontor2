@@ -40,6 +40,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import {
+  realAgeFromIso,
+  validateBicMessage,
+  validateIbanMessage,
+  validateNameMessage,
+  validatePastDateMessage,
+  validatePhoneMessage,
+  validatePlzMessage,
+} from "~/lib/application-validation";
 import { cn } from "~/lib/cn";
 import { EMPTY_VALUE, formatCurrency, formatDate, orEmpty } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -56,10 +65,19 @@ const ERROR_ORDER = [
   "nachname",
   "geburtsdatum",
   "abteilung",
+  "strasse",
+  "plz",
+  "ort",
+  "telefon",
   "email",
   "erzVorname",
   "erzNachname",
+  "elternteilMitglied",
+  "partnerVorname",
+  "partnerNachname",
+  "partnerGeburtsdatum",
   "iban",
+  "bic",
 ] as const;
 
 // Subtle magnetic pull of an element toward the pointer. Offsets are written to
@@ -103,6 +121,7 @@ type Draft = {
   telefonOptOut: boolean;
   email: string;
   selectedAbt: string[];
+  passive: boolean;
   erzVorname: string;
   erzNachname: string;
   elternteilMitglied: boolean;
@@ -119,20 +138,6 @@ type Draft = {
   datenschutz: boolean;
   satzung: boolean;
 };
-
-function realAge(iso: string): number | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
-  const [y, m, d] = iso.split("-").map(Number);
-  const today = new Date();
-  let age = today.getFullYear() - (y ?? 0);
-  if (
-    today.getMonth() + 1 < (m ?? 0) ||
-    (today.getMonth() + 1 === m && today.getDate() < (d ?? 0))
-  ) {
-    age -= 1;
-  }
-  return age;
-}
 
 function AntragForm() {
   const settings = useQuery({
@@ -160,6 +165,7 @@ function AntragForm() {
   const [telefonOptOut, setTelefonOptOut] = useState(false);
   const [email, setEmail] = useState("");
   const [selectedAbt, setSelectedAbt] = useState<string[]>([]);
+  const [passive, setPassive] = useState(false);
   const [erzVorname, setErzVorname] = useState("");
   const [erzNachname, setErzNachname] = useState("");
   const [elternteilMitglied, setElternteilMitglied] = useState(false);
@@ -231,6 +237,7 @@ function AntragForm() {
         if (typeof d.telefonOptOut === "boolean") setTelefonOptOut(d.telefonOptOut);
         if (typeof d.email === "string") setEmail(d.email);
         if (Array.isArray(d.selectedAbt)) setSelectedAbt(d.selectedAbt);
+        if (typeof d.passive === "boolean") setPassive(d.passive);
         if (typeof d.erzVorname === "string") setErzVorname(d.erzVorname);
         if (typeof d.erzNachname === "string") setErzNachname(d.erzNachname);
         if (typeof d.elternteilMitglied === "boolean") setElternteilMitglied(d.elternteilMitglied);
@@ -270,6 +277,7 @@ function AntragForm() {
     telefonOptOut,
     email,
     selectedAbt,
+    passive,
     erzVorname,
     erzNachname,
     elternteilMitglied,
@@ -345,7 +353,7 @@ function AntragForm() {
     };
   }, [vorname, nachname, geburtsdatum]);
 
-  const age = geburtsdatum ? realAge(geburtsdatum) : null;
+  const age = geburtsdatum ? realAgeFromIso(geburtsdatum) : null;
   const isMinor = age != null && age < 18;
   const hasPartner = partnerVorname.trim().length >= 2 && partnerNachname.trim().length >= 2;
   // Show the family editors when the user opened them or when there is already
@@ -393,8 +401,9 @@ function AntragForm() {
         plz: plz || null,
         ort: ort || null,
         telefon: telefon || null,
+        telefonOptOut,
         email: email || null,
-        abteilungen: selectedAbt,
+        abteilungen: passive ? [] : selectedAbt,
         erziehungsberechtigterVorname: isMinor ? erzVorname || null : null,
         erziehungsberechtigterNachname: isMinor ? erzNachname || null : null,
         partnerVorname: antragstyp === "familie" ? partnerVorname || null : null,
@@ -450,23 +459,76 @@ function AntragForm() {
     set(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
   }
 
+  function childAge(iso: string): number | null {
+    return realAgeFromIso(iso);
+  }
+
   // Per-field validation for a step. Keys match the `f-<key>` anchor ids so the
   // first invalid field can be scrolled into view.
   function computeErrors(s: number): Record<string, string> {
     const e: Record<string, string> = {};
     if (s === 0) {
       if (!isMinor && !geschlecht) e.geschlecht = "Bitte eine Anrede wählen.";
-      if (vorname.trim().length < 2) e.vorname = "Mindestens zwei Zeichen.";
-      if (nachname.trim().length < 2) e.nachname = "Mindestens zwei Zeichen.";
-      if (age == null) e.geburtsdatum = "Bitte ein gültiges Geburtsdatum angeben.";
-      if (selectedAbt.length === 0) e.abteilung = "Bitte mindestens eine Abteilung wählen.";
+      const vorErr = validateNameMessage(vorname, "Vorname");
+      if (vorErr) e.vorname = vorErr;
+      const nachErr = validateNameMessage(nachname, "Nachname");
+      if (nachErr) e.nachname = nachErr;
+      const dobErr = validatePastDateMessage(geburtsdatum, "Geburtsdatum", { maxAge: 120 });
+      if (dobErr) e.geburtsdatum = dobErr;
+      if (!passive && selectedAbt.length === 0) {
+        e.abteilung = "Bitte mindestens eine Abteilung wählen oder passiv auswählen.";
+      }
+      if (!strasse.trim() || strasse.trim().length < 3)
+        e.strasse = "Bitte eine vollständige Straße angeben.";
+      const plzErr = validatePlzMessage(plz);
+      if (plzErr) e.plz = plzErr;
+      if (ort.trim().length < 2) e.ort = "Ort ist erforderlich.";
+      const phoneErr = validatePhoneMessage(telefon, telefonOptOut);
+      if (phoneErr) e.telefon = phoneErr;
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
         e.email = "Bitte eine gültige E-Mail-Adresse angeben.";
-      if (isMinor && erzVorname.trim().length < 2) e.erzVorname = "Mindestens zwei Zeichen.";
-      if (isMinor && erzNachname.trim().length < 2) e.erzNachname = "Mindestens zwei Zeichen.";
+      if (isMinor) {
+        const erzVorErr = validateNameMessage(erzVorname, "Vorname");
+        if (erzVorErr) e.erzVorname = erzVorErr;
+        const erzNachErr = validateNameMessage(erzNachname, "Nachname");
+        if (erzNachErr) e.erzNachname = erzNachErr;
+      }
+      if (!isMinor && kinder.length > 0) {
+        const partnerVorErr = validateNameMessage(partnerVorname, "Vorname des Partners");
+        if (partnerVorErr) e.partnerVorname = partnerVorErr;
+        const partnerNachErr = validateNameMessage(partnerNachname, "Nachname des Partners");
+        if (partnerNachErr) e.partnerNachname = partnerNachErr;
+        const partnerDobErr = validatePastDateMessage(
+          partnerGeburtsdatum,
+          "Geburtsdatum des Partners",
+          { maxAge: 120 },
+        );
+        if (partnerDobErr) e.partnerGeburtsdatum = partnerDobErr;
+        else if ((realAgeFromIso(partnerGeburtsdatum) ?? 0) < 18) {
+          e.partnerGeburtsdatum = "Partner oder zweites Elternteil muss volljährig sein.";
+        }
+        kinder.forEach((k, i) => {
+          const prefix = `kind_${i}`;
+          const kv = validateNameMessage(k.vorname, "Vorname des Kindes");
+          if (kv) e[`${prefix}_vorname`] = kv;
+          const kn = validateNameMessage(k.nachname, "Nachname des Kindes");
+          if (kn) e[`${prefix}_nachname`] = kn;
+          const kd = validatePastDateMessage(k.geburtsdatum, "Geburtsdatum des Kindes");
+          if (kd) e[`${prefix}_geburtsdatum`] = kd;
+          else if ((childAge(k.geburtsdatum) ?? 99) > 18) {
+            e[`${prefix}_geburtsdatum`] = "Kind muss 18 Jahre oder jünger sein.";
+          }
+          if (k.abteilungen.length === 0) {
+            e[`${prefix}_abteilungen`] = "Bitte mindestens eine Abteilung wählen.";
+          }
+        });
+      }
     }
     if (s === 1) {
-      if (iban.replace(/\s/g, "").length < 15) e.iban = "Bitte eine gültige IBAN angeben.";
+      const ibanErr = validateIbanMessage(iban);
+      if (ibanErr) e.iban = ibanErr;
+      const bicErr = validateBicMessage(bic);
+      if (bicErr) e.bic = bicErr;
     }
     return e;
   }
@@ -479,7 +541,8 @@ function AntragForm() {
   function next() {
     const errs = computeErrors(step);
     setErrors(errs);
-    const keys = ERROR_ORDER.filter((k) => errs[k]);
+    const ordered = ERROR_ORDER.filter((k) => errs[k]);
+    const keys = [...ordered, ...Object.keys(errs).filter((k) => !ordered.includes(k as never))];
     if (keys.length > 0) {
       setError(
         keys.length === 1
@@ -508,7 +571,9 @@ function AntragForm() {
     setStep((s) => Math.max(s - 1, 0));
   }
 
-  const selectedAbtNames = abteilungen.filter((a) => selectedAbt.includes(a.id)).map((a) => a.name);
+  const selectedAbtNames = passive
+    ? ["Keine Abteilung / passiv"]
+    : abteilungen.filter((a) => selectedAbt.includes(a.id)).map((a) => a.name);
   const tarifLabel =
     antragstyp === "familie" ? "Familienmitgliedschaft" : (fee.data?.label ?? null);
 
@@ -655,6 +720,11 @@ function AntragForm() {
                   onPlz={setPlz}
                   onOrt={setOrt}
                 />
+                {(errors.strasse || errors.plz || errors.ort) && (
+                  <p className="text-xs text-destructive">
+                    {errors.strasse ?? errors.plz ?? errors.ort}
+                  </p>
+                )}
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
@@ -676,6 +746,9 @@ function AntragForm() {
                       />
                       Ich möchte keine Telefonnummer angeben
                     </label>
+                    {errors.telefon ? (
+                      <span className="text-xs text-destructive">{errors.telefon}</span>
+                    ) : null}
                   </div>
                   <Field
                     label="E-Mail *"
@@ -768,17 +841,24 @@ function AntragForm() {
 
             <Card id="f-abteilung" className="glass-card scroll-mt-24">
               <CardHeader>
-                <CardTitle>Abteilungen *</CardTitle>
+                <CardTitle>Abteilungen</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Mehrfachauswahl ist möglich. Wählen Sie keine Abteilung, wenn Sie den Verein nur
-                  passiv unterstützen möchten.
+                  Mehrfachauswahl ist möglich. Wählen Sie passiv, wenn Sie den Verein ohne Abteilung
+                  unterstützen möchten.
                 </p>
               </CardHeader>
               <CardContent>
                 <AbteilungPicker
                   abteilungen={abteilungen}
                   selected={selectedAbt}
+                  passive={passive}
+                  onPassiveChange={(active) => {
+                    setPassive(active);
+                    if (active) setSelectedAbt([]);
+                    clearError("abteilung");
+                  }}
                   onToggle={(id) => {
+                    if (passive) setPassive(false);
                     toggle(selectedAbt, setSelectedAbt, id);
                     clearError("abteilung");
                   }}
@@ -814,22 +894,31 @@ function AntragForm() {
                 ) : (
                   <CardContent className="motion-reveal-up flex flex-col gap-4">
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <Field label="Partner Vorname">
+                      <Field label="Partner Vorname" error={errors.partnerVorname}>
                         <Input
                           value={partnerVorname}
-                          onChange={(e) => setPartnerVorname(e.target.value)}
+                          onChange={(e) => {
+                            setPartnerVorname(e.target.value);
+                            clearError("partnerVorname");
+                          }}
                         />
                       </Field>
-                      <Field label="Partner Nachname">
+                      <Field label="Partner Nachname" error={errors.partnerNachname}>
                         <Input
                           value={partnerNachname}
-                          onChange={(e) => setPartnerNachname(e.target.value)}
+                          onChange={(e) => {
+                            setPartnerNachname(e.target.value);
+                            clearError("partnerNachname");
+                          }}
                         />
                       </Field>
-                      <Field label="Partner Geburtsdatum">
+                      <Field label="Partner Geburtsdatum" error={errors.partnerGeburtsdatum}>
                         <DateField
                           value={partnerGeburtsdatum}
-                          onChange={(v) => setPartnerGeburtsdatum(v)}
+                          onChange={(v) => {
+                            setPartnerGeburtsdatum(v);
+                            clearError("partnerGeburtsdatum");
+                          }}
                         />
                       </Field>
                     </div>
@@ -901,33 +990,58 @@ function AntragForm() {
                                   <Input
                                     placeholder="Vorname"
                                     value={k.vorname}
-                                    onChange={(e) =>
-                                      updateKind(setKinder, i, { vorname: e.target.value })
-                                    }
+                                    onChange={(e) => {
+                                      updateKind(setKinder, i, { vorname: e.target.value });
+                                      clearError(`kind_${i}_vorname`);
+                                    }}
+                                    aria-invalid={Boolean(errors[`kind_${i}_vorname`])}
                                   />
                                   <Input
                                     placeholder="Nachname"
                                     value={k.nachname}
-                                    onChange={(e) =>
-                                      updateKind(setKinder, i, { nachname: e.target.value })
-                                    }
+                                    onChange={(e) => {
+                                      updateKind(setKinder, i, { nachname: e.target.value });
+                                      clearError(`kind_${i}_nachname`);
+                                    }}
+                                    aria-invalid={Boolean(errors[`kind_${i}_nachname`])}
                                   />
                                   <DateField
                                     value={k.geburtsdatum}
-                                    onChange={(v) => updateKind(setKinder, i, { geburtsdatum: v })}
+                                    onChange={(v) => {
+                                      updateKind(setKinder, i, { geburtsdatum: v });
+                                      clearError(`kind_${i}_geburtsdatum`);
+                                    }}
                                   />
                                 </div>
                                 <AbteilungPicker
                                   abteilungen={abteilungen}
                                   selected={k.abteilungen}
-                                  onToggle={(id) =>
+                                  onToggle={(id) => {
                                     updateKind(setKinder, i, {
                                       abteilungen: k.abteilungen.includes(id)
                                         ? k.abteilungen.filter((x) => x !== id)
                                         : [...k.abteilungen, id],
-                                    })
-                                  }
+                                    });
+                                    clearError(`kind_${i}_abteilungen`);
+                                  }}
                                 />
+                                {[
+                                  errors[`kind_${i}_vorname`],
+                                  errors[`kind_${i}_nachname`],
+                                  errors[`kind_${i}_geburtsdatum`],
+                                  errors[`kind_${i}_abteilungen`],
+                                ].filter(Boolean)[0] ? (
+                                  <p className="text-xs text-destructive">
+                                    {
+                                      [
+                                        errors[`kind_${i}_vorname`],
+                                        errors[`kind_${i}_nachname`],
+                                        errors[`kind_${i}_geburtsdatum`],
+                                        errors[`kind_${i}_abteilungen`],
+                                      ].filter(Boolean)[0]
+                                    }
+                                  </p>
+                                ) : null}
                               </div>
                             ) : null}
                           </div>
@@ -1047,7 +1161,17 @@ function AntragForm() {
                   />
                 </div>
                 <Field label="BIC" hint="Wird nach IBAN-Eingabe automatisch ergänzt.">
-                  <Input value={bic} onChange={(e) => setBic(e.target.value.toUpperCase())} />
+                  <Input
+                    value={bic}
+                    aria-invalid={Boolean(errors.bic)}
+                    onChange={(e) => {
+                      setBic(e.target.value.toUpperCase());
+                      clearError("bic");
+                    }}
+                  />
+                  {errors.bic ? (
+                    <span className="text-xs text-destructive">{errors.bic}</span>
+                  ) : null}
                 </Field>
                 <Field label="Kreditinstitut" hint="Wird nach IBAN-Eingabe automatisch ergänzt.">
                   <Input

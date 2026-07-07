@@ -5,18 +5,17 @@ import { createServerOnlyFn } from "@tanstack/react-start";
 // reaches the client bundle. See `api/rpc.$.ts`.
 const handle = createServerOnlyFn(
   async ({ request, params }: { request: Request; params: { token: string } }) => {
-    const [{ dbForTenant }, { resolveTenantFromHost }, portalAuth, { rateLimit }] =
+    const [{ dbForTenant }, { requestHost }, { resolveTenantFromHost }, portalAuth, { rateLimit }] =
       await Promise.all([
         import("~/server/db/client"),
+        import("~/server/tenants/request-host"),
         import("~/server/tenants/resolve"),
         import("~/server/portal/auth"),
         import("~/server/redis/client"),
       ]);
     const { buildPortalCookie, consumePortalToken, isSecureRequest } = portalAuth;
     // Magic-Link gegen die DB DIESES Vereins prüfen, nicht gegen die Primär-DB.
-    const tenant = resolveTenantFromHost(
-      request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
-    );
+    const tenant = resolveTenantFromHost(requestHost(request.headers));
     const db = () => dbForTenant(tenant.databaseUrl);
     const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
     const userAgent = request.headers.get("user-agent");
