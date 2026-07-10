@@ -1,0 +1,1 @@
+ALTER TYPE "public"."antrag_token_purpose" ADD VALUE 'status';

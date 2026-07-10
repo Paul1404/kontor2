@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
@@ -469,16 +469,13 @@ function MembersListPage() {
                     : undefined,
               abteilungId: search.abteilungId || undefined,
             }}
+            className={buttonVariants({ variant: "outline" })}
           >
-            <Button type="button" variant="outline">
-              <FileDown className="size-4" /> Export
-            </Button>
+            <FileDown className="size-4" /> Export
           </Link>
           {canEdit ? (
-            <Link to="/app/mitglieder/neu">
-              <Button>
-                <Plus className="size-4" /> Neues Mitglied
-              </Button>
+            <Link to="/app/mitglieder/neu" className={buttonVariants()}>
+              <Plus className="size-4" /> Neues Mitglied
             </Link>
           ) : null}
         </div>

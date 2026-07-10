@@ -6,7 +6,10 @@ import { db } from "~/server/db/client";
 import { users } from "~/server/db/schema/auth";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { membersTable } from "~/server/db/schema/members";
-import { membershipApplicationsTable } from "~/server/db/schema/membership-applications";
+import {
+  membershipApplicationFilesTable,
+  membershipApplicationsTable,
+} from "~/server/db/schema/membership-applications";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import type { AppContext } from "~/server/orpc/context";
@@ -85,6 +88,16 @@ describe.skipIf(!onTestDb)("Antrag-Genehmigung legt Zahler an (integration)", ()
       .returning({ id: membershipApplicationsTable.id });
     if (!app) throw new Error("seed failed");
     applicationId = app.id;
+    await db()
+      .insert(membershipApplicationFilesTable)
+      .values({
+        applicationId,
+        kind: "signed_scan",
+        s3Key: `test/${MARKER}.pdf`,
+        filename: `${MARKER}.pdf`,
+        mimeType: "application/pdf",
+        sizeBytes: 1,
+      });
   });
 
   afterAll(async () => {

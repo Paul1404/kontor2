@@ -20,6 +20,7 @@ function ZahlungsabgleichPage() {
   const qc = useQueryClient();
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [sourceHash, setSourceHash] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirm, setConfirm] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -29,6 +30,7 @@ function ZahlungsabgleichPage() {
     onSuccess: (r) => {
       setProposals(r.proposals);
       setWarnings(r.warnings);
+      setSourceHash(r.sourceHash);
       // Pre-select high-confidence matches.
       setSelected(
         new Set(r.proposals.filter((p) => p.match && p.confidence === "high").map((p) => p.line)),
@@ -43,7 +45,8 @@ function ZahlungsabgleichPage() {
       const items = (proposals ?? [])
         .filter((p) => p.match && selected.has(p.line))
         .map((p) => ({ sollStellungId: p.match!.sollStellungId, amount: p.amount }));
-      return orpc.payments.apply({ items });
+      if (!sourceHash) throw new Error("Die Quelldatei muss erneut eingelesen werden.");
+      return orpc.payments.apply({ sourceHash, items });
     },
     onSuccess: async (r) => {
       setConfirm(false);
@@ -53,7 +56,12 @@ function ZahlungsabgleichPage() {
       setProposals(null);
       setSelected(new Set());
       setFileName(null);
-      await qc.invalidateQueries({ queryKey: ["dashboard.insights"] });
+      setSourceHash(null);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["dashboard.insights"] }),
+        qc.invalidateQueries({ queryKey: ["dunning.open"] }),
+        qc.invalidateQueries({ queryKey: ["members.get"] }),
+      ]);
     },
     onError: (e: Error) => {
       setConfirm(false);

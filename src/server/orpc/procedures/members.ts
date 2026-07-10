@@ -324,6 +324,11 @@ const OnboardSepa = v.object({
 
 export const membersRouter = {
   list: authedProc.input(ListInput).handler(async ({ context, input }) => {
+    if (input.deletedOnly && context.role === "readonly") {
+      throw new ORPCError("FORBIDDEN", {
+        message: "Der Papierkorb ist nur für den Vorstand sichtbar.",
+      });
+    }
     const cacheKey = searchCacheKey(context.tenant.key, input);
     const cached = await getCached<{ rows: unknown[]; total: number }>(cacheKey);
     if (cached) return cached;
@@ -542,6 +547,9 @@ export const membersRouter = {
         }
       }
       if (!m) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+      if (m.deletedAt && context.role === "readonly") {
+        throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+      }
 
       const [abteilungen, vertraege, sepa, anhaenge, audit, beziehungen, sollstellungen] =
         await Promise.all([
@@ -743,6 +751,11 @@ export const membersRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
+      if (input.includeDeleted && context.role === "readonly") {
+        throw new ORPCError("FORBIDDEN", {
+          message: "Gelöschte Mitglieder dürfen nur vom Vorstand exportiert werden.",
+        });
+      }
       const conditions = [] as ReturnType<typeof eq>[];
       if (!input.includeDeleted) conditions.push(memberNotDeleted() as never);
       if (input.cursor) conditions.push(sql`${membersTable.id} > ${input.cursor}` as never);

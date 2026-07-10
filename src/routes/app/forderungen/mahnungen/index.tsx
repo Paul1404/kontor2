@@ -2,12 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Plus } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
+import { QueryError } from "~/components/ui/query-error";
 import { SkeletonText } from "~/components/ui/skeleton";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
+import { cn } from "~/lib/cn";
 
 export const Route = createFileRoute("/app/forderungen/mahnungen/")({
   component: MahnungenListPage,
@@ -33,10 +35,8 @@ function MahnungenListPage() {
             Erstellte Erinnerungen und Mahnungen. PDFs lassen sich pro Empfänger herunterladen.
           </p>
         </div>
-        <Link to="/app/forderungen/mahnungen/neu">
-          <Button>
-            <Plus className="size-4" /> Neuer Mahnlauf
-          </Button>
+        <Link to="/app/forderungen/mahnungen/neu" className={cn(buttonVariants())}>
+          <Plus className="size-4" /> Neuer Mahnlauf
         </Link>
       </div>
 
@@ -73,6 +73,8 @@ function MahnungenListPage() {
         <CardContent>
           {list.isLoading ? (
             <SkeletonText lines={5} className="max-w-md" />
+          ) : list.isError ? (
+            <QueryError error={list.error} onRetry={() => list.refetch()} />
           ) : !list.data || list.data.rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">Bisher keine Mahnläufe erstellt.</p>
           ) : (
@@ -95,10 +97,12 @@ function MahnungenListPage() {
                       {formatCurrency(r.totalFees)} · Frist {formatDate(r.dueDate)}
                     </p>
                   </div>
-                  <Link to="/app/forderungen/mahnungen/$id" params={{ id: r.id }}>
-                    <Button variant="ghost" size="sm">
-                      Details
-                    </Button>
+                  <Link
+                    to="/app/forderungen/mahnungen/$id"
+                    params={{ id: r.id }}
+                    className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                  >
+                    Details
                   </Link>
                 </li>
               ))}

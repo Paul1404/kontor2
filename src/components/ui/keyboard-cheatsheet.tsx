@@ -1,5 +1,6 @@
 import { Keyboard, X } from "lucide-react";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useRef } from "react";
+import { useModalFocus } from "~/lib/modal-focus";
 
 type Shortcut = { keys: string[]; label: string; needsRole?: Array<"vorstand" | "admin"> };
 
@@ -52,14 +53,14 @@ export function KeyboardCheatsheet({
   onOpenChange: (open: boolean) => void;
   role: string;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useModalFocus({
+    open,
+    containerRef: dialogRef,
+    initialFocusRef: closeRef,
+    onEscape: () => onOpenChange(false),
+  });
 
   if (!open) return null;
 
@@ -74,13 +75,14 @@ export function KeyboardCheatsheet({
         if (e.target === e.currentTarget) onOpenChange(false);
       }}
     >
-      <div className="motion-zoom-in flex w-full max-w-lg flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-card">
+      <div ref={dialogRef} tabIndex={-1} className="motion-zoom-in flex w-full max-w-lg flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-card">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
             <Keyboard className="size-4 text-primary" />
             <h2 className="text-base font-semibold tracking-tight">Tastaturkürzel</h2>
           </div>
           <button
+            ref={closeRef}
             type="button"
             onClick={() => onOpenChange(false)}
             className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"

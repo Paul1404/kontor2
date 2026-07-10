@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -119,6 +120,16 @@ export async function getObject(key: string): Promise<Buffer> {
   const bytes = await res.Body?.transformToByteArray();
   if (!bytes) throw new Error(`empty object: ${key}`);
   return Buffer.from(bytes);
+}
+
+export async function headObject(
+  key: string,
+): Promise<{ contentLength: number; contentType: string | null }> {
+  const res = await s3Client().send(new HeadObjectCommand({ Bucket: bucket(), Key: key }));
+  return {
+    contentLength: res.ContentLength ?? 0,
+    contentType: res.ContentType?.split(";", 1)[0]?.trim() ?? null,
+  };
 }
 
 export async function deleteObject(key: string): Promise<void> {

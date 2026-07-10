@@ -140,7 +140,7 @@ export const membershipApplicationsTable = pgTable(
   ],
 );
 
-export const antragTokenPurposeEnum = pgEnum("antrag_token_purpose", ["upload"]);
+export const antragTokenPurposeEnum = pgEnum("antrag_token_purpose", ["upload", "status"]);
 
 /**
  * One-shot, hashed token granting a public action on an application without a

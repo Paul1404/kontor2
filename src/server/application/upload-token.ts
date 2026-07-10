@@ -24,6 +24,26 @@ export function buildUploadUrl(baseUrl: string, token: string): string {
   return `${baseUrl.replace(/\/+$/, "")}/antrag/upload/${token}`;
 }
 
+export function buildStatusUrl(baseUrl: string, applicationNumber: string, token: string): string {
+  const params = new URLSearchParams({ nr: applicationNumber, token });
+  return `${baseUrl.replace(/\/+$/, "")}/antrag/status?${params.toString()}`;
+}
+
+export async function issueStatusToken(
+  db: DBOrTx,
+  opts: { applicationId: string; ttlDays?: number },
+): Promise<{ rawToken: string; expiresAt: Date }> {
+  const rawToken = randomToken(32);
+  const expiresAt = new Date(Date.now() + (opts.ttlDays ?? DEFAULT_TTL_DAYS) * 24 * 60 * 60 * 1000);
+  await db.insert(membershipApplicationTokensTable).values({
+    applicationId: opts.applicationId,
+    tokenHash: sha256(rawToken),
+    purpose: "status",
+    expiresAt,
+  });
+  return { rawToken, expiresAt };
+}
+
 /**
  * Issue a single-use, hashed token granting the "return the signed paper form"
  * upload for one application. Returns the raw token (never stored) to embed in
@@ -52,6 +72,7 @@ export async function issueUploadToken(
 export async function consumeUploadToken(
   db: DB,
   rawToken: string,
+  register?: (tx: DBOrTx, applicationId: string) => Promise<void>,
 ): Promise<{ applicationId: string } | null> {
   const hash = sha256(rawToken);
   return await db.transaction(async (tx) => {
@@ -61,6 +82,7 @@ export async function consumeUploadToken(
       .where(
         and(
           eq(membershipApplicationTokensTable.tokenHash, hash),
+          eq(membershipApplicationTokensTable.purpose, "upload"),
           gt(membershipApplicationTokensTable.expiresAt, new Date()),
           isNull(membershipApplicationTokensTable.consumedAt),
         ),
@@ -81,6 +103,10 @@ export async function consumeUploadToken(
       .returning({ id: membershipApplicationTokensTable.id });
     if (claimed.length === 0) return null;
 
+    // File-row registration and the workflow status transition must commit with
+    // the one-shot claim. If either fails, the token remains reusable.
+    await register?.(tx, token.applicationId);
+
     return { applicationId: token.applicationId };
   });
 }
@@ -100,8 +126,29 @@ export async function peekUploadToken(
     .where(
       and(
         eq(membershipApplicationTokensTable.tokenHash, hash),
+        eq(membershipApplicationTokensTable.purpose, "upload"),
         gt(membershipApplicationTokensTable.expiresAt, new Date()),
         isNull(membershipApplicationTokensTable.consumedAt),
+      ),
+    )
+    .limit(1);
+  return token ?? null;
+}
+
+/** Resolve a reusable bearer token for the public application-status page. */
+export async function peekStatusToken(
+  db: DBOrTx,
+  rawToken: string,
+): Promise<{ applicationId: string } | null> {
+  const hash = sha256(rawToken);
+  const [token] = await db
+    .select({ applicationId: membershipApplicationTokensTable.applicationId })
+    .from(membershipApplicationTokensTable)
+    .where(
+      and(
+        eq(membershipApplicationTokensTable.tokenHash, hash),
+        eq(membershipApplicationTokensTable.purpose, "status"),
+        gt(membershipApplicationTokensTable.expiresAt, new Date()),
       ),
     )
     .limit(1);

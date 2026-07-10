@@ -46,6 +46,7 @@ export function AustrittDialog({
   onLeft: (austrittDatum: string) => void;
 }) {
   const [austrittDatum, setAustrittDatum] = useState(today);
+  const [dateValid, setDateValid] = useState(true);
   const [revokeSepa, setRevokeSepa] = useState(true);
 
   const openAbteilungen = useMemo(
@@ -100,6 +101,7 @@ export function AustrittDialog({
       confirmLabel="Austritt eintragen"
       cancelLabel="Abbrechen"
       loading={mut.isPending}
+      confirmDisabled={!dateValid}
       onConfirm={() => mut.mutate()}
     >
       <div className="flex flex-col gap-4">
@@ -109,6 +111,7 @@ export function AustrittDialog({
             id="austritt-datum"
             value={austrittDatum}
             onChange={(v) => setAustrittDatum(v)}
+            onValidityChange={setDateValid}
             className="max-w-44"
           />
         </div>

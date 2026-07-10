@@ -14,7 +14,8 @@ import { logger } from "~/server/lib/logger";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { adminProc, authedProc, publicProc } from "~/server/orpc/base";
 import { rateLimit } from "~/server/redis/client";
-import { isOperatorTenant } from "~/server/tenants/resolve";
+import { requestHost } from "~/server/tenants/request-host";
+import { isOperatorTenant, setupAllowedForHost } from "~/server/tenants/resolve";
 
 /**
  * Throttle an unauthenticated, token-bearing endpoint by client IP. These
@@ -50,6 +51,9 @@ export const authRouter = {
    * returns `false` once any user exists.
    */
   setupStatus: publicProc.input(v.void()).handler(async ({ context }) => {
+    if (!setupAllowedForHost(requestHost(context.headers), context.tenant)) {
+      return { needsSetup: false };
+    }
     return { needsSetup: await isInSetupMode(context.tenant) };
   }),
 
@@ -69,6 +73,9 @@ export const authRouter = {
     )
     .handler(async ({ context, input }) => {
       await throttle(context.headers, "setup", 10);
+      if (!setupAllowedForHost(requestHost(context.headers), context.tenant)) {
+        throw new ORPCError("NOT_FOUND", { message: "Setup ist für diesen Host nicht verfügbar." });
+      }
       const result = await completeSetup(context.tenant, input);
       if (!result.ok) {
         if (result.reason === "already_initialized") {

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
@@ -92,8 +92,8 @@ function NewFeeRunPage() {
             Bevor ein Beitragslauf erzeugt werden kann, müssen Gläubiger-ID, Vereins-IBAN und BIC
             gepflegt sein.
           </p>
-          <Link to="/app/einstellungen/verein">
-            <Button>Zu den Vereinsdaten</Button>
+          <Link to="/app/einstellungen/verein" className={buttonVariants()}>
+            Zu den Vereinsdaten
           </Link>
         </CardContent>
       </Card>
@@ -687,11 +687,15 @@ function DoneStep({
               <Download className="size-4" /> pain.008 herunterladen
             </Button>
           ) : null}
-          <Link to="/app/beitrag/$id" params={{ id: result.feeRunId }}>
-            <Button variant="outline">Zum Lauf</Button>
+          <Link
+            to="/app/beitrag/$id"
+            params={{ id: result.feeRunId }}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Zum Lauf
           </Link>
-          <Link to="/app/beitrag">
-            <Button variant="ghost">Übersicht</Button>
+          <Link to="/app/beitrag" className={buttonVariants({ variant: "ghost" })}>
+            Übersicht
           </Link>
         </div>
       </CardContent>

@@ -41,6 +41,7 @@ function systemPref(): ResolvedTheme {
 function applyToDocument(resolved: ResolvedTheme): void {
   const root = document.documentElement;
   root.classList.toggle("dark", resolved === "dark");
+  root.style.colorScheme = resolved;
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

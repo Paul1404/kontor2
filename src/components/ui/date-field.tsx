@@ -21,6 +21,8 @@ type DateFieldProps = {
   max?: string;
   placeholder?: string;
   "aria-label"?: string;
+  /** Reports whether the visible draft can safely be submitted. */
+  onValidityChange?: (valid: boolean) => void;
 };
 
 /** ISO YYYY-MM-DD -> a local Date at midnight (calendar date preserved). */
@@ -54,12 +56,30 @@ export function DateField({
   max,
   placeholder = "TT.MM.JJJJ",
   "aria-label": ariaLabel,
+  onValidityChange,
 }: DateFieldProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => formatDateInput(value));
   const wrapRef = useRef<HTMLDivElement>(null);
   const reactId = useId();
   const inputId = id ?? reactId;
+  const errorId = `${inputId}-error`;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const validate = (parsed: string | null): string | null => {
+    if (parsed === null) return "Bitte ein gültiges Datum im Format TT.MM.JJJJ eingeben.";
+    if (parsed === "") return required ? "Bitte ein Datum eingeben." : null;
+    if (min && parsed < min) return `Das Datum darf nicht vor ${formatDateInput(min)} liegen.`;
+    if (max && parsed > max) return `Das Datum darf nicht nach ${formatDateInput(max)} liegen.`;
+    return null;
+  };
+
+  const setValidity = (message: string | null) => {
+    setValidationError(message);
+    inputRef.current?.setCustomValidity(message ?? "");
+    onValidityChange?.(!message);
+  };
 
   // Resync the visible text when the controlled value changes from outside (form
   // load, reset, calendar pick). Skip while the user is mid-typing a string that
@@ -67,6 +87,7 @@ export function DateField({
   // biome-ignore lint/correctness/useExhaustiveDependencies: draft is read but intentionally not a trigger.
   useEffect(() => {
     if (parseDateInput(draft) !== value) setDraft(formatDateInput(value));
+    setValidity(null);
   }, [value]);
 
   // Close the popover on outside pointer or Escape.
@@ -89,18 +110,16 @@ export function DateField({
   const handleText = (text: string) => {
     setDraft(text);
     const parsed = parseDateInput(text);
-    // Empty -> clear. A valid date -> commit. null means "still typing or not a
-    // real date"; leave the stored value untouched until blur.
-    if (parsed === "") onChange("");
-    else if (parsed !== null) onChange(parsed);
+    const message = validate(parsed);
+    setValidity(message);
+    if (!message && parsed !== null) onChange(parsed);
   };
 
   const handleBlur = () => {
     const parsed = parseDateInput(draft);
-    if (parsed === null) {
-      // Unparseable: revert the text to the last good value.
-      setDraft(formatDateInput(value));
-    } else {
+    const message = validate(parsed);
+    setValidity(message);
+    if (!message && parsed !== null) {
       setDraft(formatDateInput(parsed));
     }
   };
@@ -115,11 +134,14 @@ export function DateField({
   return (
     <div ref={wrapRef} className="relative">
       <Input
+        ref={inputRef}
         id={inputId}
         type="text"
         inputMode="numeric"
         autoComplete="off"
         aria-label={ariaLabel}
+        aria-invalid={Boolean(validationError)}
+        aria-describedby={validationError ? errorId : undefined}
         required={required}
         disabled={disabled}
         placeholder={placeholder}
@@ -154,11 +176,17 @@ export function DateField({
                 const iso = dateToIso(d);
                 onChange(iso);
                 setDraft(formatDateInput(iso));
+                setValidity(null);
               }
               setOpen(false);
             }}
           />
         </div>
+      ) : null}
+      {validationError ? (
+        <p id={errorId} role="alert" className="mt-1 text-xs text-destructive">
+          {validationError}
+        </p>
       ) : null}
     </div>
   );

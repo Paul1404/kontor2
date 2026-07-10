@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Inbox, KeyRound, Pencil, ShieldCheck } from "lucide-react";
-import { Button } from "~/components/ui/button";
+import { buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { SkeletonText } from "~/components/ui/skeleton";
+import { QueryError } from "~/components/ui/query-error";
+import { cn } from "~/lib/cn";
 import { EMPTY_VALUE, formatDate, formatPhone } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
@@ -21,6 +23,9 @@ function PortalHome() {
 
   if (me.isLoading) {
     return <SkeletonText lines={5} className="max-w-md" />;
+  }
+  if (me.isError) {
+    return <QueryError error={me.error} onRetry={() => me.refetch()} />;
   }
   if (!me.data?.member) {
     return <NotSignedIn />;
@@ -93,10 +98,8 @@ function PortalHome() {
             </p>
           </div>
         </div>
-        <Link to="/portal/profil">
-          <Button>
-            <Pencil className="size-4" /> Daten bearbeiten
-          </Button>
+        <Link to="/portal/profil" className={cn(buttonVariants())}>
+          <Pencil className="size-4" /> Daten bearbeiten
         </Link>
       </div>
 

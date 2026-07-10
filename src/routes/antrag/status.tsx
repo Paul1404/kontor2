@@ -1,27 +1,17 @@
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, useSearch } from "@tanstack/react-router";
-import {
-  Check,
-  CheckCircle2,
-  Clock,
-  FileCheck,
-  Inbox,
-  Loader2,
-  Search,
-  XCircle,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import { Button } from "~/components/ui/button";
+import { Check, CheckCircle2, Clock, FileCheck, Inbox, Loader2, XCircle } from "lucide-react";
+import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/cn";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/antrag/status")({
   component: StatusPage,
-  validateSearch: (s: Record<string, unknown>): { nr?: string } => ({
+  validateSearch: (s: Record<string, unknown>): { nr?: string; token?: string } => ({
     nr: typeof s.nr === "string" ? s.nr : undefined,
+    token: typeof s.token === "string" ? s.token : undefined,
   }),
 });
 
@@ -52,19 +42,19 @@ const STAGE_INDEX: Record<string, number> = {
 };
 
 function StatusPage() {
-  const { nr } = useSearch({ from: "/antrag/status" });
-  const [query, setQuery] = useState(nr ?? "");
+  const { nr, token } = useSearch({ from: "/antrag/status" });
 
   const lookup = useMutation({
-    mutationFn: (antragsnummer: string) => orpc.applications.lookupStatus({ antragsnummer }),
+    mutationFn: ({ antragsnummer, bearer }: { antragsnummer: string; bearer: string }) =>
+      orpc.applications.lookupStatus({ antragsnummer, token: bearer }),
   });
 
   // Auto-run the lookup when arriving with ?nr=ANT-... The mutation handle is
   // stable; we intentionally only react to the URL parameter changing.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run on nr change only
   useEffect(() => {
-    if (nr) lookup.mutate(nr);
-  }, [nr]);
+    if (nr && token) lookup.mutate({ antragsnummer: nr, bearer: token });
+  }, [nr, token]);
 
   const data = lookup.data;
   const declined = data?.status === "abgelehnt";
@@ -75,33 +65,20 @@ function StatusPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Antragsstatus</h1>
         <p className="text-sm text-muted-foreground">
-          Geben Sie Ihre Antragsnummer ein, um den aktuellen Stand zu sehen. Sie finden die Nummer
-          in Ihrer Bestätigungs-E-Mail (Format ANT-JJJJ-XXXX).
+          Dieser geschützte Link zeigt den aktuellen Stand Ihres Aufnahmeantrags.
         </p>
       </div>
 
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (query.trim()) lookup.mutate(query.trim());
-        }}
-      >
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="ANT-2026-0001"
-          aria-label="Antragsnummer"
-        />
-        <Button type="submit" disabled={lookup.isPending || !query.trim()}>
-          {lookup.isPending ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Search className="size-4" />
-          )}
-          Suchen
-        </Button>
-      </form>
+      {!nr || !token ? (
+        <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+          Der Status-Link ist unvollständig. Öffnen Sie bitte den Link aus Ihrer Bestätigungs-E-Mail
+          oder wenden Sie sich an den Verein.
+        </p>
+      ) : lookup.isPending ? (
+        <div className="flex justify-center py-6 text-muted-foreground">
+          <Loader2 className="size-5 animate-spin" />
+        </div>
+      ) : null}
 
       {lookup.isError ? (
         <p className="text-sm text-destructive">

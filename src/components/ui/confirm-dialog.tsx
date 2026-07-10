@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/cn";
+import { useModalFocus } from "~/lib/modal-focus";
 
 export function ConfirmDialog({
   open,
@@ -13,6 +14,7 @@ export function ConfirmDialog({
   cancelLabel = "Abbrechen",
   destructive = false,
   loading = false,
+  confirmDisabled = false,
   children,
   onConfirm,
 }: {
@@ -24,27 +26,50 @@ export function ConfirmDialog({
   cancelLabel?: string;
   destructive?: boolean;
   loading?: boolean;
+  confirmDisabled?: boolean;
   children?: ReactNode;
   onConfirm: () => void;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onOpenChange(false);
+      if (e.key === "Escape" && !loading) {
+        e.preventDefault();
+        onOpenChange(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0]!;
+      const last = focusable.at(-1)!;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
     window.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    // Autofocus the confirm button so Enter / Space submits and the focus
-    // ring lands on the action the user is about to take.
-    const t = window.setTimeout(() => confirmRef.current?.focus(), 0);
+    const t = window.setTimeout(() => cancelRef.current?.focus(), 0);
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
       window.clearTimeout(t);
+      opener?.focus();
     };
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, loading]);
 
   if (!open) return null;
 
@@ -59,7 +84,10 @@ export function ConfirmDialog({
         if (e.target === e.currentTarget) onOpenChange(false);
       }}
     >
-      <div className="motion-zoom-in flex w-full max-w-xl flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-card">
+      <div
+        ref={dialogRef}
+        className="motion-zoom-in flex w-full max-w-xl flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-card"
+      >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div
@@ -94,6 +122,7 @@ export function ConfirmDialog({
         ) : null}
         <div className="flex justify-end gap-2">
           <Button
+            ref={cancelRef}
             type="button"
             variant="ghost"
             onClick={() => onOpenChange(false)}
@@ -106,7 +135,7 @@ export function ConfirmDialog({
             type="button"
             variant={destructive ? "destructive" : "default"}
             onClick={onConfirm}
-            disabled={loading}
+            disabled={loading || confirmDisabled}
           >
             {loading ? <Loader2 className="size-4 animate-spin" /> : null}
             {confirmLabel}
@@ -151,23 +180,20 @@ export function TypeToConfirmDialog({
   const [typed, setTyped] = useState("");
   const [typedAgain, setTypedAgain] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocus({
+    open,
+    containerRef: dialogRef,
+    initialFocusRef: inputRef,
+    onEscape: () => {
+      if (!loading) onOpenChange(false);
+    },
+  });
   useEffect(() => {
     if (!open) return;
     setTyped("");
     setTypedAgain("");
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !loading) onOpenChange(false);
-    }
-    window.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const t = window.setTimeout(() => inputRef.current?.focus(), 0);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-      window.clearTimeout(t);
-    };
-  }, [open, onOpenChange, loading]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -186,7 +212,7 @@ export function TypeToConfirmDialog({
         if (e.target === e.currentTarget && !loading) onOpenChange(false);
       }}
     >
-      <div className="motion-zoom-in flex w-full max-w-xl flex-col gap-4 rounded-xl border border-destructive/40 bg-card p-6 shadow-elevated">
+      <div ref={dialogRef} tabIndex={-1} className="motion-zoom-in flex w-full max-w-xl flex-col gap-4 rounded-xl border border-destructive/40 bg-card p-6 shadow-elevated">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">

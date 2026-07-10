@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
 import { LogOut } from "lucide-react";
+import { useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { signOut } from "~/lib/auth-client";
 import { orpc } from "~/lib/orpc";
@@ -27,7 +34,18 @@ export const Route = createFileRoute("/console")({
 });
 
 function ConsoleLayout() {
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const me = useQuery({ queryKey: ["me"], queryFn: () => orpc.auth.me(), retry: 1 });
+
+  useEffect(() => {
+    if (me.isError) {
+      navigate({ to: "/login", search: { expired: true, redirect: pathname } });
+    }
+  }, [me.isError, navigate, pathname]);
+
+  if (me.isError) return null;
+
   return (
     <div className="min-h-screen bg-muted/30">
       <header className="border-b bg-background">

@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { eq, inArray } from "drizzle-orm";
 import * as v from "valibot";
+import { decodeBase64Upload, MIB, maxBase64Length } from "~/server/application/upload-bytes";
 import { membersTable } from "~/server/db/schema/members";
 import { memberSnapshotsTable, snapshotRunsTable } from "~/server/db/schema/snapshots";
 import { runIngest } from "~/server/importer/ingest-pipeline";
@@ -10,7 +11,8 @@ import { parseDump, rowToDict } from "~/server/importer/sql-tokenizer";
 import { adminProc } from "~/server/orpc/base";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
-const MAX_BYTES = 50 * 1024 * 1024;
+const MAX_BYTES = 50 * MIB;
+const MAX_MESSAGE = `Datei zu groß. Maximum: ${MAX_BYTES / MIB} MB.`;
 
 export const importRouter = {
   /** Live progress for an in-flight import, keyed by the token the client
@@ -35,7 +37,7 @@ export const importRouter = {
     .input(
       v.object({
         filename: v.string(),
-        contentBase64: v.pipe(v.string(), v.minLength(1)),
+        contentBase64: v.pipe(v.string(), v.minLength(1), v.maxLength(maxBase64Length(MAX_BYTES))),
         forceOverwriteAbteilungLinks: v.optional(v.boolean(), false),
         /** Opaque token the client also polls `import.progress` with. */
         progressToken: v.optional(v.string()),
@@ -43,15 +45,7 @@ export const importRouter = {
     )
     .handler(async ({ context, input }) => {
       const reporter = createProgressReporter(context.tenant.key, input.progressToken);
-      const buf = Buffer.from(input.contentBase64, "base64");
-      if (buf.length === 0) {
-        throw new ORPCError("BAD_REQUEST", { message: "Leere Datei." });
-      }
-      if (buf.length > MAX_BYTES) {
-        throw new ORPCError("PAYLOAD_TOO_LARGE", {
-          message: `Datei zu groß. Maximum: ${MAX_BYTES / 1024 / 1024} MB.`,
-        });
-      }
+      const buf = decodeBase64Upload(input.contentBase64, MAX_BYTES, MAX_MESSAGE);
       const text = buf.toString("utf8");
       if (!/CREATE TABLE|INSERT INTO/i.test(text)) {
         throw new ORPCError("BAD_REQUEST", { message: "Keine SQL-Befehle erkannt." });

@@ -95,7 +95,7 @@ function RootDocument({
 }): ReactNode {
   const brandCss = brandColorCss(branding?.primaryColor);
   return (
-    <html lang="de" className="h-full">
+    <html lang="de" className="h-full" suppressHydrationWarning>
       <head>
         {/* Titel, theme-color, Favicons, Manifest kommen aus head() via HeadContent. */}
         <HeadContent />

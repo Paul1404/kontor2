@@ -29,10 +29,11 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { VersionChip } from "~/components/ui/version-chip";
 import { useBranding } from "~/lib/branding";
 import { cn } from "~/lib/cn";
+import { useModalFocus } from "~/lib/modal-focus";
 import { orpc } from "~/lib/orpc";
 import { roleLabel } from "~/lib/role";
 import { useRecentMembers } from "~/lib/use-recent-members";
@@ -402,52 +403,26 @@ export function MobileSidebar({
   open: boolean;
   onClose: () => void;
 }) {
-  // Lock body scroll while the drawer is open so the underlying page
-  // doesn't move when the user scrolls the nav.
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  const dialogRef = useRef<HTMLElement>(null);
+  useModalFocus({ open, containerRef: dialogRef, onEscape: onClose });
 
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  // Do not leave dozens of off-screen links in the tab order while closed.
+  if (!open) return null;
 
   return (
-    <div
-      className={cn(
-        "fixed inset-0 z-50 md:hidden print:hidden",
-        open ? "pointer-events-auto" : "pointer-events-none",
-      )}
-      aria-hidden={!open}
-    >
+    <div className="fixed inset-0 z-50 md:hidden print:hidden">
       <button
         type="button"
         aria-label="Menü schließen"
-        tabIndex={open ? 0 : -1}
         onClick={onClose}
-        className={cn(
-          "absolute inset-0 bg-black/50 transition-opacity",
-          open ? "opacity-100" : "opacity-0",
-        )}
+        className="absolute inset-0 bg-black/50"
       />
       <aside
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Hauptmenü"
-        className={cn(
-          "absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-elevated transition-transform duration-200 ease-out",
-          open ? "translate-x-0" : "-translate-x-full",
-        )}
+        className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-elevated"
       >
         <SidebarBody role={role} showCloseButton onClose={onClose} onNavigate={onClose} />
       </aside>

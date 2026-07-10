@@ -25,6 +25,7 @@ export function SignaturePad({
   // an inline drawing stays on the canvas itself.
   const [preview, setPreview] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const redrawAfterResize = useRef<string | null>(null);
 
   // Keep the canvas backing resolution in sync with its CSS width so strokes
   // land under the pointer on every screen size.
@@ -33,11 +34,33 @@ export function SignaturePad({
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       const w = Math.floor(entries[0]?.contentRect.width ?? 0);
-      if (w > 0) setWidth(w);
+      if (w > 0 && w !== width) {
+        const canvas = canvasRef.current;
+        redrawAfterResize.current = dirty.current && canvas ? canvas.toDataURL("image/png") : value;
+        setWidth(w);
+      }
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [value, width]);
+
+  // Changing a canvas' backing width clears its pixels. Restore the captured
+  // signature after a responsive resize/device rotation so a later stroke does
+  // not silently replace everything drawn before the resize.
+  useEffect(() => {
+    const source = redrawAfterResize.current;
+    const canvas = canvasRef.current;
+    if (!source || !canvas || canvas.width !== width) return;
+    redrawAfterResize.current = null;
+    const image = new Image();
+    image.onload = () => {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    };
+    image.src = source;
+  }, [width]);
 
   const pos = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -65,6 +88,12 @@ export function SignaturePad({
     ctx.lineTo(x, y);
     ctx.stroke();
     dirty.current = true;
+  };
+
+  // Lift the pen without emitting; the fullscreen overlay applies its result
+  // explicitly via "Übernehmen".
+  const end = () => {
+    drawing.current = false;
   };
 
   // Inline drawing: emit the canvas as-is once the stroke ends.
@@ -147,6 +176,8 @@ export function SignaturePad({
         <FullscreenSignature
           start={start}
           move={move}
+          end={end}
+          drawing={drawing}
           onClose={() => setFullscreen(false)}
           onApply={(dataUri) => {
             setPreview(dataUri);
@@ -162,11 +193,15 @@ export function SignaturePad({
 function FullscreenSignature({
   start,
   move,
+  end,
+  drawing,
   onApply,
   onClose,
 }: {
   start: (e: React.PointerEvent<HTMLCanvasElement>) => void;
   move: (e: React.PointerEvent<HTMLCanvasElement>) => void;
+  end: () => void;
+  drawing: React.RefObject<boolean>;
   onApply: (dataUri: string) => void;
   onClose: () => void;
 }) {
@@ -219,9 +254,12 @@ function FullscreenSignature({
           height={size.h}
           onPointerDown={start}
           onPointerMove={(e) => {
+            if (drawing.current) touched.current = true;
             move(e);
-            touched.current = true;
           }}
+          onPointerUp={end}
+          onPointerLeave={end}
+          onPointerCancel={end}
           className="size-full touch-none rounded-lg border border-input bg-white"
         />
       </div>

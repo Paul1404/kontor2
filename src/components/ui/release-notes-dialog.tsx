@@ -1,5 +1,5 @@
 import { Sparkles, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
@@ -9,6 +9,7 @@ import {
   type ReleaseCategory,
   writeLastSeenVersion,
 } from "~/lib/release-notes";
+import { useModalFocus } from "~/lib/modal-focus";
 
 export function ReleaseNotesDialog({
   open,
@@ -17,16 +18,14 @@ export function ReleaseNotesDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  // Body-scroll lock while open. Matches KeyboardCheatsheet so the dialog
-  // chrome behaves consistently.
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useModalFocus({
+    open,
+    containerRef: dialogRef,
+    initialFocusRef: closeRef,
+    onEscape: () => onOpenChange(false),
+  });
 
   // Acknowledging happens on open, not on close — opening is intent enough.
   // Re-runs whenever a fresh release arrives.
@@ -34,15 +33,6 @@ export function ReleaseNotesDialog({
     if (!open) return;
     if (RELEASES[0]) writeLastSeenVersion(RELEASES[0].version);
   }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onOpenChange(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onOpenChange]);
 
   if (!open) return null;
 
@@ -57,7 +47,7 @@ export function ReleaseNotesDialog({
         if (e.target === e.currentTarget) onOpenChange(false);
       }}
     >
-      <div className="motion-zoom-in flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-border bg-card text-card-foreground shadow-card">
+      <div ref={dialogRef} tabIndex={-1} className="motion-zoom-in flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-border bg-card text-card-foreground shadow-card">
         <div className="flex items-start justify-between border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <Sparkles className="size-4 text-primary" />
@@ -70,6 +60,7 @@ export function ReleaseNotesDialog({
             </div>
           </div>
           <button
+            ref={closeRef}
             type="button"
             onClick={() => onOpenChange(false)}
             className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"

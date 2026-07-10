@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "sepa_returns_imported_posting_uk" ON "sepa_returns" USING btree ("soll_stellung_id") WHERE "sepa_returns"."fee_run_item_id" is null and "sepa_returns"."soll_stellung_id" is not null;

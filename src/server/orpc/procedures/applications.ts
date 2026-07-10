@@ -1,10 +1,11 @@
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { ORPCError } from "@orpc/server";
-import { and, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { unzipSync } from "fflate";
 import * as v from "valibot";
 import {
@@ -24,9 +25,12 @@ import {
   maxBase64Length,
 } from "~/server/application/upload-bytes";
 import {
+  buildStatusUrl,
   buildUploadUrl,
   consumeUploadToken,
+  issueStatusToken,
   issueUploadToken,
+  peekStatusToken,
   peekUploadToken,
 } from "~/server/application/upload-token";
 import { appendAudit } from "~/server/audit/log";
@@ -103,6 +107,7 @@ const MAX_SIGNED_UPLOAD_BYTES = 10 * MIB;
 const MAX_ADMIN_UPLOAD_BYTES = 20 * MIB;
 const MAX_IMPORT_JSON_BYTES = 20 * MIB;
 const MAX_IMPORT_ZIP_BYTES = 100 * MIB;
+const MAX_SVUMS_DOCUMENT_BYTES = 25 * MIB;
 
 const ANRede = v.picklist(["Herr", "Frau", "keine Angabe"]);
 const ISODate = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
@@ -168,8 +173,8 @@ function baseUrl(tenant: Tenant): string {
   return authBaseUrl(tenant).replace(/\/+$/, "");
 }
 
-function statusUrlFor(tenant: Tenant, antragsnummer: string): string {
-  return `${baseUrl(tenant)}/antrag/status?nr=${encodeURIComponent(antragsnummer)}`;
+function statusUrlFor(tenant: Tenant, antragsnummer: string, token: string): string {
+  return buildStatusUrl(baseUrl(tenant), antragsnummer, token);
 }
 
 /** Numeric suffix of an ANT-YYYY-NNNN reference, for the Mandatsreferenz. */
@@ -189,6 +194,31 @@ function parseDataUri(uri: string): { mime: string; body: Buffer } | null {
   const m = /^data:([^;]+);base64,(.+)$/s.exec(uri);
   if (!m) return null;
   return { mime: m[1]!, body: Buffer.from(m[2]!, "base64") };
+}
+
+async function readResponseBytesLimited(res: Response, maxBytes: number): Promise<Buffer | null> {
+  const declaredLength = Number(res.headers.get("content-length") ?? "");
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) return null;
+  if (!res.body) {
+    const bytes = Buffer.from(await res.arrayBuffer());
+    return bytes.byteLength > maxBytes ? null : bytes;
+  }
+
+  const reader = res.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) return null;
+      chunks.push(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks, total);
 }
 
 async function extractTextBestEffort(opts: {
@@ -883,18 +913,38 @@ async function approveByLinking(
       member.mitgliedsnummer ??
       `A${member.adrNr}`) as string;
 
-    // Contract only when the member has none and the reviewer picked a Beitragsart.
+    // Contract only when the member has no currently billable contract and the
+    // reviewer picked a Beitragsart. Historical contracts may keep vertrag_ende
+    // null while gekuend_zum closes them for billing.
+    const now = new Date();
     const existingContract = await tx
       .select({ id: contractsTable.id })
       .from(contractsTable)
-      .where(and(eq(contractsTable.memberId, member.id), isNull(contractsTable.vertragEnde)))
+      .where(
+        and(
+          eq(contractsTable.memberId, member.id),
+          or(isNull(contractsTable.vertragEnde), gt(contractsTable.vertragEnde, now)),
+          or(isNull(contractsTable.gekuendZum), gt(contractsTable.gekuendZum, now)),
+        ),
+      )
       .limit(1);
     if (existingContract.length === 0 && opts.art != null) {
+      const existingNumbers = await tx
+        .select({ vertragNr: contractsTable.vertragNr })
+        .from(contractsTable)
+        .where(eq(contractsTable.adrNr, member.adrNr));
+      const nextVertragNr =
+        Math.max(
+          0,
+          ...existingNumbers
+            .map((r) => Number.parseInt(r.vertragNr, 10))
+            .filter((n) => Number.isFinite(n)),
+        ) + 1;
       await tx.insert(contractsTable).values({
         memberId: member.id,
         adrNr: member.adrNr,
         mitglNr: ref,
-        vertragNr: "1",
+        vertragNr: String(nextVertragNr),
         art: opts.art,
         betrag: opts.betrag ?? app.jahresbeitrag ?? null,
         vertragBegin: new Date(),
@@ -924,6 +974,18 @@ async function approveByLinking(
     // Abteilungen: additive.
     let abtAdded = 0;
     for (const abteilungId of app.abteilungen ?? []) {
+      const active = await tx
+        .select({ memberId: memberAbteilungenTable.memberId })
+        .from(memberAbteilungenTable)
+        .where(
+          and(
+            eq(memberAbteilungenTable.memberId, member.id),
+            eq(memberAbteilungenTable.abteilungId, abteilungId),
+            isNull(memberAbteilungenTable.austrittsdatum),
+          ),
+        )
+        .limit(1);
+      if (active.length > 0) continue;
       const r = await tx
         .insert(memberAbteilungenTable)
         .values({ memberId: member.id, abteilungId, eintrittsdatum: today })
@@ -1215,9 +1277,14 @@ export const applicationsRouter = {
       return { candidates };
     }),
 
-  /** Public status lookup by Antragsnummer; returns only status, no PII. */
+  /** Public status lookup by an application-scoped bearer token. */
   lookupStatus: publicProc
-    .input(v.object({ antragsnummer: v.string() }))
+    .input(
+      v.object({
+        antragsnummer: v.string(),
+        token: v.pipe(v.string(), v.minLength(32), v.maxLength(128)),
+      }),
+    )
     .handler(async ({ context, input }) => {
       // Throttle per IP: the Antragsnummer is a low-entropy reference
       // (ANT-YYYY-NNNN), so without a limit the status of every application
@@ -1233,6 +1300,8 @@ export const applicationsRouter = {
           message: "Zu viele Anfragen. Bitte versuchen Sie es in einigen Minuten erneut.",
         });
       }
+      const grant = await peekStatusToken(context.db, input.token);
+      if (!grant) throw new ORPCError("NOT_FOUND", { message: "Status-Link ungültig." });
       const [row] = await context.db
         .select({
           antragsnummer: membershipApplicationsTable.antragsnummer,
@@ -1242,7 +1311,10 @@ export const applicationsRouter = {
         })
         .from(membershipApplicationsTable)
         .where(
-          eq(membershipApplicationsTable.antragsnummer, input.antragsnummer.trim().toUpperCase()),
+          and(
+            eq(membershipApplicationsTable.id, grant.applicationId),
+            eq(membershipApplicationsTable.antragsnummer, input.antragsnummer.trim().toUpperCase()),
+          ),
         )
         .limit(1);
       if (!row) throw new ORPCError("NOT_FOUND", { message: "Antragsnummer nicht gefunden." });
@@ -1406,7 +1478,16 @@ export const applicationsRouter = {
     const geschlecht: "m" | "w" | "unbekannt" | null = input.geschlecht
       ? (GESCHLECHT_MAP[input.geschlecht] ?? "unbekannt")
       : null;
-    const hasSignature = Boolean(input.unterschriftBase64);
+    const signature = input.unterschriftBase64 ? parseDataUri(input.unterschriftBase64) : null;
+    if (
+      input.unterschriftBase64 &&
+      (!signature ||
+        !["image/png", "image/jpeg"].includes(signature.mime) ||
+        signature.body.byteLength === 0)
+    ) {
+      fail("Die Unterschrift muss ein gültiges PNG- oder JPEG-Bild sein.");
+    }
+    const hasSignature = signature !== null;
 
     // Insert the row (+ mint the reference) atomically. PDF/file/mail happen
     // post-commit and are best-effort so an SMTP/S3 blip never loses an antrag.
@@ -1418,7 +1499,9 @@ export const applicationsRouter = {
         .values({
           antragsnummer,
           antragstyp,
-          status: hasSignature ? "dokument_hochgeladen" : "neu",
+          // Document storage happens after the row commit. Only advance the
+          // workflow once the PDF and its file record are durable.
+          status: "neu",
           source: "online",
           mitgliedschaftTyp: kategorie,
           geschlecht,
@@ -1462,7 +1545,8 @@ export const applicationsRouter = {
           mandatsreferenz: membershipApplicationsTable.mandatsreferenz,
         });
       if (!row) throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
-      return row;
+      const statusToken = await issueStatusToken(tx, { applicationId: row.id });
+      return { ...row, statusToken: statusToken.rawToken };
     });
 
     // Render the Beitrittserklärung PDF, store it, optionally issue an upload
@@ -1530,26 +1614,26 @@ export const applicationsRouter = {
         mimeType: "application/pdf",
         sizeBytes: pdf.byteLength,
       });
+      if (hasSignature) {
+        await context.db
+          .update(membershipApplicationsTable)
+          .set({ status: "dokument_hochgeladen", updatedAt: new Date() })
+          .where(eq(membershipApplicationsTable.id, inserted.id));
+      }
 
       // Keep the raw inline signature on its own so the genehmigte PDF can
       // re-embed it later next to the Vorstands-Gegenzeichnung.
-      if (hasSignature && input.unterschriftBase64) {
-        const sig = parseDataUri(input.unterschriftBase64);
-        // Only store a signature with an allowlisted image mime. The mime comes
-        // from the client's data URI, so a crafted value (e.g. text/html) must
-        // never become the stored object's content-type (served on download).
-        if (sig && (sig.mime === "image/png" || sig.mime === "image/jpeg")) {
-          const sigKey = `applications/${inserted.id}/signature.${sig.mime === "image/jpeg" ? "jpg" : "png"}`;
-          await putObject({ key: sigKey, body: sig.body, contentType: sig.mime });
-          await context.db.insert(membershipApplicationFilesTable).values({
-            applicationId: inserted.id,
-            kind: "signature_image",
-            s3Key: sigKey,
-            filename: `signature-${inserted.antragsnummer}.png`,
-            mimeType: sig.mime,
-            sizeBytes: sig.body.byteLength,
-          });
-        }
+      if (signature) {
+        const sigKey = `applications/${inserted.id}/signature.${signature.mime === "image/jpeg" ? "jpg" : "png"}`;
+        await putObject({ key: sigKey, body: signature.body, contentType: signature.mime });
+        await context.db.insert(membershipApplicationFilesTable).values({
+          applicationId: inserted.id,
+          kind: "signature_image",
+          s3Key: sigKey,
+          filename: `signature-${inserted.antragsnummer}.${signature.mime === "image/jpeg" ? "jpg" : "png"}`,
+          mimeType: signature.mime,
+          sizeBytes: signature.body.byteLength,
+        });
       }
 
       // Paper path (no inline signature): hand out a 30-day upload link.
@@ -1569,7 +1653,7 @@ export const applicationsRouter = {
         clubEmail,
         notifyClub: org.antragBenachrichtigungAktiv,
         antragsnummer: inserted.antragsnummer,
-        statusUrl: statusUrlFor(context.tenant, inserted.antragsnummer),
+        statusUrl: statusUrlFor(context.tenant, inserted.antragsnummer, inserted.statusToken),
         uploadUrl,
         pdf: {
           filename: `Beitrittserklaerung-${inserted.antragsnummer}.pdf`,
@@ -1601,7 +1685,7 @@ export const applicationsRouter = {
 
     return {
       antragsnummer: inserted.antragsnummer,
-      statusUrl: statusUrlFor(context.tenant, inserted.antragsnummer),
+      statusUrl: statusUrlFor(context.tenant, inserted.antragsnummer, inserted.statusToken),
     };
   }),
 
@@ -1681,34 +1765,40 @@ export const applicationsRouter = {
         });
       }
       const ext = extensionForMimeType(input.mimeType) ?? "bin";
-      const s3Key = `applications/${peek.applicationId}/signed-${Date.now()}.${ext}`;
+      const s3Key = `applications/${peek.applicationId}/signed-${randomUUID()}.${ext}`;
       await putObject({ key: s3Key, body, contentType: input.mimeType });
 
-      const claim = await consumeUploadToken(context.db, input.token);
+      let claim: { applicationId: string } | null;
+      try {
+        claim = await consumeUploadToken(context.db, input.token, async (tx, applicationId) => {
+          await tx.insert(membershipApplicationFilesTable).values({
+            applicationId,
+            kind: "signed_scan",
+            s3Key,
+            filename: input.filename,
+            mimeType: input.mimeType,
+            sizeBytes: body.byteLength,
+          });
+          await tx
+            .update(membershipApplicationsTable)
+            .set({ status: "dokument_hochgeladen", updatedAt: new Date() })
+            .where(
+              and(
+                eq(membershipApplicationsTable.id, applicationId),
+                eq(membershipApplicationsTable.status, "neu"),
+              ),
+            );
+        });
+      } catch (error) {
+        await deleteObject(s3Key).catch(() => undefined);
+        throw error;
+      }
       if (!claim) {
-        // Consumed by a concurrent request between peek and now. The stored
-        // object is a harmless orphan; the link was already used once.
+        await deleteObject(s3Key).catch(() => undefined);
         throw new ORPCError("NOT_FOUND", {
           message: "Der Upload-Link ist ungültig, abgelaufen oder bereits benutzt.",
         });
       }
-      await context.db.insert(membershipApplicationFilesTable).values({
-        applicationId: claim.applicationId,
-        kind: "signed_scan",
-        s3Key,
-        filename: input.filename,
-        mimeType: input.mimeType,
-        sizeBytes: body.byteLength,
-      });
-      await context.db
-        .update(membershipApplicationsTable)
-        .set({ status: "dokument_hochgeladen", updatedAt: new Date() })
-        .where(
-          and(
-            eq(membershipApplicationsTable.id, claim.applicationId),
-            eq(membershipApplicationsTable.status, "neu"),
-          ),
-        );
       return { ok: true };
     }),
 
@@ -1760,50 +1850,57 @@ export const applicationsRouter = {
       }
 
       const year = new Date().getUTCFullYear();
+      const applicationId = randomUUID();
+      const ext = extensionForMimeType(input.mimeType) ?? "bin";
+      const s3Key = `applications/${applicationId}/paper-${randomUUID()}.${ext}`;
+      await putObject({ key: s3Key, body, contentType: input.mimeType });
       // Placeholder person fields: the row carries no real applicant data until
       // the Vorstand transcribes the scan. They are NOT NULL in the schema, so
       // use clearly-marked sentinels that read as "needs entry" in the list.
-      const inserted = await context.db.transaction(async (tx) => {
-        const antragsnummer = await allocateDocRef(tx, "ANT", year);
-        const [row] = await tx
-          .insert(membershipApplicationsTable)
-          .values({
-            antragsnummer,
-            antragstyp: "einzel",
-            status: "scan_eingegangen",
-            source: "legacy",
-            mitgliedschaftTyp: "erwachsener",
-            vorname: "Papier-Antrag",
-            nachname: "(zu erfassen)",
-            geburtsdatum: new Date("1900-01-01"),
-            email: input.email,
-            consentIp: clientIp(context.headers),
-          })
-          .returning({
-            id: membershipApplicationsTable.id,
-            antragsnummer: membershipApplicationsTable.antragsnummer,
-          });
-        if (!row) {
-          throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
-        }
-        return row;
-      });
-
-      // Store the scan and notify, both best-effort so a storage/SMTP blip
-      // never loses the intake.
+      let inserted: { id: string; antragsnummer: string; statusToken: string };
       try {
-        const ext = extensionForMimeType(input.mimeType) ?? "bin";
-        const s3Key = `applications/${inserted.id}/paper-${Date.now()}.${ext}`;
-        await putObject({ key: s3Key, body, contentType: input.mimeType });
-        await context.db.insert(membershipApplicationFilesTable).values({
-          applicationId: inserted.id,
-          kind: "signed_scan",
-          s3Key,
-          filename: input.filename,
-          mimeType: input.mimeType,
-          sizeBytes: body.byteLength,
+        inserted = await context.db.transaction(async (tx) => {
+          const antragsnummer = await allocateDocRef(tx, "ANT", year);
+          const [row] = await tx
+            .insert(membershipApplicationsTable)
+            .values({
+              id: applicationId,
+              antragsnummer,
+              antragstyp: "einzel",
+              status: "scan_eingegangen",
+              source: "legacy",
+              mitgliedschaftTyp: "erwachsener",
+              vorname: "Papier-Antrag",
+              nachname: "(zu erfassen)",
+              geburtsdatum: new Date("1900-01-01"),
+              email: input.email,
+              consentIp: clientIp(context.headers),
+            })
+            .returning({
+              id: membershipApplicationsTable.id,
+              antragsnummer: membershipApplicationsTable.antragsnummer,
+            });
+          if (!row) {
+            throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Anlage fehlgeschlagen." });
+          }
+          await tx.insert(membershipApplicationFilesTable).values({
+            applicationId: row.id,
+            kind: "signed_scan",
+            s3Key,
+            filename: input.filename,
+            mimeType: input.mimeType,
+            sizeBytes: body.byteLength,
+          });
+          const statusToken = await issueStatusToken(tx, { applicationId: row.id });
+          return { ...row, statusToken: statusToken.rawToken };
         });
+      } catch (error) {
+        await deleteObject(s3Key).catch(() => undefined);
+        throw error;
+      }
 
+      // The scan is durable now. Notification remains best-effort.
+      try {
         const records: EmailLogEntry[] = [];
         if (input.email) {
           const subject = `Ihr Papier-Antrag bei ${org.vereinsname}`;
@@ -1816,7 +1913,7 @@ export const applicationsRouter = {
               `vielen Dank. Ihr Papier-Antrag beim ${org.vereinsname} ist bei uns eingegangen.`,
               `Ihre Vorgangsnummer lautet ${inserted.antragsnummer}.`,
               "",
-              `Den aktuellen Stand sehen Sie hier: ${statusUrlFor(context.tenant, inserted.antragsnummer)}`,
+              `Den aktuellen Stand sehen Sie hier: ${statusUrlFor(context.tenant, inserted.antragsnummer, inserted.statusToken)}`,
               "",
               "Bitte achten Sie darauf, dass auf dem Scan Ihre Kontaktdaten gut lesbar sind.",
             ].join("\n"),
@@ -2094,6 +2191,7 @@ export const applicationsRouter = {
         const token = await issueUploadToken(context.db, { applicationId: app.id });
         uploadUrl = buildUploadUrl(baseUrl(context.tenant), token.rawToken);
       }
+      const statusToken = await issueStatusToken(context.db, { applicationId: app.id });
       const pdf = await getObject(file.s3Key);
       const applicantName =
         app.antragstyp === "kind"
@@ -2107,7 +2205,7 @@ export const applicationsRouter = {
         clubEmail,
         notifyClub: org.antragBenachrichtigungAktiv,
         antragsnummer: app.antragsnummer,
-        statusUrl: statusUrlFor(context.tenant, app.antragsnummer),
+        statusUrl: statusUrlFor(context.tenant, app.antragsnummer, statusToken.rawToken),
         uploadUrl,
         pdf: {
           filename: file.filename ?? `Beitrittserklaerung-${app.antragsnummer}.pdf`,
@@ -2421,6 +2519,22 @@ export const applicationsRouter = {
       if (!app) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
       if (app.status === "genehmigt" || app.memberId) {
         throw new ORPCError("CONFLICT", { message: "Antrag ist bereits genehmigt." });
+      }
+      const [signedFile] = await context.db
+        .select({ id: membershipApplicationFilesTable.id })
+        .from(membershipApplicationFilesTable)
+        .where(
+          and(
+            eq(membershipApplicationFilesTable.applicationId, app.id),
+            eq(membershipApplicationFilesTable.kind, "signed_scan"),
+          ),
+        )
+        .limit(1);
+      if (!signedFile) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message:
+            "Der Antrag kann erst genehmigt werden, wenn das unterschriebene Dokument vorliegt.",
+        });
       }
 
       const actorId = context.session!.user.id;
@@ -2910,11 +3024,11 @@ export const applicationsRouter = {
               warning: `Dokument ${name} konnte nicht geladen werden (HTTP ${res.status}).`,
             };
           }
-          const bytes = Buffer.from(await res.arrayBuffer());
-          if (bytes.byteLength === 0) return { warning: `Dokument ${name} ist leer.` };
-          if (bytes.byteLength > 25 * 1024 * 1024) {
+          const bytes = await readResponseBytesLimited(res, MAX_SVUMS_DOCUMENT_BYTES);
+          if (!bytes) {
             return { warning: `Dokument ${name} ist größer als 25 MB, übersprungen.` };
           }
+          if (bytes.byteLength === 0) return { warning: `Dokument ${name} ist leer.` };
           const mimeType = res.headers.get("content-type")?.split(";")[0]?.trim() || null;
           return { bytes, mimeType };
         } catch {

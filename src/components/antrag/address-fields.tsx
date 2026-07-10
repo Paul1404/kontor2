@@ -52,18 +52,23 @@ export function AddressFields({
       return;
     }
     setStreetLoading(true);
+    let cancelled = false;
     const timer = setTimeout(async () => {
       try {
         const res = await orpc.applications.searchStreets({ query: q, plz: plz || null });
+        if (cancelled) return;
         setStreetHits(res.results);
         setStreetOpen(res.results.length > 0);
       } catch {
-        setStreetHits([]);
+        if (!cancelled) setStreetHits([]);
       } finally {
-        setStreetLoading(false);
+        if (!cancelled) setStreetLoading(false);
       }
     }, 400);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [strasse, plz]);
 
   // PLZ -> Ort resolution once five digits are entered.
@@ -76,9 +81,11 @@ export function AddressFields({
       }
       return;
     }
+    let cancelled = false;
     const timer = setTimeout(async () => {
       try {
         const res = await orpc.applications.lookupPlz({ plz: code });
+        if (cancelled) return;
         lastPlz.current = code;
         setPlzOrte(res.orte);
         if (res.orte.length === 1 && res.orte[0] && !ort.trim()) {
@@ -87,10 +94,13 @@ export function AddressFields({
           setPlzOpen(true);
         }
       } catch {
-        setPlzOrte([]);
+        if (!cancelled) setPlzOrte([]);
       }
     }, 400);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [plz, ort, onOrt]);
 
   function pickStreet(hit: { strasse: string; plz: string; ort: string }) {

@@ -54,6 +54,7 @@ export type Env = RawEnv & {
   /** Full keyring (current + any rotated-out keys still readable). */
   encryptionKeyring: Keyring;
   svumsPushSecret: string;
+  snapshotCronSecret: string;
 };
 
 function derive(master: Buffer, info: string, length = 32): Buffer {
@@ -103,6 +104,7 @@ export function env(): Env {
       dataEncryptionKey,
       encryptionKeyring,
       svumsPushSecret: derive(master, "kontor2:svums-push-secret:v1").toString("hex"),
+      snapshotCronSecret: derive(master, "kontor2:snapshot-cron-secret:v1").toString("hex"),
     };
     return cached;
   } catch (err) {
@@ -114,6 +116,21 @@ export function env(): Env {
     }
     throw err;
   }
+}
+
+/**
+ * HMAC credential for the deprecated SVUMS sender, scoped to one tenant. The
+ * primary keeps its historical derivation so the existing sender does not need
+ * a coordinated cutover; other tenants receive isolated credentials.
+ */
+export function tenantSvumsPushSecret(tenantKey: string): string {
+  const e = env();
+  const primaryKey = process.env.PRIMARY_TENANT_KEY ?? "svu";
+  if (tenantKey === primaryKey) return e.svumsPushSecret;
+  return derive(
+    Buffer.from(e.APP_SECRET, "hex"),
+    `kontor2:svums-push-secret:v1:${tenantKey}`,
+  ).toString("hex");
 }
 
 const DATA_KEY_LABEL = "kontor2:data-encryption-key:v1";

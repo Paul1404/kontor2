@@ -86,7 +86,8 @@ function UploadPage() {
                   className="hidden"
                   disabled={upload.isPending}
                   onChange={(e) => {
-                    const f = e.target.files?.[0];
+                    const f = e.currentTarget.files?.[0];
+                    e.currentTarget.value = "";
                     if (f) {
                       setErr(null);
                       upload.mutate(f);

@@ -34,7 +34,7 @@ import { SepaCard } from "~/components/forms/SepaCard";
 import { WiedervorlagenCard } from "~/components/forms/WiedervorlagenCard";
 import { SnapshotsTab } from "~/components/snapshots/SnapshotsTab";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { CopyButton } from "~/components/ui/copy-button";
@@ -304,16 +304,18 @@ function MemberDetailPage() {
             <Contact className="size-4" /> Als Kontakt
           </Button>
           {canEdit ? (
-            <Link to="/app/mitglieder/$mitgliedsnummer/bearbeiten" params={{ mitgliedsnummer }}>
-              <Button variant="outline" size="sm">
-                <Pencil className="size-4" /> Bearbeiten
-              </Button>
+            <Link
+              to="/app/mitglieder/$mitgliedsnummer/bearbeiten"
+              params={{ mitgliedsnummer }}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <Pencil className="size-4" /> Bearbeiten
             </Link>
           ) : null}
           {canEdit ? (
             <PortalAccessButton memberId={detail.data!.member.id} email={member.email} />
           ) : null}
-          {canEdit && member.mitgliedsnummer && !member.verstorbenAm ? (
+          {canEdit && member.memberNo && !member.verstorbenAm ? (
             member.austritt ? (
               <Button
                 variant="outline"
@@ -776,13 +778,16 @@ function MemberStatusBadge({
   member: {
     austritt?: string | Date | null;
     verstorbenAm?: string | Date | null;
-    mitgliedsnummer?: string | null;
+    memberNo?: string | null;
   };
   hatAktiveAbteilung: boolean;
 }) {
-  // Kontakte (no Mitgliedsnummer) carry their own badge in the header; a
-  // membership status would be misleading for them.
-  if (!member.mitgliedsnummer) return null;
+  // Kontakte (no member number) carry their own badge in the header; a
+  // membership status would be misleading for them. Keyed on the app-owned
+  // `memberNo`, which every member has (legacy imports were backfilled in
+  // migration 0032); the legacy `mitgliedsnummer` is null for members created
+  // in-app, which used to wrongly hide their badge.
+  if (!member.memberNo) return null;
   // Date-aware: a future-dated Austritt reads "Kündigt zum …", not "Ausgetreten".
   // aktiv vs passiv is derived from the member's active Abteilungen.
   const view = memberStatusView({

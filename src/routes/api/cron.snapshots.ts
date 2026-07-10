@@ -1,6 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerOnlyFn } from "@tanstack/react-start";
 
+const MAX_BODY_BYTES = 1024;
+
+function tooLarge(): Response {
+  return new Response(JSON.stringify({ error: "payload_too_large" }), {
+    status: 413,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 /**
  * External trigger for the nightly snapshot run. Use this when the
  * in-process scheduler is disabled (e.g. behind a Railway Cron service)
@@ -12,16 +21,27 @@ import { createServerOnlyFn } from "@tanstack/react-start";
 const handle = createServerOnlyFn(async ({ request }: { request: Request }): Promise<Response> => {
   // Server imports loaded lazily so the server graph stays out of the client
   // bundle (see api/rpc.$.ts).
-  const [{ verifySignature }, { env }, { logger }, { rateLimit }, { runNightlySnapshot }] =
-    await Promise.all([
-      import("~/server/crypto/hmac"),
-      import("~/server/env"),
-      import("~/server/lib/logger"),
-      import("~/server/redis/client"),
-      import("~/server/snapshots/scheduler"),
-    ]);
+  const [
+    { verifySignature },
+    { env },
+    { clientIp },
+    { logger },
+    { acquireNonce, rateLimit },
+    { runNightlySnapshot },
+  ] = await Promise.all([
+    import("~/server/crypto/hmac"),
+    import("~/server/env"),
+    import("~/server/lib/client-ip"),
+    import("~/server/lib/logger"),
+    import("~/server/redis/client"),
+    import("~/server/snapshots/scheduler"),
+  ]);
+  const declaredLength = Number(request.headers.get("content-length") ?? "");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    return tooLarge();
+  }
   const limit = await rateLimit({
-    key: `cron-snapshots:${request.headers.get("x-forwarded-for") ?? "ip"}`,
+    key: `cron-snapshots:${clientIp(request.headers)}`,
     limit: 6,
     windowSeconds: 3600,
   });
@@ -33,15 +53,25 @@ const handle = createServerOnlyFn(async ({ request }: { request: Request }): Pro
   }
 
   const raw = await request.text();
+  if (raw.length > MAX_BODY_BYTES) {
+    return tooLarge();
+  }
   const verify = verifySignature({
-    secret: env().svumsPushSecret,
-    timestampHeader: request.headers.get("x-svums-timestamp"),
-    signatureHeader: request.headers.get("x-svums-signature"),
+    secret: env().snapshotCronSecret,
+    timestampHeader: request.headers.get("x-kontor-timestamp"),
+    signatureHeader: request.headers.get("x-kontor-signature"),
     rawBody: raw,
   });
   if (!verify.ok) {
     return new Response(JSON.stringify({ error: verify.reason }), {
       status: 401,
+      headers: { "content-type": "application/json" },
+    });
+  }
+  const signature = request.headers.get("x-kontor-signature")!;
+  if (!(await acquireNonce(`snapshot-cron:${signature}`, 600))) {
+    return new Response(JSON.stringify({ error: "replay" }), {
+      status: 409,
       headers: { "content-type": "application/json" },
     });
   }

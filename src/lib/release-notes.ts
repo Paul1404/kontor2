@@ -41,6 +41,50 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.122.4",
+    date: "2026-07-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Im Vollbild der Unterschrift zeichnete der Stift nach dem Loslassen weiter und hörte auch im normalen Feld nicht auf. Außerdem ließ sich eine leere Unterschrift übernehmen, wenn der Mauszeiger nur über die Fläche bewegt wurde. Beides ist behoben.",
+      },
+    ],
+  },
+  {
+    version: "0.122.3",
+    date: "2026-07-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die Straßen- und PLZ-Vorschläge im Antragsformular konnten bei schnellem Tippen veraltete Ergebnisse anzeigen, wenn eine ältere Anfrage nach einer neueren antwortete. Auswahl aus der Liste konnte dadurch die falsche Straße, PLZ oder Ort einsetzen. Beide Abfragen ignorieren jetzt veraltete Antworten.",
+      },
+    ],
+  },
+  {
+    version: "0.122.2",
+    date: "2026-07-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Mitglieder, die direkt in der App angelegt wurden, ließen sich nicht austreten lassen und zeigten keinen Status (Aktiv, Passiv, Ausgetreten). Der Austritt-Knopf und das Status-Kennzeichen hingen an der alten Linear-Mitgliedsnummer, die neu angelegte Mitglieder nicht haben. Beide richten sich jetzt nach der App-Mitgliedsnummer und funktionieren für alle Mitglieder.",
+      },
+    ],
+  },
+  {
+    version: "0.122.1",
+    date: "2026-07-07",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Browser-Tests (Playwright) für die wichtigsten Abläufe: Anmelden, Zugriffsschutz der App, Mitglied anlegen und Mitglied austreten lassen. Läuft lokal gegen eine Wegwerf-Datenbank. Keine Änderung an der Anwendung selbst.",
+      },
+    ],
+  },
+  {
     version: "0.122.0",
     date: "2026-07-04",
     changes: [

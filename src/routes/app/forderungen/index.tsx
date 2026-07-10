@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { FilterChip } from "~/components/ui/filter-chip";
@@ -23,6 +23,7 @@ import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
+import { cn } from "~/lib/cn";
 
 export const Route = createFileRoute("/app/forderungen/")({
   component: ForderungenPage,
@@ -84,26 +85,32 @@ function ForderungenPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link to="/app/forderungen/ruecklaeufer">
-            <Button variant="outline" size="sm">
-              <Banknote className="size-4" />
-              Rückläufer
-            </Button>
+          <Link
+            to="/app/forderungen/ruecklaeufer"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            <Banknote className="size-4" />
+            Rückläufer
           </Link>
-          <Link to="/app/forderungen/mahnungen">
-            <Button variant="outline" size="sm">
-              <FileText className="size-4" />
-              Mahnläufe
-            </Button>
+          <Link
+            to="/app/forderungen/mahnungen"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            <FileText className="size-4" />
+            Mahnläufe
           </Link>
-          <Link to="/app/forderungen/kulanz">
-            <Button variant="outline" size="sm">
-              <HeartHandshake className="size-4" />
-              Kulanz-Brief
-            </Button>
+          <Link
+            to="/app/forderungen/kulanz"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            <HeartHandshake className="size-4" />
+            Kulanz-Brief
           </Link>
-          <Link to="/app/forderungen/mahnungen/neu">
-            <Button size="sm">Neue Mahnungen</Button>
+          <Link
+            to="/app/forderungen/mahnungen/neu"
+            className={cn(buttonVariants({ size: "sm" }))}
+          >
+            Neue Mahnungen
           </Link>
         </div>
       </div>

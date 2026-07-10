@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { ORPCError } from "@orpc/server";
 import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { decodeBase64Upload, MIB, maxBase64Length } from "~/server/application/upload-bytes";
 import { ingestArchive } from "~/server/archive/ingest-archive";
 import { analyzeDump } from "~/server/archive/sql-analyzer";
 import type { DB } from "~/server/db/client";
@@ -19,7 +20,8 @@ import { membersTable } from "~/server/db/schema/members";
 import { createProgressReporter, readImportProgress } from "~/server/importer/progress";
 import { adminProc, vorstandProc } from "~/server/orpc/base";
 
-const MAX_BYTES = 50 * 1024 * 1024;
+const MAX_BYTES = 50 * MIB;
+const MAX_MESSAGE = `Datei zu groß. Maximum: ${MAX_BYTES / MIB} MB.`;
 
 /** Optional selector shared by every read procedure; omitting both = latest. */
 const VersionSelector = {
@@ -109,22 +111,14 @@ export const archiveRouter = {
     .input(
       v.object({
         filename: v.string(),
-        contentBase64: v.pipe(v.string(), v.minLength(1)),
+        contentBase64: v.pipe(v.string(), v.minLength(1), v.maxLength(maxBase64Length(MAX_BYTES))),
         notes: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(2000)))),
         progressToken: v.optional(v.string()),
       }),
     )
     .handler(async ({ context, input }) => {
       const reporter = createProgressReporter(context.tenant.key, input.progressToken);
-      const buf = Buffer.from(input.contentBase64, "base64");
-      if (buf.length === 0) {
-        throw new ORPCError("BAD_REQUEST", { message: "Leere Datei." });
-      }
-      if (buf.length > MAX_BYTES) {
-        throw new ORPCError("PAYLOAD_TOO_LARGE", {
-          message: `Datei zu groß. Maximum: ${MAX_BYTES / 1024 / 1024} MB.`,
-        });
-      }
+      const buf = decodeBase64Upload(input.contentBase64, MAX_BYTES, MAX_MESSAGE);
       const text = buf.toString("utf8");
       if (!/CREATE TABLE|INSERT INTO/i.test(text)) {
         throw new ORPCError("BAD_REQUEST", { message: "Keine SQL-Befehle erkannt." });

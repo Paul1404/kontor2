@@ -61,6 +61,37 @@ function authDomainHost(): string | null {
   }
 }
 
+function normalizedHost(host: string | null | undefined): string | null {
+  if (!host) return null;
+  const trimmed = host.trim().toLowerCase();
+  if (trimmed.startsWith("[")) {
+    return trimmed.slice(1, trimmed.indexOf("]")).trim() || null;
+  }
+  return (trimmed.split(":")[0] ?? trimmed).trim() || null;
+}
+
+function isLocalDevHost(host: string): boolean {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    (host === "localhost" || host === "127.0.0.1" || host === "::1")
+  );
+}
+
+export function setupAllowedForHost(host: string | null | undefined, tenant: Tenant): boolean {
+  const h = normalizedHost(host);
+  if (!h) return false;
+  if (isLocalDevHost(h)) return true;
+
+  const suffix = `.${productDomain()}`;
+  if (isOperatorTenant(tenant)) {
+    return h === `${consoleSubdomain()}${suffix}`;
+  }
+
+  const primary = primaryTenant();
+  if (tenant.key === primary.key && h === authDomainHost()) return true;
+  return h === `${tenant.key}${suffix}`;
+}
+
 /**
  * Bildet den eingehenden Request-Host auf einen Mandanten ab.
  *
@@ -78,7 +109,7 @@ export function resolveTenantFromHost(host: string | null | undefined): Tenant {
   const primary = primaryTenant();
   // Kein Host (interne/Health-Requests): konservativ der Default-Verein.
   if (!host) return primary;
-  const h = (host.split(":")[0] ?? host).trim().toLowerCase();
+  const h = normalizedHost(host) ?? "";
 
   // Auth-/Alt-Domain -> Default-Verein (Cold-Start-sicher über primaryTenant).
   if (h === authDomainHost()) return findTenantByKey(primary.key) ?? primary;

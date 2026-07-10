@@ -3,12 +3,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Coins, Download, Loader2, Plus, RotateCcw } from "lucide-react";
 import { MandateNachtragCard } from "~/components/sepa/MandateNachtragCard";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
+import { QueryError } from "~/components/ui/query-error";
 import { triggerDownload } from "~/lib/download";
 import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
+import { cn } from "~/lib/cn";
 
 export const Route = createFileRoute("/app/beitrag/")({
   component: FeeRunsListPage,
@@ -50,15 +52,14 @@ function FeeRunsListPage() {
         </div>
         {canRun ? (
           <div className="flex flex-wrap gap-2">
-            <Link to="/app/beitrag/erneut-einziehen">
-              <Button variant="outline">
-                <RotateCcw className="size-4" /> Erneut einziehen
-              </Button>
+            <Link
+              to="/app/beitrag/erneut-einziehen"
+              className={cn(buttonVariants({ variant: "outline" }))}
+            >
+              <RotateCcw className="size-4" /> Erneut einziehen
             </Link>
-            <Link to="/app/beitrag/neu">
-              <Button>
-                <Plus className="size-4" /> Neuer Lauf
-              </Button>
+            <Link to="/app/beitrag/neu" className={cn(buttonVariants())}>
+              <Plus className="size-4" /> Neuer Lauf
             </Link>
           </div>
         ) : null}
@@ -100,6 +101,8 @@ function FeeRunsListPage() {
             <div className="flex items-center justify-center gap-2 p-12 text-muted-foreground">
               <Loader2 className="size-5 animate-spin" /> Lade…
             </div>
+          ) : list.isError ? (
+            <QueryError error={list.error} onRetry={() => list.refetch()} />
           ) : !list.data || list.data.rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 p-12 text-center text-muted-foreground">
               <Coins className="size-8 opacity-40" />
@@ -151,10 +154,12 @@ function FeeRunsListPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          <Link to="/app/beitrag/$id" params={{ id: r.id }}>
-                            <Button variant="ghost" size="sm">
-                              Details
-                            </Button>
+                          <Link
+                            to="/app/beitrag/$id"
+                            params={{ id: r.id }}
+                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                          >
+                            Details
                           </Link>
                           {r.xmlFilename && r.status !== "cancelled" && canRun ? (
                             <DownloadButton runId={r.id} filename={r.xmlFilename} />

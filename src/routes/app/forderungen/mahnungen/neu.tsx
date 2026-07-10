@@ -51,6 +51,14 @@ function NewDunningRunPage() {
     queryKey: ["dunning.preview", level, runDate],
     queryFn: () => orpc.dunning.preview({ level, runDate }),
   });
+  const previewMemberIds = useMemo(
+    () => new Set(preview.data?.items.map((i) => i.memberId) ?? []),
+    [preview.data],
+  );
+  const selectedForPreview = useMemo(
+    () => [...selected].filter((id) => previewMemberIds.has(id)),
+    [previewMemberIds, selected],
+  );
 
   // Default-select everyone when the preview loads. The user can still
   // deselect individually before committing.
@@ -64,7 +72,7 @@ function NewDunningRunPage() {
     mutationFn: () =>
       orpc.dunning.commit({
         level,
-        memberIds: [...selected],
+        memberIds: selectedForPreview,
         runDate,
         notes: notes.trim() || null,
       }),
@@ -79,14 +87,24 @@ function NewDunningRunPage() {
 
   const filteredTotals = useMemo(() => {
     if (!preview.data) return { count: 0, openSum: "0", fees: "0", totalDue: "0" };
-    const picked = preview.data.items.filter((i) => selected.has(i.memberId));
+    const picked = preview.data.items.filter((i) => selectedForPreview.includes(i.memberId));
     return {
       count: picked.length,
       openSum: sumDec(picked.map((i) => i.openSum)),
       fees: sumDec(picked.map((i) => i.mahngebuhr)),
       totalDue: sumDec(picked.map((i) => i.totalDue)),
     };
-  }, [preview.data, selected]);
+  }, [preview.data, selectedForPreview]);
+
+  function changeLevel(next: 1 | 2 | 3) {
+    setSelected(new Set());
+    setLevel(next);
+  }
+
+  function changeRunDate(next: string) {
+    setSelected(new Set());
+    setRunDate(next);
+  }
 
   function toggleAll() {
     if (!preview.data) return;
@@ -132,7 +150,7 @@ function NewDunningRunPage() {
           <Field label="Stufe">
             <select
               value={level}
-              onChange={(e) => setLevel(Number.parseInt(e.target.value, 10) as 1 | 2 | 3)}
+              onChange={(e) => changeLevel(Number.parseInt(e.target.value, 10) as 1 | 2 | 3)}
               className="h-9 rounded-lg border border-input bg-card px-3 text-sm shadow-soft"
             >
               <option value="1">1: Erinnerung</option>
@@ -141,7 +159,7 @@ function NewDunningRunPage() {
             </select>
           </Field>
           <Field label="Lauf-Datum">
-            <DateField value={runDate} onChange={(v) => setRunDate(v)} />
+            <DateField value={runDate} onChange={changeRunDate} />
           </Field>
           <Field label="Frist">
             <Input
@@ -209,7 +227,7 @@ function NewDunningRunPage() {
           ) : null}
         </CardHeader>
         <CardContent>
-          {preview.isLoading ? (
+          {preview.isLoading || preview.isFetching ? (
             <SkeletonText lines={5} className="max-w-md" />
           ) : preview.isError ? (
             <QueryError onRetry={() => preview.refetch()} />
@@ -292,7 +310,7 @@ function NewDunningRunPage() {
             </span>
           </div>
           <Button
-            disabled={selected.size === 0 || commit.isPending}
+            disabled={selectedForPreview.length === 0 || preview.isFetching || commit.isPending}
             onClick={() => setConfirmOpen(true)}
           >
             {commit.isPending ? "Wird erstellt…" : `${LEVEL_LABELS[level]} erstellen`}

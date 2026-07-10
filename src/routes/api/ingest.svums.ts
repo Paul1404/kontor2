@@ -33,27 +33,32 @@ const handle = createServerOnlyFn(async ({ request }: { request: Request }): Pro
   // bundle (see api/rpc.$.ts).
   const [
     { verifySignature },
-    { db },
-    { env },
+    { dbForTenant },
+    { tenantSvumsPushSecret },
     { runIngest },
-    { primaryTenant },
+    { clientIp },
     { logger },
     { acquireNonce, rateLimit },
+    { requestHost },
+    { resolveTenantFromHost },
   ] = await Promise.all([
     import("~/server/crypto/hmac"),
     import("~/server/db/client"),
     import("~/server/env"),
     import("~/server/importer/ingest-pipeline"),
-    import("~/server/tenants/resolve"),
+    import("~/server/lib/client-ip"),
     import("~/server/lib/logger"),
     import("~/server/redis/client"),
+    import("~/server/tenants/request-host"),
+    import("~/server/tenants/resolve"),
   ]);
+  const tenant = resolveTenantFromHost(requestHost(request.headers));
   const declaredLength = Number(request.headers.get("content-length") ?? "");
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BYTES) {
     return tooLarge();
   }
   const limit = await rateLimit({
-    key: `ingest-svums:${request.headers.get("x-forwarded-for") ?? "ip"}`,
+    key: `ingest-svums:${tenant.key}:${clientIp(request.headers)}`,
     limit: 30,
     windowSeconds: 60,
   });
@@ -70,7 +75,7 @@ const handle = createServerOnlyFn(async ({ request }: { request: Request }): Pro
     return tooLarge();
   }
   const verify = verifySignature({
-    secret: env().svumsPushSecret,
+    secret: tenantSvumsPushSecret(tenant.key),
     timestampHeader: request.headers.get("x-svums-timestamp"),
     signatureHeader: request.headers.get("x-svums-signature"),
     rawBody: raw,
@@ -93,6 +98,7 @@ const handle = createServerOnlyFn(async ({ request }: { request: Request }): Pro
   // replaced this path. Warn so we can tell when no svums sender is left.
   logger.warn("ingest.svums.deprecated", {
     requestId: request.headers.get("x-request-id"),
+    tenant: tenant.key,
     note: "svums push pipeline is deprecated; new members come via /antrag",
   });
 
@@ -124,7 +130,7 @@ const handle = createServerOnlyFn(async ({ request }: { request: Request }): Pro
   }
 
   const result = await runIngest(
-    db(),
+    dbForTenant(tenant.databaseUrl),
     {
       source: "svums_push",
       filename: payload.batch?.svumsBatchId ?? null,
@@ -146,7 +152,7 @@ const handle = createServerOnlyFn(async ({ request }: { request: Request }): Pro
       lastprotsh: payload.lastprotsh as never,
       requestId: request.headers.get("x-request-id"),
     },
-    primaryTenant().key,
+    tenant.key,
   );
 
   return Response.json({

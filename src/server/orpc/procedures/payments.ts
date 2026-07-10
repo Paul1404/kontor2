@@ -1,11 +1,13 @@
+import { createHash } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, eq, gt, inArray } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import { matchBankTransactions, type OpenPosting, parseBankCsv } from "~/server/bank/reconcile";
 import type { DB } from "~/server/db/client";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
+import { idempotencyKeysTable } from "~/server/db/schema/idempotency";
 import { membersTable } from "~/server/db/schema/members";
 import { memberDisplayName, memberRef } from "~/server/domain/member";
 import { vorstandProc } from "~/server/orpc/base";
@@ -60,6 +62,7 @@ export const paymentsRouter = {
       const postings = await loadOpenPostings(context.db);
       const proposals = matchBankTransactions(parsed.rows, postings);
       return {
+        sourceHash: createHash("sha256").update(input.csv).digest("hex"),
         warnings: parsed.warnings,
         totalRows: parsed.rows.length,
         proposals: proposals.map((p) => ({
@@ -87,6 +90,7 @@ export const paymentsRouter = {
   apply: vorstandProc
     .input(
       v.object({
+        sourceHash: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/)),
         items: v.array(
           v.object({
             sollStellungId: v.pipe(v.string(), v.uuid()),
@@ -110,7 +114,45 @@ export const paymentsRouter = {
         // Sort by id so concurrent requests acquire row locks in the same
         // order, which rules out a deadlock between two overlapping batches.
         .sort((a, b) => a.sollStellungId.localeCompare(b.sollStellungId));
+      const idempotencyKey = createHash("sha256")
+        .update(
+          JSON.stringify({
+            sourceHash: input.sourceHash,
+            items: items.map((item) => ({
+              sollStellungId: item.sollStellungId,
+              amountCents: cents(item.amount),
+            })),
+          }),
+        )
+        .digest("hex");
       const result = await context.db.transaction(async (tx) => {
+        const [reservation] = await tx
+          .insert(idempotencyKeysTable)
+          .values({ scope: "payments.apply", key: idempotencyKey })
+          .onConflictDoNothing()
+          .returning({ id: idempotencyKeysTable.id });
+        if (!reservation) {
+          const [existing] = await tx
+            .select({
+              result: idempotencyKeysTable.result,
+              completedAt: idempotencyKeysTable.completedAt,
+            })
+            .from(idempotencyKeysTable)
+            .where(
+              and(
+                eq(idempotencyKeysTable.scope, "payments.apply"),
+                eq(idempotencyKeysTable.key, idempotencyKey),
+              ),
+            )
+            .limit(1);
+          if (existing?.completedAt && existing.result) {
+            return existing.result as { applied: number; skipped: number };
+          }
+          throw new ORPCError("CONFLICT", {
+            message:
+              "Diese Bankbuchungen werden bereits verarbeitet. Bitte versuchen Sie es erneut.",
+          });
+        }
         let applied = 0;
         let skipped = 0;
         for (const item of items) {
@@ -160,13 +202,15 @@ export const paymentsRouter = {
           });
           applied += 1;
         }
-        return { applied, skipped };
+        const result = { applied, skipped };
+        await tx
+          .update(idempotencyKeysTable)
+          .set({ result, completedAt: new Date() })
+          .where(eq(idempotencyKeysTable.id, reservation.id));
+        return result;
       });
       // Payments change revenue and Zahlungsquote on the dashboard.
       await invalidateDashboardCaches(context.tenant.key);
       return result;
     }),
 };
-
-// Keep sql import used if future raw filters are added.
-void sql;

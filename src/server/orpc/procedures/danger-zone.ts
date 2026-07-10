@@ -8,6 +8,7 @@ import { auditLogTable } from "~/server/db/schema/audit";
 import { bestandserhebungenTable } from "~/server/db/schema/bestandserhebungen";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { dsgvoConsentLogTable, dsgvoRequestsTable } from "~/server/db/schema/dsgvo";
+import { familienTable } from "~/server/db/schema/familien";
 import { feeRunItemsTable, feeRunsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
@@ -40,6 +41,14 @@ const orphanKontaktCondition = and(
     select 1 from ${relationshipsTable}
     where ${relationshipsTable.fromMemberId} = ${membersTable.id}
        or ${relationshipsTable.toMemberId} = ${membersTable.id}
+  )`,
+  sql`not exists (
+    select 1 from ${contractsTable}
+    where ${contractsTable.zahlerMemberId} = ${membersTable.id}
+  )`,
+  sql`not exists (
+    select 1 from ${familienTable}
+    where ${familienTable.zahlerMemberId} = ${membersTable.id}
   )`,
 );
 

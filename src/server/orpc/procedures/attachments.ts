@@ -7,7 +7,7 @@ import { memberNotDeleted } from "~/server/db/member-filters";
 import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
 import { membersTable } from "~/server/db/schema/members";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
-import { deleteObject, presignDownload, presignUpload } from "~/server/s3/client";
+import { deleteObject, headObject, presignDownload, presignUpload } from "~/server/s3/client";
 
 /**
  * Resolve an attachment for download, but only if its parent member is still
@@ -113,6 +113,30 @@ export const attachmentsRouter = {
   finalize: vorstandProc
     .input(v.object({ uploadId: v.string() }))
     .handler(async ({ context, input }) => {
+      const [candidate] = await context.db
+        .select()
+        .from(pendingUploadsTable)
+        .where(eq(pendingUploadsTable.id, input.uploadId))
+        .limit(1);
+      if (!candidate || candidate.requestedBy !== context.session!.user.id) {
+        throw new ORPCError("NOT_FOUND", { message: "Upload-Ticket nicht gefunden." });
+      }
+      let metadata: Awaited<ReturnType<typeof headObject>>;
+      try {
+        metadata = await headObject(candidate.s3Key);
+      } catch {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Die Datei wurde noch nicht vollständig hochgeladen. Bitte erneut versuchen.",
+        });
+      }
+      if (
+        metadata.contentLength !== candidate.sizeBytes ||
+        metadata.contentType !== candidate.mimeType
+      ) {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: "Die hochgeladene Datei stimmt nicht mit dem Upload-Ticket überein.",
+        });
+      }
       // Look up the ticket we issued at presign time and trust ONLY its
       // server-stored fields. The client previously controlled all of
       // memberId, key, mimeType, sizeBytes — those are now ignored.

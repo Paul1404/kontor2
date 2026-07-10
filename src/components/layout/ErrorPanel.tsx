@@ -1,7 +1,8 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
+import { cn } from "~/lib/cn";
 
 export function ErrorPanel({
   title = "Etwas ist schiefgelaufen",
@@ -53,10 +54,8 @@ export function ErrorPanel({
           </Button>
         )}
         {showHome ? (
-          <Link to="/app">
-            <Button variant="outline">
-              <ArrowLeft className="size-4" /> Zur Übersicht
-            </Button>
+          <Link to="/app" className={cn(buttonVariants({ variant: "outline" }))}>
+            <ArrowLeft className="size-4" /> Zur Übersicht
           </Link>
         ) : null}
       </div>
@@ -92,10 +91,8 @@ export function NotFoundPanel({ children }: { children?: ReactNode }) {
           {children ?? "Diese Seite existiert nicht oder wurde verschoben."}
         </p>
       </div>
-      <Link to="/app">
-        <Button>
-          <ArrowLeft className="size-4" /> Zur Übersicht
-        </Button>
+      <Link to="/app" className={cn(buttonVariants())}>
+        <ArrowLeft className="size-4" /> Zur Übersicht
       </Link>
     </div>
   );

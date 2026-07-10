@@ -6,12 +6,14 @@ import { matchCamtReturns, parseCamt054, type ReturnableItem } from "~/server/ba
 import type { DB } from "~/server/db/client";
 import { escapeLike } from "~/server/db/like";
 import { memberNotDeleted } from "~/server/db/member-filters";
+import { isUniqueViolation } from "~/server/db/retry";
 import { sepaReturnsTable } from "~/server/db/schema/dunning";
 import { feeRunItemsTable, feeRunsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { memberRef } from "~/server/domain/member";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
+import { invalidateDashboardCaches } from "~/server/search/cache";
 
 type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0];
 
@@ -393,6 +395,7 @@ export const sepaReturnsRouter = {
       return id;
     });
 
+    await invalidateDashboardCaches(context.tenant.key);
     return { id: result };
   }),
 
@@ -456,26 +459,37 @@ export const sepaReturnsRouter = {
         if (org?.sepaReturnFee && org.sepaReturnFee !== "0") gebuhr = org.sepaReturnFee;
       }
 
-      const id = await context.db.transaction((tx) =>
-        insertReturnAndReopen(
-          tx,
-          {
-            actorId: context.session!.user.id,
-            actorEmail: context.session!.user.email,
-            requestId: context.requestId ?? null,
-            source: "ui",
-          },
-          { feeRunItemId: null, memberId: soll.memberId, sollStellungId: soll.id },
-          {
-            returnedOn: input.returnedOn,
-            reasonCode: input.reasonCode,
-            reasonText: input.reasonText,
-            rueckgebuhr: gebuhr,
-            notes: input.notes,
-          },
-        ),
-      );
+      let id: string;
+      try {
+        id = await context.db.transaction((tx) =>
+          insertReturnAndReopen(
+            tx,
+            {
+              actorId: context.session!.user.id,
+              actorEmail: context.session!.user.email,
+              requestId: context.requestId ?? null,
+              source: "ui",
+            },
+            { feeRunItemId: null, memberId: soll.memberId, sollStellungId: soll.id },
+            {
+              returnedOn: input.returnedOn,
+              reasonCode: input.reasonCode,
+              reasonText: input.reasonText,
+              rueckgebuhr: gebuhr,
+              notes: input.notes,
+            },
+          ),
+        );
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new ORPCError("CONFLICT", {
+            message: "Für diesen Posten ist bereits ein Rückläufer erfasst.",
+          });
+        }
+        throw error;
+      }
 
+      await invalidateDashboardCaches(context.tenant.key);
       return { id };
     }),
 
@@ -628,6 +642,9 @@ export const sepaReturnsRouter = {
         return { imported, skipped };
       });
 
+      if (out.imported > 0) {
+        await invalidateDashboardCaches(context.tenant.key);
+      }
       return out;
     }),
 
@@ -697,6 +714,7 @@ export const sepaReturnsRouter = {
       });
     });
 
+    await invalidateDashboardCaches(context.tenant.key);
     return { ok: true };
   }),
 };

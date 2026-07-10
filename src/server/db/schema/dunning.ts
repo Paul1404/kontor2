@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   date,
   index,
@@ -65,6 +66,9 @@ export const sepaReturnsTable = pgTable(
     index("sepa_returns_member_idx").on(t.memberId, t.returnedOn),
     index("sepa_returns_item_idx").on(t.feeRunItemId),
     index("sepa_returns_returned_idx").on(t.returnedOn),
+    uniqueIndex("sepa_returns_imported_posting_uk")
+      .on(t.sollStellungId)
+      .where(sql`${t.feeRunItemId} is null and ${t.sollStellungId} is not null`),
   ],
 );
 
