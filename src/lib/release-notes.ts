@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.124.0",
+    date: "2026-07-13",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Neue Seite Dokumentation mit einem Handbuch für die wiederkehrenden Abläufe. Das erste Kapitel führt Schritt für Schritt vom Beitragslauf über Rückläufer und Mahnungen bis zum Kulanz-Brief, verlinkt direkt auf die passenden Seiten und zeigt den aktuellen Stand der offenen Forderungen und Ihre Mahn-Einstellungen.",
+      },
+    ],
+  },
+  {
     version: "0.123.0",
     date: "2026-07-13",
     changes: [

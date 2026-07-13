@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   AlertTriangle,
+  BookOpen,
   Building2,
   ClipboardList,
   Clock,
@@ -126,6 +127,12 @@ const SECTIONS: NavSection[] = [
         to: "/app/portal-anfragen",
         label: "Portal-Anfragen",
         icon: <Inbox className="size-[18px]" />,
+        vorstandOnly: true,
+      },
+      {
+        to: "/app/dokumentation",
+        label: "Dokumentation",
+        icon: <BookOpen className="size-[18px]" />,
         vorstandOnly: true,
       },
     ],

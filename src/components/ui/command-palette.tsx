@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
+  BookOpen,
   Building2,
   Coins,
   FileBarChart,
@@ -72,6 +73,14 @@ const NAV_COMMANDS: NavCommand[] = [
     label: "Berichte",
     icon: <FileBarChart className="size-4" />,
     path: "/app/berichte",
+    needs: ["vorstand", "admin"],
+  },
+  {
+    kind: "nav",
+    id: "docs",
+    label: "Dokumentation",
+    icon: <BookOpen className="size-4" />,
+    path: "/app/dokumentation",
     needs: ["vorstand", "admin"],
   },
   {
