@@ -6,7 +6,7 @@ import { appendAudit } from "~/server/audit/log";
 import { auth, authBaseUrl } from "~/server/auth/auth";
 import { invitationStatus } from "~/server/auth/invitation-status";
 import { wouldRemoveLastAdmin } from "~/server/auth/last-admin-guard";
-import { sendInviteEmail } from "~/server/auth/send-invite";
+import { loadSmtpConfig, sendInviteEmail } from "~/server/auth/send-invite";
 import { completeSetup, isInSetupMode } from "~/server/auth/setup";
 import { invitations, roleEnum, users } from "~/server/db/schema/auth";
 import { clientIp } from "~/server/lib/client-ip";
@@ -440,6 +440,63 @@ export const authRouter = {
         requestId: context.requestId ?? null,
       });
       return { email: target.email, tempPassword };
+    }),
+
+  /**
+   * Admin-initiated password reset link: triggers the same self-service reset
+   * flow (better-auth issues the token, the `sendResetPassword` hook mails the
+   * /passwort-zuruecksetzen link and records it in the mail log) but on behalf
+   * of a chosen user. Unlike `resetUserPassword` this sets no temporary
+   * password and does not revoke sessions — the user keeps their current login
+   * until they follow the link and pick a new password. We refuse up front when
+   * SMTP is unconfigured, because the reset hook is intentionally best-effort
+   * and silently no-ops in that case, which would leave the admin thinking a
+   * mail went out.
+   */
+  sendPasswordResetLink: adminProc
+    .input(v.object({ userId: v.string() }))
+    .handler(async ({ context, input }) => {
+      const [target] = await context.db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!target) {
+        throw new ORPCError("NOT_FOUND", { message: "Benutzer nicht gefunden." });
+      }
+      if (!(await loadSmtpConfig(context.db))) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message:
+            "SMTP ist nicht konfiguriert. Bitte zuerst den E-Mail-Versand einrichten, dann kann ein Link versendet werden.",
+        });
+      }
+
+      try {
+        await auth(context.tenant).api.requestPasswordReset({
+          body: { email: target.email },
+          headers: context.headers,
+        });
+      } catch (err) {
+        logger.error("auth.sendPasswordResetLink.failed", {
+          userId: input.userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Link zum Zurücksetzen konnte nicht versendet werden.",
+        });
+      }
+
+      await appendAudit(context.db, {
+        entityType: "user",
+        entityId: input.userId,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: { passwordResetLinkSent: { before: null, after: true } },
+        requestId: context.requestId ?? null,
+      });
+      return { email: target.email };
     }),
 
   invite: adminProc

@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.123.0",
+    date: "2026-07-13",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "In der Benutzer-Verwaltung lässt sich einem Konto jetzt ein Link zum Zurücksetzen des Passworts per E-Mail schicken. Der Benutzer wählt sein neues Passwort selbst, der Link ist eine Stunde gültig. Das bisherige Zurücksetzen mit angezeigtem Passwort bleibt daneben bestehen.",
+      },
+    ],
+  },
+  {
     version: "0.122.4",
     date: "2026-07-07",
     changes: [

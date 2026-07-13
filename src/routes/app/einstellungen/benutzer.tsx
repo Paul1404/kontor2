@@ -9,6 +9,7 @@ import {
   Loader2,
   LogOut,
   Mail,
+  MailPlus,
   Save,
   ShieldCheck,
   ShieldOff,
@@ -144,6 +145,13 @@ function UsersPage() {
   const resetPassword = useMutation({
     mutationFn: (userId: string) => orpc.auth.resetUserPassword({ userId }),
     onSuccess: (data) => setTempPassword({ email: data.email, password: data.tempPassword }),
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  const sendResetLink = useMutation({
+    mutationFn: (userId: string) => orpc.auth.sendPasswordResetLink({ userId }),
+    onSuccess: (data) =>
+      toast.success(`Link zum Zurücksetzen an ${data.email} versendet. Er ist eine Stunde gültig.`),
     onError: (err) => toast.error((err as Error).message),
   });
 
@@ -432,6 +440,22 @@ function UsersPage() {
                                     <Loader2 className="size-4 animate-spin" />
                                   ) : (
                                     <KeyRound className="size-4" />
+                                  )}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-8"
+                                  aria-label={`Link zum Zurücksetzen an ${u.email} senden`}
+                                  title="Link zum Zurücksetzen senden"
+                                  disabled={sendResetLink.isPending}
+                                  onClick={() => sendResetLink.mutate(u.id)}
+                                >
+                                  {sendResetLink.isPending && sendResetLink.variables === u.id ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                  ) : (
+                                    <MailPlus className="size-4" />
                                   )}
                                 </Button>
                                 <Button
