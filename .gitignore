@@ -29,6 +29,9 @@ bun-debug.log*
 .claude/settings.local.json
 .claude/launch.json
 
+# Machine-local Codex MCP credentials. Never commit plaintext API keys.
+.codex/config.toml
+
 # tests
 coverage
 .vitest
