@@ -112,7 +112,9 @@ function MemberDetailPage() {
   });
 
   const { push: pushRecent } = useRecentMembers();
-  const canEdit = me.data?.role === "vorstand" || me.data?.role === "admin";
+  const canEdit =
+    (me.data?.role === "vorstand" || me.data?.role === "admin") &&
+    detail.data?.member.deletedAt == null;
 
   usePageShortcut(
     "e",

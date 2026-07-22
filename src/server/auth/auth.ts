@@ -3,6 +3,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
+import { recordPasswordResetDelivery } from "~/server/auth/password-reset-delivery";
 import { sendPasswordResetEmail } from "~/server/auth/send-invite";
 import { getSessionConfig } from "~/server/auth/session-config";
 import { db, dbForTenant } from "~/server/db/client";
@@ -81,6 +82,7 @@ function buildAuth(tenant: Tenant) {
       sendResetPassword: async ({ user, token }) => {
         const resetUrl = `${baseURL}/passwort-zuruecksetzen?token=${token}`;
         const result = await sendPasswordResetEmail(tenantDb, { to: user.email, resetUrl });
+        recordPasswordResetDelivery(result);
         if (!result.ok && result.reason !== "smtp_not_configured") {
           logger.warn("auth.password-reset.send-failed", { reason: result.reason });
         }

@@ -245,10 +245,12 @@ function AddContractForm({
   const [vertragNr, setVertragNr] = useState("");
   const [art, setArt] = useState<string>("");
   const [vertragBegin, setVertragBegin] = useState(() => new Date().toISOString().slice(0, 10));
+  const [isDirectDebit, setIsDirectDebit] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const artId = useId();
   const vertragNrId = useId();
   const beginId = useId();
+  const zahlartId = useId();
 
   // Hide inactive Beitragsarten and anything the member already has.
   const options = (feeTypes.data ?? []).filter(
@@ -268,6 +270,7 @@ function AddContractForm({
           artName: selected.bezeichnung ?? null,
           betrag: selected.betrag1 ?? null,
           vertragBegin: vertragBegin || null,
+          isDirectDebit,
         },
       });
     },
@@ -330,6 +333,23 @@ function AddContractForm({
             Beginn
           </Label>
           <DateField id={beginId} value={vertragBegin} onChange={(v) => setVertragBegin(v)} />
+        </div>
+        <div className="flex flex-col gap-1.5 md:col-span-2">
+          <Label
+            htmlFor={zahlartId}
+            className="text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Zahlart
+          </Label>
+          <select
+            id={zahlartId}
+            value={isDirectDebit ? "lastschrift" : "rechnung"}
+            onChange={(e) => setIsDirectDebit(e.target.value === "lastschrift")}
+            className="h-10 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+          >
+            <option value="lastschrift">Lastschrift</option>
+            <option value="rechnung">Rechnung</option>
+          </select>
         </div>
       </div>
 

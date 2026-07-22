@@ -8,6 +8,7 @@ export type SnapshotDiff = {
   relationships: { added: number; removed: number; changedIds: string[] };
   memberAbteilungen: { added: number; removed: number };
   sollstellungen: { added: number; removed: number; changedIds: string[] };
+  families: { added: number; removed: number; changedIds: string[] };
 };
 
 function compareList(
@@ -58,6 +59,7 @@ export function diffSnapshotVsCurrent(
     relationships: Record<string, unknown>[];
     memberAbteilungen: Record<string, unknown>[];
     sollstellungen: Record<string, unknown>[];
+    families: Record<string, unknown>[];
   },
   current: {
     member: Record<string, unknown>;
@@ -67,6 +69,7 @@ export function diffSnapshotVsCurrent(
     relationships: Record<string, unknown>[];
     memberAbteilungen: Record<string, unknown>[];
     sollstellungen: Record<string, unknown>[];
+    families: Record<string, unknown>[];
   },
 ): SnapshotDiff {
   return {
@@ -85,5 +88,6 @@ export function diffSnapshotVsCurrent(
       (r) => `${r.memberId}|${r.abteilungId}|${r.eintrittsdatum}`,
     ),
     sollstellungen: compareList(snapshot.sollstellungen, current.sollstellungen),
+    families: compareList(snapshot.families, current.families),
   };
 }

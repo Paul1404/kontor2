@@ -3,9 +3,11 @@ import { and, eq, ne, or, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import { escapeLike } from "~/server/db/like";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { vorstandProc } from "~/server/orpc/base";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 function toDateOrNull(value: string | null | undefined, field: string): Date | null {
   if (!value) return null;
@@ -49,7 +51,12 @@ export const relationshipsRouter = {
       const members = await context.db
         .select({ id: membersTable.id, adrNr: membersTable.adrNr })
         .from(membersTable)
-        .where(or(eq(membersTable.id, input.fromMemberId), eq(membersTable.id, input.toMemberId)));
+        .where(
+          and(
+            or(eq(membersTable.id, input.fromMemberId), eq(membersTable.id, input.toMemberId)),
+            memberNotDeleted(),
+          ),
+        );
       const from = members.find((m) => m.id === input.fromMemberId);
       const to = members.find((m) => m.id === input.toMemberId);
       if (!from || !to) {
@@ -88,7 +95,7 @@ export const relationshipsRouter = {
             .returning({ id: relationshipsTable.id });
           if (row) {
             created.push(row.id);
-            await appendAudit(tx, {
+            const auditId = await appendAudit(tx, {
               entityType: "relationship",
               entityId: row.id,
               action: "create",
@@ -101,6 +108,12 @@ export const relationshipsRouter = {
                 beziehung: { before: null, after: input.beziehung ?? null },
               },
               requestId: context.requestId ?? null,
+            });
+            await takeMemberSnapshot(tx, pair.from.id, {
+              trigger: "mutation",
+              actorId: context.session!.user.id,
+              actorEmail: context.session!.user.email,
+              auditId,
             });
           }
         }
@@ -120,6 +133,12 @@ export const relationshipsRouter = {
         if (!existing) {
           throw new ORPCError("NOT_FOUND", { message: "Beziehung nicht gefunden." });
         }
+        const [liveMember] = await tx
+          .select({ id: membersTable.id })
+          .from(membersTable)
+          .where(and(eq(membersTable.id, existing.fromMemberId), memberNotDeleted()))
+          .limit(1);
+        if (!liveMember) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
 
         const patch: Record<string, unknown> = { updatedAt: new Date() };
         if ("beziehung" in input.patch) patch.beziehung = input.patch.beziehung ?? null;
@@ -148,7 +167,7 @@ export const relationshipsRouter = {
           .set(patch as never)
           .where(eq(relationshipsTable.id, input.id));
 
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "relationship",
           entityId: input.id,
           action: "update",
@@ -173,6 +192,12 @@ export const relationshipsRouter = {
           },
           requestId: context.requestId ?? null,
         });
+        await takeMemberSnapshot(tx, existing.fromMemberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
+        });
       });
       return { ok: true };
     }),
@@ -189,9 +214,15 @@ export const relationshipsRouter = {
         if (!existing) {
           throw new ORPCError("NOT_FOUND", { message: "Beziehung nicht gefunden." });
         }
+        const [liveMember] = await tx
+          .select({ id: membersTable.id })
+          .from(membersTable)
+          .where(and(eq(membersTable.id, existing.fromMemberId), memberNotDeleted()))
+          .limit(1);
+        if (!liveMember) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
 
         await tx.delete(relationshipsTable).where(eq(relationshipsTable.id, input.id));
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "relationship",
           entityId: input.id,
           action: "delete",
@@ -203,6 +234,12 @@ export const relationshipsRouter = {
             toAdrNr: { before: existing.toAdrNr, after: null },
           },
           requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, existing.fromMemberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
         });
 
         if (input.removeReciprocal) {
@@ -218,7 +255,7 @@ export const relationshipsRouter = {
             .limit(1);
           if (mirror) {
             await tx.delete(relationshipsTable).where(eq(relationshipsTable.id, mirror.id));
-            await appendAudit(tx, {
+            const mirrorAuditId = await appendAudit(tx, {
               entityType: "relationship",
               entityId: mirror.id,
               action: "delete",
@@ -230,6 +267,12 @@ export const relationshipsRouter = {
                 toAdrNr: { before: mirror.toAdrNr, after: null },
               },
               requestId: context.requestId ?? null,
+            });
+            await takeMemberSnapshot(tx, mirror.fromMemberId, {
+              trigger: "mutation",
+              actorId: context.session!.user.id,
+              actorEmail: context.session!.user.email,
+              auditId: mirrorAuditId,
             });
           }
         }

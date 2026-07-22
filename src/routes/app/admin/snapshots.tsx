@@ -38,7 +38,7 @@ function AdminSnapshotsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Snapshots</h1>
         <p className="text-sm text-muted-foreground">
-          Vollständige Backups jedes Mitglieds vor jeder Änderung und einmal pro Nacht. Bei einem
+          Vollständige Backups jedes Mitglieds bei Änderungen und einmal pro Nacht. Bei einem
           missglückten Massen-Import (oder einem falschen manuellen Eingriff) lassen sich Mitglieder
           zielgenau zurücksetzen.
         </p>

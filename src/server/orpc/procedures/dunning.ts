@@ -37,6 +37,7 @@ import { resolveClubLogo } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { MahnungDocument, type MahnungInput } from "~/server/pdf/templates/mahnung";
 import { invalidateDashboardCaches } from "~/server/search/cache";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 const Level = v.picklist([1, 2, 3] as const);
 
@@ -879,6 +880,7 @@ export const dunningRouter = {
         const existing = await tx
           .select({
             id: sollStellungenTable.id,
+            memberId: sollStellungenTable.memberId,
             status: sollStellungenTable.status,
             amount: sollStellungenTable.amount,
             paidAmount: sollStellungenTable.paidAmount,
@@ -912,7 +914,7 @@ export const dunningRouter = {
             })
             .where(eq(sollStellungenTable.id, row.id));
 
-          await appendAudit(tx, {
+          const auditId = await appendAudit(tx, {
             entityType: "soll_stellung",
             entityId: row.id,
             action: "update",
@@ -928,6 +930,12 @@ export const dunningRouter = {
                 : {}),
             },
             requestId,
+          });
+          await takeMemberSnapshot(tx, row.memberId, {
+            trigger: "mutation",
+            actorId,
+            actorEmail,
+            auditId,
           });
           changed += 1;
         }
@@ -972,6 +980,7 @@ export const dunningRouter = {
         const existing = await tx
           .select({
             id: sollStellungenTable.id,
+            memberId: sollStellungenTable.memberId,
             status: sollStellungenTable.status,
             amount: sollStellungenTable.amount,
             paidAmount: sollStellungenTable.paidAmount,
@@ -1007,7 +1016,7 @@ export const dunningRouter = {
             })
             .where(eq(sollStellungenTable.id, row.id));
 
-          await appendAudit(tx, {
+          const auditId = await appendAudit(tx, {
             entityType: "soll_stellung",
             entityId: row.id,
             action: "update",
@@ -1026,6 +1035,12 @@ export const dunningRouter = {
                 : {}),
             },
             requestId,
+          });
+          await takeMemberSnapshot(tx, row.memberId, {
+            trigger: "mutation",
+            actorId,
+            actorEmail,
+            auditId,
           });
           changed += 1;
         }

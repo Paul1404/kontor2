@@ -4,11 +4,12 @@ import type { DBOrTx } from "~/server/db/client";
 import { memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { attachmentsTable } from "~/server/db/schema/attachments";
 import { contractsTable } from "~/server/db/schema/contracts";
+import { familienMitgliederTable, familienTable } from "~/server/db/schema/familien";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
-import { memberSnapshotsTable } from "~/server/db/schema/snapshots";
+import { memberSnapshotsTable, snapshotRunsTable } from "~/server/db/schema/snapshots";
 
 export type SnapshotTrigger = "mutation" | "nightly" | "manual" | "pre_restore" | "pre_import";
 
@@ -81,7 +82,7 @@ export async function takeMemberSnapshot(
     .limit(1);
   if (!member) return { snapshotId: null, skipped: true };
 
-  const [contracts, sepa, attachments, relationships, memberAbteilungen, sollstellungen] =
+  const [contracts, sepa, attachments, relationships, memberAbteilungen, sollstellungen, families] =
     await Promise.all([
       tx.select().from(contractsTable).where(eq(contractsTable.memberId, memberId)),
       tx.select().from(sepaMandatesTable).where(eq(sepaMandatesTable.memberId, memberId)),
@@ -89,6 +90,11 @@ export async function takeMemberSnapshot(
       tx.select().from(relationshipsTable).where(eq(relationshipsTable.fromMemberId, memberId)),
       tx.select().from(memberAbteilungenTable).where(eq(memberAbteilungenTable.memberId, memberId)),
       tx.select().from(sollStellungenTable).where(eq(sollStellungenTable.memberId, memberId)),
+      tx
+        .select({ membership: familienMitgliederTable, family: familienTable })
+        .from(familienMitgliederTable)
+        .innerJoin(familienTable, eq(familienTable.id, familienMitgliederTable.familieId))
+        .where(eq(familienMitgliederTable.memberId, memberId)),
     ]);
 
   const payload = {
@@ -103,6 +109,7 @@ export async function takeMemberSnapshot(
     // snapshots.
     memberAbteilungen: canonicalize(sortByComposite(memberAbteilungen)),
     sollstellungen: canonicalize(sortById(sollstellungen)),
+    families: canonicalize(sortById(families.map((row) => ({ id: row.membership.id, ...row })))),
   };
   const canonicalJson = JSON.stringify(payload);
   const contentHash = sha256Hex(canonicalJson);
@@ -120,10 +127,29 @@ export async function takeMemberSnapshot(
     }
   }
 
+  let runId = opts.runId ?? null;
+  if (!runId) {
+    const now = new Date();
+    const [run] = await tx
+      .insert(snapshotRunsTable)
+      .values({
+        trigger: opts.trigger,
+        startedAt: now,
+        finishedAt: now,
+        memberCount: 1,
+        bytesTotal: byteSize,
+        actorId: opts.actorId ?? null,
+        actorEmail: opts.actorEmail ?? null,
+        notes: opts.notes ?? null,
+      })
+      .returning({ id: snapshotRunsTable.id });
+    runId = run?.id ?? null;
+  }
+
   const [inserted] = await tx
     .insert(memberSnapshotsTable)
     .values({
-      runId: opts.runId ?? null,
+      runId,
       memberId,
       trigger: opts.trigger,
       actorId: opts.actorId ?? null,
@@ -137,6 +163,7 @@ export async function takeMemberSnapshot(
       relationships: payload.relationships as Record<string, unknown>[],
       memberAbteilungen: payload.memberAbteilungen as Record<string, unknown>[],
       sollstellungen: payload.sollstellungen as Record<string, unknown>[],
+      families: payload.families as Record<string, unknown>[],
       contentHash,
       byteSize,
     })

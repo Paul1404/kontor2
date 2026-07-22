@@ -7,6 +7,7 @@ import type { DBOrTx } from "~/server/db/client";
 import { memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { attachmentsTable } from "~/server/db/schema/attachments";
 import { contractsTable } from "~/server/db/schema/contracts";
+import { familienMitgliederTable, familienTable } from "~/server/db/schema/familien";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
@@ -93,7 +94,7 @@ function coerce(key: string, value: unknown): unknown {
 }
 
 async function loadCurrentDependents(tx: DBOrTx, memberId: string) {
-  const [contracts, sepa, attachments, relationships, memberAbteilungen, sollstellungen] =
+  const [contracts, sepa, attachments, relationships, memberAbteilungen, sollstellungen, families] =
     await Promise.all([
       tx.select().from(contractsTable).where(eq(contractsTable.memberId, memberId)),
       tx.select().from(sepaMandatesTable).where(eq(sepaMandatesTable.memberId, memberId)),
@@ -101,6 +102,11 @@ async function loadCurrentDependents(tx: DBOrTx, memberId: string) {
       tx.select().from(relationshipsTable).where(eq(relationshipsTable.fromMemberId, memberId)),
       tx.select().from(memberAbteilungenTable).where(eq(memberAbteilungenTable.memberId, memberId)),
       tx.select().from(sollStellungenTable).where(eq(sollStellungenTable.memberId, memberId)),
+      tx
+        .select({ membership: familienMitgliederTable, family: familienTable })
+        .from(familienMitgliederTable)
+        .innerJoin(familienTable, eq(familienTable.id, familienMitgliederTable.familieId))
+        .where(eq(familienMitgliederTable.memberId, memberId)),
     ]);
   return {
     contracts: contracts as Record<string, unknown>[],
@@ -109,6 +115,10 @@ async function loadCurrentDependents(tx: DBOrTx, memberId: string) {
     relationships: relationships as Record<string, unknown>[],
     memberAbteilungen: memberAbteilungen as Record<string, unknown>[],
     sollstellungen: sollstellungen as Record<string, unknown>[],
+    families: families.map((row) => ({ id: row.membership.id, ...row })) as Record<
+      string,
+      unknown
+    >[],
   };
 }
 
@@ -160,16 +170,33 @@ async function restoreDependents(
     sepa: Record<string, unknown>[];
     relationships: Record<string, unknown>[];
     memberAbteilungen: Record<string, unknown>[];
+    attachments: Record<string, unknown>[];
+    families: Record<string, unknown>[];
   },
 ) {
   await tx.delete(relationshipsTable).where(eq(relationshipsTable.fromMemberId, memberId));
   await tx.delete(memberAbteilungenTable).where(eq(memberAbteilungenTable.memberId, memberId));
+  await tx.delete(familienMitgliederTable).where(eq(familienMitgliederTable.memberId, memberId));
 
   for (const r of snapshot.contracts) {
     await upsertRowById(tx, contractsTable, coerceRow(r));
   }
   for (const r of snapshot.sepa) {
     await upsertRowById(tx, sepaMandatesTable, coerceRow(r));
+  }
+  for (const r of snapshot.attachments) {
+    await upsertRowById(tx, attachmentsTable, {
+      ...coerceRow(r),
+      // Old snapshots predate this column and therefore mean "visible".
+      deletedAt: r.deletedAt == null ? null : coerce("deletedAt", r.deletedAt),
+    });
+  }
+  for (const row of snapshot.families) {
+    const family = row.family as Record<string, unknown> | undefined;
+    const membership = row.membership as Record<string, unknown> | undefined;
+    if (!family || !membership) continue;
+    await upsertRowById(tx, familienTable, coerceRow(family));
+    await upsertRowById(tx, familienMitgliederTable, coerceRow(membership));
   }
   if (snapshot.relationships.length > 0) {
     await tx
@@ -268,6 +295,7 @@ export const snapshotsRouter = {
               relationships: snap.relationships,
               memberAbteilungen: snap.memberAbteilungen,
               sollstellungen: snap.sollstellungen,
+              families: snap.families,
             },
             current,
           )
@@ -291,6 +319,7 @@ export const snapshotsRouter = {
           relationships: snap.relationships,
           memberAbteilungen: snap.memberAbteilungen,
           sollstellungen: snap.sollstellungen,
+          families: snap.families,
         },
         diffVsCurrent: diffPayload,
         memberDeleted: !currentMember,
@@ -352,6 +381,7 @@ export const snapshotsRouter = {
             relationships: snap.relationships,
             memberAbteilungen: snap.memberAbteilungen,
             sollstellungen: snap.sollstellungen,
+            families: snap.families,
           },
           { member: current as unknown as Record<string, unknown>, ...currentDeps },
         );
@@ -379,6 +409,8 @@ export const snapshotsRouter = {
             sepa: snap.sepa,
             relationships: snap.relationships,
             memberAbteilungen: snap.memberAbteilungen,
+            attachments: snap.attachments,
+            families: snap.families,
           });
         }
 
@@ -621,6 +653,7 @@ export const snapshotsRouter = {
                 relationships: snap.relationships,
                 memberAbteilungen: snap.memberAbteilungen,
                 sollstellungen: snap.sollstellungen,
+                families: snap.families,
               },
               { member: current as unknown as Record<string, unknown>, ...currentDeps },
             );
@@ -644,6 +677,8 @@ export const snapshotsRouter = {
                 sepa: snap.sepa,
                 relationships: snap.relationships,
                 memberAbteilungen: snap.memberAbteilungen,
+                attachments: snap.attachments,
+                families: snap.families,
               });
             }
             const auditId = await appendAudit(tx, {

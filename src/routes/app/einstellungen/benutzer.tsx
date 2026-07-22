@@ -226,8 +226,8 @@ function UsersPage() {
           <li className="flex items-start gap-2">
             <Eye className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <span>
-              <strong>Readonly</strong>: Sieht Mitglieder, Berichte und Forderungen. Kann nichts
-              ändern. Geeignet für Trainer oder Abteilungsleiter, die nur Listen einsehen wollen.
+              <strong>Readonly</strong>: Sieht Übersicht, Mitglieder und Änderungsprotokoll. Kann
+              nichts ändern. Geeignet für Personen, die Mitgliedsdaten nur einsehen sollen.
             </span>
           </li>
           <li className="flex items-start gap-2">

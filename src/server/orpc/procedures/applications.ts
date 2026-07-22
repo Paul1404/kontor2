@@ -100,6 +100,7 @@ import { rateLimit } from "~/server/redis/client";
 import { deleteObject, getObject, presignDownload, putObject } from "~/server/s3/client";
 import { invalidateMemberCaches } from "~/server/search/cache";
 import { formatIbanGrouped, normalizeIban, validateIban } from "~/server/sepa/iban";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 import type { Tenant } from "~/server/tenants/registry";
 
 const execFileAsync = promisify(execFile);
@@ -748,6 +749,13 @@ async function createApplicationSecondaries(
         beziehung: "Erziehungsberechtigt",
         istVertreter: true,
       });
+      for (const memberId of [primary.id, guardian.id]) {
+        await takeMemberSnapshot(tx, memberId, {
+          trigger: "mutation",
+          actorId: opts.actorId,
+          actorEmail: opts.actorEmail,
+        });
+      }
     }
   }
 
@@ -817,6 +825,13 @@ async function createApplicationSecondaries(
           von: today,
         })),
       ]);
+      for (const memberId of [primary.id, ...(partnerId ? [partnerId] : []), ...childIds]) {
+        await takeMemberSnapshot(tx, memberId, {
+          trigger: "mutation",
+          actorId: opts.actorId,
+          actorEmail: opts.actorEmail,
+        });
+      }
     }
   }
 
@@ -1022,7 +1037,7 @@ async function approveByLinking(
       .where(eq(membershipApplicationsTable.id, app.id));
 
     changes.verknuepfterAntrag = { before: null, after: app.antragsnummer };
-    await appendAudit(tx, {
+    const memberAuditId = await appendAudit(tx, {
       entityType: "member",
       entityId: member.id,
       action: "update",
@@ -1031,6 +1046,12 @@ async function approveByLinking(
       actorEmail: opts.actorEmail,
       changes,
       requestId: opts.requestId,
+    });
+    await takeMemberSnapshot(tx, member.id, {
+      trigger: "mutation",
+      actorId: opts.actorId,
+      actorEmail: opts.actorEmail,
+      auditId: memberAuditId,
     });
     await appendAudit(tx, {
       entityType: "membership_application",

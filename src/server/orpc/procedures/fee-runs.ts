@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, count, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import { getMailer } from "~/server/auth/send-invite";
@@ -20,6 +20,7 @@ import { isTargetBusinessDay, nextCollectionDate } from "~/server/sepa/business-
 import { buildPain008, type Pain008Item } from "~/server/sepa/pain008";
 import { buildPrenotificationEmail } from "~/server/sepa/prenotification";
 import { mandateSignatureDate, selectMandate, sequenceTypeFor } from "~/server/sepa/select-mandate";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 const PreviewInput = v.object({
   billingYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
@@ -187,7 +188,7 @@ export const feeRunsRouter = {
       });
     }
 
-    if (preview.candidates.length === 0) {
+    if (preview.candidates.length === 0 && preview.invoices.length === 0) {
       throw new ORPCError("BAD_REQUEST", {
         message: "Keine berechtigten Posten. Es gibt nichts zu erzeugen.",
       });
@@ -213,7 +214,7 @@ export const feeRunsRouter = {
     }
 
     const orgIban = org.vereinsIban;
-    if (!orgIban) {
+    if (preview.candidates.length > 0 && !orgIban) {
       throw new ORPCError("INTERNAL_SERVER_ERROR", {
         message: "Vereins-IBAN ist nicht hinterlegt.",
       });
@@ -221,7 +222,7 @@ export const feeRunsRouter = {
     // A blank creditor BIC produces `<BIC></BIC>` in the pain.008 and the bank
     // rejects the whole file on upload, after the run is already committed.
     // Fail before booking anything.
-    if (!org.vereinsBic?.trim()) {
+    if (preview.candidates.length > 0 && !org.vereinsBic?.trim()) {
       throw new ORPCError("INTERNAL_SERVER_ERROR", {
         message: "Vereins-BIC ist nicht hinterlegt.",
       });
@@ -440,7 +441,23 @@ export const feeRunsRouter = {
       }
 
       if (itemValues.length > 0) {
-        await tx.insert(feeRunItemsTable).values(itemValues as never);
+        const insertedItems = await tx
+          .insert(feeRunItemsTable)
+          .values(itemValues as never)
+          .returning({
+            id: feeRunItemsTable.id,
+            sollStellungId: feeRunItemsTable.sollStellungId,
+          });
+        // Keep the posting pointed at the debit item that most recently
+        // collected it. Storno uses this to distinguish the original run from
+        // a later Wiedereinzug of the same posting.
+        for (const item of insertedItems) {
+          if (!item.sollStellungId) continue;
+          await tx
+            .update(sollStellungenTable)
+            .set({ lastFeeRunItemId: item.id, updatedAt: new Date() })
+            .where(eq(sollStellungenTable.id, item.sollStellungId));
+        }
       }
 
       // 4. Bump mandate timestamps in a single statement instead of one
@@ -469,8 +486,8 @@ export const feeRunsRouter = {
         const xml = buildPain008({
           creditor: {
             name: org.vereinsname,
-            iban: orgIban,
-            bic: org.vereinsBic,
+            iban: orgIban!,
+            bic: org.vereinsBic!,
             glaeubigerId: org.glaeubigerId,
           },
           falligkeitsdatum: input.falligkeitsdatum,
@@ -494,7 +511,7 @@ export const feeRunsRouter = {
         xmlFilename = filename;
       }
 
-      await appendAudit(tx, {
+      const auditId = await appendAudit(tx, {
         entityType: "fee_run",
         entityId: run.id,
         action: "create",
@@ -509,6 +526,16 @@ export const feeRunsRouter = {
         },
         requestId: context.requestId ?? null,
       });
+      for (const memberId of new Set(
+        [...candidates, ...invoiceItems].map((item) => item.memberId),
+      )) {
+        await takeMemberSnapshot(tx, memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
+        });
+      }
 
       return {
         feeRunId: run.id,
@@ -1022,6 +1049,7 @@ export const feeRunsRouter = {
         const [row] = await tx
           .select({
             id: sollStellungenTable.id,
+            memberId: sollStellungenTable.memberId,
             status: sollStellungenTable.status,
             paidAmount: sollStellungenTable.paidAmount,
             openAmount: sollStellungenTable.openAmount,
@@ -1068,7 +1096,7 @@ export const feeRunsRouter = {
           })
           .where(eq(sollStellungenTable.id, input.sollStellungId));
 
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "soll_stellung",
           entityId: row.id,
           action: "update",
@@ -1082,6 +1110,12 @@ export const feeRunsRouter = {
             ...(input.notes ? { notes: { before: row.notes, after: input.notes } } : {}),
           },
           requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, row.memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
         });
       });
       return { ok: true };
@@ -1413,6 +1447,40 @@ export const feeRunsRouter = {
       }
 
       await context.db.transaction(async (tx) => {
+        const items = await tx
+          .select({ id: feeRunItemsTable.id, sollStellungId: feeRunItemsTable.sollStellungId })
+          .from(feeRunItemsTable)
+          .where(eq(feeRunItemsTable.feeRunId, input.id));
+        const sollIds = items.map((i) => i.sollStellungId).filter((id): id is string => id != null);
+        const itemIds = new Set(items.map((item) => item.id));
+        const linked = await tx
+          .select({
+            id: sollStellungenTable.id,
+            memberId: sollStellungenTable.memberId,
+            status: sollStellungenTable.status,
+            paidAmount: sollStellungenTable.paidAmount,
+            lastFeeRunItemId: sollStellungenTable.lastFeeRunItemId,
+          })
+          .from(sollStellungenTable)
+          .where(
+            sql`${sollStellungenTable.feeRunId} = ${input.id} or ${sollStellungenTable.id} in
+              (select ${feeRunItemsTable.sollStellungId} from ${feeRunItemsTable}
+               where ${feeRunItemsTable.feeRunId} = ${input.id})`,
+          );
+        const debitIds = new Set(sollIds);
+        const changed = linked.filter((row) =>
+          debitIds.has(row.id)
+            ? row.status !== "eingezogen" ||
+              (row.lastFeeRunItemId !== null && !itemIds.has(row.lastFeeRunItemId))
+            : row.status !== "open" || Number(row.paidAmount) !== 0,
+        );
+        if (changed.length > 0) {
+          throw new ORPCError("CONFLICT", {
+            message:
+              "Der Lauf enthält bereits bezahlte, teilweise bezahlte oder zurückgegebene Posten und kann deshalb nicht vollständig storniert werden. Bitte diese Posten zuerst einzeln klären.",
+          });
+        }
+
         await tx
           .update(feeRunsTable)
           .set({
@@ -1426,11 +1494,6 @@ export const feeRunsRouter = {
           .where(eq(feeRunsTable.id, input.id));
 
         // Mark all linked soll_stellungen as cancelled.
-        const items = await tx
-          .select({ sollStellungId: feeRunItemsTable.sollStellungId })
-          .from(feeRunItemsTable)
-          .where(eq(feeRunItemsTable.feeRunId, input.id));
-        const sollIds = items.map((i) => i.sollStellungId).filter((id): id is string => id != null);
         if (sollIds.length > 0) {
           // Only revert postings still in the `eingezogen` state this run put
           // them in. A posting that has since been returned (Rücklastschrift ->
@@ -1443,6 +1506,10 @@ export const feeRunsRouter = {
               and(
                 inArray(sollStellungenTable.id, sollIds),
                 eq(sollStellungenTable.status, "eingezogen"),
+                or(
+                  isNull(sollStellungenTable.lastFeeRunItemId),
+                  inArray(sollStellungenTable.lastFeeRunItemId, [...itemIds]),
+                ),
               ),
             );
         }
@@ -1463,7 +1530,7 @@ export const feeRunsRouter = {
             ),
           );
 
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "fee_run",
           entityId: input.id,
           action: "update",
@@ -1476,6 +1543,14 @@ export const feeRunsRouter = {
           },
           requestId: context.requestId ?? null,
         });
+        for (const memberId of new Set(linked.map((row) => row.memberId))) {
+          await takeMemberSnapshot(tx, memberId, {
+            trigger: "mutation",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            auditId,
+          });
+        }
       });
 
       // Storno reverts revenue/Sollstellungen shown on the dashboard.

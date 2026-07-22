@@ -12,6 +12,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { memberDisplayName, memberRef } from "~/server/domain/member";
 import { vorstandProc } from "~/server/orpc/base";
 import { invalidateDashboardCaches } from "~/server/search/cache";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 const cents = (n: number) => Math.round(n * 100);
 const toAmount = (c: number) => (c / 100).toFixed(2);
@@ -184,7 +185,7 @@ export const paymentsRouter = {
               updatedAt: new Date(),
             })
             .where(eq(sollStellungenTable.id, item.sollStellungId));
-          await appendAudit(tx, {
+          const auditId = await appendAudit(tx, {
             entityType: "member",
             entityId: soll.memberId,
             action: "update",
@@ -199,6 +200,12 @@ export const paymentsRouter = {
               billingYear: { before: null, after: soll.billingYear },
             },
             requestId: context.requestId ?? null,
+          });
+          await takeMemberSnapshot(tx, soll.memberId, {
+            trigger: "mutation",
+            actorId: context.session!.user.id,
+            actorEmail: context.session!.user.email,
+            auditId,
           });
           applied += 1;
         }

@@ -1,14 +1,18 @@
 import nodemailer from "nodemailer";
 import { loadSmtpConfig } from "~/server/auth/send-invite";
+import type { DB } from "~/server/db/client";
 
-export async function sendPortalInvite(opts: {
-  to: string;
-  memberName: string;
-  vereinsname: string;
-  portalUrl: string;
-  expiresAt: Date;
-}): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const cfg = await loadSmtpConfig();
+export async function sendPortalInvite(
+  db: DB,
+  opts: {
+    to: string;
+    memberName: string;
+    vereinsname: string;
+    portalUrl: string;
+    expiresAt: Date;
+  },
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const cfg = await loadSmtpConfig(db);
   if (!cfg) return { ok: false, reason: "smtp_not_configured" };
   const t = nodemailer.createTransport({
     host: cfg.host,

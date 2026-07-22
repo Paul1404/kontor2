@@ -10,6 +10,7 @@ function emptyBlob() {
     relationships: [],
     memberAbteilungen: [],
     sollstellungen: [],
+    families: [],
   };
 }
 
@@ -79,5 +80,11 @@ describe("diffSnapshotVsCurrent", () => {
     const out = diffSnapshotVsCurrent(snap, live);
     expect(out.memberAbteilungen.added).toBe(1); // c
     expect(out.memberAbteilungen.removed).toBe(1); // a
+  });
+
+  it("reports family membership changes", () => {
+    const snap = { ...emptyBlob(), families: [{ id: "fm1", family: { name: "Familie A" } }] };
+    const live = { ...emptyBlob(), families: [] };
+    expect(diffSnapshotVsCurrent(snap, live).families.removed).toBe(1);
   });
 });

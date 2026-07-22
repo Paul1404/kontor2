@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { and, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
@@ -447,7 +447,7 @@ export const sepaRouter = {
         const [member] = await tx
           .select({ id: membersTable.id, adrNr: membersTable.adrNr })
           .from(membersTable)
-          .where(eq(membersTable.id, input.memberId))
+          .where(and(eq(membersTable.id, input.memberId), isNull(membersTable.deletedAt)))
           .limit(1);
         if (!member) {
           throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });

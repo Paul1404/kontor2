@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, eq, lt } from "drizzle-orm";
+import { and, eq, isNull, lt } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import type { DB } from "~/server/db/client";
@@ -7,7 +7,8 @@ import { memberNotDeleted } from "~/server/db/member-filters";
 import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
 import { membersTable } from "~/server/db/schema/members";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
-import { deleteObject, headObject, presignDownload, presignUpload } from "~/server/s3/client";
+import { headObject, presignDownload, presignUpload } from "~/server/s3/client";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 /**
  * Resolve an attachment for download, but only if its parent member is still
@@ -24,7 +25,7 @@ export async function loadDownloadableAttachment(
     .select({ s3Key: attachmentsTable.s3Key, filename: attachmentsTable.filename })
     .from(attachmentsTable)
     .innerJoin(membersTable, eq(membersTable.id, attachmentsTable.memberId))
-    .where(and(eq(attachmentsTable.id, id), memberNotDeleted()))
+    .where(and(eq(attachmentsTable.id, id), isNull(attachmentsTable.deletedAt), memberNotDeleted()))
     .limit(1);
   return row ?? null;
 }
@@ -55,7 +56,7 @@ export const attachmentsRouter = {
       const exists = await context.db
         .select({ id: membersTable.id })
         .from(membersTable)
-        .where(eq(membersTable.id, input.memberId))
+        .where(and(eq(membersTable.id, input.memberId), memberNotDeleted()))
         .limit(1);
       if (exists.length === 0) {
         throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
@@ -157,6 +158,14 @@ export const attachmentsRouter = {
         if (ticket.expiresAt < new Date()) {
           throw new ORPCError("BAD_REQUEST", { message: "Upload-Ticket abgelaufen." });
         }
+        const [liveMember] = await tx
+          .select({ id: membersTable.id })
+          .from(membersTable)
+          .where(and(eq(membersTable.id, ticket.memberId), memberNotDeleted()))
+          .limit(1);
+        if (!liveMember) {
+          throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        }
 
         const [row] = await tx
           .insert(attachmentsTable)
@@ -174,7 +183,7 @@ export const attachmentsRouter = {
         // Consume the ticket so it can't be replayed.
         await tx.delete(pendingUploadsTable).where(eq(pendingUploadsTable.id, ticket.id));
 
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "member_attachment",
           entityId: row!.id,
           action: "create",
@@ -188,6 +197,12 @@ export const attachmentsRouter = {
           },
           requestId: context.requestId ?? null,
         });
+        await takeMemberSnapshot(tx, ticket.memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
+        });
         return { id: row!.id };
       });
     }),
@@ -196,19 +211,19 @@ export const attachmentsRouter = {
     const rows = await context.db
       .select()
       .from(attachmentsTable)
-      .where(eq(attachmentsTable.id, input.id))
+      .where(and(eq(attachmentsTable.id, input.id), isNull(attachmentsTable.deletedAt)))
       .limit(1);
     const att = rows[0];
     if (!att) throw new ORPCError("NOT_FOUND", { message: "Anhang nicht gefunden." });
 
-    // Delete the row and write its audit entry atomically. If the audit
-    // insert fails the row delete rolls back, so the DB never loses the
-    // record without a trail. The S3 object is removed only AFTER commit:
-    // it's external best-effort cleanup, and deleting it before commit would
-    // strand the file if the transaction then rolled back.
+    // Soft-delete the row and retain the object. A later snapshot restore can
+    // make the attachment visible again without pointing at a missing S3 key.
     await context.db.transaction(async (tx) => {
-      await tx.delete(attachmentsTable).where(eq(attachmentsTable.id, input.id));
-      await appendAudit(tx, {
+      await tx
+        .update(attachmentsTable)
+        .set({ deletedAt: new Date() })
+        .where(eq(attachmentsTable.id, input.id));
+      const auditId = await appendAudit(tx, {
         entityType: "member_attachment",
         entityId: input.id,
         action: "delete",
@@ -218,13 +233,13 @@ export const attachmentsRouter = {
         changes: { filename: { before: att.filename, after: null } },
         requestId: context.requestId ?? null,
       });
+      await takeMemberSnapshot(tx, att.memberId, {
+        trigger: "mutation",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        auditId,
+      });
     });
-
-    try {
-      await deleteObject(att.s3Key);
-    } catch {
-      /* tolerate orphan in S3; record is gone */
-    }
     return { ok: true };
   }),
 

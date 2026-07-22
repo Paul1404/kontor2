@@ -16,7 +16,7 @@ export const snapshotTriggerEnum = pgEnum("snapshot_trigger", [
  * Groups multiple member snapshots taken in one operation. A nightly cron
  * produces exactly one run with N snapshots; a bulk SQL import produces one
  * run with one snapshot per affected member. Mutation snapshots typically
- * have `runId = null` (one-off).
+ * are represented as one-member runs so the central history also shows them.
  */
 export const snapshotRunsTable = pgTable(
   "snapshot_runs",
@@ -79,6 +79,10 @@ export const memberSnapshotsTable = pgTable(
       .notNull()
       .default(sql`'[]'::jsonb`),
     sollstellungen: jsonb("sollstellungen")
+      .$type<Record<string, unknown>[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    families: jsonb("families")
       .$type<Record<string, unknown>[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),

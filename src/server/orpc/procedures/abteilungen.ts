@@ -3,6 +3,7 @@ import { and, asc, count, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { KEINE_ABTEILUNG_NAME } from "~/lib/abteilung-filter";
 import { appendAudit, diff } from "~/server/audit/log";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { isUniqueViolation } from "~/server/db/retry";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { feeTypesTable } from "~/server/db/schema/fee-types";
@@ -18,6 +19,7 @@ import {
   invalidateFeeTypeCaches,
   invalidateMemberCaches,
 } from "~/server/search/cache";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 const NameInput = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80));
 const DateStringInput = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
@@ -385,7 +387,7 @@ export const abteilungenRouter = {
         const [member] = await tx
           .select({ id: membersTable.id })
           .from(membersTable)
-          .where(eq(membersTable.id, input.memberId))
+          .where(and(eq(membersTable.id, input.memberId), memberNotDeleted()))
           .limit(1);
         if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
 
@@ -415,7 +417,7 @@ export const abteilungenRouter = {
           throw e;
         }
 
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "member",
           entityId: input.memberId,
           action: "update",
@@ -429,6 +431,12 @@ export const abteilungenRouter = {
             },
           },
           requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, input.memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
         });
       });
       await invalidateMemberCaches(context.tenant.key);
@@ -446,6 +454,12 @@ export const abteilungenRouter = {
     )
     .handler(async ({ context, input }) => {
       await context.db.transaction(async (tx) => {
+        const [member] = await tx
+          .select({ id: membersTable.id })
+          .from(membersTable)
+          .where(and(eq(membersTable.id, input.memberId), memberNotDeleted()))
+          .limit(1);
+        if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
         const [existing] = await tx
           .select({ austrittsdatum: memberAbteilungenTable.austrittsdatum })
           .from(memberAbteilungenTable)
@@ -478,7 +492,7 @@ export const abteilungenRouter = {
               eq(memberAbteilungenTable.eintrittsdatum, input.eintrittsdatum),
             ),
           );
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "member",
           entityId: input.memberId,
           action: "update",
@@ -489,6 +503,12 @@ export const abteilungenRouter = {
             austrittsdatum: { before: existing.austrittsdatum, after: input.austrittsdatum },
           },
           requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, input.memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
         });
       });
       await invalidateMemberCaches(context.tenant.key);
@@ -505,7 +525,13 @@ export const abteilungenRouter = {
     )
     .handler(async ({ context, input }) => {
       await context.db.transaction(async (tx) => {
-        await tx
+        const [member] = await tx
+          .select({ id: membersTable.id })
+          .from(membersTable)
+          .where(and(eq(membersTable.id, input.memberId), memberNotDeleted()))
+          .limit(1);
+        if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        const removed = await tx
           .delete(memberAbteilungenTable)
           .where(
             and(
@@ -513,8 +539,12 @@ export const abteilungenRouter = {
               eq(memberAbteilungenTable.abteilungId, input.abteilungId),
               eq(memberAbteilungenTable.eintrittsdatum, input.eintrittsdatum),
             ),
-          );
-        await appendAudit(tx, {
+          )
+          .returning({ memberId: memberAbteilungenTable.memberId });
+        if (removed.length === 0) {
+          throw new ORPCError("NOT_FOUND", { message: "Mitgliedschaft nicht gefunden." });
+        }
+        const auditId = await appendAudit(tx, {
           entityType: "member",
           entityId: input.memberId,
           action: "delete",
@@ -528,6 +558,12 @@ export const abteilungenRouter = {
             },
           },
           requestId: context.requestId ?? null,
+        });
+        await takeMemberSnapshot(tx, input.memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
         });
       });
       await invalidateMemberCaches(context.tenant.key);

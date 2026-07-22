@@ -505,6 +505,13 @@
       "when": 1783704066770,
       "tag": "0071_gray_nightshade",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1784727247262,
+      "tag": "0072_lowly_longshot",
+      "breakpoints": true
     }
   ]
 }

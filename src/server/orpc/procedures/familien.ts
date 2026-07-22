@@ -2,14 +2,32 @@ import { ORPCError } from "@orpc/server";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
-import type { DB } from "~/server/db/client";
+import type { DB, DBOrTx } from "~/server/db/client";
+import { memberNotDeleted } from "~/server/db/member-filters";
 import { familienMitgliederTable, familienTable } from "~/server/db/schema/familien";
 import { membersTable } from "~/server/db/schema/members";
 import { familienNameVorschlag, rolleVorschlag } from "~/server/domain/familie";
 import { memberDisplayName, memberRef } from "~/server/domain/member";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 const RolleInput = v.picklist(["zahler", "partner", "kind"]);
+
+async function takeFamilySnapshots(
+  tx: DBOrTx,
+  memberIds: string[],
+  actor: { id: string; email: string | null },
+  auditId: string | null,
+) {
+  for (const memberId of new Set(memberIds)) {
+    await takeMemberSnapshot(tx, memberId, {
+      trigger: "mutation",
+      actorId: actor.id,
+      actorEmail: actor.email,
+      auditId,
+    });
+  }
+}
 
 type MemberLite = {
   id: string;
@@ -298,6 +316,13 @@ export const familienRouter = {
           message: "Genau ein Mitglied muss die Rolle Zahler haben, und zwar der Zahler selbst.",
         });
       }
+      const liveMembers = await context.db
+        .select({ id: membersTable.id })
+        .from(membersTable)
+        .where(and(inArray(membersTable.id, memberIds), memberNotDeleted()));
+      if (liveMembers.length !== memberIds.length) {
+        throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+      }
 
       // Sprechende Fehlermeldung statt nacktem Unique-Verstoß, wenn jemand
       // schon einer aktiven Familie angehört.
@@ -344,7 +369,7 @@ export const familienRouter = {
             rolle: m.rolle,
           })),
         );
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "familie",
           entityId: fam!.id,
           action: "create",
@@ -357,6 +382,12 @@ export const familienRouter = {
           },
           requestId: context.requestId ?? null,
         });
+        await takeFamilySnapshots(
+          tx,
+          memberIds,
+          { id: context.session!.user.id, email: context.session!.user.email },
+          auditId,
+        );
         return { id: fam!.id };
       });
     }),
@@ -426,7 +457,7 @@ export const familienRouter = {
           .set(patch as never)
           .where(eq(familienTable.id, input.id));
 
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "familie",
           entityId: input.id,
           action: "update",
@@ -442,6 +473,16 @@ export const familienRouter = {
           },
           requestId: context.requestId ?? null,
         });
+        const familyMembers = await tx
+          .select({ memberId: familienMitgliederTable.memberId })
+          .from(familienMitgliederTable)
+          .where(eq(familienMitgliederTable.familieId, input.id));
+        await takeFamilySnapshots(
+          tx,
+          familyMembers.map((m) => m.memberId),
+          { id: context.session!.user.id, email: context.session!.user.email },
+          auditId,
+        );
       });
       return { ok: true };
     }),
@@ -461,6 +502,12 @@ export const familienRouter = {
           .where(eq(familienTable.id, input.familieId))
           .limit(1);
         if (!fam) throw new ORPCError("NOT_FOUND", { message: "Familie nicht gefunden." });
+        const [liveMember] = await tx
+          .select({ id: membersTable.id })
+          .from(membersTable)
+          .where(and(eq(membersTable.id, input.memberId), memberNotDeleted()))
+          .limit(1);
+        if (!liveMember) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
         const [aktiv] = await tx
           .select({ familieId: familienMitgliederTable.familieId })
           .from(familienMitgliederTable)
@@ -481,7 +528,7 @@ export const familienRouter = {
           memberId: input.memberId,
           rolle: input.rolle,
         });
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "familie",
           entityId: input.familieId,
           action: "update",
@@ -491,6 +538,12 @@ export const familienRouter = {
           changes: { mitgliedHinzu: { before: null, after: input.memberId } },
           requestId: context.requestId ?? null,
         });
+        await takeFamilySnapshots(
+          tx,
+          [input.memberId],
+          { id: context.session!.user.id, email: context.session!.user.email },
+          auditId,
+        );
       });
       return { ok: true };
     }),
@@ -517,7 +570,7 @@ export const familienRouter = {
           .update(familienMitgliederTable)
           .set({ bis: sql`current_date` })
           .where(eq(familienMitgliederTable.id, input.mitgliedschaftId));
-        await appendAudit(tx, {
+        const auditId = await appendAudit(tx, {
           entityType: "familie",
           entityId: row.familieId,
           action: "update",
@@ -527,6 +580,12 @@ export const familienRouter = {
           changes: { mitgliedBeendet: { before: row.memberId, after: null } },
           requestId: context.requestId ?? null,
         });
+        await takeFamilySnapshots(
+          tx,
+          [row.memberId],
+          { id: context.session!.user.id, email: context.session!.user.email },
+          auditId,
+        );
       });
       return { ok: true };
     }),
@@ -539,13 +598,17 @@ export const familienRouter = {
         .where(eq(familienTable.id, input.id))
         .limit(1);
       if (!fam) throw new ORPCError("NOT_FOUND", { message: "Familie nicht gefunden." });
+      const familyMembers = await tx
+        .select({ memberId: familienMitgliederTable.memberId })
+        .from(familienMitgliederTable)
+        .where(eq(familienMitgliederTable.familieId, input.id));
       // FK auf zahler_member_id ist restrict: erst lösen, dann löschen.
       await tx
         .update(familienTable)
         .set({ zahlerMemberId: null })
         .where(eq(familienTable.id, input.id));
       await tx.delete(familienTable).where(eq(familienTable.id, input.id));
-      await appendAudit(tx, {
+      const auditId = await appendAudit(tx, {
         entityType: "familie",
         entityId: input.id,
         action: "delete",
@@ -555,6 +618,12 @@ export const familienRouter = {
         changes: { name: { before: fam.name, after: null } },
         requestId: context.requestId ?? null,
       });
+      await takeFamilySnapshots(
+        tx,
+        familyMembers.map((m) => m.memberId),
+        { id: context.session!.user.id, email: context.session!.user.email },
+        auditId,
+      );
     });
     return { ok: true };
   }),

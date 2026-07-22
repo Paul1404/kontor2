@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { contractsTable } from "~/server/db/schema/contracts";
@@ -106,12 +106,17 @@ export const contractsRouter = {
             mitgliedsnummer: membersTable.mitgliedsnummer,
           })
           .from(membersTable)
-          .where(eq(membersTable.id, input.memberId))
+          .where(and(eq(membersTable.id, input.memberId), isNull(membersTable.deletedAt)))
           .limit(1);
         if (!member) {
           throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
         }
         const patch = buildPatch(input.patch);
+        // A contract created from the member form is a direct-debit contract by
+        // default. Updates still preserve an omitted value, but creates must not
+        // inherit the database's conservative `false` default and silently turn
+        // a normal membership into an invoice contract.
+        if (input.patch.isDirectDebit === undefined) patch.isDirectDebit = true;
         if (patch.gekuendZum instanceof Date) {
           const [settings] = await tx.select().from(organizationSettingsTable).limit(1);
           assertCancellationAllowed(settings, patch.gekuendZum);

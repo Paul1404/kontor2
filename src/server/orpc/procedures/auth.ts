@@ -3,9 +3,11 @@ import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq, ne, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
+import { revokeThenSetPassword } from "~/server/auth/admin-password-reset";
 import { auth, authBaseUrl } from "~/server/auth/auth";
 import { invitationStatus } from "~/server/auth/invitation-status";
 import { wouldRemoveLastAdmin } from "~/server/auth/last-admin-guard";
+import { observePasswordResetDelivery } from "~/server/auth/password-reset-delivery";
 import { loadSmtpConfig, sendInviteEmail } from "~/server/auth/send-invite";
 import { completeSetup, isInSetupMode } from "~/server/auth/setup";
 import { invitations, roleEnum, users } from "~/server/db/schema/auth";
@@ -411,14 +413,21 @@ export const authRouter = {
       // the 12-char minimum and high entropy.
       const tempPassword = randomBytes(18).toString("base64url");
       try {
-        await auth(context.tenant).api.setUserPassword({
-          body: { userId: input.userId, newPassword: tempPassword },
-          headers: context.headers,
-        });
-        await auth(context.tenant).api.revokeUserSessions({
-          body: { userId: input.userId },
-          headers: context.headers,
-        });
+        // Revoke first. If this fails, the existing password is untouched. Once
+        // setUserPassword succeeds there is no later auth operation that can
+        // turn the request into an error while hiding the generated password.
+        await revokeThenSetPassword(
+          () =>
+            auth(context.tenant).api.revokeUserSessions({
+              body: { userId: input.userId },
+              headers: context.headers,
+            }),
+          () =>
+            auth(context.tenant).api.setUserPassword({
+              body: { userId: input.userId, newPassword: tempPassword },
+              headers: context.headers,
+            }),
+        );
       } catch (err) {
         logger.error("auth.resetUserPassword.failed", {
           userId: input.userId,
@@ -429,16 +438,25 @@ export const authRouter = {
         });
       }
 
-      await appendAudit(context.db, {
-        entityType: "user",
-        entityId: input.userId,
-        action: "update",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: { passwordReset: { before: null, after: true } },
-        requestId: context.requestId ?? null,
-      });
+      try {
+        await appendAudit(context.db, {
+          entityType: "user",
+          entityId: input.userId,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: { passwordReset: { before: null, after: true } },
+          requestId: context.requestId ?? null,
+        });
+      } catch (err) {
+        // The credential has already changed. Never withhold the only copy of
+        // the generated password because the secondary audit write failed.
+        logger.error("auth.resetUserPassword.audit-failed", {
+          userId: input.userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
       return { email: target.email, tempPassword };
     }),
 
@@ -472,10 +490,17 @@ export const authRouter = {
       }
 
       try {
-        await auth(context.tenant).api.requestPasswordReset({
-          body: { email: target.email },
-          headers: context.headers,
-        });
+        const { delivery } = await observePasswordResetDelivery(() =>
+          auth(context.tenant).api.requestPasswordReset({
+            body: { email: target.email },
+            headers: context.headers,
+          }),
+        );
+        if (!delivery?.ok) {
+          throw new ORPCError("INTERNAL_SERVER_ERROR", {
+            message: "Link zum Zurücksetzen konnte nicht versendet werden.",
+          });
+        }
       } catch (err) {
         logger.error("auth.sendPasswordResetLink.failed", {
           userId: input.userId,

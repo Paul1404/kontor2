@@ -80,8 +80,8 @@ export function SnapshotsTab({
             Versionen
           </CardTitle>
           <CardDescription>
-            Vollständige Schnappschüsse vor jeder Änderung plus täglicher Backup-Lauf.
-            Wiederherstellung ist selbst rückgängig machbar.
+            Vollständige Schnappschüsse bei Änderungen plus täglicher Backup-Lauf. Wiederherstellung
+            ist selbst rückgängig machbar.
           </CardDescription>
         </div>
         {canRestore ? (
@@ -143,6 +143,7 @@ type SnapshotDetail = {
     relationships: Record<string, unknown>[];
     memberAbteilungen: Record<string, unknown>[];
     sollstellungen: Record<string, unknown>[];
+    families: Record<string, unknown>[];
   };
   diffVsCurrent: {
     member: Record<string, { before: unknown; after: unknown }>;
@@ -152,6 +153,7 @@ type SnapshotDetail = {
     relationships: { added: number; removed: number; changedIds: string[] };
     memberAbteilungen: { added: number; removed: number };
     sollstellungen: { added: number; removed: number; changedIds: string[] };
+    families: { added: number; removed: number; changedIds: string[] };
   } | null;
   memberDeleted: boolean;
 };
@@ -381,12 +383,14 @@ function SnapshotDetailView({
               onChange={(e) => setIncludeDependents(e.target.checked)}
               className="rounded border-border"
             />
-            Abhängige Datensätze einbeziehen (Verträge, SEPA-Mandate, Beziehungen, Abteilungen)
+            Abhängige Datensätze einbeziehen (Verträge, SEPA, Anhänge, Beziehungen, Abteilungen,
+            Familien)
           </label>
           {includeDependents ? (
             <p className="text-xs text-muted-foreground">
-              Achtung: Bestehende Verträge, SEPA-Mandate, Beziehungen und Abteilungs-Zugehörigkeiten
-              dieses Mitglieds werden vollständig durch die Werte aus dem Snapshot ersetzt.
+              Beziehungen, Abteilungs- und Familienzugehörigkeiten werden auf den Snapshot-Stand
+              gesetzt. Gelöschte Anhänge werden wieder eingeblendet, solange ihr gespeichertes
+              Objekt noch vorhanden ist.
             </p>
           ) : null}
         </div>
@@ -442,6 +446,7 @@ function sumDepChanges(d: SnapshotDetail["diffVsCurrent"]): {
     "relationships",
     "memberAbteilungen",
     "sollstellungen",
+    "families",
   ] as const) {
     const v = d[key] as { added: number; removed: number; changedIds?: string[] };
     added += v.added;

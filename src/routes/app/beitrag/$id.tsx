@@ -106,8 +106,10 @@ function FeeRunDetailPage() {
           <CardContent>
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground">
-                Setzt den Status auf 'storniert'. Alle Soll-Stellungen werden ebenfalls storniert.
-                Sie können danach einen neuen Lauf für {r.billingYear} erzeugen.
+                Storniert den Lauf und alle noch unveränderten Sollstellungen. Sobald ein Posten
+                bezahlt, teilweise bezahlt oder als Rückläufer erfasst wurde, wird der gesamte
+                Vorgang sicher abgebrochen. Danach können Sie einen neuen Lauf für {r.billingYear}
+                erzeugen.
               </p>
               <input
                 className="rounded-md border border-border bg-background px-3 py-2 text-sm"

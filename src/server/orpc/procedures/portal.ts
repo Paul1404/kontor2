@@ -220,7 +220,7 @@ export const portalRouter = {
           member.kurzname ||
           member.firma1 ||
           "Mitglied";
-        mailResult = await sendPortalInvite({
+        mailResult = await sendPortalInvite(context.db, {
           to: targetEmail,
           memberName,
           vereinsname: org?.vereinsname ?? "Verein",

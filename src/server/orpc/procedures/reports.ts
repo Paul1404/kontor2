@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { escapeLike } from "~/server/db/like";
 import {
@@ -161,8 +161,10 @@ async function loadGeburtstage(
 
   const conditions = [
     isNotNull(membersTable.geburtsdatum) as never,
-    isNull(membersTable.austritt) as never,
-    isNull(membersTable.verstorbenAm) as never,
+    // Include members whose exit/death happens after the requested birthday.
+    // A future lifecycle date must not remove them from an earlier month's list.
+    sql`(${membersTable.austritt} is null or ${membersTable.austritt}::date >= (make_date(${input.year}, ${input.month}, 1) + (${dayExpr} - 1)))` as never,
+    sql`(${membersTable.verstorbenAm} is null or ${membersTable.verstorbenAm}::date >= (make_date(${input.year}, ${input.month}, 1) + (${dayExpr} - 1)))` as never,
     memberNotDeleted() as never,
     sql`${monthExpr} = ${input.month}` as never,
   ];
@@ -351,7 +353,13 @@ async function loadFinanzbericht(
     })
     .from(sollStellungenTable)
     .innerJoin(membersTable, eq(membersTable.id, sollStellungenTable.memberId))
-    .where(and(eq(sollStellungenTable.billingYear, input.year), notDeleted));
+    .where(
+      and(
+        eq(sollStellungenTable.billingYear, input.year),
+        ne(sollStellungenTable.status, "cancelled"),
+        notDeleted,
+      ),
+    );
   const totals = totalsRows[0] ?? { billed: "0", paid: "0", open: "0", count: 0 };
 
   const perAbteilung = await db
@@ -366,7 +374,13 @@ async function loadFinanzbericht(
     .innerJoin(membersTable, eq(membersTable.id, sollStellungenTable.memberId))
     .innerJoin(contractsTable, eq(contractsTable.id, sollStellungenTable.contractId))
     .leftJoin(feeTypesTable, eq(feeTypesTable.art, contractsTable.art))
-    .where(and(eq(sollStellungenTable.billingYear, input.year), notDeleted))
+    .where(
+      and(
+        eq(sollStellungenTable.billingYear, input.year),
+        ne(sollStellungenTable.status, "cancelled"),
+        notDeleted,
+      ),
+    )
     .groupBy(feeTypesTable.abteilung)
     .orderBy(sql`coalesce(${feeTypesTable.abteilung}, '(ohne Abteilung)')`);
 
@@ -385,7 +399,13 @@ async function loadFinanzbericht(
     .innerJoin(membersTable, eq(membersTable.id, sollStellungenTable.memberId))
     .innerJoin(contractsTable, eq(contractsTable.id, sollStellungenTable.contractId))
     .leftJoin(feeTypesTable, eq(feeTypesTable.art, contractsTable.art))
-    .where(and(eq(sollStellungenTable.billingYear, input.year), notDeleted))
+    .where(
+      and(
+        eq(sollStellungenTable.billingYear, input.year),
+        ne(sollStellungenTable.status, "cancelled"),
+        notDeleted,
+      ),
+    )
     .groupBy(contractsTable.art, feeTypesTable.bezeichnung, contractsTable.artName)
     .orderBy(asc(contractsTable.art));
 

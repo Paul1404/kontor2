@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, Globe, Loader2, Upload, XCircle } from "lucide-react";
+import { CheckCircle2, Globe, Loader2, RotateCcw, Upload, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -40,6 +40,15 @@ function ImportPage() {
         contentBase64,
         forceOverwriteAbteilungLinks,
         progressToken,
+      });
+    },
+  });
+  const undoCreated = useMutation({
+    mutationFn: () => {
+      if (!upload.data?.snapshotRunId) throw new Error("Kein Vor-Import-Snapshot vorhanden.");
+      return orpc.import.hideCreatedMembers({
+        batchId: upload.data.batchId,
+        snapshotRunId: upload.data.snapshotRunId,
       });
     },
   });
@@ -83,9 +92,10 @@ function ImportPage() {
             Tabellen für Mitglieder, Adressen, Verträge, SEPA-Mandate und Abteilungen enthalten.
           </li>
           <li>
-            <strong>Snapshot vor Import</strong>: Vor dem ersten Schreibzugriff wird ein
-            vollständiger Snapshot aller Mitglieder abgelegt. Im Fehlerfall lässt sich der Zustand
-            vor dem Import unter <em>Snapshots</em> wieder herstellen.
+            <strong>Snapshot vor Import</strong>: Vor dem ersten Schreibzugriff werden die bereits
+            vorhandenen Mitglieder gesichert, die der Import verändert. Diese lassen sich unter
+            <em> Snapshots</em> wiederherstellen. Neu angelegte Mitglieder können im Ergebnisbericht
+            gemeinsam ausgeblendet werden.
           </li>
           <li>
             <strong>Normalisieren</strong>: Linear-Daten werden in das Schema dieser Anwendung
@@ -245,6 +255,35 @@ function ImportPage() {
                   ))}
                 </ul>
               </details>
+            ) : null}
+            {upload.data?.snapshotRunId && upload.data.membersCreated > 0 ? (
+              <div className="flex flex-col gap-2 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm">
+                <div>
+                  Zum Rückgängigmachen zuerst die vorhandenen Mitglieder über den Vor-Import-Lauf
+                  unter Snapshots wiederherstellen. Danach können die {upload.data.membersCreated}{" "}
+                  neu angelegten Mitglieder hier gemeinsam ausgeblendet werden.
+                </div>
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={undoCreated.isPending || undoCreated.isSuccess}
+                    onClick={() => undoCreated.mutate()}
+                  >
+                    {undoCreated.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="size-4" />
+                    )}
+                    {undoCreated.isSuccess
+                      ? `${undoCreated.data.hiddenCount} Mitglieder ausgeblendet`
+                      : "Neu angelegte Mitglieder ausblenden"}
+                  </Button>
+                </div>
+                {undoCreated.isError ? (
+                  <span className="text-destructive">{(undoCreated.error as Error).message}</span>
+                ) : null}
+              </div>
             ) : null}
             <ImportValidationReport report={upload.data.validationReport} />
           </CardContent>

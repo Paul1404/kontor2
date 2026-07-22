@@ -15,6 +15,7 @@ export const attachmentsTable = pgTable(
     s3Key: text("s3_key").notNull().unique(),
     uploadedBy: text("uploaded_by").references(() => users.id, { onDelete: "set null" }),
     uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => [index("attachments_member_idx").on(t.memberId)],
 );

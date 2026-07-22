@@ -14,6 +14,7 @@ import { organizationSettingsTable } from "~/server/db/schema/organization-setti
 import { memberRef } from "~/server/domain/member";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { invalidateDashboardCaches } from "~/server/search/cache";
+import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0];
 
@@ -84,7 +85,7 @@ async function insertReturnAndReopen(
       .where(eq(sollStellungenTable.id, ref.sollStellungId));
   }
 
-  await appendAudit(tx, {
+  const auditId = await appendAudit(tx, {
     entityType: "sepa_return",
     entityId: row!.id,
     action: "create",
@@ -98,6 +99,12 @@ async function insertReturnAndReopen(
       rueckgebuhr: { before: null, after: data.rueckgebuhr },
     },
     requestId: actor.requestId ?? null,
+  });
+  await takeMemberSnapshot(tx, ref.memberId, {
+    trigger: "mutation",
+    actorId: actor.actorId,
+    actorEmail: actor.actorEmail,
+    auditId,
   });
   return row!.id;
 }
@@ -702,7 +709,7 @@ export const sepaReturnsRouter = {
             );
         }
       }
-      await appendAudit(tx, {
+      const auditId = await appendAudit(tx, {
         entityType: "sepa_return",
         entityId: input.id,
         action: "delete",
@@ -711,6 +718,12 @@ export const sepaReturnsRouter = {
         actorEmail: context.session!.user.email,
         changes: { undone: { before: row.reasonCode ?? null, after: null } },
         requestId: context.requestId ?? null,
+      });
+      await takeMemberSnapshot(tx, row.memberId, {
+        trigger: "mutation",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        auditId,
       });
     });
 

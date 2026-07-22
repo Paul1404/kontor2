@@ -41,6 +41,53 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.125.0",
+    date: "2026-07-22",
+    title: "Verlässliche Grundfunktionen",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Beitragsläufe nur mit Rechnungszahlern lassen sich jetzt erzeugen. Stornierte Posten werden im Finanzbericht nicht mehr mitgerechnet.",
+      },
+      {
+        category: "fix",
+        description:
+          "Ein Beitragslauf wird nur vollständig storniert. Bereits bezahlte, zurückgegebene oder erneut eingezogene Posten verhindern ein widersprüchliches Storno.",
+      },
+      {
+        category: "fix",
+        description:
+          "Snapshots erscheinen jetzt auch nach einzelnen Änderungen in der zentralen Übersicht. Anhänge und Familienzugehörigkeiten lassen sich mit wiederherstellen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Anhänge werden beim Löschen sicher aufbewahrt. Beziehungen, Abteilungen, Familien, Zahlungen, Rückläufer und Mahnänderungen erzeugen eigene Snapshots.",
+      },
+      {
+        category: "fix",
+        description:
+          "Passwort-Links melden Versandfehler korrekt. Portal-Einladungen verwenden die E-Mail-Einstellungen des jeweiligen Vereins.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Importe lassen sich vollständig nachvollziehbar zurücknehmen. Bestehende Mitglieder werden vorher gesichert und neu angelegte Mitglieder können gemeinsam ausgeblendet werden.",
+      },
+      {
+        category: "fix",
+        description:
+          "Gelöschte Mitglieder können nicht mehr weiterbearbeitet werden. Neue SEPA-Mandate benötigen eine IBAN und Verträge fragen die Zahlart ausdrücklich ab.",
+      },
+      {
+        category: "fix",
+        description:
+          "Mitglieder mit einem späteren Austrittsdatum bleiben bis dahin in Geburtstagslisten sichtbar.",
+      },
+    ],
+  },
+  {
     version: "0.124.1",
     date: "2026-07-22",
     changes: [

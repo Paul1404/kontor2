@@ -626,7 +626,7 @@ export const membersRouter = {
           context.db
             .select()
             .from(attachmentsTable)
-            .where(eq(attachmentsTable.memberId, m.id))
+            .where(and(eq(attachmentsTable.memberId, m.id), isNull(attachmentsTable.deletedAt)))
             .orderBy(desc(attachmentsTable.uploadedAt)),
           // Audit history is sensitive: project only what the UI renders,
           // and gate the full feed to vorstand+ via the role check below.
@@ -888,7 +888,7 @@ export const membersRouter = {
         const [existing] = await tx
           .select()
           .from(membersTable)
-          .where(eq(membersTable.id, input.memberId))
+          .where(and(eq(membersTable.id, input.memberId), memberNotDeleted()))
           .limit(1);
         if (!existing) {
           throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
@@ -1767,7 +1767,7 @@ export const membersRouter = {
       const [member] = await tx
         .select()
         .from(membersTable)
-        .where(eq(membersTable.id, input.memberId))
+        .where(and(eq(membersTable.id, input.memberId), memberNotDeleted()))
         .limit(1);
       if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
 
@@ -1922,7 +1922,7 @@ export const membersRouter = {
         const [member] = await tx
           .select()
           .from(membersTable)
-          .where(eq(membersTable.id, input.memberId))
+          .where(and(eq(membersTable.id, input.memberId), memberNotDeleted()))
           .limit(1);
         if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
         const day = toIsoDay(member.austritt);
@@ -2083,6 +2083,11 @@ export const membersRouter = {
       const eintrittIso = patch.eintritt instanceof Date ? toIsoDay(patch.eintritt) : null;
       const fallbackEintritt = eintrittIso ?? new Date().toISOString().slice(0, 10);
       const isKontakt = input.kind === "kontakt";
+      if (input.sepa != null && !patch.iban1) {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: "Für ein SEPA-Mandat ist eine gültige IBAN erforderlich.",
+        });
+      }
       const status = memberStatusFromForm(
         (patch.austritt as Date | null) ?? null,
         (patch.verstorbenAm as Date | null) ?? null,
