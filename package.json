@@ -1,6 +1,6 @@
 {
   "name": "kontor2",
-  "version": "0.125.0",
+  "version": "0.126.0",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "author": "Paul Dresch <paul.dresch@untereuerheim.com>",
@@ -47,6 +47,8 @@
     "@aws-sdk/client-s3": "^3.1073.0",
     "@aws-sdk/s3-request-presigner": "^3.1073.0",
     "@better-auth/api-key": "1.6.20",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/spectral": "^5.3.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@orpc/client": "^1.14.6",
     "@orpc/openapi": "^1.14.6",

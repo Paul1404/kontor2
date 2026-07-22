@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.126.0",
+    date: "2026-07-22",
+    title: "Öffentliche Produktseite",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "kontor2.com zeigt jetzt Kontor2 als Produkt für interessierte Pilotvereine. Vereins-Subdomains und die Betreiber-Console bleiben getrennte Bereiche.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Impressum und Datenschutzerklärung sind auf der Produktseite erreichbar. Schriften werden ohne Verbindung zu Google direkt von Kontor2 geladen.",
+      },
+    ],
+  },
+  {
     version: "0.125.0",
     date: "2026-07-22",
     title: "Verlässliche Grundfunktionen",

@@ -13,6 +13,8 @@ import { Route as SetupRouteImport } from './setup'
 import { Route as PasswortZuruecksetzenRouteImport } from './passwort-zuruecksetzen'
 import { Route as PasswortVergessenRouteImport } from './passwort-vergessen'
 import { Route as LoginRouteImport } from './login'
+import { Route as ImpressumRouteImport } from './impressum'
+import { Route as DatenschutzRouteImport } from './datenschutz'
 import { Route as PortalRouteRouteImport } from './portal/route'
 import { Route as ConsoleRouteRouteImport } from './console/route'
 import { Route as AppRouteRouteImport } from './app/route'
@@ -107,6 +109,16 @@ const PasswortVergessenRoute = PasswortVergessenRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImpressumRoute = ImpressumRouteImport.update({
+  id: '/impressum',
+  path: '/impressum',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DatenschutzRoute = DatenschutzRouteImport.update({
+  id: '/datenschutz',
+  path: '/datenschutz',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PortalRouteRoute = PortalRouteRouteImport.update({
@@ -507,6 +519,8 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteRouteWithChildren
   '/console': typeof ConsoleRouteRouteWithChildren
   '/portal': typeof PortalRouteRouteWithChildren
+  '/datenschutz': typeof DatenschutzRoute
+  '/impressum': typeof ImpressumRoute
   '/login': typeof LoginRoute
   '/passwort-vergessen': typeof PasswortVergessenRoute
   '/passwort-zuruecksetzen': typeof PasswortZuruecksetzenRoute
@@ -584,6 +598,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/datenschutz': typeof DatenschutzRoute
+  '/impressum': typeof ImpressumRoute
   '/login': typeof LoginRoute
   '/passwort-vergessen': typeof PasswortVergessenRoute
   '/passwort-zuruecksetzen': typeof PasswortZuruecksetzenRoute
@@ -666,6 +682,8 @@ export interface FileRoutesById {
   '/app': typeof AppRouteRouteWithChildren
   '/console': typeof ConsoleRouteRouteWithChildren
   '/portal': typeof PortalRouteRouteWithChildren
+  '/datenschutz': typeof DatenschutzRoute
+  '/impressum': typeof ImpressumRoute
   '/login': typeof LoginRoute
   '/passwort-vergessen': typeof PasswortVergessenRoute
   '/passwort-zuruecksetzen': typeof PasswortZuruecksetzenRoute
@@ -749,6 +767,8 @@ export interface FileRouteTypes {
     | '/app'
     | '/console'
     | '/portal'
+    | '/datenschutz'
+    | '/impressum'
     | '/login'
     | '/passwort-vergessen'
     | '/passwort-zuruecksetzen'
@@ -826,6 +846,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/datenschutz'
+    | '/impressum'
     | '/login'
     | '/passwort-vergessen'
     | '/passwort-zuruecksetzen'
@@ -907,6 +929,8 @@ export interface FileRouteTypes {
     | '/app'
     | '/console'
     | '/portal'
+    | '/datenschutz'
+    | '/impressum'
     | '/login'
     | '/passwort-vergessen'
     | '/passwort-zuruecksetzen'
@@ -989,6 +1013,8 @@ export interface RootRouteChildren {
   AppRouteRoute: typeof AppRouteRouteWithChildren
   ConsoleRouteRoute: typeof ConsoleRouteRouteWithChildren
   PortalRouteRoute: typeof PortalRouteRouteWithChildren
+  DatenschutzRoute: typeof DatenschutzRoute
+  ImpressumRoute: typeof ImpressumRoute
   LoginRoute: typeof LoginRoute
   PasswortVergessenRoute: typeof PasswortVergessenRoute
   PasswortZuruecksetzenRoute: typeof PasswortZuruecksetzenRoute
@@ -1035,6 +1061,20 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/impressum': {
+      id: '/impressum'
+      path: '/impressum'
+      fullPath: '/impressum'
+      preLoaderRoute: typeof ImpressumRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/datenschutz': {
+      id: '/datenschutz'
+      path: '/datenschutz'
+      fullPath: '/datenschutz'
+      preLoaderRoute: typeof DatenschutzRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/portal': {
@@ -1728,6 +1768,8 @@ const rootRouteChildren: RootRouteChildren = {
   AppRouteRoute: AppRouteRouteWithChildren,
   ConsoleRouteRoute: ConsoleRouteRouteWithChildren,
   PortalRouteRoute: PortalRouteRouteWithChildren,
+  DatenschutzRoute: DatenschutzRoute,
+  ImpressumRoute: ImpressumRoute,
   LoginRoute: LoginRoute,
   PasswortVergessenRoute: PasswortVergessenRoute,
   PasswortZuruecksetzenRoute: PasswortZuruecksetzenRoute,

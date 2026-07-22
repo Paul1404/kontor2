@@ -1,23 +1,33 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, redirect, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { ErrorPanel, NotFoundPanel } from "~/components/layout/ErrorPanel";
 import { Toaster } from "~/components/ui/toaster";
 import { type Branding, BrandingProvider } from "~/lib/branding";
 import { brandColorCss } from "~/lib/branding-color";
+import { isPublicProductRequest } from "~/lib/current-product-host";
 import { orpc } from "~/lib/orpc";
+import { isPublicProductPath } from "~/lib/product-host";
 import { ThemeProvider, themeInitScript } from "~/lib/theme";
 import appCss from "~/styles/globals.css?url";
 
 export const Route = createRootRoute({
+  beforeLoad: ({ location }) => {
+    // The apex is a public product site, never an accidental doorway into the
+    // operator or a club realm. API handlers stay reachable for health checks.
+    if (isPublicProductRequest() && !isPublicProductPath(location.pathname)) {
+      throw redirect({ to: "/" });
+    }
+  },
   // Branding wird einmal serverseitig geladen und steht dem ganzen Baum (inkl.
   // Login/Setup) zur Verfügung. Resilient: ein Fehler darf die App nie
   // blockieren, dann gilt das Standard-Aussehen. Langer staleTime, damit
   // Client-Navigationen nicht neu laden.
-  loader: async (): Promise<{ branding: Branding | null }> => {
+  loader: async (): Promise<{ branding: Branding | null; isPublic: boolean }> => {
+    if (isPublicProductRequest()) return { branding: null, isPublic: true };
     try {
-      return { branding: await orpc.organization.branding() };
+      return { branding: await orpc.organization.branding(), isPublic: false };
     } catch {
-      return { branding: null };
+      return { branding: null, isPublic: false };
     }
   },
   staleTime: 5 * 60 * 1000,
@@ -29,6 +39,7 @@ export const Route = createRootRoute({
   // Favicon, sonst gilt das gebündelte Kontor2-Zeichen.
   head: ({ loaderData }) => {
     const b = loaderData?.branding ?? null;
+    const isPublic = loaderData?.isPublic ?? false;
     // The browser favicon is part of the app chrome and stays Kontor², not the
     // Verein's logo. Per-Verein branding belongs on member-facing documents, not
     // the tab icon (otherwise the club looks like the software).
@@ -44,19 +55,45 @@ export const Route = createRootRoute({
         { charSet: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { name: "color-scheme", content: "light dark" },
-        { title: `${b?.anzeigename?.trim() || "Kontor2"}: Vereinsverwaltung` },
+        {
+          title: isPublic
+            ? "Kontor2 | Vereinsverwaltung aus der Praxis"
+            : `${b?.anzeigename?.trim() || "Kontor2"}: Vereinsverwaltung`,
+        },
+        ...(isPublic
+          ? [
+              {
+                name: "description",
+                content:
+                  "Kontor2 verbindet Mitgliederverwaltung, Beiträge, SEPA, Forderungen und Datenschutz in nachvollziehbaren Abläufen für Sportvereine.",
+              },
+              { property: "og:type", content: "website" },
+              { property: "og:title", content: "Kontor2 | Vereinsverwaltung aus der Praxis" },
+              {
+                property: "og:description",
+                content:
+                  "Vereinsverwaltung für den echten Verwaltungsalltag. Entwickelt aus der Praxis eines Sportvereins.",
+              },
+              { property: "og:url", content: "https://kontor2.com/" },
+              { property: "og:image", content: "https://kontor2.com/og.png" },
+              { property: "og:image:width", content: "1200" },
+              { property: "og:image:height", content: "630" },
+              {
+                property: "og:image:alt",
+                content: "Kontor2: Vereinsverwaltung für den echten Verwaltungsalltag",
+              },
+              { name: "twitter:card", content: "summary_large_image" },
+            ]
+          : [{ name: "robots", content: "noindex, nofollow" }]),
         { name: "theme-color", content: b?.primaryColor || "#14223D" },
       ],
       links: [
-        { rel: "preconnect", href: "https://fonts.googleapis.com" },
-        { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-        {
-          rel: "stylesheet",
-          href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:wght@500;600&display=swap",
-        },
         { rel: "stylesheet", href: appCss },
         ...iconLinks,
-        { rel: "manifest", href: "/api/branding/manifest" },
+        {
+          rel: "manifest",
+          href: isPublic ? "/manifest.webmanifest" : "/api/branding/manifest",
+        },
       ],
     };
   },
