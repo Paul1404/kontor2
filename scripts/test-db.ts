@@ -15,6 +15,7 @@
  * a real database.
  */
 import { spawnSync } from "node:child_process";
+import { createTestEnv } from "./test-env";
 
 const COMPOSE = ["compose", "-f", "docker-compose.test.yml"];
 
@@ -23,19 +24,7 @@ const COMPOSE = ["compose", "-f", "docker-compose.test.yml"];
  * test-only values. APP_SECRET is 64 hex zeros (valid shape, no real secret).
  * AWS_* are placeholders so `env()` parses; tests that need S3 must mock it.
  */
-const TEST_ENV: Record<string, string> = {
-  NODE_ENV: "test",
-  DATABASE_URL: "postgresql://svuwv@localhost:5433/svuwv_test",
-  REDIS_URL: "redis://localhost:6380",
-  BETTER_AUTH_URL: "http://localhost:3000",
-  APP_SECRET: "0".repeat(64),
-  AWS_ENDPOINT_URL: "http://localhost:9000",
-  AWS_S3_BUCKET_NAME: "svuwv-test",
-  AWS_DEFAULT_REGION: "us-east-1",
-  AWS_ACCESS_KEY_ID: "test",
-  AWS_SECRET_ACCESS_KEY: "test",
-  SNAPSHOT_CRON_DISABLED: "1",
-};
+const TEST_ENV = createTestEnv();
 
 function run(cmd: string, args: string[], extraEnv: Record<string, string> = {}): number {
   const res = spawnSync(cmd, args, {

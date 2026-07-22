@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.124.1",
+    date: "2026-07-22",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Eine vollständig temporäre Testinstanz lässt sich jetzt mit einem Befehl starten. Datenbank, Zugangsdaten und App werden frisch angelegt und beim Beenden wieder entfernt.",
+      },
+    ],
+  },
+  {
     version: "0.124.0",
     date: "2026-07-13",
     changes: [

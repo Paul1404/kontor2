@@ -49,6 +49,23 @@ First run: open <http://localhost:3000/setup> and create the first admin (it get
 the `admin` role). The MinIO console is at <http://localhost:9001> (`minioadmin`
 / `minioadmin`).
 
+## Disposable browser sandbox
+
+For interactive QA in a completely fresh instance, run:
+
+```sh
+bun run sandbox
+```
+
+The command resets the tmpfs-backed test database, applies all migrations,
+creates a temporary admin with newly generated credentials, and serves the app
+at <http://localhost:3100>. The URL and credentials are printed once startup is
+complete. Press Ctrl-C to stop the app and delete the test containers and all
+their data. The persistent development stack on port 3000 is not touched.
+
+Set `SANDBOX_PORT` to use another app port. If a previous sandbox process was
+interrupted before cleanup, `bun run sandbox:down` removes its test containers.
+
 ## Notes
 
 - **No HMR yet.** The app is served from the production build (`dev:serve`
