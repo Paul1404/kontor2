@@ -55,6 +55,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=512m
           --health-cmd "pg_isready -U svuwv -d svuwv_test"
           --health-interval 2s
           --health-timeout 5s
@@ -64,6 +65,7 @@ jobs:
         ports:
           - 6379:6379
         options: >-
+          --tmpfs /data:rw,noexec,nosuid,size=128m
           --health-cmd "redis-cli ping"
           --health-interval 2s
           --health-timeout 5s

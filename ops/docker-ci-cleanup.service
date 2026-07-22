@@ -1,0 +1,19 @@
+[Unit]
+Description=Prune aged Docker artifacts from GitHub Actions
+Requires=docker.service
+After=docker.service
+ConditionPathExists=/var/run/docker.sock
+
+[Service]
+Type=oneshot
+Environment=DOCKER_CI_RETENTION=168h
+Environment=DOCKER_CI_VOLUME_MIN_AGE_SECONDS=86400
+Environment=DOCKER_CONFIG=/run/docker-ci-cleanup
+RuntimeDirectory=docker-ci-cleanup
+ExecStart=/usr/local/sbin/docker-ci-cleanup
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
