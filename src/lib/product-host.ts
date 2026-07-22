@@ -19,7 +19,13 @@ export function isPublicProductHost(
   return Boolean(normalized && domain && (normalized === domain || normalized === `www.${domain}`));
 }
 
-const PUBLIC_PRODUCT_PATHS = new Set(["/", "/impressum", "/datenschutz"]);
+const PUBLIC_PRODUCT_PATHS = new Set([
+  "/",
+  "/impressum",
+  "/datenschutz",
+  "/robots.txt",
+  "/sitemap.xml",
+]);
 
 /** Only these pages are published on the product apex. App routes stay tenant-only. */
 export function isPublicProductPath(pathname: string): boolean {

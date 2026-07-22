@@ -1,4 +1,5 @@
 import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { DEFAULT_DUNNING_TEXTS, type DunningLevelText } from "~/lib/tenant-settings";
 import { altMitgliedsnummer, memberRef } from "~/server/domain/member";
 import { LetterPage } from "~/server/pdf/letter-layout";
 
@@ -77,6 +78,7 @@ export type MahnungInput = {
     glaeubigerId: string;
     /** Club logo as a data URI, or null to render without one. */
     logoDataUri: string | null;
+    dunningText?: DunningLevelText | null;
   };
   /** The member the dues belong to (drives Mitgliedsnummer + Verwendungszweck). */
   member: {
@@ -104,24 +106,6 @@ export type MahnungInput = {
   openSum: string;
   mahngebuhr: string;
   totalDue: string;
-};
-
-const LEVEL_TITLES: Record<1 | 2 | 3, string> = {
-  1: "Zahlungserinnerung",
-  2: "1. Mahnung",
-  3: "2. Mahnung",
-};
-
-const LEVEL_INTROS: Record<1 | 2 | 3, string> = {
-  1: "bei der Überprüfung unserer Buchhaltung haben wir festgestellt, dass die nachfolgend aufgeführten Beiträge bisher noch nicht beglichen wurden. Möglicherweise ist Ihnen dies entgangen. Wir bitten um Ausgleich des Betrags bis spätestens",
-  2: "trotz unserer Zahlungserinnerung sind die nachfolgend aufgeführten Beiträge weiterhin offen. Wir bitten Sie nun nachdrücklich, den ausstehenden Betrag bis spätestens",
-  3: "leider mussten wir feststellen, dass auch nach unserer 1. Mahnung die offenen Beiträge bislang nicht beglichen wurden. Bitte überweisen Sie den fälligen Gesamtbetrag bis spätestens",
-};
-
-const LEVEL_CLOSING: Record<1 | 2 | 3, string> = {
-  1: "Sollte sich Ihre Zahlung mit dieser Erinnerung überschnitten haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.",
-  2: "Bitte beachten Sie, dass wir die Sache im Falle weiterer Nichtzahlung an den Vorstand zur Klärung weiterleiten müssen.",
-  3: "Sollte auch nach Ablauf dieser Frist keine Zahlung erfolgen, behält sich der Verein die Einleitung weiterer Schritte einschließlich der Beendigung der Mitgliedschaft vor.",
 };
 
 function fmtDate(s: string): string {
@@ -168,7 +152,10 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
     .filter(Boolean)
     .join(" · ");
 
-  const title = LEVEL_TITLES[pkg.level];
+  const text = org.dunningText ?? DEFAULT_DUNNING_TEXTS[pkg.level];
+  const title = text.title;
+  const introduction = text.introduction;
+  const closing = text.closing;
   const subject = subjectName(pkg.member);
   const ref = memberRef(pkg.member);
   const altNr = altMitgliedsnummer(pkg.member.mitgliedsnummer, ref);
@@ -206,7 +193,7 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
           </Text>
         ) : null}
         <Text style={styles.intro}>
-          {LEVEL_INTROS[pkg.level]} {fmtDate(pkg.dueDate)} zu begleichen.
+          {introduction} {fmtDate(pkg.dueDate)} zu begleichen.
         </Text>
 
         <View style={styles.table}>
@@ -278,7 +265,7 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
         </View>
 
         <View style={styles.notice}>
-          <Text>{LEVEL_CLOSING[pkg.level]}</Text>
+          <Text>{closing}</Text>
         </View>
 
         <Text style={{ marginTop: 18 }}>Mit freundlichen Grüßen</Text>

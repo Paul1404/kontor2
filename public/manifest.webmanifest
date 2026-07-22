@@ -1,7 +1,8 @@
 {
   "name": "Kontor2",
   "short_name": "Kontor2",
-  "description": "Kontor2 Vereinsverwaltung",
+  "description": "Vereinssoftware für Sportvereine mit nachvollziehbaren Abläufen für Mitglieder, Beiträge, SEPA, Forderungen und Datenschutz.",
+  "scope": "/",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F6F3EC",

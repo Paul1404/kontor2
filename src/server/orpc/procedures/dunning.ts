@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { normalizeTenantPolicy } from "~/lib/tenant-settings";
 import { appendAudit } from "~/server/audit/log";
 import type { DB } from "~/server/db/client";
 import { allocateDocRef } from "~/server/db/doc-ref";
@@ -455,6 +456,13 @@ export const dunningRouter = {
             ort: m.ort,
           };
 
+          const tenantPolicy = normalizeTenantPolicy(org.tenantPolicy);
+          const dunningText =
+            input.level === 1
+              ? tenantPolicy.dunningTexts.level1
+              : input.level === 2
+                ? tenantPolicy.dunningTexts.level2
+                : tenantPolicy.dunningTexts.level3;
           const pdfInput: MahnungInput = {
             level: input.level as 1 | 2 | 3,
             runDate: toDateString(runDate),
@@ -469,6 +477,7 @@ export const dunningRouter = {
               vereinsBankname: org.vereinsBankname,
               glaeubigerId: org.glaeubigerId,
               logoDataUri,
+              dunningText,
             },
             member: {
               memberNo: m.memberNo,

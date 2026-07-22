@@ -41,6 +41,33 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.127.0",
+    date: "2026-07-22",
+    title: "Vereinsregeln und Auffindbarkeit",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Vereinsspezifische Regeln für Anträge, Kündigungen, Mahnungen und frühere Datenquellen lassen sich jetzt je Verein einstellen.",
+      },
+      {
+        category: "feature",
+        description:
+          "Kanonische und frühere Domains werden dauerhaft in der Betreiber-Console verwaltet.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die öffentliche Produktseite liefert erweiterte Suchmaschinen-Metadaten, strukturierte Produktdaten, robots.txt und eine Sitemap.",
+      },
+      {
+        category: "fix",
+        description:
+          "Feste Annahmen des ursprünglichen SVU-Betriebs wurden aus allgemeinen Abläufen entfernt und als Einstellungen abgebildet.",
+      },
+    ],
+  },
+  {
     version: "0.126.0",
     date: "2026-07-22",
     title: "Öffentliche Produktseite",

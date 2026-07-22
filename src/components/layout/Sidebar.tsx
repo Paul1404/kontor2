@@ -30,13 +30,14 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useRef } from "react";
 import { VersionChip } from "~/components/ui/version-chip";
 import { useBranding } from "~/lib/branding";
 import { cn } from "~/lib/cn";
 import { useModalFocus } from "~/lib/modal-focus";
 import { orpc } from "~/lib/orpc";
 import { roleLabel } from "~/lib/role";
+import { normalizeTenantPolicy } from "~/lib/tenant-settings";
 import { useRecentMembers } from "~/lib/use-recent-members";
 
 type NavItem = {
@@ -45,6 +46,7 @@ type NavItem = {
   icon: ReactNode;
   adminOnly?: boolean;
   vorstandOnly?: boolean;
+  capability?: "legacy-import" | "legacy-archive";
 };
 
 type NavSection = {
@@ -145,12 +147,14 @@ const SECTIONS: NavSection[] = [
         label: "Datenimport",
         icon: <FileSpreadsheet className="size-[18px]" />,
         adminOnly: true,
+        capability: "legacy-import",
       },
       {
         to: "/app/archive",
         label: "SQL-Archiv",
         icon: <Database className="size-[18px]" />,
         adminOnly: true,
+        capability: "legacy-archive",
       },
       {
         to: "/app/einstellungen/verein",
@@ -242,6 +246,13 @@ function SidebarBody({
   const { location } = useRouterState();
   const { recent } = useRecentMembers();
   const branding = useBranding();
+  const organization = useQuery({
+    queryKey: ["organization"],
+    queryFn: () => orpc.organization.get(),
+    enabled: role === "admin",
+    staleTime: 5 * 60 * 1000,
+  });
+  const tenantPolicy = normalizeTenantPolicy(organization.data?.tenantPolicy);
   // Open data-quality issues drive a badge on the nav item. Vorstand+ only;
   // kept warm for 5 minutes so navigation does not re-run the check.
   const canSeeDq = role === "vorstand" || role === "admin";
@@ -289,6 +300,12 @@ function SidebarBody({
           const items = sect.items.filter((n) => {
             if (n.adminOnly && role !== "admin") return false;
             if (n.vorstandOnly && role !== "admin" && role !== "vorstand") return false;
+            if (n.capability === "legacy-import" && tenantPolicy.legacyImportSources.length === 0) {
+              return false;
+            }
+            if (n.capability === "legacy-archive" && !tenantPolicy.legacyArchiveEnabled) {
+              return false;
+            }
             return true;
           });
           if (items.length === 0) return null;

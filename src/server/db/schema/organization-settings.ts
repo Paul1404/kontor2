@@ -1,4 +1,5 @@
 import { boolean, integer, jsonb, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import type { TenantPolicy } from "~/lib/tenant-settings";
 import { users } from "~/server/db/schema/auth";
 import { encryptedText } from "~/server/db/types";
 
@@ -18,7 +19,8 @@ export type Beitragsstaffel = {
   erwachsener: string;
 };
 
-export const DEFAULT_BEITRAGSSTAFFEL: Beitragsstaffel = {
+/** Historical SVU fixture. Runtime requests always use persisted tenant settings. */
+export const LEGACY_SVU_BEITRAGSSTAFFEL: Beitragsstaffel = {
   familie: "96.00",
   kind: "24.00",
   kindElternMitglied: "12.00",
@@ -51,6 +53,8 @@ export const organizationSettingsTable = pgTable("organization_settings", {
   logo: text("logo"),
   /** Markenfarbe als Hex (#rrggbb). Färbt Primär-/Brand-Elemente. Leer: Standardrot. */
   primaryColor: text("primary_color"),
+  /** Tenant-specific workflow and legacy-source policy. Null until explicitly configured. */
+  tenantPolicy: jsonb("tenant_policy").$type<TenantPolicy>(),
   anschriftStrasse: text("anschrift_strasse"),
   anschriftPlz: text("anschrift_plz"),
   anschriftOrt: text("anschrift_ort"),

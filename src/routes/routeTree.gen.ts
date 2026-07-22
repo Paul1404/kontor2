@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './__root'
+import { Route as SitemapDotxmlRouteImport } from './sitemap[.]xml'
 import { Route as SetupRouteImport } from './setup'
+import { Route as RobotsDottxtRouteImport } from './robots[.]txt'
 import { Route as PasswortZuruecksetzenRouteImport } from './passwort-zuruecksetzen'
 import { Route as PasswortVergessenRouteImport } from './passwort-vergessen'
 import { Route as LoginRouteImport } from './login'
@@ -91,9 +93,19 @@ import { Route as AppForderungenMahnungenNeuRouteImport } from './app/forderunge
 import { Route as AppForderungenMahnungenIdRouteImport } from './app/forderungen/mahnungen/$id'
 import { Route as ApiPortalZugangTokenRouteImport } from './api/portal.zugang.$token'
 
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PasswortZuruecksetzenRoute = PasswortZuruecksetzenRouteImport.update({
@@ -524,7 +536,9 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/passwort-vergessen': typeof PasswortVergessenRoute
   '/passwort-zuruecksetzen': typeof PasswortZuruecksetzenRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/setup': typeof SetupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
@@ -603,7 +617,9 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/passwort-vergessen': typeof PasswortVergessenRoute
   '/passwort-zuruecksetzen': typeof PasswortZuruecksetzenRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/setup': typeof SetupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
@@ -687,7 +703,9 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/passwort-vergessen': typeof PasswortVergessenRoute
   '/passwort-zuruecksetzen': typeof PasswortZuruecksetzenRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/setup': typeof SetupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
@@ -772,7 +790,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/passwort-vergessen'
     | '/passwort-zuruecksetzen'
+    | '/robots.txt'
     | '/setup'
+    | '/sitemap.xml'
     | '/antrag/papierformular'
     | '/antrag/status'
     | '/api/health'
@@ -851,7 +871,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/passwort-vergessen'
     | '/passwort-zuruecksetzen'
+    | '/robots.txt'
     | '/setup'
+    | '/sitemap.xml'
     | '/antrag/papierformular'
     | '/antrag/status'
     | '/api/health'
@@ -934,7 +956,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/passwort-vergessen'
     | '/passwort-zuruecksetzen'
+    | '/robots.txt'
     | '/setup'
+    | '/sitemap.xml'
     | '/antrag/papierformular'
     | '/antrag/status'
     | '/api/health'
@@ -1018,7 +1042,9 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PasswortVergessenRoute: typeof PasswortVergessenRoute
   PasswortZuruecksetzenRoute: typeof PasswortZuruecksetzenRoute
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
   SetupRoute: typeof SetupRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiMcpRoute: typeof ApiMcpRoute
   InviteTokenRoute: typeof InviteTokenRoute
@@ -1035,11 +1061,25 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/setup': {
       id: '/setup'
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/passwort-zuruecksetzen': {
@@ -1773,7 +1813,9 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PasswortVergessenRoute: PasswortVergessenRoute,
   PasswortZuruecksetzenRoute: PasswortZuruecksetzenRoute,
+  RobotsDottxtRoute: RobotsDottxtRoute,
   SetupRoute: SetupRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiMcpRoute: ApiMcpRoute,
   InviteTokenRoute: InviteTokenRoute,

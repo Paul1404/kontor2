@@ -12,7 +12,7 @@ import { and, asc, eq, isNotNull, isNull, ne, or } from "drizzle-orm";
 import type { DBOrTx } from "~/server/db/client";
 import { feeTypesTable } from "~/server/db/schema/fee-types";
 import type { Beitragsstaffel } from "~/server/db/schema/organization-settings";
-import type { AntragKategorie } from "~/server/domain/application/antragstyp";
+import type { Altersgrenzen, AntragKategorie } from "~/server/domain/application/antragstyp";
 import { antragsRolleFor, calculateFee } from "~/server/domain/application/fees";
 
 export type ResolvedFee = {
@@ -34,6 +34,7 @@ export async function resolveApplicationFee(
     kategorie: AntragKategorie;
     elternteilMitglied: boolean;
     staffel: Beitragsstaffel | null;
+    altersgrenzen: Altersgrenzen;
   },
 ): Promise<ResolvedFee> {
   const rolle = antragsRolleFor(opts.kategorie, opts.elternteilMitglied);
@@ -70,6 +71,7 @@ export async function resolveApplicationFee(
       kategorie: opts.kategorie,
       elternteilMitglied: opts.elternteilMitglied,
       staffel: opts.staffel,
+      altersgrenzen: opts.altersgrenzen,
     });
     return { betrag: f.betrag, label: f.label, art: null };
   }

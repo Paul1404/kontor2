@@ -15,6 +15,26 @@ import {
 import { invalidateTenantCache } from "~/server/tenants/registry";
 import { consoleSubdomain, primaryTenant, productDomain } from "~/server/tenants/resolve";
 
+const HOST_RE = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+function normalizeHost(value: string): string {
+  const host = value.trim().toLowerCase().replace(/\.$/, "");
+  if (!HOST_RE.test(host)) {
+    throw new ORPCError("BAD_REQUEST", { message: `Ungültiger Hostname: ${host || "leer"}` });
+  }
+  return host;
+}
+
+function primaryDatabaseName(): string {
+  const name = new URL(env().DATABASE_URL).pathname.slice(1);
+  if (!DB_NAME_RE.test(name)) {
+    throw new ORPCError("INTERNAL_SERVER_ERROR", {
+      message: "Der Datenbankname des primären Vereins ist ungültig.",
+    });
+  }
+  return name;
+}
+
 /**
  * Betreiber-Console (Control-Plane): Vereine listen, anlegen, sperren, entfernen.
  * Alles `operatorProc` -- nur Operator-Accounts der Control-DB auf `admin.<domain>`.
@@ -29,15 +49,32 @@ export const consoleRouter = {
         key: tenantsTable.key,
         databaseName: tenantsTable.databaseName,
         displayName: tenantsTable.displayName,
+        canonicalHost: tenantsTable.canonicalHost,
+        legacyHosts: tenantsTable.legacyHosts,
         status: tenantsTable.status,
         createdAt: tenantsTable.createdAt,
       })
       .from(tenantsTable)
       .orderBy(tenantsTable.key);
+    const primary = primaryTenant();
+    const tenants = rows.map((row) => ({ ...row, registered: true }));
+    if (!tenants.some((row) => row.key === primary.key)) {
+      tenants.push({
+        key: primary.key,
+        databaseName: primaryDatabaseName(),
+        displayName: primary.key.toUpperCase(),
+        canonicalHost: `${primary.key}.${productDomain()}`,
+        legacyHosts: [],
+        status: "active",
+        createdAt: new Date(0),
+        registered: false,
+      });
+      tenants.sort((a, b) => a.key.localeCompare(b.key));
+    }
     return {
       productDomain: productDomain(),
-      primaryKey: primaryTenant().key,
-      tenants: rows,
+      primaryKey: primary.key,
+      tenants,
     };
   }),
 
@@ -81,6 +118,7 @@ export const consoleRouter = {
         databaseName,
         primaryKey: primaryTenant().key,
         controlUrl: controlDbUrl(),
+        canonicalHost: `${key}.${productDomain()}`,
       });
       invalidateTenantCache();
       await appendAudit(context.db, {
@@ -97,6 +135,67 @@ export const consoleRouter = {
         requestId: context.requestId,
       });
       return { key, databaseName };
+    }),
+
+  updateRouting: operatorProc
+    .input(
+      v.object({
+        key: v.string(),
+        canonicalHost: v.pipe(v.string(), v.trim(), v.minLength(1)),
+        legacyHosts: v.array(v.string()),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const canonicalHost = normalizeHost(input.canonicalHost);
+      const legacyHosts = [...new Set(input.legacyHosts.map(normalizeHost))];
+      if (legacyHosts.includes(canonicalHost)) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Der kanonische Host darf nicht zugleich als alte Domain eingetragen sein.",
+        });
+      }
+
+      const [existing] = await context.db
+        .select({
+          canonicalHost: tenantsTable.canonicalHost,
+          legacyHosts: tenantsTable.legacyHosts,
+        })
+        .from(tenantsTable)
+        .where(eq(tenantsTable.key, input.key))
+        .limit(1);
+
+      if (existing) {
+        await context.db
+          .update(tenantsTable)
+          .set({ canonicalHost, legacyHosts, updatedAt: new Date() })
+          .where(eq(tenantsTable.key, input.key));
+      } else if (input.key === primaryTenant().key) {
+        await context.db.insert(tenantsTable).values({
+          key: input.key,
+          databaseName: primaryDatabaseName(),
+          displayName: input.key.toUpperCase(),
+          canonicalHost,
+          legacyHosts,
+          status: "active",
+        });
+      } else {
+        throw new ORPCError("NOT_FOUND", { message: "Verein nicht gefunden." });
+      }
+
+      invalidateTenantCache();
+      await appendAudit(context.db, {
+        entityType: "tenant",
+        entityId: input.key,
+        action: "update",
+        source: "ui",
+        actorId: context.session?.user.id ?? null,
+        actorEmail: context.session?.user.email ?? null,
+        changes: {
+          canonicalHost: { before: existing?.canonicalHost ?? null, after: canonicalHost },
+          legacyHosts: { before: existing?.legacyHosts ?? [], after: legacyHosts },
+        },
+        requestId: context.requestId,
+      });
+      return { key: input.key, canonicalHost, legacyHosts };
     }),
 
   setStatus: operatorProc

@@ -132,7 +132,7 @@ function SmtpPage() {
                 type="email"
                 value={form.fromAddress}
                 onChange={(e) => setForm({ ...form, fromAddress: e.target.value })}
-                placeholder="info@sv-untereuerheim.de"
+                placeholder="info@verein.de"
                 required
               />
             </Field>
@@ -140,7 +140,7 @@ function SmtpPage() {
               <Input
                 value={form.fromName}
                 onChange={(e) => setForm({ ...form, fromName: e.target.value })}
-                placeholder="SV Untereuerheim"
+                placeholder="TSV Musterstadt"
               />
             </Field>
 

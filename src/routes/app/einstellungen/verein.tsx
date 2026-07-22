@@ -7,9 +7,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { QueryError } from "~/components/ui/query-error";
+import { Textarea } from "~/components/ui/textarea";
 import { toast } from "~/components/ui/toaster";
 import { useBranding } from "~/lib/branding";
 import { orpc } from "~/lib/orpc";
+import {
+  DEFAULT_DUNNING_TEXTS,
+  DEFAULT_TENANT_POLICY,
+  type DunningLevelText,
+  normalizeTenantPolicy,
+} from "~/lib/tenant-settings";
 
 export const Route = createFileRoute("/app/einstellungen/verein")({
   component: VereinsdatenPage,
@@ -51,6 +58,7 @@ function VereinsdatenPage() {
 
   const [form, setForm] = useState({
     vereinsname: "",
+    tenantPolicy: normalizeTenantPolicy(DEFAULT_TENANT_POLICY),
     anschriftStrasse: "",
     anschriftPlz: "",
     anschriftOrt: "",
@@ -88,10 +96,26 @@ function VereinsdatenPage() {
   });
   const [msg, setMsg] = useState<Msg | null>(null);
 
+  const setDunningText = (level: 1 | 2 | 3, field: keyof DunningLevelText, value: string) => {
+    const key = level === 1 ? "level1" : level === 2 ? "level2" : "level3";
+    const current = form.tenantPolicy.dunningTexts[key] ?? DEFAULT_DUNNING_TEXTS[level];
+    setForm({
+      ...form,
+      tenantPolicy: {
+        ...form.tenantPolicy,
+        dunningTexts: {
+          ...form.tenantPolicy.dunningTexts,
+          [key]: { ...current, [field]: value },
+        },
+      },
+    });
+  };
+
   useEffect(() => {
     if (cfg.data) {
       setForm({
         vereinsname: cfg.data.vereinsname,
+        tenantPolicy: normalizeTenantPolicy(cfg.data.tenantPolicy),
         anschriftStrasse: cfg.data.anschriftStrasse ?? "",
         anschriftPlz: cfg.data.anschriftPlz ?? "",
         anschriftOrt: cfg.data.anschriftOrt ?? "",
@@ -134,6 +158,7 @@ function VereinsdatenPage() {
     mutationFn: () =>
       orpc.organization.update({
         vereinsname: form.vereinsname,
+        tenantPolicy: form.tenantPolicy,
         anschriftStrasse: form.anschriftStrasse || null,
         anschriftPlz: form.anschriftPlz || null,
         anschriftOrt: form.anschriftOrt || null,
@@ -543,6 +568,240 @@ function VereinsdatenPage() {
 
             <div className="md:col-span-2">
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Vereinsregeln und Altsysteme
+              </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Diese Regeln gelten nur für diesen Verein. Neue Mandanten übernehmen keine
+                Altsysteme oder Satzungsregeln eines anderen Vereins.
+              </p>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <Field label="Linear Webverein Import">
+                  <Select
+                    value={
+                      form.tenantPolicy.legacyImportSources.includes("linear_webverein")
+                        ? "ja"
+                        : "nein"
+                    }
+                    onChange={(e) => {
+                      const enabled = e.target.value === "ja";
+                      const sources = form.tenantPolicy.legacyImportSources.filter(
+                        (source) => source !== "linear_webverein",
+                      );
+                      setForm({
+                        ...form,
+                        tenantPolicy: {
+                          ...form.tenantPolicy,
+                          legacyImportSources: enabled ? [...sources, "linear_webverein"] : sources,
+                        },
+                      });
+                    }}
+                  >
+                    <option value="nein">Aus</option>
+                    <option value="ja">An</option>
+                  </Select>
+                </Field>
+                <Field label="SVUMS Import">
+                  <Select
+                    value={form.tenantPolicy.legacyImportSources.includes("svums") ? "ja" : "nein"}
+                    onChange={(e) => {
+                      const enabled = e.target.value === "ja";
+                      const sources = form.tenantPolicy.legacyImportSources.filter(
+                        (source) => source !== "svums",
+                      );
+                      setForm({
+                        ...form,
+                        tenantPolicy: {
+                          ...form.tenantPolicy,
+                          legacyImportSources: enabled ? [...sources, "svums"] : sources,
+                        },
+                      });
+                    }}
+                  >
+                    <option value="nein">Aus</option>
+                    <option value="ja">An</option>
+                  </Select>
+                </Field>
+                <Field label="Linear Archiv und Museum">
+                  <Select
+                    value={form.tenantPolicy.legacyArchiveEnabled ? "ja" : "nein"}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        tenantPolicy: {
+                          ...form.tenantPolicy,
+                          legacyArchiveEnabled: e.target.value === "ja",
+                        },
+                      })
+                    }
+                  >
+                    <option value="nein">Aus</option>
+                    <option value="ja">An</option>
+                  </Select>
+                </Field>
+                <Field label="Zulässiger Austrittstermin">
+                  <Select
+                    value={form.tenantPolicy.cancellationDateMode}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        tenantPolicy: {
+                          ...form.tenantPolicy,
+                          cancellationDateMode: e.target.value as
+                            | "anytime"
+                            | "month_end"
+                            | "year_end",
+                        },
+                      })
+                    }
+                  >
+                    <option value="anytime">Jederzeit</option>
+                    <option value="month_end">Nur zum Monatsende</option>
+                    <option value="year_end">Nur zum Jahresende</option>
+                  </Select>
+                </Field>
+                <Field label="Satzungsstelle Kündigung">
+                  <Input
+                    value={form.tenantPolicy.cancellationStatuteReference ?? ""}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        tenantPolicy: {
+                          ...form.tenantPolicy,
+                          cancellationStatuteReference: e.target.value || null,
+                        },
+                      })
+                    }
+                    placeholder="z. B. § 3 Abs. 2"
+                  />
+                </Field>
+                <Field label="Satzungsstelle offene Forderungen">
+                  <Input
+                    value={form.tenantPolicy.outstandingClaimsStatuteReference ?? ""}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        tenantPolicy: {
+                          ...form.tenantPolicy,
+                          outstandingClaimsStatuteReference: e.target.value || null,
+                        },
+                      })
+                    }
+                    placeholder="z. B. § 3 Abs. 5"
+                  />
+                </Field>
+                <Field label="Satzungsstelle Datenschutz">
+                  <Input
+                    value={form.tenantPolicy.privacyStatuteReference ?? ""}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        tenantPolicy: {
+                          ...form.tenantPolicy,
+                          privacyStatuteReference: e.target.value || null,
+                        },
+                      })
+                    }
+                    placeholder="z. B. § 18"
+                  />
+                </Field>
+                <Field label="Partner bei Familienantrag erforderlich">
+                  <Select
+                    value={form.tenantPolicy.familyPartnerRequired ? "ja" : "nein"}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        tenantPolicy: {
+                          ...form.tenantPolicy,
+                          familyPartnerRequired: e.target.value === "ja",
+                        },
+                      })
+                    }
+                  >
+                    <option value="nein">Nein</option>
+                    <option value="ja">Ja</option>
+                  </Select>
+                </Field>
+                <Field label="Höchstalter Kind im Familienantrag">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={form.tenantPolicy.familyChildMaxAge}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        tenantPolicy: {
+                          ...form.tenantPolicy,
+                          familyChildMaxAge: Number(e.target.value) || 0,
+                        },
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Abteilung je Person erforderlich">
+                  <Select
+                    value={form.tenantPolicy.departmentPerPersonRequired ? "ja" : "nein"}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        tenantPolicy: {
+                          ...form.tenantPolicy,
+                          departmentPerPersonRequired: e.target.value === "ja",
+                        },
+                      })
+                    }
+                  >
+                    <option value="nein">Nein</option>
+                    <option value="ja">Ja</option>
+                  </Select>
+                </Field>
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Texte im Mahnwesen
+              </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Titel, Einleitung und Abschlusstext werden je Mahnstufe in den PDF-Schreiben dieses
+                Vereins verwendet. Rechtliche Folgen werden nicht von einem anderen Verein
+                übernommen.
+              </p>
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                {([1, 2, 3] as const).map((level) => {
+                  const key = level === 1 ? "level1" : level === 2 ? "level2" : "level3";
+                  const text = form.tenantPolicy.dunningTexts[key] ?? DEFAULT_DUNNING_TEXTS[level];
+                  return (
+                    <div key={level} className="space-y-4 rounded-lg border border-border p-4">
+                      <div className="text-sm font-semibold">Mahnstufe {level}</div>
+                      <Field label="Titel">
+                        <Input
+                          value={text.title}
+                          onChange={(e) => setDunningText(level, "title", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Einleitung">
+                        <Textarea
+                          rows={5}
+                          value={text.introduction}
+                          onChange={(e) => setDunningText(level, "introduction", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Abschluss">
+                        <Textarea
+                          rows={4}
+                          value={text.closing}
+                          onChange={(e) => setDunningText(level, "closing", e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Aufnahmeantrag (Online)
               </h3>
               <p className="mb-3 text-xs text-muted-foreground">
@@ -552,12 +811,12 @@ function VereinsdatenPage() {
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <Field
                   label="Mandatsreferenz-Präfix"
-                  hint="Optional. Vorsilbe der neuen Mandatsreferenz, z. B. SVU1945-. Leer lassen für nur Jahr und Nummer."
+                  hint="Optional. Vorsilbe der neuen Mandatsreferenz, z. B. VEREIN-. Leer lassen für nur Jahr und Nummer."
                 >
                   <Input
                     value={form.mandatsreferenzPrefix}
                     onChange={(e) => setForm({ ...form, mandatsreferenzPrefix: e.target.value })}
-                    placeholder="SVU1945-"
+                    placeholder="VEREIN-"
                   />
                 </Field>
                 <Field
@@ -878,7 +1137,7 @@ function BrandingCard() {
             <Input
               value={anzeigename ?? ""}
               onChange={(e) => setAnzeigename(e.target.value)}
-              placeholder="z. B. SV Untereuerheim"
+              placeholder="z. B. TSV Musterstadt"
             />
           </Field>
 

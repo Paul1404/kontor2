@@ -1,8 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { ArrowLeft, Landmark, ShieldAlert } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent } from "~/components/ui/card";
 import { LEGACY_EXHIBITS, LEGACY_STATS } from "~/lib/legacy-schema-trivia";
+import { orpc } from "~/lib/orpc";
+import { normalizeTenantPolicy } from "~/lib/tenant-settings";
 
 /**
  * Hidden easter egg. Not in the navigation. Reached by tapping the version
@@ -10,6 +12,12 @@ import { LEGACY_EXHIBITS, LEGACY_STATS } from "~/lib/legacy-schema-trivia";
  * Webverein database schema this app replaced.
  */
 export const Route = createFileRoute("/app/museum")({
+  beforeLoad: async () => {
+    const organization = await orpc.organization.get();
+    if (!normalizeTenantPolicy(organization?.tenantPolicy).legacyArchiveEnabled) {
+      throw redirect({ to: "/app" });
+    }
+  },
   component: MuseumPage,
 });
 

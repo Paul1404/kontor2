@@ -23,10 +23,7 @@ import {
   type AntragKind,
   membershipApplicationsTable,
 } from "~/server/db/schema/membership-applications";
-import {
-  DEFAULT_BEITRAGSSTAFFEL,
-  organizationSettingsTable,
-} from "~/server/db/schema/organization-settings";
+import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import {
   type Antragstyp,
   detectAntragstyp,
@@ -122,7 +119,12 @@ async function main() {
   const handle = db();
   try {
     const [org] = await handle.select().from(organizationSettingsTable).limit(1);
-    const staffel = org?.beitragsstaffel ?? DEFAULT_BEITRAGSSTAFFEL;
+    if (!org?.beitragsstaffel) {
+      throw new Error(
+        "Keine Beitragsstaffel konfiguriert. Seed-Daten übernehmen keine Preise eines anderen Vereins.",
+      );
+    }
+    const staffel = org.beitragsstaffel;
     const prefix = org?.mandatsreferenzPrefix ?? "";
 
     const abteilungen = await handle

@@ -17,6 +17,7 @@ import {
   validatePhoneMessage,
   validatePlzMessage,
 } from "~/lib/application-validation";
+import { normalizeTenantPolicy } from "~/lib/tenant-settings";
 import { lookupPlz, searchStreets } from "~/server/address/lookup";
 import {
   decodeBase64Upload,
@@ -345,6 +346,7 @@ async function buildApprovedPdf(
     kategorie: app.mitgliedschaftTyp,
     elternteilMitglied: app.elternteilMitglied,
     staffel: org.beitragsstaffel,
+    altersgrenzen: altersgrenzenOf(org),
   });
 
   const model = buildBeitrittModel({
@@ -1153,6 +1155,7 @@ export const applicationsRouter = {
       satzungUrl: org?.satzungUrl ?? null,
       glaeubigerId: org?.glaeubigerId ?? null,
       beitragsstaffel: org?.beitragsstaffel ?? null,
+      tenantPolicy: normalizeTenantPolicy(org?.tenantPolicy),
       abteilungen,
     };
   }),
@@ -1188,6 +1191,7 @@ export const applicationsRouter = {
         kategorie,
         elternteilMitglied: input.elternteilMitglied,
         staffel: org.beitragsstaffel,
+        altersgrenzen: altersgrenzenOf(org),
       });
       return { kategorie, jahresbeitrag: fee.betrag, label: fee.label, art: fee.art };
     }),
@@ -1391,13 +1395,19 @@ export const applicationsRouter = {
     const hasPartner =
       (input.partnerVorname ?? "").trim().length >= 2 &&
       (input.partnerNachname ?? "").trim().length >= 2;
-    const antragstyp = detectAntragstyp({ geburtsdatum: dob, hasChildren, hasPartner });
     const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
     if (!org) {
       throw new ORPCError("BAD_REQUEST", {
         message: "Der Verein hat das Antragsformular noch nicht eingerichtet.",
       });
     }
+    const tenantPolicy = normalizeTenantPolicy(org.tenantPolicy);
+    const antragstyp = detectAntragstyp({
+      geburtsdatum: dob,
+      hasChildren,
+      hasPartner,
+      familyPartnerRequired: tenantPolicy.familyPartnerRequired,
+    });
     const kategorie = mitgliedschaftTypFor(antragstyp, dob, altersgrenzenOf(org));
 
     if (antragstyp === "kind") {
@@ -1429,23 +1439,25 @@ export const applicationsRouter = {
     if (bicMessage) fail(bicMessage);
 
     if (hasChildren) {
-      if (!hasPartner) {
+      if (tenantPolicy.familyPartnerRequired && !hasPartner) {
         fail(
           "Für die Familienmitgliedschaft ist ein Partner oder zweites Elternteil erforderlich.",
         );
       }
-      const pv = validateNameMessage(input.partnerVorname ?? "", "Vorname des Partners");
-      if (pv) fail(pv);
-      const pn = validateNameMessage(input.partnerNachname ?? "", "Nachname des Partners");
-      if (pn) fail(pn);
-      const pd = validatePastDateMessage(
-        input.partnerGeburtsdatum ?? "",
-        "Geburtsdatum des Partners",
-        { maxAge: 120 },
-      );
-      if (pd) fail(pd);
-      if ((realAgeFromIso(input.partnerGeburtsdatum ?? "") ?? 0) < 18) {
-        fail("Partner oder zweites Elternteil muss volljährig sein.");
+      if (hasPartner) {
+        const pv = validateNameMessage(input.partnerVorname ?? "", "Vorname des Partners");
+        if (pv) fail(pv);
+        const pn = validateNameMessage(input.partnerNachname ?? "", "Nachname des Partners");
+        if (pn) fail(pn);
+        const pd = validatePastDateMessage(
+          input.partnerGeburtsdatum ?? "",
+          "Geburtsdatum des Partners",
+          { maxAge: 120 },
+        );
+        if (pd) fail(pd);
+        if ((realAgeFromIso(input.partnerGeburtsdatum ?? "") ?? 0) < 18) {
+          fail("Partner oder zweites Elternteil muss volljährig sein.");
+        }
       }
       for (const [idx, kind] of (input.kinder ?? []).entries()) {
         const kv = validateNameMessage(kind.vorname, `Vorname von Kind ${idx + 1}`);
@@ -1454,10 +1466,10 @@ export const applicationsRouter = {
         if (kn) fail(kn);
         const kd = validatePastDateMessage(kind.geburtsdatum, `Geburtsdatum von Kind ${idx + 1}`);
         if (kd) fail(kd);
-        if ((realAgeFromIso(kind.geburtsdatum) ?? 99) > 18) {
-          fail(`Kind ${idx + 1} muss 18 Jahre oder jünger sein.`);
+        if ((realAgeFromIso(kind.geburtsdatum) ?? 99) > tenantPolicy.familyChildMaxAge) {
+          fail(`Kind ${idx + 1} darf höchstens ${tenantPolicy.familyChildMaxAge} Jahre alt sein.`);
         }
-        if (kind.abteilungen.length === 0) {
+        if (tenantPolicy.departmentPerPersonRequired && kind.abteilungen.length === 0) {
           fail(`Für Kind ${idx + 1} muss mindestens eine Abteilung gewählt werden.`);
         }
       }
@@ -1494,6 +1506,7 @@ export const applicationsRouter = {
       kategorie,
       elternteilMitglied: input.elternteilMitglied,
       staffel: org.beitragsstaffel,
+      altersgrenzen: altersgrenzenOf(org),
     });
     const year = new Date().getUTCFullYear();
     const geschlecht: "m" | "w" | "unbekannt" | null = input.geschlecht

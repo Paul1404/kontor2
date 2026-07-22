@@ -35,6 +35,8 @@ export type ProvisionInput = {
    * und Instanz in derselben DB liegen). Die Console übergibt `controlDbUrl()`.
    */
   controlUrl?: string;
+  /** Bevorzugter Host. Kann später in der Betreiber-Console geändert werden. */
+  canonicalHost?: string;
 };
 
 function validate(key: string, dbName: string, primaryKey: string): void {
@@ -80,11 +82,12 @@ export async function provisionTenant(adminUrl: string, input: ProvisionInput): 
   const control = postgres(input.controlUrl ?? adminUrl, { max: 1, onnotice: () => {} });
   try {
     await control`
-      insert into tenants (key, database_name, display_name, status)
-      values (${input.key}, ${dbName}, ${input.displayName}, 'active')
+      insert into tenants (key, database_name, display_name, canonical_host, status)
+      values (${input.key}, ${dbName}, ${input.displayName}, ${input.canonicalHost ?? null}, 'active')
       on conflict (key) do update
         set database_name = excluded.database_name,
             display_name = excluded.display_name,
+            canonical_host = coalesce(excluded.canonical_host, tenants.canonical_host),
             status = 'active',
             updated_at = now()
     `;

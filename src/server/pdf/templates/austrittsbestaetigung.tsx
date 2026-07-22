@@ -138,10 +138,13 @@ export function AustrittsbestaetigungDocument({ model, docRef }: Austrittsbestae
           <View style={styles.hr} />
           <Text style={styles.infoHeading}>Datenschutz und weitere Informationen</Text>
           <Text style={styles.infoPara}>
-            Ihre personenbezogenen Daten werden im Rahmen der Vereinsmitgliedschaft gemäß § 18
-            unserer Vereinssatzung sowie den Vorgaben der Datenschutz-Grundverordnung (DS-GVO)
-            verarbeitet. Nach Beendigung der Mitgliedschaft werden Ihre Daten entsprechend den
-            gesetzlichen Aufbewahrungsfristen aufbewahrt und anschließend gelöscht.
+            Ihre personenbezogenen Daten werden im Rahmen der Vereinsmitgliedschaft
+            {club.privacyStatuteReference
+              ? ` gemäß ${club.privacyStatuteReference} unserer Vereinssatzung`
+              : ""}{" "}
+            sowie nach den Vorgaben der Datenschutz-Grundverordnung (DS-GVO) verarbeitet. Nach
+            Beendigung der Mitgliedschaft werden Ihre Daten entsprechend den gesetzlichen
+            Aufbewahrungsfristen aufbewahrt und anschließend gelöscht.
           </Text>
           <Text style={styles.infoPara}>
             Sie haben jederzeit das Recht auf Auskunft über Ihre gespeicherten Daten sowie das Recht

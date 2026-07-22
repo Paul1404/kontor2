@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { ExternalLink, Loader2, Plus, Power, PowerOff, Trash2 } from "lucide-react";
+import { ExternalLink, Loader2, Plus, Power, PowerOff, Save, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -8,6 +8,7 @@ import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { Textarea } from "~/components/ui/textarea";
 import { formatDate, orEmpty } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -27,6 +28,76 @@ function StatusBadge({ status }: { status: string }) {
     >
       {active ? "Aktiv" : "Gesperrt"}
     </span>
+  );
+}
+
+function DomainSettings({
+  tenantKey,
+  canonicalHost: initialCanonicalHost,
+  legacyHosts: initialLegacyHosts,
+  onSaved,
+  onError,
+}: {
+  tenantKey: string;
+  canonicalHost: string | null;
+  legacyHosts: string[];
+  onSaved: () => void;
+  onError: (message: string) => void;
+}) {
+  const [canonicalHost, setCanonicalHost] = useState(initialCanonicalHost ?? "");
+  const [legacyHosts, setLegacyHosts] = useState(initialLegacyHosts.join("\n"));
+  const save = useMutation({
+    mutationFn: () =>
+      orpc.console.updateRouting({
+        key: tenantKey,
+        canonicalHost,
+        legacyHosts: legacyHosts
+          .split(/[\n,]/)
+          .map((host) => host.trim())
+          .filter(Boolean),
+      }),
+    onSuccess: onSaved,
+    onError: (err) => onError((err as Error).message),
+  });
+
+  return (
+    <div className="grid min-w-[24rem] grid-cols-[1fr_1fr_auto] items-end gap-2">
+      <div className="space-y-1">
+        <Label htmlFor={`canonical-${tenantKey}`} className="text-xs">
+          Kanonischer Host
+        </Label>
+        <Input
+          id={`canonical-${tenantKey}`}
+          value={canonicalHost}
+          onChange={(event) => setCanonicalHost(event.target.value)}
+          placeholder={`${tenantKey}.kontor2.com`}
+          autoCapitalize="none"
+          spellCheck={false}
+        />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor={`legacy-${tenantKey}`} className="text-xs">
+          Alte Domains
+        </Label>
+        <Textarea
+          id={`legacy-${tenantKey}`}
+          value={legacyHosts}
+          onChange={(event) => setLegacyHosts(event.target.value)}
+          placeholder="verwaltung.verein.de"
+          rows={1}
+          className="min-h-9 resize-y"
+        />
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={save.isPending || !canonicalHost.trim()}
+        onClick={() => save.mutate()}
+      >
+        {save.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+        Speichern
+      </Button>
+    </div>
   );
 }
 
@@ -161,6 +232,7 @@ function ConsoleVereinePage() {
                     <th className="py-2 pr-3 font-medium">Verein</th>
                     <th className="py-2 pr-3 font-medium">Datenbank</th>
                     <th className="py-2 pr-3 font-medium">Status</th>
+                    <th className="py-2 pr-3 font-medium">Domains</th>
                     <th className="py-2 pr-3 font-medium">Angelegt</th>
                     <th className="py-2 font-medium" />
                   </tr>
@@ -191,8 +263,20 @@ function ConsoleVereinePage() {
                         <td className="py-2.5 pr-3">
                           <StatusBadge status={t.status} />
                         </td>
+                        <td className="py-2.5 pr-3">
+                          <DomainSettings
+                            tenantKey={t.key}
+                            canonicalHost={t.canonicalHost}
+                            legacyHosts={t.legacyHosts}
+                            onSaved={() => {
+                              setError(null);
+                              refresh();
+                            }}
+                            onError={setError}
+                          />
+                        </td>
                         <td className="py-2.5 pr-3 text-muted-foreground">
-                          {formatDate(t.createdAt)}
+                          {t.registered ? formatDate(t.createdAt) : "Primärinstanz"}
                         </td>
                         <td className="py-2.5">
                           <div className="flex justify-end gap-1">

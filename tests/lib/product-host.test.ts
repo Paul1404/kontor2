@@ -31,6 +31,8 @@ describe("isPublicProductPath", () => {
     "/impressum",
     "/impressum/",
     "/datenschutz",
+    "/robots.txt",
+    "/sitemap.xml",
     "/api/health",
   ])("allows %s on the product host", (pathname) =>
     expect(isPublicProductPath(pathname)).toBe(true));

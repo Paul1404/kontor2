@@ -7,6 +7,7 @@ import { brandColorCss } from "~/lib/branding-color";
 import { isPublicProductRequest } from "~/lib/current-product-host";
 import { orpc } from "~/lib/orpc";
 import { isPublicProductPath } from "~/lib/product-host";
+import { PRODUCT_DESCRIPTION, PRODUCT_SOCIAL_DESCRIPTION, PRODUCT_TITLE } from "~/lib/product-seo";
 import { ThemeProvider, themeInitScript } from "~/lib/theme";
 import appCss from "~/styles/globals.css?url";
 
@@ -57,25 +58,27 @@ export const Route = createRootRoute({
         { name: "color-scheme", content: "light dark" },
         {
           title: isPublic
-            ? "Kontor2 | Vereinsverwaltung aus der Praxis"
+            ? PRODUCT_TITLE
             : `${b?.anzeigename?.trim() || "Kontor2"}: Vereinsverwaltung`,
         },
         ...(isPublic
           ? [
               {
                 name: "description",
-                content:
-                  "Kontor2 verbindet Mitgliederverwaltung, Beiträge, SEPA, Forderungen und Datenschutz in nachvollziehbaren Abläufen für Sportvereine.",
+                content: PRODUCT_DESCRIPTION,
               },
+              { name: "robots", content: "index, follow, max-image-preview:large" },
               { property: "og:type", content: "website" },
-              { property: "og:title", content: "Kontor2 | Vereinsverwaltung aus der Praxis" },
+              { property: "og:site_name", content: "Kontor2" },
+              { property: "og:locale", content: "de_DE" },
+              { property: "og:title", content: PRODUCT_TITLE },
               {
                 property: "og:description",
-                content:
-                  "Vereinsverwaltung für den echten Verwaltungsalltag. Entwickelt aus der Praxis eines Sportvereins.",
+                content: PRODUCT_SOCIAL_DESCRIPTION,
               },
               { property: "og:url", content: "https://kontor2.com/" },
               { property: "og:image", content: "https://kontor2.com/og.png" },
+              { property: "og:image:type", content: "image/png" },
               { property: "og:image:width", content: "1200" },
               { property: "og:image:height", content: "630" },
               {
@@ -83,6 +86,13 @@ export const Route = createRootRoute({
                 content: "Kontor2: Vereinsverwaltung für den echten Verwaltungsalltag",
               },
               { name: "twitter:card", content: "summary_large_image" },
+              { name: "twitter:title", content: PRODUCT_TITLE },
+              { name: "twitter:description", content: PRODUCT_SOCIAL_DESCRIPTION },
+              { name: "twitter:image", content: "https://kontor2.com/og.png" },
+              {
+                name: "twitter:image:alt",
+                content: "Kontor2: Vereinssoftware für den echten Verwaltungsalltag",
+              },
             ]
           : [{ name: "robots", content: "noindex, nofollow" }]),
         { name: "theme-color", content: b?.primaryColor || "#14223D" },
@@ -94,6 +104,12 @@ export const Route = createRootRoute({
           rel: "manifest",
           href: isPublic ? "/manifest.webmanifest" : "/api/branding/manifest",
         },
+        ...(isPublic
+          ? [
+              { rel: "alternate", hrefLang: "de", href: "https://kontor2.com/" },
+              { rel: "alternate", hrefLang: "x-default", href: "https://kontor2.com/" },
+            ]
+          : []),
       ],
     };
   },

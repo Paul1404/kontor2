@@ -7,6 +7,7 @@
  */
 import { statSync } from "node:fs";
 import { join, normalize, resolve } from "node:path";
+import postgres from "postgres";
 import server from "../dist/server/server.js";
 import { log } from "./log";
 import { preflight } from "./preflight";
@@ -62,18 +63,32 @@ const DEFAULT_CSP = [
 const CSP = process.env.CONTENT_SECURITY_POLICY ?? DEFAULT_CSP;
 let activeRequests = 0;
 
-// Host canonicalization. The app's canonical home is `svu.kontor2.com`; requests
-// arriving on a legacy Verein domain are 301-redirected so old bookmarks and
-// in-flight magic links keep working. Both are overridable via env so a future
-// tenant can set its own. `/api/health` is exempt so a health probe succeeds on
-// any host.
-const CANONICAL_HOST = process.env.CANONICAL_HOST ?? "svu.kontor2.com";
-const LEGACY_HOSTS = new Set(
-  (process.env.LEGACY_HOSTS ?? "svuwv.sv-untereuerheim.de")
-    .split(",")
-    .map((h) => h.trim())
-    .filter(Boolean),
-);
+// Legacy-domain redirects belong to the persisted Control-Plane settings. The
+// map refreshes without a restart, Railway variable, or tenant-database scan.
+let legacyRedirects = new Map<string, string>();
+
+async function refreshLegacyRedirects(): Promise<void> {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) return;
+  const control = postgres(databaseUrl, { max: 1, connect_timeout: 5, onnotice: () => {} });
+  try {
+    const tenants = await control<
+      Array<{ canonical_host: string | null; legacy_hosts: string[] | null }>
+    >`
+      select canonical_host, legacy_hosts from tenants where status = 'active'
+    `;
+    const next = new Map<string, string>();
+    for (const tenant of tenants) {
+      if (!tenant.canonical_host) continue;
+      for (const legacy of tenant.legacy_hosts ?? []) {
+        next.set(legacy.toLowerCase(), tenant.canonical_host.toLowerCase());
+      }
+    }
+    legacyRedirects = next;
+  } finally {
+    await control.end({ timeout: 1 });
+  }
+}
 
 function withSecurityHeaders(res: Response): Response {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
@@ -124,10 +139,11 @@ async function handle(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url);
     const host = (request.headers.get("host") ?? "").split(":")[0];
-    if (host && LEGACY_HOSTS.has(host) && url.pathname !== "/api/health") {
+    const canonicalHost = legacyRedirects.get(host.toLowerCase());
+    if (canonicalHost && url.pathname !== "/api/health") {
       const response = new Response(null, {
         status: 301,
-        headers: { location: `https://${CANONICAL_HOST}${url.pathname}${url.search}` },
+        headers: { location: `https://${canonicalHost}${url.pathname}${url.search}` },
       });
       status = response.status;
       return response;
@@ -161,6 +177,7 @@ async function handle(request: Request): Promise<Response> {
 
 try {
   await preflight();
+  await refreshLegacyRedirects();
 } catch (err) {
   log.error("startup aborted", { error: err instanceof Error ? err.message : String(err) });
   process.exit(1);
@@ -168,6 +185,14 @@ try {
 
 const s = Bun.serve({ port, fetch: handle });
 log.info("listening", { url: String(s.url) });
+const routingRefresh = setInterval(() => {
+  void refreshLegacyRedirects().catch((err) =>
+    log.warn("routing settings refresh failed", {
+      error: err instanceof Error ? err.message : String(err),
+    }),
+  );
+}, 60_000);
+routingRefresh.unref();
 
 // Graceful shutdown. Railway sends SIGTERM on redeploy; without this the
 // container is killed mid-request and DB/Redis connections are reset instead of

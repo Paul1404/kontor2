@@ -2,7 +2,8 @@ import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "~/server/db/client";
 import { feeTypesTable } from "~/server/db/schema/fee-types";
-import { DEFAULT_BEITRAGSSTAFFEL } from "~/server/db/schema/organization-settings";
+import { LEGACY_SVU_BEITRAGSSTAFFEL } from "~/server/db/schema/organization-settings";
+import { DEFAULT_ALTERSGRENZEN } from "~/server/domain/application/antragstyp";
 import { resolveApplicationFee } from "~/server/domain/application/resolve-fee";
 
 /**
@@ -35,7 +36,8 @@ describe.skipIf(!onTestDb)("resolveApplicationFee (integration)", () => {
     const fee = await resolveApplicationFee(db(), {
       kategorie: "erwachsener",
       elternteilMitglied: false,
-      staffel: DEFAULT_BEITRAGSSTAFFEL,
+      staffel: LEGACY_SVU_BEITRAGSSTAFFEL,
+      altersgrenzen: DEFAULT_ALTERSGRENZEN,
     });
     expect(fee.art).toBe(art);
     expect(fee.betrag).toBe("60.00");
@@ -47,10 +49,11 @@ describe.skipIf(!onTestDb)("resolveApplicationFee (integration)", () => {
     const fee = await resolveApplicationFee(db(), {
       kategorie: "familie",
       elternteilMitglied: false,
-      staffel: DEFAULT_BEITRAGSSTAFFEL,
+      staffel: LEGACY_SVU_BEITRAGSSTAFFEL,
+      altersgrenzen: DEFAULT_ALTERSGRENZEN,
     });
     expect(fee.art).toBeNull();
-    expect(fee.betrag).toBe(DEFAULT_BEITRAGSSTAFFEL.familie);
+    expect(fee.betrag).toBe(LEGACY_SVU_BEITRAGSSTAFFEL.familie);
   });
 
   it("throws when neither a tagged Beitragsart nor a Staffel is available", async () => {
@@ -59,6 +62,7 @@ describe.skipIf(!onTestDb)("resolveApplicationFee (integration)", () => {
         kategorie: "kind",
         elternteilMitglied: false,
         staffel: null,
+        altersgrenzen: DEFAULT_ALTERSGRENZEN,
       }),
     ).rejects.toThrow();
   });

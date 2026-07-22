@@ -8,11 +8,12 @@
 import type { AntragsRolle } from "~/server/db/schema/fee-types";
 import {
   type Beitragsstaffel,
-  DEFAULT_BEITRAGSSTAFFEL,
+  LEGACY_SVU_BEITRAGSSTAFFEL,
 } from "~/server/db/schema/organization-settings";
 import type { AntragKategorie } from "~/server/domain/application/antragstyp";
+import { type Altersgrenzen, DEFAULT_ALTERSGRENZEN } from "~/server/domain/application/antragstyp";
 
-export { DEFAULT_BEITRAGSSTAFFEL };
+export { LEGACY_SVU_BEITRAGSSTAFFEL };
 
 /**
  * Map an application case (age category + parent-member flag) to the
@@ -54,24 +55,38 @@ export function calculateFee(opts: {
   kategorie: AntragKategorie;
   elternteilMitglied: boolean;
   staffel: Beitragsstaffel;
+  altersgrenzen?: Altersgrenzen;
 }): FeeResult {
   const s = opts.staffel;
+  const g = opts.altersgrenzen ?? DEFAULT_ALTERSGRENZEN;
   switch (opts.kategorie) {
     case "familie":
       return { betrag: s.familie, label: "Familie (2 Erwachsene + Kinder bis 18 Jahre)" };
     case "kind":
       return opts.elternteilMitglied
-        ? { betrag: s.kindElternMitglied, label: "Kinder (bis 14 Jahre), 1 Elternteil Mitglied" }
-        : { betrag: s.kind, label: "Kinder (bis 14 Jahre), kein Elternteil Mitglied" };
+        ? {
+            betrag: s.kindElternMitglied,
+            label: `Kinder (unter ${g.kindMax} Jahren), 1 Elternteil Mitglied`,
+          }
+        : {
+            betrag: s.kind,
+            label: `Kinder (unter ${g.kindMax} Jahren), kein Elternteil Mitglied`,
+          };
     case "jugendlich":
       return opts.elternteilMitglied
         ? {
             betrag: s.jugendlichElternMitglied,
-            label: "Jugendliche (bis 18 Jahre), 1 Elternteil Mitglied",
+            label: `Jugendliche (unter ${g.jugendlichMax} Jahren), 1 Elternteil Mitglied`,
           }
-        : { betrag: s.jugendlich, label: "Jugendliche (bis 18 Jahre), kein Elternteil Mitglied" };
+        : {
+            betrag: s.jugendlich,
+            label: `Jugendliche (unter ${g.jugendlichMax} Jahren), kein Elternteil Mitglied`,
+          };
     case "junger_erwachsener":
-      return { betrag: s.jungerErwachsener, label: "Junge Erwachsene (bis 25 Jahre)" };
+      return {
+        betrag: s.jungerErwachsener,
+        label: `Junge Erwachsene (unter ${g.jungerErwachsenerMax} Jahren)`,
+      };
     case "erwachsener":
       return { betrag: s.erwachsener, label: "Erwachsene" };
   }

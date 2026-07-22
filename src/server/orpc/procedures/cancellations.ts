@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
 import { desc, eq } from "drizzle-orm";
 import * as v from "valibot";
+import { normalizeTenantPolicy } from "~/lib/tenant-settings";
 import { appendAudit } from "~/server/audit/log";
 import { allocateDocRef } from "~/server/db/doc-ref";
 import { cancellationLettersTable } from "~/server/db/schema/cancellations";
@@ -73,6 +74,7 @@ export const cancellationsRouter = {
       });
     }
 
+    const tenantPolicy = normalizeTenantPolicy(org.tenantPolicy);
     const model = buildCancellationModel({
       member: {
         anrede: member.anrede,
@@ -104,6 +106,11 @@ export const cancellationsRouter = {
         datenschutzUrl: org.datenschutzUrl,
         satzungUrl: org.satzungUrl,
         logoDataUri: resolveClubLogo(org.logo),
+        cancellationDateMode: tenantPolicy.cancellationDateMode,
+        cancellationNoticeDays: org.kuendigungsfristAktiv ? org.kuendigungsfristTage : 0,
+        cancellationStatuteReference: tenantPolicy.cancellationStatuteReference,
+        outstandingClaimsStatuteReference: tenantPolicy.outstandingClaimsStatuteReference,
+        privacyStatuteReference: tenantPolicy.privacyStatuteReference,
       },
     });
 

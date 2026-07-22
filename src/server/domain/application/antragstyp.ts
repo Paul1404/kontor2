@@ -99,10 +99,12 @@ export function detectAntragstyp(opts: {
   geburtsdatum: Date;
   hasChildren: boolean;
   hasPartner: boolean;
+  familyPartnerRequired?: boolean;
   today?: Date;
 }): Antragstyp {
   if (realAge(opts.geburtsdatum, opts.today) < 18) return "kind";
-  if (opts.hasChildren && opts.hasPartner) return "familie";
+  if (opts.hasChildren && (opts.hasPartner || opts.familyPartnerRequired === false))
+    return "familie";
   return "einzel";
 }
 

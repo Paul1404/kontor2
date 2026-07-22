@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import {
   CheckCircle2,
   Coins,
@@ -27,8 +27,15 @@ import { Textarea } from "~/components/ui/textarea";
 import { EMPTY_VALUE, formatBytes, formatDateTime } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
+import { normalizeTenantPolicy } from "~/lib/tenant-settings";
 
 export const Route = createFileRoute("/app/archive")({
+  beforeLoad: async () => {
+    const organization = await orpc.organization.get();
+    if (!normalizeTenantPolicy(organization?.tenantPolicy).legacyArchiveEnabled) {
+      throw redirect({ to: "/app" });
+    }
+  },
   component: ArchivePage,
 });
 

@@ -1,15 +1,21 @@
 import { ORPCError } from "@orpc/server";
+import { normalizeTenantPolicy, type TenantPolicy } from "~/lib/tenant-settings";
 
 /** Subset of organization_settings relevant to the Kündigungsfrist check. */
 export type FristSettings = {
   kuendigungsfristAktiv: boolean;
   kuendigungsfristTage: number;
   kuendigungZumMonatsende: boolean;
+  tenantPolicy?: TenantPolicy | null;
 };
 
 function isLastDayOfMonth(d: Date): boolean {
   const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1));
   return next.getUTCMonth() !== d.getUTCMonth();
+}
+
+function isLastDayOfYear(d: Date): boolean {
+  return d.getUTCMonth() === 11 && d.getUTCDate() === 31;
 }
 
 /** UTC midnight of the given date, dropping any time component. */
@@ -42,9 +48,20 @@ export function assertCancellationAllowed(
     });
   }
 
-  if (settings.kuendigungZumMonatsende && !isLastDayOfMonth(eff)) {
+  const configuredMode = settings.tenantPolicy
+    ? normalizeTenantPolicy(settings.tenantPolicy).cancellationDateMode
+    : settings.kuendigungZumMonatsende
+      ? "month_end"
+      : "anytime";
+
+  if (configuredMode === "month_end" && !isLastDayOfMonth(eff)) {
     throw new ORPCError("VALIDATION_FAILED", {
       message: "Kündigung ist nur zum Monatsende zulässig.",
+    });
+  }
+  if (configuredMode === "year_end" && !isLastDayOfYear(eff)) {
+    throw new ORPCError("VALIDATION_FAILED", {
+      message: "Kündigung ist nur zum Jahresende zulässig.",
     });
   }
 }

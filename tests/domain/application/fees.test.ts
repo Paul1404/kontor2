@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   antragsRolleFor,
   calculateFee,
-  DEFAULT_BEITRAGSSTAFFEL,
+  LEGACY_SVU_BEITRAGSSTAFFEL,
 } from "~/server/domain/application/fees";
 
 // `staffel` is required now (no hardcoded fallback), so these pass the historic
 // SVU schedule explicitly to assert the per-category mapping.
-const staffel = DEFAULT_BEITRAGSSTAFFEL;
+const staffel = LEGACY_SVU_BEITRAGSSTAFFEL;
 
 describe("calculateFee (mapping over a schedule)", () => {
   it("familie is the flat tariff", () => {
@@ -44,7 +44,7 @@ describe("calculateFee (mapping over a schedule)", () => {
   });
 
   it("honours a custom schedule from settings", () => {
-    const custom = { ...DEFAULT_BEITRAGSSTAFFEL, erwachsener: "60.00" };
+    const custom = { ...LEGACY_SVU_BEITRAGSSTAFFEL, erwachsener: "60.00" };
     expect(
       calculateFee({ kategorie: "erwachsener", elternteilMitglied: false, staffel: custom }).betrag,
     ).toBe("60.00");

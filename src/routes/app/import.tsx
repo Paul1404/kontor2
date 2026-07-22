@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { CheckCircle2, Globe, Loader2, RotateCcw, Upload, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -8,9 +8,16 @@ import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { orpc } from "~/lib/orpc";
+import { normalizeTenantPolicy } from "~/lib/tenant-settings";
 import type { BatchReport } from "~/server/validation/member-fields";
 
 export const Route = createFileRoute("/app/import")({
+  beforeLoad: async () => {
+    const organization = await orpc.organization.get();
+    if (normalizeTenantPolicy(organization?.tenantPolicy).legacyImportSources.length === 0) {
+      throw redirect({ to: "/app" });
+    }
+  },
   component: ImportPage,
 });
 

@@ -36,6 +36,9 @@ export const tenantsTable = pgTable(
     databaseUrl: encryptedText("database_url"),
     /** Anzeigename für die Verwaltung (C4). Leer: es wird der Schlüssel gezeigt. */
     displayName: text("display_name"),
+    /** Bevorzugter Host und frühere Domains. Verwaltung erfolgt in der Betreiber-Console. */
+    canonicalHost: text("canonical_host"),
+    legacyHosts: text("legacy_hosts").array().notNull().default(sql`'{}'::text[]`),
     /**
      * Lebenszyklus. Nur `active` wird vom Resolver bedient; `disabled` lässt einen
      * Verein bestehen, ohne dass seine Subdomain noch auflöst (Sperre statt Löschen).

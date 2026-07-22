@@ -10,6 +10,7 @@
  */
 
 import { altMitgliedsnummer } from "~/lib/member-ref";
+import type { CancellationDateMode } from "~/lib/tenant-settings";
 
 export type CancellationFamilyMemberInput = {
   vorname: string;
@@ -30,6 +31,11 @@ export type CancellationClub = {
   datenschutzUrl: string | null;
   satzungUrl: string | null;
   logoDataUri: string | null;
+  cancellationDateMode?: CancellationDateMode;
+  cancellationNoticeDays?: number;
+  cancellationStatuteReference?: string | null;
+  outstandingClaimsStatuteReference?: string | null;
+  privacyStatuteReference?: string | null;
 };
 
 export type CancellationInput = {
@@ -204,10 +210,24 @@ export function buildCancellationModel(input: CancellationInput): CancellationMo
       ? `hiermit bestätigen wir den Eingang der schriftlichen Austrittserklärung und das Ende der Mitgliedschaft von ${memberFull} beim ${club.vereinsname}.`
       : `hiermit bestätigen wir den Eingang Ihrer schriftlichen Austrittserklärung und das Ende Ihrer Mitgliedschaft beim ${club.vereinsname}.`;
 
-  const clauseHead =
-    "Gemäß § 3 Abs. 2 der Vereinssatzung ist der Austritt nur zum Schluss eines Kalenderjahres unter Einhaltung einer Frist von sechs Wochen zulässig. ";
-  const clauseTail =
-    "Bis dahin bestehende Beitragspflichten bleiben unberührt; der Anspruch des Vereins auf rückständige Beiträge oder sonstige Forderungen bleibt gemäß § 3 Abs. 5 der Satzung auch nach Beendigung der Mitgliedschaft bestehen.";
+  const ruleSource = club.cancellationStatuteReference
+    ? `Gemäß ${club.cancellationStatuteReference} der Vereinssatzung`
+    : "Nach den hinterlegten Kündigungsregeln";
+  const dateRule =
+    club.cancellationDateMode === "year_end"
+      ? "ist der Austritt nur zum Schluss eines Kalenderjahres"
+      : club.cancellationDateMode === "month_end"
+        ? "ist der Austritt nur zum Ende eines Monats"
+        : "ist der Austritt zum bestätigten Datum";
+  const noticeRule =
+    (club.cancellationNoticeDays ?? 0) > 0
+      ? ` unter Einhaltung einer Frist von ${club.cancellationNoticeDays} Tagen`
+      : "";
+  const clauseHead = `${ruleSource} ${dateRule}${noticeRule} zulässig. `;
+  const claimsSource = club.outstandingClaimsStatuteReference
+    ? ` gemäß ${club.outstandingClaimsStatuteReference} der Satzung`
+    : "";
+  const clauseTail = `Bis dahin bestehende Beitragspflichten bleiben unberührt; der Anspruch des Vereins auf rückständige Beiträge oder sonstige Forderungen bleibt${claimsSource} auch nach Beendigung der Mitgliedschaft bestehen.`;
   const sepaText = (von: boolean) =>
     ` Das ${von ? "von Ihnen " : ""}erteilte SEPA-Lastschriftmandat wird mit Beendigung der Mitgliedschaft ebenfalls widerrufen.`;
   const bodyClause = isFamily

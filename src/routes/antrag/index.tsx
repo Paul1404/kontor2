@@ -52,6 +52,7 @@ import {
 import { cn } from "~/lib/cn";
 import { EMPTY_VALUE, formatCurrency, formatDate, orEmpty } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
+import { normalizeTenantPolicy } from "~/lib/tenant-settings";
 
 type Anrede = "Herr" | "Frau" | "keine Angabe";
 type KindRow = { vorname: string; nachname: string; geburtsdatum: string; abteilungen: string[] };
@@ -146,6 +147,7 @@ function AntragForm() {
   });
   const abteilungen = settings.data?.abteilungen ?? [];
   const vereinsname = settings.data?.vereinsname ?? "der Verein";
+  const tenantPolicy = normalizeTenantPolicy(settings.data?.tenantPolicy);
 
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState<"forward" | "backward">("forward");
@@ -366,7 +368,7 @@ function AntragForm() {
   const familieExpanded = familieOpen || hasFamilieData;
   const antragstyp: "einzel" | "kind" | "familie" = isMinor
     ? "kind"
-    : kinder.length > 0 && hasPartner
+    : kinder.length > 0 && (hasPartner || !tenantPolicy.familyPartnerRequired)
       ? "familie"
       : "einzel";
 
@@ -1072,7 +1074,7 @@ function AntragForm() {
                       >
                         <Plus className="size-4" /> Kind hinzufügen
                       </Button>
-                      {kinder.length > 0 && !hasPartner ? (
+                      {kinder.length > 0 && tenantPolicy.familyPartnerRequired && !hasPartner ? (
                         <p className="text-xs text-muted-foreground">
                           Für den Familientarif bitte oben einen Partner oder ein zweites Elternteil
                           eintragen. Bis dahin gilt Ihr Einzelbeitrag.

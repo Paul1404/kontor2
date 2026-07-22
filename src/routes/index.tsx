@@ -25,6 +25,7 @@ import {
 import { buttonVariants } from "~/components/ui/button";
 import { cn } from "~/lib/cn";
 import { isPublicProductRequest } from "~/lib/current-product-host";
+import { productStructuredData } from "~/lib/product-seo";
 
 const CONTACT_HREF =
   "mailto:hallo@kontor2.com?subject=Interesse%20an%20Kontor2&body=Hallo%20Paul%2C%0A%0Awir%20interessieren%20uns%20f%C3%BCr%20Kontor2.%0A%0AVerein%3A%0AMitgliederzahl%3A%0AAbteilungen%3A%0AAktuelle%20L%C3%B6sung%3A%0AWichtigste%20Anforderungen%3A%0A%0AViele%20Gr%C3%BC%C3%9Fe";
@@ -112,8 +113,14 @@ const NOT_YET = [
 ];
 
 function ProductHomePage() {
+  const structuredData = JSON.stringify(productStructuredData()).replace(/</g, "\\u003c");
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
+      <script
+        type="application/ld+json"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: static schema.org data from trusted constants
+        dangerouslySetInnerHTML={{ __html: structuredData }}
+      />
       <a
         href="#inhalt"
         className="sr-only z-50 rounded-md bg-card px-4 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
@@ -174,7 +181,7 @@ function ProductHomePage() {
               </div>
 
               <h1 className="max-w-3xl text-4xl font-semibold leading-[1.04] tracking-[-0.035em] sm:text-6xl lg:text-7xl">
-                Vereinsverwaltung für den echten Verwaltungsalltag.
+                Vereinssoftware für den echten Verwaltungsalltag.
               </h1>
 
               <p className="mt-7 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl">
@@ -573,7 +580,7 @@ function ArchitectureSection() {
             </span>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            {["svu", "verein-a", "verein-b"].map((club, index) => (
+            {["verein-mitte", "verein-a", "verein-b"].map((club, index) => (
               <div key={club} className="rounded-2xl border border-white/10 bg-[#14223d] p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex size-9 items-center justify-center rounded-lg bg-white/8">

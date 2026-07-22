@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import * as v from "valibot";
 import { normalizeHex } from "~/lib/branding-color";
+import { normalizeTenantPolicy } from "~/lib/tenant-settings";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
@@ -26,8 +27,32 @@ const BeitragsstaffelInput = v.object({
   erwachsener: MoneyString,
 });
 
+const DunningLevelTextInput = v.object({
+  title: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120)),
+  introduction: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(2_000)),
+  closing: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(2_000)),
+});
+
+const TenantPolicyInput = v.object({
+  legacyImportSources: v.array(v.picklist(["linear_webverein", "svums"])),
+  legacyArchiveEnabled: v.boolean(),
+  cancellationDateMode: v.picklist(["anytime", "month_end", "year_end"]),
+  cancellationStatuteReference: v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120))),
+  outstandingClaimsStatuteReference: v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120))),
+  privacyStatuteReference: v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120))),
+  familyPartnerRequired: v.boolean(),
+  familyChildMaxAge: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(30)),
+  departmentPerPersonRequired: v.boolean(),
+  dunningTexts: v.object({
+    level1: v.nullable(DunningLevelTextInput),
+    level2: v.nullable(DunningLevelTextInput),
+    level3: v.nullable(DunningLevelTextInput),
+  }),
+});
+
 const UpdateInput = v.object({
   vereinsname: v.pipe(v.string(), v.minLength(1)),
+  tenantPolicy: v.optional(TenantPolicyInput),
   anschriftStrasse: v.optional(v.nullable(v.string()), null),
   anschriftPlz: v.optional(v.nullable(v.string()), null),
   anschriftOrt: v.optional(v.nullable(v.string()), null),
@@ -136,6 +161,7 @@ export const organizationSettingsRouter = {
 
     const next = {
       vereinsname: input.vereinsname,
+      tenantPolicy: normalizeTenantPolicy(input.tenantPolicy ?? existing?.tenantPolicy),
       anschriftStrasse: input.anschriftStrasse,
       anschriftPlz: input.anschriftPlz,
       anschriftOrt: input.anschriftOrt,

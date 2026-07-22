@@ -57,4 +57,43 @@ describe("assertCancellationAllowed", () => {
       ),
     ).not.toThrow();
   });
+
+  it("enforces end-of-year from the tenant policy", () => {
+    const policy = {
+      legacyImportSources: [],
+      legacyArchiveEnabled: false,
+      cancellationDateMode: "year_end" as const,
+      cancellationStatuteReference: null,
+      outstandingClaimsStatuteReference: null,
+      privacyStatuteReference: null,
+      familyPartnerRequired: false,
+      familyChildMaxAge: 18,
+      departmentPerPersonRequired: false,
+      dunningTexts: { level1: null, level2: null, level3: null },
+    };
+    expect(() =>
+      assertCancellationAllowed(
+        {
+          kuendigungsfristAktiv: true,
+          kuendigungsfristTage: 0,
+          kuendigungZumMonatsende: false,
+          tenantPolicy: policy,
+        },
+        utc(2026, 12, 30),
+        today,
+      ),
+    ).toThrow(/Jahresende/);
+    expect(() =>
+      assertCancellationAllowed(
+        {
+          kuendigungsfristAktiv: true,
+          kuendigungsfristTage: 0,
+          kuendigungZumMonatsende: false,
+          tenantPolicy: policy,
+        },
+        utc(2026, 12, 31),
+        today,
+      ),
+    ).not.toThrow();
+  });
 });
