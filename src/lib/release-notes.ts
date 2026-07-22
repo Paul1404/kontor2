@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.127.1",
+    date: "2026-07-22",
+    title: "Domain-Weiterleitungen",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Gespeicherte frühere Vereinsdomains werden jetzt aus der Betreiber-Datenbank geladen und ohne Neustart als Weiterleitung aktiviert.",
+      },
+    ],
+  },
+  {
     version: "0.127.0",
     date: "2026-07-22",
     title: "Vereinsregeln und Auffindbarkeit",

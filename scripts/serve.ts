@@ -68,9 +68,13 @@ let activeRequests = 0;
 let legacyRedirects = new Map<string, string>();
 
 async function refreshLegacyRedirects(): Promise<void> {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) return;
-  const control = postgres(databaseUrl, { max: 1, connect_timeout: 5, onnotice: () => {} });
+  const controlDatabaseUrl = process.env.CONTROL_DATABASE_URL ?? process.env.DATABASE_URL;
+  if (!controlDatabaseUrl) return;
+  const control = postgres(controlDatabaseUrl, {
+    max: 1,
+    connect_timeout: 5,
+    onnotice: () => {},
+  });
   try {
     const tenants = await control<
       Array<{ canonical_host: string | null; legacy_hosts: string[] | null }>
