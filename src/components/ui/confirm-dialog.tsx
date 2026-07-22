@@ -212,7 +212,11 @@ export function TypeToConfirmDialog({
         if (e.target === e.currentTarget && !loading) onOpenChange(false);
       }}
     >
-      <div ref={dialogRef} tabIndex={-1} className="motion-zoom-in flex w-full max-w-xl flex-col gap-4 rounded-xl border border-destructive/40 bg-card p-6 shadow-elevated">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="motion-zoom-in flex w-full max-w-xl flex-col gap-4 rounded-xl border border-destructive/40 bg-card p-6 shadow-elevated"
+      >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">

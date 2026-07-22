@@ -31,7 +31,9 @@ export function useModalFocus({
         return;
       }
       if (event.key !== "Tab") return;
-      const focusable = Array.from(containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
+      const focusable = Array.from(
+        containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [],
+      );
       if (focusable.length === 0) {
         event.preventDefault();
         return;

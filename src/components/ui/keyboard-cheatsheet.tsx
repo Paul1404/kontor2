@@ -75,7 +75,11 @@ export function KeyboardCheatsheet({
         if (e.target === e.currentTarget) onOpenChange(false);
       }}
     >
-      <div ref={dialogRef} tabIndex={-1} className="motion-zoom-in flex w-full max-w-lg flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-card">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="motion-zoom-in flex w-full max-w-lg flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-card"
+      >
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
             <Keyboard className="size-4 text-primary" />

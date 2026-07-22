@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "0.127.2",
+    date: "2026-07-22",
+    title: "Codepflege",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Bestehende Formatierungs- und Importsortierungsfehler wurden bereinigt, damit die vollständige Prüfung wieder ohne Ausnahmen durchläuft.",
+      },
+    ],
+  },
+  {
     version: "0.127.1",
     date: "2026-07-22",
     title: "Domain-Weiterleitungen",

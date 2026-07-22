@@ -7,9 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
 import { QueryError } from "~/components/ui/query-error";
 import { SkeletonText } from "~/components/ui/skeleton";
+import { cn } from "~/lib/cn";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
-import { cn } from "~/lib/cn";
 
 export const Route = createFileRoute("/app/forderungen/mahnungen/")({
   component: MahnungenListPage,

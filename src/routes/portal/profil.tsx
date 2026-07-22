@@ -5,15 +5,15 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
-import { SkeletonText } from "~/components/ui/skeleton";
 import { QueryError } from "~/components/ui/query-error";
+import { SkeletonText } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
-import { orpc } from "~/lib/orpc";
 import {
   validateNameMessage,
   validatePhoneMessage,
   validatePlzMessage,
 } from "~/lib/application-validation";
+import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/portal/profil")({
   component: PortalProfilePage,
@@ -221,7 +221,8 @@ function validateForm(
 ): Partial<Record<FieldKey, string>> {
   const errors: Partial<Record<FieldKey, string>> = {};
   const changed = (key: FieldKey) => (original?.[key] ?? "") !== form[key];
-  if (changed("vorname")) errors.vorname = validateNameMessage(form.vorname, "Vorname") ?? undefined;
+  if (changed("vorname"))
+    errors.vorname = validateNameMessage(form.vorname, "Vorname") ?? undefined;
   if (changed("nachname"))
     errors.nachname = validateNameMessage(form.nachname, "Nachname") ?? undefined;
   if (changed("email") && form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {

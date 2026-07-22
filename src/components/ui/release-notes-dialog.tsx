@@ -1,5 +1,6 @@
 import { Sparkles, X } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { useModalFocus } from "~/lib/modal-focus";
 import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
@@ -9,7 +10,6 @@ import {
   type ReleaseCategory,
   writeLastSeenVersion,
 } from "~/lib/release-notes";
-import { useModalFocus } from "~/lib/modal-focus";
 
 export function ReleaseNotesDialog({
   open,
@@ -47,7 +47,11 @@ export function ReleaseNotesDialog({
         if (e.target === e.currentTarget) onOpenChange(false);
       }}
     >
-      <div ref={dialogRef} tabIndex={-1} className="motion-zoom-in flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-border bg-card text-card-foreground shadow-card">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="motion-zoom-in flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-border bg-card text-card-foreground shadow-card"
+      >
         <div className="flex items-start justify-between border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <Sparkles className="size-4 text-primary" />

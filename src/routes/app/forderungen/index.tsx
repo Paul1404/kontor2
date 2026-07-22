@@ -20,10 +20,10 @@ import { InfoBox } from "~/components/ui/info-box";
 import { QueryError } from "~/components/ui/query-error";
 import { SkeletonText } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
+import { cn } from "~/lib/cn";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
-import { cn } from "~/lib/cn";
 
 export const Route = createFileRoute("/app/forderungen/")({
   component: ForderungenPage,
@@ -106,10 +106,7 @@ function ForderungenPage() {
             <HeartHandshake className="size-4" />
             Kulanz-Brief
           </Link>
-          <Link
-            to="/app/forderungen/mahnungen/neu"
-            className={cn(buttonVariants({ size: "sm" }))}
-          >
+          <Link to="/app/forderungen/mahnungen/neu" className={cn(buttonVariants({ size: "sm" }))}>
             Neue Mahnungen
           </Link>
         </div>
