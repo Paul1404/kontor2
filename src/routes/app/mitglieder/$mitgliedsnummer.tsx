@@ -957,7 +957,7 @@ function SollstellungenCard({
                       aria-label={`Status für ${r.billingYear} ändern`}
                       className="rounded-md border border-input bg-background px-2 py-1 text-sm"
                       value=""
-                      disabled={setStatus.isPending}
+                      disabled={setStatus.isPending || r.status === "pending"}
                       onChange={(e) => {
                         const next = e.target.value as OverridableStatus | "";
                         e.currentTarget.selectedIndex = 0;
@@ -1009,21 +1009,25 @@ function SollstellungStatusBadge({ status }: { status: string }) {
       ? "success"
       : status === "eingezogen"
         ? "info"
-        : status === "open"
+        : status === "pending"
           ? "warning"
-          : "secondary";
+          : status === "open"
+            ? "warning"
+            : "secondary";
   const label =
     status === "paid"
       ? "Bezahlt"
       : status === "eingezogen"
         ? "Eingezogen"
-        : status === "open"
-          ? "Offen"
-          : status === "returned"
-            ? "Rückläufer"
-            : status === "cancelled"
-              ? "Storniert"
-              : status;
+        : status === "pending"
+          ? "Noch nicht übermittelt"
+          : status === "open"
+            ? "Offen"
+            : status === "returned"
+              ? "Rückläufer"
+              : status === "cancelled"
+                ? "Storniert"
+                : status;
   return <Badge variant={variant}>{label}</Badge>;
 }
 

@@ -50,10 +50,16 @@ async function main() {
     console.error("[provision] --name=<Anzeigename> erforderlich.");
     process.exit(1);
   }
-  await provisionTenant(adminUrl(), { key, displayName: name, databaseName, primaryKey });
+  const result = await provisionTenant(adminUrl(), {
+    key,
+    displayName: name,
+    databaseName,
+    primaryKey,
+  });
   console.log(
-    `[provision] "${key}" fertig. <${key}>.<PRODUCT_DOMAIN> löst nach Cache-TTL (~60s) auf; /setup legt den Admin an.`,
+    `[provision] "${key}" fertig. <${key}>.<PRODUCT_DOMAIN> löst nach Cache-TTL (~60s) auf; /setup legt den Admin mit dem einmaligen Setup-Code an.`,
   );
+  console.log(`[provision] Einmaliger Setup-Code: ${result.bootstrapToken}`);
 }
 
 main().catch((e) => {

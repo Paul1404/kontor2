@@ -643,7 +643,7 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "commit_fee_run",
     description:
-      'Führt den Beitragslauf aus: legt fehlende Sollstellungen für das Jahr an, erzeugt die pain.008-Lastschriftdatei nur für Lastschrift-Posten und schreibt dafür die fee_run_items; Rechnungsposten bleiben offene Sollstellungen ohne XML. Bereits offen gestellte Verträge werden nicht doppelt gestellt (inkrementell). Optional `memberIds`: nur diese (abgerechneten) Mitglieder einziehen, für einen gezielten (Wieder-)Einzug ohne den Rest des Vereins. Sicherheits-Check: `expectedTotalAmount` muss `preview.totals.grandTotal` (z. B. "510.00") sein und `expectedItemCount` muss `preview.totals.count` sein, sonst bricht der Lauf ab. Geld- und bankrelevant, vollständig auditiert. Eine XML gibt es nur bei Lastschrift-Posten und kann danach mit get_fee_run_xml abgerufen werden.',
+      "Erzeugt den Beitragslauf: legt fehlende Sollstellungen für das Jahr an, erzeugt die pain.008-Lastschriftdatei nur für Lastschrift-Posten und schreibt dafür die fee_run_items; Rechnungsposten bleiben offene Sollstellungen ohne XML. Lastschrift-Posten bleiben bis submit_fee_run ausstehend und gelten noch nicht als eingezogen. Bereits gestellte Verträge werden nicht doppelt gestellt (inkrementell). Optional `memberIds`: nur diese Mitglieder berücksichtigen. Sicherheits-Check: `expectedTotalAmount` muss `preview.totals.grandTotal` und `expectedItemCount` muss `preview.totals.count` sein. Geld- und bankrelevant, vollständig auditiert. Eine XML gibt es nur bei Lastschrift-Posten und kann danach mit get_fee_run_xml abgerufen werden.",
     minRole: "vorstand",
     input: v.object({
       billingYear: v.pipe(v.number(), v.integer(), v.minValue(2000), v.maxValue(2100)),
@@ -671,10 +671,18 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "get_fee_run_xml",
     description:
-      "Liefert die pain.008-Lastschriftdatei eines committeten Laufs als Text (Dateiname + XML-Inhalt) zum Bankupload. id aus list_fee_runs/commit_fee_run.",
+      "Liefert die pain.008-Lastschriftdatei eines erzeugten Laufs als Text (Dateiname + XML-Inhalt) zum Bankupload. id aus list_fee_runs/commit_fee_run.",
     minRole: "vorstand",
     input: v.object({ id: v.string() }),
     execute: (context, input) => call(appRouter.feeRuns.downloadXml, input, { context }),
+  }),
+  defineTool({
+    name: "submit_fee_run",
+    description:
+      "Bestätigt, dass die pain.008-Datei eines erzeugten Beitrags- oder Wiedereinzugslaufs erfolgreich an die Bank übermittelt wurde. Erst dadurch wechseln seine Lastschrift-Posten von ausstehend auf eingezogen. Nur nach dem tatsächlichen Bankupload verwenden. Geldrelevant, gesperrt, idempotent und auditiert.",
+    minRole: "vorstand",
+    input: v.object({ id: v.string() }),
+    execute: (context, input) => call(appRouter.feeRuns.submit, input, { context }),
   }),
   defineTool({
     name: "cancel_fee_run",
@@ -724,7 +732,7 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "list_return_candidates",
     description:
-      "Committete Lastschrift-Posten (fee_run_items), die noch NICHT als Rückläufer erfasst sind. Quelle für record_sepa_return. Optional per Freitext (Name, Mitgliedsnummer, EndToEndId) filtern.",
+      "An die Bank übermittelte Lastschrift-Posten (fee_run_items), die noch NICHT als Rückläufer erfasst sind. Quelle für record_sepa_return. Optional per Freitext (Name, Mitgliedsnummer, EndToEndId) filtern.",
     minRole: "vorstand",
     input: v.object({
       query: v.optional(v.nullable(v.string())),
@@ -777,7 +785,7 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "recollect_returns",
     description:
-      "Wiedereinzug: erzeugt eine neue pain.008-Datei für ausgewählte zurückgegangene Sollstellungen (sollStellungIds aus list_recollect_candidates), ohne die Original-Sollstellung zu löschen. Jeder Posten wechselt von returned zurück auf eingezogen und bekommt ein neues fee_run_item. `falligkeitsdatum` YYYY-MM-DD. Geld- und bankrelevant, auditiert. XML danach mit get_fee_run_xml.",
+      "Wiedereinzug: erzeugt eine neue pain.008-Datei für ausgewählte zurückgegangene Sollstellungen (sollStellungIds aus list_recollect_candidates), ohne die Original-Sollstellung zu löschen. Jeder Posten wechselt zunächst auf ausstehend und bekommt ein neues fee_run_item. XML danach mit get_fee_run_xml abrufen und nach dem Bankupload mit submit_fee_run bestätigen. `falligkeitsdatum` YYYY-MM-DD. Geld- und bankrelevant, auditiert.",
     minRole: "vorstand",
     input: v.object({
       sollStellungIds: v.pipe(v.array(v.string()), v.minLength(1)),
@@ -792,7 +800,7 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "preview_camt_returns",
     description:
-      "Liest eine camt.054-Datei der Bank (Rücklastschriften) und ordnet jeden Rückläufer per EndToEndId einem committeten fee_run_item zu. Reine Vorschau (kein Schreiben): zeigt matched/already_returned/unmatched. Danach mit import_camt_returns bestätigen.",
+      "Liest eine camt.054-Datei der Bank (Rücklastschriften) und ordnet jeden Rückläufer per EndToEndId einem an die Bank übermittelten fee_run_item zu. Reine Vorschau (kein Schreiben): zeigt matched/already_returned/unmatched. Danach mit import_camt_returns bestätigen.",
     minRole: "vorstand",
     input: v.object({ xml: v.pipe(v.string(), v.minLength(1)) }),
     execute: (context, input) => call(appRouter.sepaReturns.previewCamt, input, { context }),

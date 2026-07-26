@@ -132,13 +132,13 @@ describe.skipIf(!onTestDb)("fee-runs.updateCollectionDate (integration)", () => 
         falligkeitsdatum: STALE_DATE,
         amount: "54.00000000",
         openAmount: "54.00000000",
-        status: "open",
+        status: "pending",
         feeRunId: runId,
       })
       .returning({ id: sollStellungenTable.id });
     sollId = soll?.id ?? "";
 
-    await db()
+    const [item] = await db()
       .insert(feeRunItemsTable)
       .values({
         feeRunId: runId,
@@ -153,7 +153,12 @@ describe.skipIf(!onTestDb)("fee-runs.updateCollectionDate (integration)", () => 
         mandateRef: `${MARKER}-MND`,
         debtorName: MARKER,
         debtorIbanLast4: "1234",
-      });
+      })
+      .returning({ id: feeRunItemsTable.id });
+    await db()
+      .update(sollStellungenTable)
+      .set({ lastFeeRunItemId: item?.id ?? null })
+      .where(eq(sollStellungenTable.id, sollId));
   });
 
   afterAll(async () => {
@@ -201,5 +206,58 @@ describe.skipIf(!onTestDb)("fee-runs.updateCollectionDate (integration)", () => 
         { context: vorstandContext() },
       ),
     ).rejects.toThrow();
+  });
+
+  it("keeps the debit pending until explicit bank submission", async () => {
+    const [before] = await db()
+      .select({ status: sollStellungenTable.status, paid: sollStellungenTable.paidAmount })
+      .from(sollStellungenTable)
+      .where(eq(sollStellungenTable.id, sollId));
+    expect(before).toMatchObject({ status: "pending" });
+    expect(Number(before?.paid)).toBe(0);
+
+    const beforeCandidates = await call(
+      appRouter.sepaReturns.candidates,
+      { query: MARKER, limit: 50 },
+      { context: vorstandContext() },
+    );
+    expect(beforeCandidates).toHaveLength(0);
+
+    const submitted = await call(
+      appRouter.feeRuns.submit,
+      { id: runId },
+      { context: vorstandContext() },
+    );
+    expect(submitted).toEqual({ ok: true, changed: true });
+
+    const [[run], [posting]] = await Promise.all([
+      db()
+        .select({ status: feeRunsTable.status })
+        .from(feeRunsTable)
+        .where(eq(feeRunsTable.id, runId)),
+      db()
+        .select({
+          status: sollStellungenTable.status,
+          paid: sollStellungenTable.paidAmount,
+          open: sollStellungenTable.openAmount,
+        })
+        .from(sollStellungenTable)
+        .where(eq(sollStellungenTable.id, sollId)),
+    ]);
+    expect(run?.status).toBe("submitted");
+    expect(posting?.status).toBe("eingezogen");
+    expect(Number(posting?.paid)).toBe(54);
+    expect(Number(posting?.open)).toBe(0);
+
+    const afterCandidates = await call(
+      appRouter.sepaReturns.candidates,
+      { query: MARKER, limit: 50 },
+      { context: vorstandContext() },
+    );
+    expect(afterCandidates).toHaveLength(1);
+
+    expect(
+      await call(appRouter.feeRuns.submit, { id: runId }, { context: vorstandContext() }),
+    ).toEqual({ ok: true, changed: false });
   });
 });

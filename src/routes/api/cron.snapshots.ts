@@ -28,6 +28,7 @@ const handle = createServerOnlyFn(async ({ request }: { request: Request }): Pro
     { logger },
     { acquireNonce, rateLimit },
     { runNightlySnapshot },
+    { snapshotCronResponse },
   ] = await Promise.all([
     import("~/server/crypto/hmac"),
     import("~/server/env"),
@@ -35,6 +36,7 @@ const handle = createServerOnlyFn(async ({ request }: { request: Request }): Pro
     import("~/server/lib/logger"),
     import("~/server/redis/client"),
     import("~/server/snapshots/scheduler"),
+    import("~/server/snapshots/cron-response"),
   ]);
   const declaredLength = Number(request.headers.get("content-length") ?? "");
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
@@ -82,14 +84,13 @@ const handle = createServerOnlyFn(async ({ request }: { request: Request }): Pro
       notes: "Externally triggered cron run",
       trigger: "nightly",
     });
-    return Response.json({
-      ok: true,
-      acquiredLock: result.acquiredLock,
-      runId: result.runId,
-      memberCount: result.memberCount,
-      skippedCount: result.skippedCount,
-      bytesTotal: result.bytesTotal,
-    });
+    if (result.failures.length > 0) {
+      logger.error("cron.snapshots.incomplete", {
+        failedTenants: result.failures.map((failure) => failure.tenant),
+        successfulTenants: result.tenants.map((tenant) => tenant.tenant),
+      });
+    }
+    return snapshotCronResponse(result);
   } catch (err) {
     // Log the detail server-side; never echo the raw exception text back to
     // the caller.

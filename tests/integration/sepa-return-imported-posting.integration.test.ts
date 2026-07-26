@@ -99,14 +99,14 @@ describe.skipIf(!onTestDb)("sepaReturns imported-posting path (integration)", ()
     importedSollId = imp?.id ?? "";
 
     // App-collected posting: eingezogen WITH a fee_run_item (must be refused by
-    // the imported path). Needs a committed run + mandate + item.
+    // the imported path). Needs a submitted run + mandate + item.
     const [mand] = await db()
       .insert(sepaMandatesTable)
       .values({ memberId, adrNr, mandatsNr: `${MARKER}-MND`, status: "aktiv" })
       .returning({ id: sepaMandatesTable.id });
     const [run] = await db()
       .insert(feeRunsTable)
-      .values({ billingYear: 2095, falligkeitsdatum: "2095-01-15", status: "committed" })
+      .values({ billingYear: 2095, falligkeitsdatum: "2095-01-15", status: "submitted" })
       .returning({ id: feeRunsTable.id });
     runId = run?.id ?? "";
     const [app] = await db()

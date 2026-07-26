@@ -1,7 +1,7 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, Landmark, Loader2, Upload } from "lucide-react";
-import { useMemo, useState } from "react";
+import { CheckCircle2, Landmark, Loader2, Search, Upload, X } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -15,6 +15,11 @@ export const Route = createFileRoute("/app/zahlungsabgleich")({
 });
 
 type Proposal = Awaited<ReturnType<typeof orpc.payments.matchBankCsv>>["proposals"][number];
+type Posting = NonNullable<Proposal["match"]>;
+
+function matchForProposal(proposal: Proposal, manualMatches: Map<number, Posting>): Posting | null {
+  return manualMatches.get(proposal.line) ?? proposal.match;
+}
 
 function ZahlungsabgleichPage() {
   const qc = useQueryClient();
@@ -24,6 +29,15 @@ function ZahlungsabgleichPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirm, setConfirm] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [manualMatches, setManualMatches] = useState<Map<number, Posting>>(new Map());
+  const [assignmentLine, setAssignmentLine] = useState<number | null>(null);
+  const [assignmentQuery, setAssignmentQuery] = useState("");
+
+  const openPostings = useQuery({
+    queryKey: ["payments.openPostings", assignmentQuery],
+    queryFn: () => orpc.payments.openPostings({ query: assignmentQuery, limit: 30 }),
+    enabled: assignmentLine !== null,
+  });
 
   const match = useMutation({
     mutationFn: (csv: string) => orpc.payments.matchBankCsv({ csv }),
@@ -31,6 +45,9 @@ function ZahlungsabgleichPage() {
       setProposals(r.proposals);
       setWarnings(r.warnings);
       setSourceHash(r.sourceHash);
+      setManualMatches(new Map());
+      setAssignmentLine(null);
+      setAssignmentQuery("");
       // Pre-select high-confidence matches.
       setSelected(
         new Set(r.proposals.filter((p) => p.match && p.confidence === "high").map((p) => p.line)),
@@ -43,8 +60,11 @@ function ZahlungsabgleichPage() {
   const apply = useMutation({
     mutationFn: () => {
       const items = (proposals ?? [])
-        .filter((p) => p.match && selected.has(p.line))
-        .map((p) => ({ sollStellungId: p.match!.sollStellungId, amount: p.amount }));
+        .filter((p) => matchForProposal(p, manualMatches) && selected.has(p.line))
+        .map((p) => ({
+          sollStellungId: matchForProposal(p, manualMatches)!.sollStellungId,
+          amount: p.amount,
+        }));
       if (!sourceHash) throw new Error("Die Quelldatei muss erneut eingelesen werden.");
       return orpc.payments.apply({ sourceHash, items });
     },
@@ -57,6 +77,8 @@ function ZahlungsabgleichPage() {
       setSelected(new Set());
       setFileName(null);
       setSourceHash(null);
+      setManualMatches(new Map());
+      setAssignmentLine(null);
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["dashboard.insights"] }),
         qc.invalidateQueries({ queryKey: ["dunning.open"] }),
@@ -79,8 +101,8 @@ function ZahlungsabgleichPage() {
   // high-confidence ones so an amount-mismatched medium guess is never booked
   // in bulk by accident.
   const matchedLines = useMemo(
-    () => (proposals ?? []).filter((p) => p.match).map((p) => p.line),
-    [proposals],
+    () => (proposals ?? []).filter((p) => matchForProposal(p, manualMatches)).map((p) => p.line),
+    [proposals, manualMatches],
   );
   const highLines = useMemo(
     () => (proposals ?? []).filter((p) => p.match && p.confidence === "high").map((p) => p.line),
@@ -90,10 +112,25 @@ function ZahlungsabgleichPage() {
   const selectedSum = useMemo(
     () =>
       (proposals ?? [])
-        .filter((p) => p.match && selected.has(p.line))
-        .reduce((s, p) => s + Math.min(p.amount, p.match?.openAmount ?? p.amount), 0),
-    [proposals, selected],
+        .filter((p) => matchForProposal(p, manualMatches) && selected.has(p.line))
+        .reduce(
+          (s, p) =>
+            s + Math.min(p.amount, matchForProposal(p, manualMatches)?.openAmount ?? p.amount),
+          0,
+        ),
+    [proposals, selected, manualMatches],
   );
+
+  function choosePosting(line: number, posting: Posting) {
+    setManualMatches((previous) => {
+      const next = new Map(previous);
+      next.set(line, posting);
+      return next;
+    });
+    setSelected((previous) => new Set(previous).add(line));
+    setAssignmentLine(null);
+    setAssignmentQuery("");
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -186,49 +223,145 @@ function ZahlungsabgleichPage() {
                 <tbody>
                   {proposals.map((p) => {
                     const isSel = selected.has(p.line);
+                    const matchForRow = matchForProposal(p, manualMatches);
+                    const manuallyAssigned = manualMatches.has(p.line);
                     return (
-                      <tr key={p.line} className="border-b border-border last:border-b-0">
-                        <td className="px-3 py-2">
-                          <input
-                            type="checkbox"
-                            disabled={!p.match}
-                            checked={isSel}
-                            onChange={(e) =>
-                              setSelected((prev) => {
-                                const next = new Set(prev);
-                                if (e.target.checked) next.add(p.line);
-                                else next.delete(p.line);
-                                return next;
-                              })
-                            }
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="font-medium">{p.name || "Ohne Namen"}</div>
-                          <div className="max-w-md truncate text-xs text-muted-foreground">
-                            {p.purpose}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {formatCurrency(p.amount.toFixed(2))}
-                        </td>
-                        <td className="px-3 py-2">
-                          {p.match ? (
-                            <div>
-                              <div>{p.match.memberName}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {p.match.billingYear} · offen{" "}
-                                {formatCurrency(p.match.openAmount.toFixed(2))}
-                              </div>
+                      <Fragment key={p.line}>
+                        <tr className="border-b border-border last:border-b-0">
+                          <td className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              aria-label={`Buchung in Zeile ${p.line} auswählen`}
+                              disabled={!matchForRow}
+                              checked={isSel}
+                              onChange={(e) =>
+                                setSelected((prev) => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(p.line);
+                                  else next.delete(p.line);
+                                  return next;
+                                })
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="font-medium">{p.name || "Ohne Namen"}</div>
+                            <div className="max-w-md truncate text-xs text-muted-foreground">
+                              {p.purpose}
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground">{p.reason}</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          <ConfidenceBadge confidence={p.confidence} />
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {formatCurrency(p.amount.toFixed(2))}
+                          </td>
+                          <td className="px-3 py-2">
+                            {matchForRow ? (
+                              <div>
+                                <div>{matchForRow.memberName}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {matchForRow.billingYear} · offen{" "}
+                                  {formatCurrency(matchForRow.openAmount.toFixed(2))}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">{p.reason}</span>
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="mt-1 h-7 px-2 text-xs"
+                              onClick={() => {
+                                setAssignmentLine(assignmentLine === p.line ? null : p.line);
+                                setAssignmentQuery("");
+                              }}
+                            >
+                              {matchForRow ? "Zuordnung ändern" : "Zuordnen"}
+                            </Button>
+                          </td>
+                          <td className="px-3 py-2">
+                            {manuallyAssigned ? (
+                              <Badge variant="info">manuell</Badge>
+                            ) : (
+                              <ConfidenceBadge confidence={p.confidence} />
+                            )}
+                          </td>
+                        </tr>
+                        {assignmentLine === p.line ? (
+                          <tr key={`${p.line}-assignment`} className="border-b bg-muted/20">
+                            <td colSpan={5} className="px-3 py-3">
+                              <div className="mx-auto flex max-w-3xl flex-col gap-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="relative flex-1">
+                                    <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                    <input
+                                      value={assignmentQuery}
+                                      onChange={(e) => setAssignmentQuery(e.target.value)}
+                                      placeholder="Mitglied, Nummer oder Beitragsjahr suchen"
+                                      aria-label="Offene Forderungen durchsuchen"
+                                      className="h-9 w-full rounded-lg border border-input bg-card pl-8 pr-3 text-sm"
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-9"
+                                    aria-label="Zuordnung schließen"
+                                    onClick={() => setAssignmentLine(null)}
+                                  >
+                                    <X className="size-4" />
+                                  </Button>
+                                </div>
+                                {openPostings.isLoading ? (
+                                  <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Loader2 className="size-4 animate-spin" /> Suche…
+                                  </span>
+                                ) : openPostings.isError ? (
+                                  <div className="flex items-center justify-between gap-3 text-sm text-destructive">
+                                    <span>Forderungen konnten nicht geladen werden.</span>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openPostings.refetch()}
+                                    >
+                                      Erneut versuchen
+                                    </Button>
+                                  </div>
+                                ) : openPostings.data?.length ? (
+                                  <ul className="max-h-64 divide-y overflow-y-auto rounded-lg border bg-card">
+                                    {openPostings.data.map((posting) => (
+                                      <li key={posting.sollStellungId}>
+                                        <button
+                                          type="button"
+                                          className="flex w-full items-center justify-between gap-4 p-3 text-left text-sm hover:bg-muted"
+                                          onClick={() => choosePosting(p.line, posting)}
+                                        >
+                                          <span>
+                                            <span className="font-medium">
+                                              {posting.memberName}
+                                            </span>
+                                            <span className="ml-2 text-xs text-muted-foreground">
+                                              #{posting.reference} · {posting.billingYear}
+                                            </span>
+                                          </span>
+                                          <span className="shrink-0 tabular-nums">
+                                            offen {formatCurrency(posting.openAmount.toFixed(2))}
+                                          </span>
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">
+                                    Keine passende offene Forderung gefunden.
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
                     );
                   })}
                 </tbody>

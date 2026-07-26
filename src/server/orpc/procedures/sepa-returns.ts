@@ -234,7 +234,7 @@ export const sepaReturnsRouter = {
     }),
 
   /**
-   * List committed fee_run_items that have not already been marked as
+   * List submitted fee_run_items that have not already been marked as
    * returned. Used by the "Rückläufer erfassen" form to pick a debit.
    */
   candidates: vorstandProc
@@ -251,7 +251,7 @@ export const sepaReturnsRouter = {
       const q = (input.query ?? "").trim();
       const like = `%${escapeLike(q)}%`;
       const where = and(
-        eq(feeRunsTable.status, "committed"),
+        eq(feeRunsTable.status, "submitted"),
         sql`${feeRunItemsTable.returnedAt} is null`,
         memberNotDeleted(),
         q
@@ -356,8 +356,12 @@ export const sepaReturnsRouter = {
         sollStellungId: feeRunItemsTable.sollStellungId,
         amount: feeRunItemsTable.amount,
         returnedAt: feeRunItemsTable.returnedAt,
+        runStatus: feeRunsTable.status,
+        postingStatus: sollStellungenTable.status,
       })
       .from(feeRunItemsTable)
+      .innerJoin(feeRunsTable, eq(feeRunItemsTable.feeRunId, feeRunsTable.id))
+      .innerJoin(sollStellungenTable, eq(feeRunItemsTable.sollStellungId, sollStellungenTable.id))
       .where(eq(feeRunItemsTable.id, input.feeRunItemId))
       .limit(1);
     if (!item) {
@@ -366,6 +370,11 @@ export const sepaReturnsRouter = {
     if (item.returnedAt) {
       throw new ORPCError("CONFLICT", {
         message: "Diese Lastschrift wurde bereits als Rückläufer erfasst.",
+      });
+    }
+    if (item.runStatus !== "submitted" || item.postingStatus !== "eingezogen") {
+      throw new ORPCError("CONFLICT", {
+        message: "Nur an die Bank übermittelte Lastschriften lassen sich als Rückläufer erfassen.",
       });
     }
 
@@ -502,7 +511,7 @@ export const sepaReturnsRouter = {
 
   /**
    * Parse an uploaded camt.054 (Rücklastschrift) file and match each returned
-   * debit to a committed fee_run_item by EndToEndId. No writes -- the operator
+   * debit to a submitted fee_run_item by EndToEndId. No writes -- the operator
    * confirms the matched set, then calls `importCamt`.
    */
   previewCamt: vorstandProc
@@ -533,7 +542,17 @@ export const sepaReturnsRouter = {
               .from(feeRunItemsTable)
               .innerJoin(feeRunsTable, eq(feeRunItemsTable.feeRunId, feeRunsTable.id))
               .innerJoin(membersTable, eq(feeRunItemsTable.memberId, membersTable.id))
-              .where(inArray(feeRunItemsTable.endToEndId, e2eIds));
+              .innerJoin(
+                sollStellungenTable,
+                eq(feeRunItemsTable.sollStellungId, sollStellungenTable.id),
+              )
+              .where(
+                and(
+                  inArray(feeRunItemsTable.endToEndId, e2eIds),
+                  eq(feeRunsTable.status, "submitted"),
+                  eq(sollStellungenTable.status, "eingezogen"),
+                ),
+              );
 
       const refByItem = new Map(items.map((i) => [i.feeRunItemId, i]));
       const returnable: ReturnableItem[] = items.map((i) => ({
@@ -614,7 +633,15 @@ export const sepaReturnsRouter = {
           sollStellungId: feeRunItemsTable.sollStellungId,
         })
         .from(feeRunItemsTable)
-        .where(inArray(feeRunItemsTable.id, ids));
+        .innerJoin(feeRunsTable, eq(feeRunItemsTable.feeRunId, feeRunsTable.id))
+        .innerJoin(sollStellungenTable, eq(feeRunItemsTable.sollStellungId, sollStellungenTable.id))
+        .where(
+          and(
+            inArray(feeRunItemsTable.id, ids),
+            eq(feeRunsTable.status, "submitted"),
+            eq(sollStellungenTable.status, "eingezogen"),
+          ),
+        );
       const itemById = new Map(items.map((i) => [i.id, i]));
 
       const out = await context.db.transaction(async (tx) => {

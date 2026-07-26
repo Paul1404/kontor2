@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { BellRing, CalendarClock, Coins, Download, Loader2, XCircle } from "lucide-react";
+import {
+  BellRing,
+  CalendarClock,
+  CheckCircle2,
+  Coins,
+  Download,
+  Loader2,
+  XCircle,
+} from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -25,6 +33,7 @@ function FeeRunDetailPage() {
   const canEdit = me.data?.role === "vorstand" || me.data?.role === "admin";
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [submitOpen, setSubmitOpen] = useState(false);
 
   const detail = useQuery({
     queryKey: ["feeRuns.get", id],
@@ -35,6 +44,14 @@ function FeeRunDetailPage() {
     mutationFn: () => orpc.feeRuns.cancel({ id, reason: cancelReason.trim() || null }),
     onSuccess: () => {
       setCancelOpen(false);
+      qc.invalidateQueries({ queryKey: ["feeRuns.get", id] });
+      qc.invalidateQueries({ queryKey: ["feeRuns.list"] });
+    },
+  });
+  const submit = useMutation({
+    mutationFn: () => orpc.feeRuns.submit({ id }),
+    onSuccess: () => {
+      setSubmitOpen(false);
       qc.invalidateQueries({ queryKey: ["feeRuns.get", id] });
       qc.invalidateQueries({ queryKey: ["feeRuns.list"] });
     },
@@ -91,12 +108,29 @@ function FeeRunDetailPage() {
             </Button>
           ) : null}
           {canEdit && r.status === "committed" ? (
-            <Button variant="destructive" onClick={() => setCancelOpen(true)}>
-              Stornieren
-            </Button>
+            <>
+              {r.hasXml ? (
+                <Button onClick={() => setSubmitOpen(true)}>
+                  <CheckCircle2 className="size-4" /> Bankübermittlung bestätigen
+                </Button>
+              ) : null}
+              <Button variant="destructive" onClick={() => setCancelOpen(true)}>
+                Stornieren
+              </Button>
+            </>
           ) : null}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={submitOpen}
+        onOpenChange={setSubmitOpen}
+        title="SEPA-Datei wirklich übermittelt?"
+        description="Erst bestätigen, nachdem die pain.008-Datei erfolgreich bei der Bank eingereicht wurde. Danach gelten die Lastschriften als eingezogen."
+        confirmLabel="Übermittlung bestätigen"
+        loading={submit.isPending}
+        onConfirm={() => submit.mutate()}
+      />
 
       {cancelOpen ? (
         <Card className="border-destructive/40 bg-destructive/5">

@@ -35,13 +35,16 @@ export const feeRunSourceEnum = pgEnum("fee_run_source", ["app", "linear_import"
  * re-runs). `recollection` is a Wiedereinzug: a fresh pain.008 for postings
  * that already exist but came back as a Rücklastschrift, now with a corrected
  * IBAN / valid mandate. A recollection never creates Sollstellungen -- it
- * re-debits existing `returned` ones and flips them back to `eingezogen`.
+ * re-debits existing `returned` ones and keeps them `pending` until the bank
+ * submission is explicitly confirmed.
  */
 export const feeRunKindEnum = pgEnum("fee_run_kind", ["regular", "recollection"]);
 
 export const sepaSequenceTypeEnum = pgEnum("sepa_sequence_type", ["FRST", "RCUR", "OOFF", "FNAL"]);
 
 export const sollStellungStatusEnum = pgEnum("soll_stellung_status", [
+  // SEPA file generated but not yet confirmed as submitted to the bank.
+  "pending",
   "open",
   "paid",
   "returned",

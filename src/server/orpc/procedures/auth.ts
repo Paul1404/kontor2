@@ -56,14 +56,17 @@ export const authRouter = {
     if (!setupAllowedForHost(requestHost(context.headers), context.tenant)) {
       return { needsSetup: false };
     }
-    return { needsSetup: await isInSetupMode(context.tenant) };
+    return {
+      needsSetup: await isInSetupMode(context.tenant),
+      requiresBootstrapToken: process.env.NODE_ENV === "production",
+    };
   }),
 
   /**
    * Creates the first admin when the users table is empty. Idempotency-safe:
    * a second concurrent call sees the user table populated and refuses.
    * This is the only first-admin path: on a fresh instance you visit /setup
-   * once and create it in the browser, with no secret in the environment.
+   * once and present the one-time capability issued during provisioning.
    */
   completeSetup: publicProc
     .input(
@@ -71,6 +74,7 @@ export const authRouter = {
         email: v.pipe(v.string(), v.email()),
         password: v.pipe(v.string(), v.minLength(12)),
         name: v.pipe(v.string(), v.minLength(1)),
+        bootstrapToken: v.optional(v.pipe(v.string(), v.minLength(32))),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -84,6 +88,9 @@ export const authRouter = {
           throw new ORPCError("CONFLICT", {
             message: "Setup wurde bereits abgeschlossen. Bitte über /login anmelden.",
           });
+        }
+        if (result.reason === "invalid_bootstrap_token") {
+          throw new ORPCError("FORBIDDEN", { message: "Setup-Code ist ungültig oder verbraucht." });
         }
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
           message: result.message ?? "Setup fehlgeschlagen.",

@@ -6,6 +6,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
 import { formatBytes, formatDateTime } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
@@ -71,6 +72,14 @@ function AdminSnapshotsPage() {
         <CardContent className="p-0">
           {runs.isLoading ? (
             <p className="p-6 text-sm text-muted-foreground">Wird geladen…</p>
+          ) : runs.isError ? (
+            <div className="p-6">
+              <QueryError
+                title="Snapshots konnten nicht geladen werden"
+                error={runs.error}
+                onRetry={() => runs.refetch()}
+              />
+            </div>
           ) : (runs.data?.rows ?? []).length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground">
               Noch keine Snapshot-Läufe vorhanden.
@@ -257,6 +266,7 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
               <input
                 type="checkbox"
                 checked={allSelected}
+                disabled={detail.isLoading || detail.isError}
                 onChange={(e) => {
                   if (e.target.checked) setSelected(new Set(allMemberIds));
                   else setSelected(new Set());
@@ -268,6 +278,7 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
               <input
                 type="checkbox"
                 checked={includeDependents}
+                disabled={detail.isLoading || detail.isError}
                 onChange={(e) => setIncludeDependents(e.target.checked)}
               />
               Abhängige Datensätze einbeziehen
@@ -277,7 +288,7 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
             type="button"
             variant="destructive"
             size="sm"
-            disabled={selected.size === 0 || dryRun.isPending}
+            disabled={detail.isError || selected.size === 0 || dryRun.isPending}
             onClick={() => dryRun.mutate()}
           >
             {dryRun.isPending ? (
@@ -290,6 +301,14 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
         </div>
         {detail.isLoading ? (
           <p className="p-4 text-sm text-muted-foreground">Wird geladen…</p>
+        ) : detail.isError ? (
+          <div className="p-6">
+            <QueryError
+              title="Snapshot-Inhalt konnte nicht geladen werden"
+              error={detail.error}
+              onRetry={() => detail.refetch()}
+            />
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">

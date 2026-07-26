@@ -108,6 +108,7 @@ function ConsoleVereinePage() {
   const [key, setKey] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [newSetup, setNewSetup] = useState<{ key: string; token: string } | null>(null);
   const [pendingRemove, setPendingRemove] = useState<{ key: string } | null>(null);
   const [confirmKey, setConfirmKey] = useState("");
 
@@ -115,8 +116,9 @@ function ConsoleVereinePage() {
 
   const create = useMutation({
     mutationFn: () => orpc.console.create({ key: key.trim().toLowerCase(), displayName }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       setError(null);
+      setNewSetup({ key: result.key, token: result.bootstrapToken });
       setKey("");
       setDisplayName("");
       refresh();
@@ -203,6 +205,15 @@ function ConsoleVereinePage() {
             </Button>
           </form>
           {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
+          {newSetup ? (
+            <div className="mt-3 rounded-lg border border-brand/30 bg-brand/5 p-3 text-sm">
+              <p className="font-medium">Setup-Code für {newSetup.key}</p>
+              <code className="mt-1 block break-all select-all">{newSetup.token}</code>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Nur einmal anzeigen und sicher an den ersten Admin übergeben.
+              </p>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

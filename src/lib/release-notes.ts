@@ -41,6 +41,43 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "1.0.0",
+    date: "2026-07-26",
+    title: "Sichere Einzüge und Wiederherstellung",
+    changes: [
+      {
+        category: "breaking",
+        description:
+          "Das erste Admin-Konto eines neuen Vereins benötigt jetzt den einmaligen Setup-Code aus der Betreiber-Console oder der Bereitstellung.",
+      },
+      {
+        category: "fix",
+        description:
+          "SEPA-Posten gelten erst nach ausdrücklicher Bestätigung des Bankuploads als eingezogen. Eine nur erzeugte Datei verfälscht keine Zahlung und kein Mahnwesen mehr.",
+      },
+      {
+        category: "fix",
+        description:
+          "Snapshot-Fehler werden im Zeitplan und in der Verwaltung sichtbar, statt als erfolgreicher oder leerer Lauf zu erscheinen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Die DSGVO-Löschung entfernt weitere Kopien aus Anträgen, Portaländerungen und Rundschreiben. Passwort-Mails werden im richtigen Verein protokolliert.",
+      },
+      {
+        category: "feature",
+        description:
+          "Nicht automatisch erkannte Bankbuchungen lassen sich jetzt einer offenen Forderung von Hand zuordnen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Mitgliederbearbeitung warnt vor ungespeicherten Änderungen. Die Speicherstatistik wird höchstens einmal täglich vollständig ermittelt.",
+      },
+    ],
+  },
+  {
     version: "0.127.2",
     date: "2026-07-22",
     title: "Codepflege",

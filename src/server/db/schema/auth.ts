@@ -16,6 +16,19 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * One-time capability for claiming the first admin account of a fresh tenant.
+ * Provisioning returns the raw token exactly once; only its SHA-256 digest is
+ * stored. A fixed singleton id makes replacement during idempotent provisioning
+ * explicit and keeps the claim transaction easy to serialize.
+ */
+export const setupBootstrapTokens = pgTable("setup_bootstrap_tokens", {
+  id: integer("id").primaryKey().default(1),
+  tokenHash: text("token_hash").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+});
+
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),

@@ -51,7 +51,7 @@ const LIFECYCLE: { id: string; step: number; icon: ReactNode; title: string; tea
     step: 2,
     icon: <Banknote className="size-4" />,
     title: "Zahlungen und SEPA",
-    teaser: "Lastschrift gilt als eingezogen, Rechnungszahler bleiben offen.",
+    teaser: "Lastschrift wird erst nach bestätigtem Bankupload als eingezogen gebucht.",
   },
   {
     id: "ruecklaeufer",
@@ -292,15 +292,19 @@ function DokumentationPage() {
               <strong>Schritt 3 (Erzeugt):</strong> mit <Ui>Lauf erzeugen</Ui> festschreiben, dann{" "}
               <Ui>pain.008 herunterladen</Ui> und im Banking-Portal hochladen.
             </>,
+            <>
+              <strong>Schritt 4 (Bestätigt):</strong> erst nach erfolgreichem Bankupload im Lauf{" "}
+              <Ui>Bankübermittlung bestätigen</Ui>. Danach gelten die Lastschriften als eingezogen.
+            </>,
           ]}
         />
         <InfoBox title="Was dabei gebucht wird" tone="muted" icon={Info}>
           <ul className="ml-4 list-disc space-y-1">
             <li>
-              <strong>Lastschriftzahler</strong> werden sofort als <Code>eingezogen</Code> gebucht
-              (offener Betrag 0). Eine Lastschrift gilt als eingezogen, solange die Bank keinen
-              Rückläufer meldet. Das verhindert, dass das Mahnwesen bereits gezogenem Geld
-              hinterherläuft.
+              <strong>Lastschriftzahler</strong> bleiben nach der Erzeugung zunächst ausstehend.
+              Erst die ausdrückliche Bestätigung nach dem Bankupload setzt sie auf{" "}
+              <Code>eingezogen</Code> und den offenen Betrag auf 0. Das verhindert, dass eine nur
+              erzeugte, aber nie hochgeladene Datei als Zahlung zählt.
             </li>
             <li>
               <strong>Rechnungszahler</strong> bekommen eine <Code>offene</Code> Sollstellung ohne
@@ -334,9 +338,10 @@ function DokumentationPage() {
         title="Zahlungen und SEPA"
       >
         <p>
-          Nach dem Lauf sind die Lastschriften eingereicht und gelten als eingezogen.
-          Rechnungszahler überweisen selbst. Deren Posten markieren Sie als bezahlt, sobald das Geld
-          da ist.
+          Nach der Erzeugung ist die Bankdatei noch nicht eingereicht. Laden Sie sie im
+          Banking-Portal hoch und bestätigen Sie die Bankübermittlung im Lauf. Erst dann gelten die
+          Lastschriften als eingezogen. Rechnungszahler überweisen selbst. Deren Posten markieren
+          Sie als bezahlt, sobald das Geld da ist.
         </p>
         <Steps
           items={[
@@ -356,8 +361,8 @@ function DokumentationPage() {
           <p>
             Mahnbar ist ein Posten mit Status <Code>offen</Code> oder <Code>Rückläufer</Code> und
             einem offenen Betrag über null, bei einem nicht gelöschten und nicht mahngesperrten
-            Mitglied. <Code>eingezogen</Code>, <Code>bezahlt</Code> und <Code>storniert</Code> sind
-            nie mahnbar.
+            Mitglied. <Code>noch nicht übermittelt</Code>, <Code>eingezogen</Code>,{" "}
+            <Code>bezahlt</Code> und <Code>storniert</Code> sind nie mahnbar.
           </p>
         </InfoBox>
         <Actions>

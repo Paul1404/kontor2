@@ -54,7 +54,7 @@ function RecollectPage() {
     onSuccess: async (r) => {
       const skippedNote = r.skipped.length > 0 ? ` ${r.skipped.length} übersprungen.` : "";
       toast.success(
-        `${r.itemCount} Posten eingezogen (${formatCurrency(r.totalAmount)}).${skippedNote}`,
+        `${r.itemCount} Posten für die Bankdatei vorbereitet (${formatCurrency(r.totalAmount)}).${skippedNote}`,
       );
       setSelected(new Set());
       setConfirmOpen(false);
@@ -105,8 +105,8 @@ function RecollectPage() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Zurückgelastete Sollstellungen erneut per SEPA einziehen, etwa nach einer korrigierten
-          IBAN. Die ursprüngliche Sollstellung bleibt erhalten und wird wieder auf eingezogen
-          gesetzt.
+          IBAN. Die ursprüngliche Sollstellung bleibt erhalten und wird erst nach bestätigter
+          Bankübermittlung wieder als eingezogen gebucht.
         </p>
       </div>
 
@@ -263,7 +263,7 @@ function RecollectPage() {
           if (!o && !recollect.isPending) setConfirmOpen(false);
         }}
         title="Erneut einziehen?"
-        description={`${selected.size} Rückläufer (${formatCurrency(selectedTotal)}) werden in eine neue pain.008-Datei aufgenommen und wieder auf eingezogen gesetzt. Die XML-Datei wird anschließend heruntergeladen.`}
+        description={`${selected.size} Rückläufer (${formatCurrency(selectedTotal)}) werden in eine neue pain.008-Datei aufgenommen. Die XML-Datei wird anschließend heruntergeladen. Als eingezogen gelten die Posten erst nach der Bestätigung im Lauf.`}
         confirmLabel="Erzeugen"
         loading={recollect.isPending}
         onConfirm={() => recollect.mutate()}

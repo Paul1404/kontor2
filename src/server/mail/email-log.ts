@@ -6,7 +6,7 @@
  * sent the mail, nor lose the mail itself.
  */
 
-import { type DBOrTx, db } from "~/server/db/client";
+import type { DBOrTx } from "~/server/db/client";
 import { type EmailStatus, emailLogTable } from "~/server/db/schema/email-log";
 import { logger } from "~/server/lib/logger";
 
@@ -53,7 +53,7 @@ export function statusFromSend(res: { ok: true } | { ok: false; reason: string }
 
 export async function recordEmail(
   entries: EmailLogEntry | EmailLogEntry[],
-  handle: DBOrTx = db(),
+  handle: DBOrTx,
 ): Promise<void> {
   const list = Array.isArray(entries) ? entries : [entries];
   if (list.length === 0) return;

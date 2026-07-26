@@ -317,10 +317,8 @@ export const feeRunsRouter = {
       //
       //    Every candidate here is a SEPA direct-debit payer (build-fee-run
       //    excludes anyone without `lastschrift = 'J'` and an active mandate).
-      //    A direct debit is collected unless the bank reports a return, so we
-      //    book the posting as `eingezogen` (presumed collected) right away
-      //    instead of `open`. Recording a Rücklastschrift reopens it. This is
-      //    what keeps the Mahnwesen from chasing money that was already pulled.
+      //    The XML exists now, but the bank has not received it yet. Keep the
+      //    posting pending and unpaid until submit confirms the external handoff.
       const sollByContract = new Map<string, string>();
       if (candidates.length > 0) {
         const sollValues = candidates.map((c) => ({
@@ -329,9 +327,9 @@ export const feeRunsRouter = {
           billingYear: input.billingYear,
           falligkeitsdatum: input.falligkeitsdatum,
           amount: c.amount,
-          paidAmount: c.amount,
-          openAmount: "0",
-          status: "eingezogen" as const,
+          paidAmount: "0",
+          openAmount: c.amount,
+          status: "pending" as const,
           feeRunId: run.id,
         }));
         const insertedSoll = await tx
@@ -341,9 +339,9 @@ export const feeRunsRouter = {
             target: [sollStellungenTable.contractId, sollStellungenTable.billingYear],
             set: {
               amount: sql`excluded.amount`,
-              openAmount: "0",
-              paidAmount: sql`excluded.amount`,
-              status: "eingezogen",
+              openAmount: sql`excluded.amount`,
+              paidAmount: "0",
+              status: "pending",
               falligkeitsdatum: input.falligkeitsdatum,
               feeRunId: run.id,
               updatedAt: new Date(),
@@ -656,9 +654,10 @@ export const feeRunsRouter = {
   /**
    * Wiedereinzug: re-debit selected returned postings in a fresh pain.008
    * without ever deleting the original Sollstellung. Each selected posting
-   * flips back from `returned` to `eingezogen`, gets a new fee_run_item (so a
-   * second Rücklastschrift can be recorded against it), and the run is marked
-   * `kind = 'recollection'` so it reads apart from the yearly Beitragslauf.
+   * flips from `returned` to `pending`, gets a new fee_run_item (so a second
+   * Rücklastschrift can be recorded against it after submission), and the run
+   * is marked `kind = 'recollection'` so it reads apart from the yearly
+   * Beitragslauf.
    */
   recollect: vorstandProc
     .input(
@@ -839,13 +838,14 @@ export const feeRunsRouter = {
               .returning({ id: feeRunItemsTable.id })
           )[0];
 
-          // Re-collected: presumed pulled again, so back to eingezogen / paid.
+          // The new XML exists, but is not collected until the operator confirms
+          // that it was actually submitted to the bank.
           await tx
             .update(sollStellungenTable)
             .set({
-              status: "eingezogen",
-              paidAmount: sql`${sollStellungenTable.amount}`,
-              openAmount: "0",
+              status: "pending",
+              paidAmount: "0",
+              openAmount: sql`${sollStellungenTable.amount}`,
               lastFeeRunItemId: item?.id ?? null,
               updatedAt: new Date(),
             })
@@ -1243,7 +1243,8 @@ export const feeRunsRouter = {
    * Escape-Hatch für Korrekturen von Hand: einen falsch gebuchten Posten auf
    * `open`, `eingezogen`, `paid` oder `cancelled` setzen. Im Gegensatz zu
    * `stornoSollstellung`/`reopenSollstellung` gibt es hier keine Vorbedingungen
-   * auf den Ausgangsstatus. Die Beträge werden über `planSollstellungStatus`
+   * auf den Ausgangsstatus, außer für einen noch nicht übermittelten
+   * Lastschriftlauf. Die Beträge werden über `planSollstellungStatus`
    * konsistent nachgezogen und jede Änderung landet im Audit-Log. `returned`
    * ist kein Ziel: dieser Status kommt nur über den Rücklastschrift-Weg.
    */
@@ -1272,6 +1273,12 @@ export const feeRunsRouter = {
           .limit(1);
         if (!row) {
           throw new ORPCError("NOT_FOUND", { message: "Sollstellung nicht gefunden." });
+        }
+        if (row.status === "pending") {
+          throw new ORPCError("CONFLICT", {
+            message:
+              "Ein noch nicht übermittelter Lastschriftposten kann nur über den Beitragslauf bestätigt oder storniert werden.",
+          });
         }
         if (row.status === input.status && input.notes == null) {
           return { ok: true as const, changed: false };
@@ -1310,6 +1317,96 @@ export const feeRunsRouter = {
         return { ok: true as const, changed: true };
       });
     }),
+
+  /**
+   * Confirm that the generated pain.008 was handed to the bank. Only this
+   * explicit external-state acknowledgement may classify debit postings as
+   * collected. Row locks and conditional updates make retries idempotent and
+   * reject any posting changed after commit.
+   */
+  submit: vorstandProc.input(v.object({ id: v.string() })).handler(async ({ context, input }) => {
+    const result = await context.db.transaction(async (tx) => {
+      const [run] = await tx
+        .select()
+        .from(feeRunsTable)
+        .where(eq(feeRunsTable.id, input.id))
+        .limit(1)
+        .for("update");
+      if (!run) throw new ORPCError("NOT_FOUND", { message: "Beitragslauf nicht gefunden." });
+      if (run.status === "submitted") return { changed: false as const };
+      if (run.status !== "committed") {
+        throw new ORPCError("CONFLICT", {
+          message: `Nur erzeugte Läufe können übermittelt werden (aktuell: ${run.status}).`,
+        });
+      }
+      if (!run.xmlContent) {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: "Dieser Lauf enthält keine SEPA-Datei.",
+        });
+      }
+
+      const items = await tx
+        .select({
+          itemId: feeRunItemsTable.id,
+          memberId: feeRunItemsTable.memberId,
+          sollId: feeRunItemsTable.sollStellungId,
+          status: sollStellungenTable.status,
+          lastFeeRunItemId: sollStellungenTable.lastFeeRunItemId,
+        })
+        .from(feeRunItemsTable)
+        .innerJoin(sollStellungenTable, eq(sollStellungenTable.id, feeRunItemsTable.sollStellungId))
+        .where(eq(feeRunItemsTable.feeRunId, run.id))
+        .for("update");
+      if (items.length !== run.itemCount || items.some((item) => item.status !== "pending")) {
+        throw new ORPCError("CONFLICT", {
+          message:
+            "Mindestens ein Posten wurde seit der Erzeugung verändert. Übermittlung abgebrochen.",
+        });
+      }
+      if (items.some((item) => item.lastFeeRunItemId !== item.itemId)) {
+        throw new ORPCError("CONFLICT", {
+          message:
+            "Ein Posten gehört inzwischen zu einem anderen Einzug. Übermittlung abgebrochen.",
+        });
+      }
+
+      const sollIds = items.map((item) => item.sollId).filter((id): id is string => id != null);
+      await tx
+        .update(sollStellungenTable)
+        .set({
+          status: "eingezogen",
+          paidAmount: sql`${sollStellungenTable.amount}`,
+          openAmount: "0",
+          updatedAt: new Date(),
+        })
+        .where(
+          and(inArray(sollStellungenTable.id, sollIds), eq(sollStellungenTable.status, "pending")),
+        );
+      await tx.update(feeRunsTable).set({ status: "submitted" }).where(eq(feeRunsTable.id, run.id));
+
+      const auditId = await appendAudit(tx, {
+        entityType: "fee_run",
+        entityId: run.id,
+        action: "update",
+        source: "ui",
+        actorId: context.session!.user.id,
+        actorEmail: context.session!.user.email,
+        changes: { status: { before: "committed", after: "submitted" } },
+        requestId: context.requestId ?? null,
+      });
+      for (const memberId of new Set(items.map((item) => item.memberId))) {
+        await takeMemberSnapshot(tx, memberId, {
+          trigger: "mutation",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          auditId,
+        });
+      }
+      return { changed: true as const };
+    });
+    if (result.changed) await invalidateDashboardCaches(context.tenant.key);
+    return { ok: true as const, changed: result.changed };
+  }),
 
   downloadXml: vorstandProc
     .input(v.object({ id: v.string() }))
@@ -1470,7 +1567,7 @@ export const feeRunsRouter = {
         const debitIds = new Set(sollIds);
         const changed = linked.filter((row) =>
           debitIds.has(row.id)
-            ? row.status !== "eingezogen" ||
+            ? row.status !== "pending" ||
               (row.lastFeeRunItemId !== null && !itemIds.has(row.lastFeeRunItemId))
             : row.status !== "open" || Number(row.paidAmount) !== 0,
         );
@@ -1495,7 +1592,7 @@ export const feeRunsRouter = {
 
         // Mark all linked soll_stellungen as cancelled.
         if (sollIds.length > 0) {
-          // Only revert postings still in the `eingezogen` state this run put
+          // Only revert postings still in the `pending` state this run put
           // them in. A posting that has since been returned (Rücklastschrift ->
           // `returned`), paid, or otherwise touched must not be clobbered back
           // to `cancelled`, or a real open debt silently leaves the Mahnwesen.
@@ -1505,7 +1602,7 @@ export const feeRunsRouter = {
             .where(
               and(
                 inArray(sollStellungenTable.id, sollIds),
-                eq(sollStellungenTable.status, "eingezogen"),
+                eq(sollStellungenTable.status, "pending"),
                 or(
                   isNull(sollStellungenTable.lastFeeRunItemId),
                   inArray(sollStellungenTable.lastFeeRunItemId, [...itemIds]),

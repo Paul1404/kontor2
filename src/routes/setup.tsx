@@ -32,10 +32,17 @@ function SetupPage() {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [bootstrapToken, setBootstrapToken] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const setup = useMutation({
-    mutationFn: () => orpc.auth.completeSetup({ email: email.trim(), password, name: name.trim() }),
+    mutationFn: () =>
+      orpc.auth.completeSetup({
+        email: email.trim(),
+        password,
+        name: name.trim(),
+        bootstrapToken: bootstrapToken.trim() || undefined,
+      }),
     onSuccess: async () => {
       const result = await signIn.email({ email: email.trim(), password });
       if (result.error) {
@@ -117,6 +124,20 @@ function SetupPage() {
                 Diese Seite ist nur sichtbar, solange noch kein Benutzer existiert. Das angelegte
                 Konto erhält die Rolle <span className="font-medium text-foreground">admin</span>.
               </p>
+              {status.data.requiresBootstrapToken ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="bootstrap-token">Einmaliger Setup-Code</Label>
+                  <Input
+                    id="bootstrap-token"
+                    type="password"
+                    value={bootstrapToken}
+                    onChange={(e) => setBootstrapToken(e.target.value)}
+                    autoComplete="off"
+                    minLength={32}
+                    required
+                  />
+                </div>
+              ) : null}
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="name">Name</Label>
                 <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />

@@ -52,12 +52,21 @@ function nextRunAt(now: Date = new Date()): Date {
   return next;
 }
 
-type SnapshotResult = {
+type TenantSnapshotResult = {
   runId: string | null;
   memberCount: number;
   skippedCount: number;
   bytesTotal: number;
   acquiredLock: boolean;
+};
+
+export type SnapshotTenantResult = TenantSnapshotResult & { tenant: string };
+
+export type SnapshotFailure = { tenant: string; error: string };
+
+export type SnapshotResult = TenantSnapshotResult & {
+  tenants: SnapshotTenantResult[];
+  failures: SnapshotFailure[];
 };
 
 type SnapshotOpts = {
@@ -71,37 +80,51 @@ type SnapshotOpts = {
  * runs against its own database under its own advisory lock (locks are
  * per-database, so the same key never collides across tenants).
  */
-export async function runNightlySnapshot(opts: SnapshotOpts = {}): Promise<SnapshotResult> {
+export async function runTenantSnapshotBatch<T extends { key: string }>(
+  tenants: T[],
+  run: (tenant: T) => Promise<TenantSnapshotResult>,
+): Promise<SnapshotResult> {
   const totals: SnapshotResult = {
     runId: null,
     memberCount: 0,
     skippedCount: 0,
     bytesTotal: 0,
     acquiredLock: false,
+    tenants: [],
+    failures: [],
   };
-  for (const t of await tenantHandles()) {
+  for (const tenant of tenants) {
     try {
-      const r = await runWithTenantKeyring(t.key, () => runTenantSnapshot(t.handle, t.conn, opts));
+      const r = await run(tenant);
       totals.acquiredLock = totals.acquiredLock || r.acquiredLock;
       totals.memberCount += r.memberCount;
       totals.skippedCount += r.skippedCount;
       totals.bytesTotal += r.bytesTotal;
       if (r.runId) totals.runId = r.runId;
+      totals.tenants.push({ tenant: tenant.key, ...r });
     } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      totals.failures.push({ tenant: tenant.key, error });
       logger.error("tenant snapshot failed", {
-        tenant: t.key,
-        error: err instanceof Error ? err.message : String(err),
+        tenant: tenant.key,
+        error,
       });
     }
   }
   return totals;
 }
 
+export async function runNightlySnapshot(opts: SnapshotOpts = {}): Promise<SnapshotResult> {
+  return runTenantSnapshotBatch(await tenantHandles(), (tenant) =>
+    runWithTenantKeyring(tenant.key, () => runTenantSnapshot(tenant.handle, tenant.conn, opts)),
+  );
+}
+
 async function runTenantSnapshot(
   handle: DB,
   conn: postgres.Sql,
   opts: SnapshotOpts = {},
-): Promise<SnapshotResult> {
+): Promise<TenantSnapshotResult> {
   const trigger = opts.trigger ?? "nightly";
 
   // Session-level advisory locks live on a specific backend connection, so
@@ -242,6 +265,12 @@ export function startSnapshotScheduler(): void {
       try {
         await runStatusReconcile();
         const result = await runNightlySnapshot({ actorEmail: "system:scheduler" });
+        if (result.failures.length > 0) {
+          logger.error("nightly snapshot incomplete", {
+            failedTenants: result.failures.map((failure) => failure.tenant),
+            successfulTenants: result.tenants.map((tenant) => tenant.tenant),
+          });
+        }
         if (result.acquiredLock) {
           logger.info("nightly snapshot run", {
             runId: result.runId ?? "noop",

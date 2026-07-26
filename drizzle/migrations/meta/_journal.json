@@ -519,6 +519,20 @@
       "when": 1784732380048,
       "tag": "0073_gigantic_lyja",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1785044479003,
+      "tag": "0074_charming_landau",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1785044592831,
+      "tag": "0075_classify_legacy_submitted_fee_runs",
+      "breakpoints": true
     }
   ]
 }

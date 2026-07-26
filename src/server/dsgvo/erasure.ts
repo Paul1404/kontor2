@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, desc, eq, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { appendAudit, type Changes } from "~/server/audit/log";
 import type { DBOrTx } from "~/server/db/client";
 import { attachmentsTable } from "~/server/db/schema/attachments";
@@ -7,10 +7,17 @@ import { auditLogTable } from "~/server/db/schema/audit";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { dsgvoConsentLogTable, dsgvoRequestsTable } from "~/server/db/schema/dsgvo";
 import { dunningItemsTable } from "~/server/db/schema/dunning";
+import { emailLogTable } from "~/server/db/schema/email-log";
 import { feeRunItemsTable, sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { memberSourceRecordsTable } from "~/server/db/schema/member-source-records";
 import { membersTable } from "~/server/db/schema/members";
+import {
+  membershipApplicationFilesTable,
+  membershipApplicationsTable,
+} from "~/server/db/schema/membership-applications";
+import { portalChangeRequestsTable } from "~/server/db/schema/portal";
 import { relationshipsTable } from "~/server/db/schema/relationships";
+import { rundschreibenRecipientsTable } from "~/server/db/schema/rundschreiben";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import { memberSnapshotsTable } from "~/server/db/schema/snapshots";
 import { buildScrubRules, earliestErasureDate } from "~/server/dsgvo/policy";
@@ -144,6 +151,17 @@ export async function executeErasure(
   let auditId: string | null = null;
 
   await db.transaction(async (tx) => {
+    const [sourceMember] = await tx
+      .select({
+        memberNo: membersTable.memberNo,
+        kontaktNo: membersTable.kontaktNo,
+        mitgliedsnummer: membersTable.mitgliedsnummer,
+      })
+      .from(membersTable)
+      .where(eq(membersTable.id, memberId))
+      .limit(1);
+    const sourceRef =
+      sourceMember?.memberNo ?? sourceMember?.kontaktNo ?? sourceMember?.mitgliedsnummer ?? null;
     await tx.update(membersTable).set(updates).where(eq(membersTable.id, memberId));
 
     // Pseudonymizing the members row is not enough: the same personal data is
@@ -250,6 +268,87 @@ export async function executeErasure(
       .where(eq(dsgvoConsentLogTable.memberId, memberId))
       .returning({ id: dsgvoConsentLogTable.id });
 
+    // 4e. Once the common retention gate above permits erasure, an approved
+    // membership application is no longer a second permanent member record.
+    // Delete its database row (tokens/files cascade) and queue every stored PDF,
+    // scan and signature for post-commit S3 deletion. A forced legal override is
+    // deliberately handled identically and remains visible in the erasure audit.
+    // Older family approvals only linked the primary member in `member_id`, but
+    // stored all created M-/K-references comma-separated in `mitgliedsnummer`.
+    // Include an exact token match so erasing a partner, child or guardian also
+    // removes the source application. New data should keep this stable reference
+    // until a normalized application-member link table replaces the legacy field.
+    const applicationMatch = or(
+      eq(membershipApplicationsTable.memberId, memberId),
+      sourceRef
+        ? sql`${sourceRef} = any(string_to_array(replace(${membershipApplicationsTable.mitgliedsnummer}, ' ', ''), ','))`
+        : undefined,
+    );
+    const applicationFiles = await tx
+      .select({
+        id: membershipApplicationFilesTable.id,
+        s3Key: membershipApplicationFilesTable.s3Key,
+      })
+      .from(membershipApplicationFilesTable)
+      .innerJoin(
+        membershipApplicationsTable,
+        eq(membershipApplicationsTable.id, membershipApplicationFilesTable.applicationId),
+      )
+      .where(applicationMatch);
+    for (const file of applicationFiles) s3KeysToDelete.push(file.s3Key);
+    const deletedApplications = await tx
+      .delete(membershipApplicationsTable)
+      .where(applicationMatch)
+      .returning({ id: membershipApplicationsTable.id });
+
+    // 4f. Portal review payloads duplicate the member's before/after values and
+    // source IP. Keep workflow timestamps/status for accountability, but remove
+    // the identifying payload once the member itself is erased.
+    const scrubbedPortalRequests = await tx
+      .update(portalChangeRequestsTable)
+      .set({ payload: {}, submittedIp: null, reviewerNotes: null })
+      .where(eq(portalChangeRequestsTable.memberId, memberId))
+      .returning({ id: portalChangeRequestsTable.id });
+
+    // 4g. Circular-mail delivery history needs aggregate delivery counts, not a
+    // permanent address book. Preserve the row and outcome while replacing the
+    // required email field and clearing free-text recipient/error data.
+    const scrubbedCircularRecipients = await tx
+      .update(rundschreibenRecipientsTable)
+      .set({
+        email: `erased+${memberId}@invalid.local`,
+        name: null,
+        error: null,
+      })
+      .where(eq(rundschreibenRecipientsTable.memberId, memberId))
+      .returning({ id: rundschreibenRecipientsTable.id });
+
+    // 4h. The central mail log intentionally outlives the workflow rows it
+    // references, so cascades cannot remove copied recipient addresses. Keep
+    // delivery status/timestamps for operational accountability while clearing
+    // recipient, subject and provider error text for every member-linked entity.
+    const mailTargets = [
+      { entityType: "member", ids: [memberId] },
+      { entityType: "membership_application", ids: deletedApplications.map((row) => row.id) },
+      { entityType: "portal_change_request", ids: scrubbedPortalRequests.map((row) => row.id) },
+      { entityType: "dunning_item", ids: scrubbedDunning.map((row) => row.id) },
+    ];
+    let scrubbedEmailLogs = 0;
+    for (const target of mailTargets) {
+      if (target.ids.length === 0) continue;
+      const rows = await tx
+        .update(emailLogTable)
+        .set({ recipient: null, subject: null, detail: null })
+        .where(
+          and(
+            eq(emailLogTable.entityType, target.entityType),
+            inArray(emailLogTable.entityId, target.ids),
+          ),
+        )
+        .returning({ id: emailLogTable.id });
+      scrubbedEmailLogs += rows.length;
+    }
+
     // The erasure audit entry records WHAT was cleared, never the cleared values
     // -- the before-values are exactly the PII we are removing.
     const changes: Changes = {
@@ -269,6 +368,20 @@ export async function executeErasure(
       changes.__attachments = { before: `${deletedAttachments.length}`, after: null };
     if (scrubbedConsent.length > 0)
       changes.__consentEvidence = { before: `${scrubbedConsent.length} scrubbed`, after: null };
+    if (deletedApplications.length > 0)
+      changes.__applications = { before: `${deletedApplications.length}`, after: null };
+    if (scrubbedPortalRequests.length > 0)
+      changes.__portalRequests = {
+        before: `${scrubbedPortalRequests.length} scrubbed`,
+        after: null,
+      };
+    if (scrubbedCircularRecipients.length > 0)
+      changes.__circularRecipients = {
+        before: `${scrubbedCircularRecipients.length} scrubbed`,
+        after: null,
+      };
+    if (scrubbedEmailLogs > 0)
+      changes.__emailLogs = { before: `${scrubbedEmailLogs} scrubbed`, after: null };
     if (opts.forceOverride && opts.overrideReason) {
       changes.__override = { before: null, after: opts.overrideReason };
     }

@@ -19,6 +19,8 @@ const EnvSchema = v.object({
   REDIS_URL: v.pipe(v.string(), v.minLength(1)),
 
   BETTER_AUTH_URL: v.pipe(v.string(), v.url()),
+  /** One-time bootstrap capability for the primary tenant on a fresh install. */
+  SETUP_BOOTSTRAP_TOKEN: v.optional(v.pipe(v.string(), v.minLength(32))),
 
   APP_SECRET: v.pipe(
     v.string(),

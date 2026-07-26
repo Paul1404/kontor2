@@ -219,6 +219,8 @@ type Props = {
    * unknown values are ignored, so the form always opens normally.
    */
   focusField?: string | null;
+  /** Reports whether the locally edited values differ from the seeded record. */
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 export function MemberStammdatenForm({
@@ -231,6 +233,7 @@ export function MemberStammdatenForm({
   mitglnrInput,
   variant = "member",
   focusField,
+  onDirtyChange,
 }: Props) {
   const isMember = variant === "member";
 
@@ -249,6 +252,17 @@ export function MemberStammdatenForm({
   // and re-seeding would silently discard unsaved edits. Callers that need a
   // fresh form for a different record pass a `key` so React remounts it.
   const [values, setValues] = useState<StammdatenValues>(initial);
+  const dirty = useMemo(
+    () =>
+      (Object.keys(initial) as Array<keyof StammdatenValues>).some(
+        (key) => values[key] !== initial[key],
+      ),
+    [initial, values],
+  );
+
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
 
   function update<K extends keyof StammdatenValues>(key: K, value: StammdatenValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));

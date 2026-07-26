@@ -4,6 +4,7 @@ import {
   type OpenPosting,
   parseBankCsv,
   parseGermanAmount,
+  searchOpenPostings,
 } from "~/server/bank/reconcile";
 
 describe("parseGermanAmount", () => {
@@ -23,6 +24,43 @@ describe("parseGermanAmount", () => {
   it("uses the rightmost separator as the decimal point", () => {
     expect(parseGermanAmount("1,234.56")).toBeCloseTo(1234.56);
     expect(parseGermanAmount("1.234,56")).toBeCloseTo(1234.56);
+  });
+});
+
+describe("searchOpenPostings", () => {
+  const postings: OpenPosting[] = [
+    {
+      sollStellungId: "s1",
+      memberId: "m1",
+      reference: "M-000042",
+      mitgliedsnummer: "42",
+      nachname: "Müller",
+      memberName: "Eva Müller",
+      billingYear: 2026,
+      openAmount: 48,
+    },
+    {
+      sollStellungId: "s2",
+      memberId: "m2",
+      reference: "K-000099",
+      mitgliedsnummer: null,
+      nachname: "Schmidt",
+      memberName: "Familie Schmidt",
+      billingYear: 2025,
+      openAmount: 60,
+    },
+  ];
+
+  it("finds candidates by name, reference, and billing year", () => {
+    expect(searchOpenPostings(postings, "müller", 30).map((p) => p.sollStellungId)).toEqual(["s1"]);
+    expect(searchOpenPostings(postings, "k-000099", 30).map((p) => p.sollStellungId)).toEqual([
+      "s2",
+    ]);
+    expect(searchOpenPostings(postings, "2026", 30).map((p) => p.sollStellungId)).toEqual(["s1"]);
+  });
+
+  it("returns a bounded default list for an empty search", () => {
+    expect(searchOpenPostings(postings, "", 1)).toEqual([postings[0]]);
   });
 });
 

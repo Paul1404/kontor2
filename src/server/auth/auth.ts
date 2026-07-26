@@ -86,14 +86,17 @@ function buildAuth(tenant: Tenant) {
         if (!result.ok && result.reason !== "smtp_not_configured") {
           logger.warn("auth.password-reset.send-failed", { reason: result.reason });
         }
-        await recordEmail({
-          kind: EMAIL_KIND.passwordReset,
-          ...statusFromSend(result),
-          recipient: user.email,
-          subject: "Passwort zurücksetzen",
-          entityType: "user",
-          entityId: user.id,
-        });
+        await recordEmail(
+          {
+            kind: EMAIL_KIND.passwordReset,
+            ...statusFromSend(result),
+            recipient: user.email,
+            subject: "Passwort zurücksetzen",
+            entityType: "user",
+            entityId: user.id,
+          },
+          tenantDb,
+        );
       },
       // One hour, matching better-auth's default; stated explicitly so the
       // mail copy ("eine Stunde gültig") cannot drift from the real window.

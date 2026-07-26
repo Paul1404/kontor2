@@ -39,6 +39,31 @@ export type MatchProposal = {
   reason: string;
 };
 
+/** Filter open postings for the manual reconciliation picker. */
+export function searchOpenPostings(
+  postings: OpenPosting[],
+  query: string,
+  limit: number,
+): OpenPosting[] {
+  const normalized = query.trim().toLocaleLowerCase("de-DE");
+  return postings
+    .filter((posting) => {
+      if (!normalized) return true;
+      return [
+        posting.memberName,
+        posting.reference,
+        posting.mitgliedsnummer,
+        posting.nachname,
+        posting.billingYear,
+      ].some((value) =>
+        String(value ?? "")
+          .toLocaleLowerCase("de-DE")
+          .includes(normalized),
+      );
+    })
+    .slice(0, limit);
+}
+
 /** German amount "1.234,56" / "-12,50" / "1234.56" / "1.234" -> number, or NaN. */
 export function parseGermanAmount(raw: string): number {
   const s = raw.trim().replace(/\s|€|EUR/gi, "");

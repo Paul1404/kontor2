@@ -112,7 +112,7 @@ export const consoleRouter = {
       }
 
       // DB anlegen + migrieren (über die Instanz), Registry-Zeile in die Control-DB.
-      await provisionTenant(env().DATABASE_URL, {
+      const provisioned = await provisionTenant(env().DATABASE_URL, {
         key,
         displayName: input.displayName,
         databaseName,
@@ -134,7 +134,7 @@ export const consoleRouter = {
         },
         requestId: context.requestId,
       });
-      return { key, databaseName };
+      return { key, databaseName, bootstrapToken: provisioned.bootstrapToken };
     }),
 
   updateRouting: operatorProc

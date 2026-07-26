@@ -8,6 +8,8 @@
  *
  * Voraussetzung: der PG-User der `adminUrl` ist Superuser (CREATE DATABASE).
  */
+
+import { createHash, randomBytes } from "node:crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
@@ -55,7 +57,10 @@ function validate(key: string, dbName: string, primaryKey: string): void {
  * Legt die Verein-DB an (idempotent), migriert sie und schreibt die tenants-Zeile.
  * `adminUrl` muss auf die Primär-/Control-DB zeigen (dort lebt die tenants-Tabelle).
  */
-export async function provisionTenant(adminUrl: string, input: ProvisionInput): Promise<void> {
+export async function provisionTenant(
+  adminUrl: string,
+  input: ProvisionInput,
+): Promise<{ bootstrapToken: string }> {
   const dbName = input.databaseName ?? input.key;
   validate(input.key, dbName, input.primaryKey ?? "svu");
 
@@ -71,8 +76,20 @@ export async function provisionTenant(adminUrl: string, input: ProvisionInput): 
 
   // 2. Migrationen auf die neue DB (idempotent via Drizzle-Journal).
   const target = postgres(tenantUrlFromName(adminUrl, dbName), { max: 1, onnotice: () => {} });
+  const bootstrapToken = randomBytes(32).toString("base64url");
+  const bootstrapTokenHash = createHash("sha256").update(bootstrapToken).digest("hex");
   try {
     await migrate(drizzle(target), { migrationsFolder: MIGRATIONS_FOLDER });
+    // Idempotent provisioning rotates the still-unused setup capability. The
+    // plaintext is returned once to the operator and never persisted.
+    await target`
+      insert into setup_bootstrap_tokens (id, token_hash, created_at, consumed_at)
+      values (1, ${bootstrapTokenHash}, now(), null)
+      on conflict (id) do update
+        set token_hash = excluded.token_hash,
+            created_at = excluded.created_at,
+            consumed_at = null
+    `;
   } finally {
     await target.end();
   }
@@ -94,6 +111,7 @@ export async function provisionTenant(adminUrl: string, input: ProvisionInput): 
   } finally {
     await control.end();
   }
+  return { bootstrapToken };
 }
 
 /** Entfernt die tenants-Zeile (aus der Control-DB) und droppt die DB. */

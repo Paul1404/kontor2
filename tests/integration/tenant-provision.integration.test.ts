@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -26,7 +27,12 @@ describe.skipIf(!onTestDb)("tenant provisioning (integration)", () => {
   });
 
   it("legt DB + Migrationen + tenants-Zeile an und löst über database_name auf", async () => {
-    await provisionTenant(adminUrl, { key: KEY, displayName: "Verein X", databaseName: DB_NAME });
+    const provisioned = await provisionTenant(adminUrl, {
+      key: KEY,
+      displayName: "Verein X",
+      databaseName: DB_NAME,
+    });
+    expect(provisioned.bootstrapToken.length).toBeGreaterThanOrEqual(32);
 
     // tenants-Zeile: database_name gesetzt, database_url leer (kein Krypto nötig).
     const rows = (await db().execute(
@@ -44,6 +50,13 @@ describe.skipIf(!onTestDb)("tenant provisioning (integration)", () => {
           n: number;
         }>;
       expect(j[0]?.n ?? 0).toBeGreaterThan(0);
+      const setupRows = (await target`
+        select token_hash, consumed_at from setup_bootstrap_tokens where id = 1
+      `) as unknown as Array<{ token_hash: string; consumed_at: Date | null }>;
+      expect(setupRows[0]?.token_hash).toBe(
+        createHash("sha256").update(provisioned.bootstrapToken).digest("hex"),
+      );
+      expect(setupRows[0]?.consumed_at).toBeNull();
     } finally {
       await target.end();
     }
@@ -57,6 +70,6 @@ describe.skipIf(!onTestDb)("tenant provisioning (integration)", () => {
   it("ist idempotent (zweiter Lauf wirft nicht)", async () => {
     await expect(
       provisionTenant(adminUrl, { key: KEY, displayName: "Verein X neu", databaseName: DB_NAME }),
-    ).resolves.toBeUndefined();
+    ).resolves.toMatchObject({ bootstrapToken: expect.any(String) });
   });
 });

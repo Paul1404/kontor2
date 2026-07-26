@@ -3,7 +3,12 @@ import { ORPCError } from "@orpc/server";
 import { and, eq, gt, inArray } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
-import { matchBankTransactions, type OpenPosting, parseBankCsv } from "~/server/bank/reconcile";
+import {
+  matchBankTransactions,
+  type OpenPosting,
+  parseBankCsv,
+  searchOpenPostings,
+} from "~/server/bank/reconcile";
 import type { DB } from "~/server/db/client";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
@@ -55,6 +60,28 @@ async function loadOpenPostings(db: DB): Promise<OpenPosting[]> {
 }
 
 export const paymentsRouter = {
+  /** Search open postings so an administrator can correct an automatic match. */
+  openPostings: vorstandProc
+    .input(
+      v.optional(
+        v.object({
+          query: v.optional(v.string(), ""),
+          limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100)), 30),
+        }),
+        {},
+      ),
+    )
+    .handler(async ({ context, input }) => {
+      const postings = await loadOpenPostings(context.db);
+      return searchOpenPostings(postings, input.query, input.limit).map((posting) => ({
+        sollStellungId: posting.sollStellungId,
+        memberName: posting.memberName,
+        reference: posting.reference,
+        billingYear: posting.billingYear,
+        openAmount: posting.openAmount,
+      }));
+    }),
+
   /** Parse a bank CSV and propose matches against open postings. No writes. */
   matchBankCsv: vorstandProc
     .input(v.object({ csv: v.pipe(v.string(), v.minLength(1)) }))

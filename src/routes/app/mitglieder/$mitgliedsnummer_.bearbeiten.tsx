@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   buildInitialValues,
   buildPatch,
@@ -27,6 +27,17 @@ function EditMemberPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const bypassBlocker = useRef(false);
+
+  useBlocker({
+    disabled: !dirty,
+    enableBeforeUnload: () => dirty && !bypassBlocker.current,
+    shouldBlockFn: () =>
+      bypassBlocker.current
+        ? false
+        : !window.confirm("Ihre Änderungen sind noch nicht gespeichert. Seite trotzdem verlassen?"),
+  });
 
   const detail = useQuery({
     queryKey: ["members.get", mitgliedsnummer],
@@ -51,6 +62,7 @@ function EditMemberPage() {
       });
     },
     onSuccess: async () => {
+      bypassBlocker.current = true;
       await qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
       await qc.invalidateQueries({ queryKey: ["members.list"] });
       toast.success("Änderungen gespeichert.");
@@ -147,6 +159,7 @@ function EditMemberPage() {
         focusField={fokus}
         submitting={mut.isPending}
         errorMessage={errorMessage}
+        onDirtyChange={setDirty}
         onCancel={() =>
           navigate({
             to: "/app/mitglieder/$mitgliedsnummer",

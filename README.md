@@ -161,7 +161,9 @@ The parts that took real engineering, not just CRUD.
   Beitragsart per member and assembles a draft run, with a simulate step that
   diffs against the previous year (direct-debit and invoice payers alike).
 - Generates valid pain.008.001.02 XML, FRST and RCUR in separate `<PmtInf>`
-  blocks per Bundesbank rules, with an honest Vorabankündigung.
+  blocks per Bundesbank rules, with an honest Vorabankündigung. Generated
+  direct debits stay pending until an administrator explicitly confirms the
+  successful bank upload.
 - Stornieren is supported and rolls back the invoice Sollstellungen it created.
 - Beitragsarten are managed in the admin with amount, Sollstellungsregel,
   Verwendungszweck and an optional age range. Each can be tagged with an
@@ -182,7 +184,7 @@ The parts that took real engineering, not just CRUD.
 
 - Forderungen-Dashboard. Open Sollstellungen grouped per member, filterable by
   Mahnstufe, batch "mark as paid" for cash and Überweisung.
-- SEPA-Rückläufer erfassen. Pick a committed `fee_run_item`, attach an
+- SEPA-Rückläufer erfassen. Pick a submitted `fee_run_item`, attach an
   R-Transaction reason code (AC04, AM04, MS03 and more) and optional
   Rücklastschriftgebühr. Reopens the matching Sollstellung as `returned`.
 - Mahnläufe in up to three escalation levels (Erinnerung, 1. Mahnung, 2.

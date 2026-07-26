@@ -18,6 +18,10 @@ updates:
       drizzle:
         patterns:
           - "drizzle-*"
+      react:
+        patterns:
+          - "react*"
+          - "@types/react*"
       aws-sdk:
         patterns:
           - "@aws-sdk/*"

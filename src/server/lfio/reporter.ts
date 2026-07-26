@@ -1,7 +1,8 @@
 import { statfsSync } from "node:fs";
 import { cpus, freemem, loadavg, totalmem } from "node:os";
-import { ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { HeadBucketCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { sql } from "~/server/db/client";
+import { type DailyGateStore, runPersistedDailyGate } from "~/server/lfio/daily-gate";
 import { logger } from "~/server/lib/logger";
 import { redis } from "~/server/redis/client";
 import { bucket, s3Client } from "~/server/s3/client";
@@ -42,6 +43,14 @@ let runtimeOk = false;
 let consecutivePostFailures = 0;
 const httpSamples: HttpSample[] = [];
 let activeRequests = 0;
+let bucketInventory: BucketInventory | null = null;
+let bucketInventoryRefresh: Promise<void> | null = null;
+
+type BucketInventory = {
+  objectCount: number;
+  totalSizeBytes: number;
+  truncated: boolean;
+};
 
 function intervalMs(): number {
   const raw = Number(process.env.LFIO_REPORT_INTERVAL_MS ?? DEFAULT_INTERVAL_MS);
@@ -321,8 +330,7 @@ async function collectRedis(): Promise<LfioPayload> {
   };
 }
 
-async function collectBucket(): Promise<LfioPayload> {
-  const started = performance.now();
+async function collectBucketInventory(): Promise<BucketInventory> {
   let objectCount = 0;
   let totalSizeBytes = 0;
   let continuationToken: string | undefined;
@@ -345,22 +353,71 @@ async function collectBucket(): Promise<LfioPayload> {
     if (!continuationToken) break;
   }
 
+  return { objectCount, totalSizeBytes, truncated };
+}
+
+const bucketInventoryStore: DailyGateStore = {
+  async reserve(key, ttlSeconds) {
+    return (await redis().set(key, "reserved", "EX", ttlSeconds, "NX")) === "OK";
+  },
+  async get(key) {
+    return await redis().get(key);
+  },
+  async put(key, value, ttlSeconds) {
+    await redis().set(key, value, "EX", ttlSeconds);
+  },
+};
+
+async function refreshBucketInventory(): Promise<void> {
+  if (bucketInventoryRefresh) return bucketInventoryRefresh;
+  bucketInventoryRefresh = (async () => {
+    const result = await runPersistedDailyGate({
+      namespace: `kontor2:lfio:s3-inventory:${bucket()}`,
+      store: bucketInventoryStore,
+      collect: collectBucketInventory,
+    });
+    if (result.status === "fresh" || result.status === "cached") {
+      if (result.value) bucketInventory = result.value;
+      return;
+    }
+    logger.warn("lfio bucket inventory skipped", {
+      reason: result.status,
+      error: result.error,
+    });
+  })().finally(() => {
+    bucketInventoryRefresh = null;
+  });
+  return bucketInventoryRefresh;
+}
+
+async function collectBucket(): Promise<LfioPayload> {
+  const started = performance.now();
+  await s3Client().send(new HeadBucketCommand({ Bucket: bucket() }));
+  // Inventory is deliberately detached from the one-minute reachability path.
+  // The persistent daily gate guarantees at most one full listing per UTC day
+  // across replicas and fails closed if Redis is unavailable.
+  void refreshBucketInventory();
+  const inventory = bucketInventory;
   return {
     assetKey: "bucket",
     name: "Object Storage",
-    status: truncated ? "degraded" : "up",
+    status: inventory?.truncated ? "degraded" : "up",
     latencyMs: Math.round(performance.now() - started),
-    message: truncated ? "Bucket listing capped at 100 pages" : "Bucket reachable",
-    metrics: {
-      objectCount: metric(objectCount, "count", "Object storage"),
-      totalSizeBytes: metric(totalSizeBytes, "bytes", "Object storage"),
-    },
+    message: inventory?.truncated ? "Bucket listing capped at 100 pages" : "Bucket reachable",
+    metrics: inventory
+      ? {
+          objectCount: metric(inventory.objectCount, "count", "Object storage"),
+          totalSizeBytes: metric(inventory.totalSizeBytes, "bytes", "Object storage"),
+        }
+      : undefined,
     metadata: {
       bucket: bucket(),
       endpoint: process.env.AWS_ENDPOINT_URL,
       region: process.env.AWS_DEFAULT_REGION,
-      statsSource: "ListObjectsV2",
-      truncated,
+      statsSource: inventory ? "ListObjectsV2" : "HeadBucket",
+      inventoryCadence: "daily",
+      inventoryAvailable: inventory !== null,
+      truncated: inventory?.truncated ?? false,
     },
   };
 }

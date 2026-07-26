@@ -1,7 +1,8 @@
-import { count, eq } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, count, eq, isNull, sql } from "drizzle-orm";
 import { auth } from "~/server/auth/auth";
 import { dbForTenant, db as primaryDb } from "~/server/db/client";
-import { users } from "~/server/db/schema/auth";
+import { setupBootstrapTokens, users } from "~/server/db/schema/auth";
 import { logger } from "~/server/lib/logger";
 import type { Tenant } from "~/server/tenants/registry";
 import { primaryTenant } from "~/server/tenants/resolve";
@@ -20,8 +21,9 @@ function tenantDb(tenant: Tenant) {
  *
  * This is the sole path to the first admin. It avoids the catch-22 of "the
  * first user must be an admin, but you need an admin to create users": on a
- * fresh Verein you visit /setup once and create it in the browser. No secret in
- * the environment. Operates on the Verein's own database.
+ * fresh Verein you visit /setup once and create it in the browser with the
+ * one-time capability issued during provisioning. Operates on the Verein's own
+ * database.
  */
 export async function isInSetupMode(tenant: Tenant): Promise<boolean> {
   const [row] = await tenantDb(tenant).select({ c: count() }).from(users);
@@ -30,7 +32,11 @@ export async function isInSetupMode(tenant: Tenant): Promise<boolean> {
 
 export type SetupResult =
   | { ok: true; userId: string }
-  | { ok: false; reason: "already_initialized" | "create_failed"; message?: string };
+  | {
+      ok: false;
+      reason: "already_initialized" | "invalid_bootstrap_token" | "create_failed";
+      message?: string;
+    };
 
 export async function completeSetup(
   tenant: Tenant,
@@ -38,15 +44,51 @@ export async function completeSetup(
     email: string;
     password: string;
     name: string;
+    bootstrapToken?: string;
   },
 ): Promise<SetupResult> {
   const db = tenantDb(tenant);
-  // Re-check inside the same transaction so two parallel POSTs can't both
-  // win the race and create two "first" admins.
+  const tokenHash = input.bootstrapToken
+    ? createHash("sha256").update(input.bootstrapToken).digest("hex")
+    : null;
   return await db.transaction(async (tx) => {
+    // The better-auth call below writes through its own connection. Serialize
+    // before checking users so two public setup requests cannot both see an
+    // empty table and create separate admins.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('kontor2:first-admin-setup'))`);
     const [row] = await tx.select({ c: count() }).from(users);
     if ((row?.c ?? 0) > 0) {
       return { ok: false, reason: "already_initialized" } as const;
+    }
+    if (process.env.NODE_ENV === "production") {
+      // The primary tenant may receive its initial capability via deployment
+      // secret. Only the digest is persisted. Provisioned tenants already have
+      // a generated digest in this table.
+      const envToken = process.env.SETUP_BOOTSTRAP_TOKEN;
+      if (envToken) {
+        const [existing] = await tx
+          .select({ id: setupBootstrapTokens.id })
+          .from(setupBootstrapTokens);
+        if (!existing) {
+          await tx.insert(setupBootstrapTokens).values({
+            id: 1,
+            tokenHash: createHash("sha256").update(envToken).digest("hex"),
+          });
+        }
+      }
+      if (!tokenHash) return { ok: false, reason: "invalid_bootstrap_token" } as const;
+      const [claimed] = await tx
+        .update(setupBootstrapTokens)
+        .set({ consumedAt: new Date() })
+        .where(
+          and(
+            eq(setupBootstrapTokens.id, 1),
+            eq(setupBootstrapTokens.tokenHash, tokenHash),
+            isNull(setupBootstrapTokens.consumedAt),
+          ),
+        )
+        .returning({ id: setupBootstrapTokens.id });
+      if (!claimed) return { ok: false, reason: "invalid_bootstrap_token" } as const;
     }
     try {
       // createUser bypasses `disableSignUp: true`. Called without headers so it
