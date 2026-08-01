@@ -34,9 +34,16 @@ describe("bank details confirmation email", () => {
       }),
     );
     expect(content.body).toContain("Guten Tag Berta Beispiel,");
+    expect(content.body).toContain("Kontor² · Automatische Bestätigung");
+    expect(content.body).toContain(
+      "Diese Nachricht wurde automatisch mit Kontor² im Auftrag von SV Beispiel erstellt.",
+    );
     expect(content.body).toContain("•••• 9890");
     expect(content.body).toContain("Künftige Beitragseinzüge verwenden die neue Bankverbindung.");
     expect(content.body).not.toContain("DE12500105170648489890");
+    expect(content.html).toContain("Automatische Bestätigung");
+    expect(content.html).toContain("IBAN endet auf •••• 9890");
+    expect(content.html).toContain("#14223d");
   });
 
   it("explains when direct debit was suspended", () => {
@@ -69,7 +76,22 @@ describe("bank details confirmation email", () => {
       to: content.to,
       subject: content.subject,
       text: content.body,
+      html: content.html,
     });
+  });
+
+  it("escapes organization and member names in the branded HTML", () => {
+    const content = buildBankDetailsConfirmation({
+      to: "berta@example.test",
+      memberName: "Berta <Beispiel>",
+      organizationName: "SV & Partner",
+      newIbanLast4: "9890",
+      debitSuspended: false,
+    });
+
+    expect(content.html).toContain("Berta &lt;Beispiel&gt;");
+    expect(content.html).toContain("SV &amp; Partner");
+    expect(content.html).not.toContain("Berta <Beispiel>");
   });
 
   it("reports SMTP setup failures without throwing after the bank update", async () => {

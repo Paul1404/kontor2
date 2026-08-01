@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.1.1",
+    date: "2026-08-01",
+    title: "Kontor²-Bestätigung per E-Mail",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Bestätigung einer Bankänderung wird als automatisch erstellte Kontor²-Nachricht mit Vereinsabsender und klarer Markenkennzeichnung versendet.",
+      },
+    ],
+  },
+  {
     version: "2.1.0",
     date: "2026-08-01",
     title: "Bestätigung nach Bankänderung",

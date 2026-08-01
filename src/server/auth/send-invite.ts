@@ -87,7 +87,7 @@ function transporterFor(cfg: SmtpDispatchConfig): Transporter {
  * so callers can surface a friendly precondition error.
  */
 export async function getMailer(db: DB = primaryDb()): Promise<{
-  send: (opts: { to: string; subject: string; text: string }) => Promise<void>;
+  send: (opts: { to: string; subject: string; text: string; html?: string }) => Promise<void>;
   from: string;
 } | null> {
   const cfg = await loadSmtpConfig(db);
@@ -97,7 +97,7 @@ export async function getMailer(db: DB = primaryDb()): Promise<{
   return {
     from,
     send: async (opts) => {
-      await t.sendMail({ from, to: opts.to, subject: opts.subject, text: opts.text });
+      await t.sendMail({ ...opts, from });
     },
   };
 }
