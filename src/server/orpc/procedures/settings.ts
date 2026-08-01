@@ -11,6 +11,7 @@ import {
 import { inspectEncryptedData, reencryptAllData } from "~/server/crypto/reencrypt";
 import { authSettingsTable, smtpConfigTable } from "~/server/db/schema/settings";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
+import { testSentMailbox } from "~/server/mail/read-sent-mail";
 import { adminProc } from "~/server/orpc/base";
 
 const SessionSettingsInput = v.object({
@@ -146,6 +147,19 @@ export const settingsRouter = {
       });
     });
     return { ok: true };
+  }),
+
+  /** Verify read-only IMAPS access with the same credentials used for SMTP. */
+  testImap: adminProc.input(v.void()).handler(async ({ context }) => {
+    try {
+      const result = await testSentMailbox(context.db);
+      return { ok: true, mailbox: result.mailbox, port: 993 };
+    } catch {
+      throw new ORPCError("PRECONDITION_FAILED", {
+        message:
+          "IMAP-Zugriff fehlgeschlagen. Bitte Host, Benutzername, Passwort und Port 993 am Mailserver prüfen.",
+      });
+    }
   }),
 
   /**

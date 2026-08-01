@@ -182,7 +182,7 @@ const SECTIONS: NavSection[] = [
       },
       {
         to: "/app/einstellungen/smtp",
-        label: "SMTP",
+        label: "E-Mail",
         icon: <Mail className="size-[18px]" />,
         adminOnly: true,
       },

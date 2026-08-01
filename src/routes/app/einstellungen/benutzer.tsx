@@ -241,7 +241,7 @@ function UsersPage() {
           <li className="flex items-start gap-2">
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <span>
-              <strong>Admin</strong>: Vorstand-Rechte plus Vereinsdaten, SMTP, Beitragsarten,
+              <strong>Admin</strong>: Vorstand-Rechte plus Vereinsdaten, E-Mail, Beitragsarten,
               Abteilungen, Benutzer-Rollen, Snapshots und der Adminbereich (Restore, endgültiges
               Löschen, Wipe). Es muss immer mindestens ein Admin existieren.
             </span>

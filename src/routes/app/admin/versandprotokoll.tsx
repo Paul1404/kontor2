@@ -489,7 +489,8 @@ function MailRow({ row, onView }: { row: MailRowData; onView: () => void }) {
           {formatDateTime(row.createdAt)}
         </span>
         <Button type="button" variant="outline" size="sm" onClick={onView}>
-          <Eye className="size-3.5" /> {row.hasContent ? "Ansehen" : "Details"}
+          <Eye className="size-3.5" />
+          {row.hasContent || row.status === "sent" ? "Ansehen" : "Details"}
         </Button>
       </div>
     </li>
@@ -502,6 +503,8 @@ type MailDetail = Omit<MailRowData, "hasContent"> & {
   attachmentNames: string[] | null;
   entityType: string | null;
   entityId: string | null;
+  contentSource: "archive" | "imap" | "none" | "unavailable";
+  imapMailbox?: string;
 };
 
 function MailDetailDialog({
@@ -568,7 +571,9 @@ function MailDetailDialog({
               ) : null}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Schreibgeschützte Momentaufnahme aus dem Versandprotokoll
+              {mail?.contentSource === "imap"
+                ? `Schreibgeschützt aus dem IMAP-Ordner „${mail.imapMailbox ?? "Gesendet"}“`
+                : "Schreibgeschützte Momentaufnahme aus dem Versandprotokoll"}
             </p>
           </div>
           <button
@@ -604,6 +609,16 @@ function MailDetailDialog({
                 <dd>{formatDateTime(mail.createdAt)}</dd>
                 <dt className="text-muted-foreground">Typ</dt>
                 <dd>{kindLabel(mail.kind)}</dd>
+                {mail.contentSource === "archive" || mail.contentSource === "imap" ? (
+                  <>
+                    <dt className="text-muted-foreground">Quelle</dt>
+                    <dd>
+                      {mail.contentSource === "imap"
+                        ? `Gesendet-Ordner (${mail.imapMailbox ?? "automatisch erkannt"})`
+                        : "Kontor²-Versandarchiv"}
+                    </dd>
+                  </>
+                ) : null}
                 {mail.actorEmail ? (
                   <>
                     <dt className="text-muted-foreground">Ausgelöst von</dt>
@@ -674,7 +689,9 @@ function MailDetailDialog({
                   />
                 ) : (
                   <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                    Für diesen älteren Eintrag wurde noch kein E-Mail-Inhalt archiviert.
+                    {mail.contentSource === "unavailable"
+                      ? "Der Gesendet-Ordner ist momentan nicht erreichbar. Bitte den IMAP-Zugriff unter E-Mail-Konfiguration prüfen."
+                      : "Im Gesendet-Ordner wurde keine eindeutig passende E-Mail gefunden."}
                   </div>
                 )}
               </section>

@@ -4,6 +4,7 @@ import * as v from "valibot";
 import { escapeLike } from "~/server/db/like";
 import { emailLogTable } from "~/server/db/schema/email-log";
 import { logger } from "~/server/lib/logger";
+import { findSentMessage } from "~/server/mail/read-sent-mail";
 import { adminProc } from "~/server/orpc/base";
 
 const StatusEnum = v.picklist(["sent", "failed", "skipped"]);
@@ -140,7 +141,32 @@ export const emailLogRouter = {
       if (!row) {
         throw new ORPCError("NOT_FOUND", { message: "E-Mail-Protokolleintrag nicht gefunden." });
       }
-      return row;
+      if (row.bodyText || row.bodyHtml) return { ...row, contentSource: "archive" as const };
+      if (row.status !== "sent" || !row.recipient || !row.subject) {
+        return { ...row, contentSource: "none" as const };
+      }
+      try {
+        const sent = await findSentMessage(context.db, {
+          recipient: row.recipient,
+          subject: row.subject,
+          sentAt: row.createdAt,
+        });
+        if (!sent) return { ...row, contentSource: "none" as const };
+        return {
+          ...row,
+          bodyText: sent.bodyText,
+          bodyHtml: sent.bodyHtml,
+          attachmentNames: sent.attachmentNames,
+          contentSource: "imap" as const,
+          imapMailbox: sent.mailbox,
+        };
+      } catch (error) {
+        logger.warn("email_log.imap_lookup_failed", {
+          emailLogId: row.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return { ...row, contentSource: "unavailable" as const };
+      }
     }),
 
   /** Delete mail-log rows older than N days, or clear the whole log. Logged. */

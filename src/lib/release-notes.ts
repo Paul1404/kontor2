@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.3.0",
+    date: "2026-08-01",
+    title: "Ältere gesendete E-Mails öffnen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Das Versandprotokoll liest ältere Nachrichten bei Bedarf schreibgeschützt aus dem Gesendet-Ordner. Dafür werden automatisch dieselben Zugangsdaten wie für SMTP und der IMAPS-Standardport 993 verwendet.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die E-Mail-Einstellungen erklären die gemeinsame Nutzung für SMTP und IMAP und bieten einen eigenen Verbindungstest für den Gesendet-Ordner.",
+      },
+    ],
+  },
+  {
     version: "2.2.0",
     date: "2026-08-01",
     title: "Versendete E-Mails einsehen",

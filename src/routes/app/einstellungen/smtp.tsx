@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, Loader2, Mail, Save, ShieldAlert, XCircle } from "lucide-react";
+import { CheckCircle2, Inbox, Loader2, Mail, Save, ShieldAlert, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -74,19 +74,31 @@ function SmtpPage() {
     onError: (err) => setMsg({ kind: "error", text: (err as Error).message }),
   });
 
+  const imapTest = useMutation({
+    mutationFn: () => orpc.settings.testImap(),
+    onSuccess: (result) =>
+      setMsg({
+        kind: "ok",
+        text: `IMAP-Zugriff funktioniert. Ordner „${result.mailbox}“ wurde schreibgeschützt geöffnet.`,
+      }),
+    onError: (err) => setMsg({ kind: "error", text: (err as Error).message }),
+  });
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="SMTP-Konfiguration"
-        description="Mail-Transport-Agent für Einladungen und Systemnachrichten."
+        title="E-Mail-Konfiguration"
+        description="Gemeinsame Zugangsdaten für SMTP-Versand und schreibgeschützten IMAP-Zugriff."
       />
 
       {msg ? <MessageBanner msg={msg} onDismiss={() => setMsg(null)} /> : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Server</CardTitle>
-          <CardDescription>Verbindungsparameter und Anmeldedaten des MTA.</CardDescription>
+          <CardTitle>Mailserver</CardTitle>
+          <CardDescription>
+            Kontor² verwendet Benutzername und Passwort für SMTP und IMAP.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -96,7 +108,18 @@ function SmtpPage() {
               save.mutate();
             }}
           >
-            <Field label="Host" hint="z. B. smtp.example.de">
+            <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm sm:col-span-2">
+              <Inbox className="mt-0.5 size-4 shrink-0 text-primary" />
+              <div>
+                <p className="font-medium">Ein Zugang für Versand und Protokollansicht</p>
+                <p className="mt-1 text-muted-foreground">
+                  SMTP nutzt den eingestellten Port. Für ältere versendete Nachrichten verbindet
+                  sich Kontor² automatisch per IMAPS auf demselben Host über Port 993 und öffnet den
+                  Ordner „Gesendet“ ausschließlich lesend.
+                </p>
+              </div>
+            </div>
+            <Field label="Host" hint="Gemeinsamer Server für SMTP und IMAP">
               <Input
                 value={form.host}
                 onChange={(e) => setForm({ ...form, host: e.target.value })}
@@ -112,7 +135,7 @@ function SmtpPage() {
                 required
               />
             </Field>
-            <Field label="Benutzername" hint="Login für die SMTP-Authentifizierung">
+            <Field label="Benutzername" hint="Gemeinsamer Login für SMTP und IMAP">
               <Input
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
@@ -194,6 +217,35 @@ function SmtpPage() {
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Gesendet-Ordner</CardTitle>
+          <CardDescription>
+            Prüft die Anmeldung und öffnet den automatisch erkannten Ordner schreibgeschützt.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={imapTest.isPending || !cfg.data?.passwordSet || !cfg.data?.username}
+            onClick={() => imapTest.mutate()}
+          >
+            {imapTest.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Inbox className="size-4" />
+            )}
+            IMAP-Zugriff testen
+          </Button>
+          {!cfg.data?.username || !cfg.data?.passwordSet ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Für IMAP müssen Benutzername und Passwort gespeichert sein.
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
