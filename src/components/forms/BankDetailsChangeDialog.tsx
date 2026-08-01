@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, FileUp } from "lucide-react";
+import { AlertTriangle, ChevronDown, FileUp, Mail } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { DateField } from "~/components/ui/date-field";
@@ -49,6 +49,8 @@ export function BankDetailsChangeDialog({
   );
   const [file, setFile] = useState<File | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [sendConfirmationEmail, setSendConfirmationEmail] = useState(false);
+  const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const normalizedIban = useMemo(() => normalizeIban(iban), [iban]);
@@ -60,12 +62,26 @@ export function BankDetailsChangeDialog({
     staleTime: Number.POSITIVE_INFINITY,
   });
   const derivedBank = bank.data?.found ? bank.data : null;
+  const previewLast4 = validIban ? normalizedIban.slice(-4) : "XXXX";
+  const emailPreview = useQuery({
+    queryKey: ["bankDetails.confirmationPreview", memberId, previewLast4, debitAction],
+    queryFn: () =>
+      orpc.bankDetails.confirmationPreview({
+        memberId,
+        newIbanLast4: previewLast4,
+        debitAction,
+      }),
+    enabled: open,
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
     if (!open) return;
     setHolderMode(currentAccountHolder ? "other" : "self");
     setAccountHolder(currentAccountHolder ?? "");
     setDebitAction(hasActiveMandate && !directDebitBlocked ? "keep" : "suspend");
+    setSendConfirmationEmail(false);
+    setEmailPreviewOpen(false);
   }, [open, currentAccountHolder, directDebitBlocked, hasActiveMandate]);
 
   const change = useMutation({
@@ -105,22 +121,35 @@ export function BankDetailsChangeDialog({
         note: note.trim() || null,
         debitAction,
         evidenceConfirmed: true,
+        sendConfirmationEmail,
         expectedUpdatedAt,
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] }),
         qc.invalidateQueries({ queryKey: ["members.list"] }),
         qc.invalidateQueries({ queryKey: ["bankDetails.recentChanges", memberId] }),
         qc.invalidateQueries({ queryKey: ["timeline.forMember", memberId] }),
       ]);
-      toast.success("Bankverbindung geändert. Nachweis gespeichert.");
+      if (result.confirmation.status === "sent") {
+        toast.success("Bankverbindung geändert. Bestätigungs-E-Mail versendet.");
+      } else if (result.confirmation.status === "failed") {
+        toast.info("Bankverbindung geändert. Bestätigungs-E-Mail nicht versendet.", {
+          description:
+            "Bitte informieren Sie das Mitglied auf anderem Weg. Details stehen im Versandprotokoll.",
+          durationMs: 8_000,
+        });
+      } else {
+        toast.success("Bankverbindung geändert. Nachweis gespeichert.");
+      }
       onOpenChange(false);
       setIban("");
       setFile(null);
       setNote("");
       setConfirmed(false);
+      setSendConfirmationEmail(false);
+      setEmailPreviewOpen(false);
       setError(null);
     },
     onError: (cause: unknown) => {
@@ -286,6 +315,69 @@ export function BankDetailsChangeDialog({
             onChange={(event) => setNote(event.target.value)}
             rows={2}
           />
+        </div>
+
+        <div className="rounded-md border border-border bg-background p-3">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={sendConfirmationEmail}
+              disabled={!emailPreview.data?.canSend}
+              onChange={(event) => {
+                setSendConfirmationEmail(event.target.checked);
+                if (event.target.checked) setEmailPreviewOpen(true);
+              }}
+            />
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <Mail className="size-4" aria-hidden />
+                Bestätigung per E-Mail senden
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {emailPreview.isLoading
+                  ? "E-Mail-Einstellungen werden geprüft…"
+                  : emailPreview.data?.reason === "no_recipient"
+                    ? "Für dieses Mitglied ist keine E-Mail-Adresse hinterlegt."
+                    : emailPreview.data?.reason === "smtp_not_configured"
+                      ? "SMTP ist nicht konfiguriert."
+                      : emailPreview.data?.to
+                        ? `An ${emailPreview.data.to}`
+                        : "E-Mail-Vorschau ist nicht verfügbar."}
+              </span>
+            </span>
+          </label>
+
+          <button
+            type="button"
+            className="mt-3 flex w-full items-center justify-between border-t border-border pt-3 text-left text-xs font-medium"
+            aria-expanded={emailPreviewOpen}
+            onClick={() => setEmailPreviewOpen((current) => !current)}
+          >
+            E-Mail-Vorschau
+            <ChevronDown
+              className={`size-4 transition-transform ${emailPreviewOpen ? "rotate-180" : ""}`}
+              aria-hidden
+            />
+          </button>
+          {emailPreviewOpen && emailPreview.data ? (
+            <div className="mt-3 space-y-2 text-xs">
+              <p>
+                <span className="font-medium">An:</span>{" "}
+                {emailPreview.data.to ?? "Keine E-Mail-Adresse hinterlegt"}
+              </p>
+              <p>
+                <span className="font-medium">Betreff:</span> {emailPreview.data.subject}
+              </p>
+              <pre className="whitespace-pre-wrap rounded-md bg-muted p-3 font-sans text-xs leading-relaxed">
+                {emailPreview.data.body}
+              </pre>
+              {!validIban ? (
+                <p className="text-muted-foreground">
+                  Die Vorschau zeigt XXXX, bis eine gültige neue IBAN eingegeben wurde.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <p className="text-xs text-muted-foreground">

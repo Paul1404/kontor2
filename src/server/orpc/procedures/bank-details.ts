@@ -2,11 +2,18 @@ import { ORPCError } from "@orpc/server";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
+import { loadSmtpConfig } from "~/server/auth/send-invite";
+import { orgDisplayName } from "~/server/branding/org-name";
 import { lastFour } from "~/server/crypto/encrypt";
 import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
 import { memberBankDetailChangesTable } from "~/server/db/schema/bank-detail-changes";
 import { membersTable } from "~/server/db/schema/members";
 import { isValidBankChangeEvidence } from "~/server/domain/bank-change-evidence";
+import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
+import {
+  buildBankDetailsConfirmation,
+  sendBankDetailsConfirmation,
+} from "~/server/mail/send-bank-details-confirmation";
 import { vorstandProc } from "~/server/orpc/base";
 import { getObject, headObject } from "~/server/s3/client";
 import { invalidateMemberCaches } from "~/server/search/cache";
@@ -21,7 +28,67 @@ function normalizeHolder(value: string | null): string | null {
   return normalized || null;
 }
 
+function memberDisplayName(member: {
+  vorname: string | null;
+  nachname: string | null;
+  kurzname: string | null;
+  firma1: string | null;
+}): string {
+  return (
+    [member.vorname, member.nachname].filter(Boolean).join(" ") ||
+    member.kurzname?.trim() ||
+    member.firma1?.trim() ||
+    "Mitglied"
+  );
+}
+
 export const bankDetailsRouter = {
+  confirmationPreview: vorstandProc
+    .input(
+      v.object({
+        memberId: v.pipe(v.string(), v.uuid()),
+        newIbanLast4: v.pipe(v.string(), v.regex(/^[A-Z0-9]{4}$/)),
+        debitAction: v.picklist(["keep", "suspend"]),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const [member, organizationName, smtp] = await Promise.all([
+        context.db
+          .select({
+            id: membersTable.id,
+            vorname: membersTable.vorname,
+            nachname: membersTable.nachname,
+            kurzname: membersTable.kurzname,
+            firma1: membersTable.firma1,
+            email: membersTable.email,
+          })
+          .from(membersTable)
+          .where(and(eq(membersTable.id, input.memberId), isNull(membersTable.deletedAt)))
+          .limit(1)
+          .then((rows) => rows[0]),
+        orgDisplayName(context.db),
+        loadSmtpConfig(context.db),
+      ]);
+      if (!member) {
+        throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+      }
+      const to = member.email?.trim() || null;
+      const content = buildBankDetailsConfirmation({
+        to: to ?? "",
+        memberName: memberDisplayName(member),
+        organizationName,
+        newIbanLast4: input.newIbanLast4,
+        debitSuspended: input.debitAction === "suspend",
+      });
+      return {
+        canSend: Boolean(to && smtp),
+        reason: !to ? "no_recipient" : !smtp ? "smtp_not_configured" : null,
+        to,
+        subject: content.subject,
+        body: content.body,
+      };
+    }),
+
   applyChange: vorstandProc
     .input(
       v.object({
@@ -34,6 +101,7 @@ export const bankDetailsRouter = {
         note: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(2_000))), null),
         debitAction: v.picklist(["keep", "suspend"]),
         evidenceConfirmed: v.literal(true),
+        sendConfirmationEmail: v.optional(v.boolean(), false),
         expectedUpdatedAt: v.string(),
       }),
     )
@@ -53,6 +121,12 @@ export const bankDetailsRouter = {
       if (!Number.isFinite(requestedAt.getTime()) || requestedAt.getTime() > Date.now()) {
         throw new ORPCError("VALIDATION_FAILED", {
           message: "Das Eingangsdatum darf nicht in der Zukunft liegen.",
+        });
+      }
+      if (input.sendConfirmationEmail && !(await loadSmtpConfig(context.db))) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message:
+            "SMTP ist nicht konfiguriert. Die Bestätigungs-E-Mail kann nicht versendet werden.",
         });
       }
 
@@ -125,6 +199,12 @@ export const bankDetailsRouter = {
           .for("update");
         if (!existing) {
           throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+        }
+        const confirmationRecipient = existing.email?.trim() || null;
+        if (input.sendConfirmationEmail && !confirmationRecipient) {
+          throw new ORPCError("PRECONDITION_FAILED", {
+            message: "Für dieses Mitglied ist keine E-Mail-Adresse hinterlegt.",
+          });
         }
         const expectedMs = new Date(input.expectedUpdatedAt).getTime();
         if (!Number.isFinite(expectedMs) || existing.updatedAt.getTime() !== expectedMs) {
@@ -224,11 +304,48 @@ export const bankDetailsRouter = {
           auditId,
           notes: "Bankverbindung geändert",
         });
-        return { attachmentId: attachment.id };
+        return {
+          attachmentId: attachment.id,
+          confirmationRecipient,
+          memberName: memberDisplayName(existing),
+        };
       });
 
       await invalidateMemberCaches(context.tenant.key);
-      return { ok: true, ...result };
+      const { confirmationRecipient, memberName, ...publicResult } = result;
+      if (!input.sendConfirmationEmail) {
+        return { ok: true, ...publicResult, confirmation: { status: "not_requested" as const } };
+      }
+
+      const organizationName = await orgDisplayName(context.db);
+      const content = buildBankDetailsConfirmation({
+        to: confirmationRecipient!,
+        memberName,
+        organizationName,
+        newIbanLast4: iban.slice(-4),
+        debitSuspended: input.debitAction === "suspend",
+      });
+      const sent = await sendBankDetailsConfirmation(context.db, content);
+      const delivery = statusFromSend(sent);
+      await recordEmail(
+        {
+          kind: EMAIL_KIND.bankDetailsConfirmation,
+          ...delivery,
+          recipient: content.to,
+          subject: content.subject,
+          entityType: "member",
+          entityId: input.memberId,
+          actorEmail: context.session!.user.email,
+          requestId: context.requestId ?? null,
+        },
+        context.db,
+      );
+
+      return {
+        ok: true,
+        ...publicResult,
+        confirmation: { status: sent.ok ? ("sent" as const) : ("failed" as const) },
+      };
     }),
 
   recentChanges: vorstandProc

@@ -68,6 +68,7 @@ const KIND_LABEL: Record<string, string> = {
   antrag_club_notification: "Antrag: Vereinsbenachrichtigung",
   antrag_approval: "Antrag: Genehmigung",
   antrag_decline: "Antrag: Ablehnung",
+  bank_details_confirmation: "Bankänderung: Bestätigung",
   dunning: "Mahnung",
   invite: "Benutzereinladung",
   portal_invite: "Portalzugang",

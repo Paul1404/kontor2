@@ -16,6 +16,7 @@ export const EMAIL_KIND = {
   antragClubNotification: "antrag_club_notification",
   antragApproval: "antrag_approval",
   antragDecline: "antrag_decline",
+  bankDetailsConfirmation: "bank_details_confirmation",
   dunning: "dunning",
   invite: "invite",
   portalInvite: "portal_invite",

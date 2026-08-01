@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.1.0",
+    date: "2026-08-01",
+    title: "Bestätigung nach Bankänderung",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Nach einer Bankänderung kann eine Bestätigungs-E-Mail an das Mitglied versendet und vorher vollständig geprüft werden.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Bestätigung nennt nur die letzten vier Zeichen der neuen IBAN und wird im Versandprotokoll erfasst.",
+      },
+    ],
+  },
+  {
     version: "2.0.0",
     date: "2026-08-01",
     title: "Bankverbindungen mit Nachweis ändern",

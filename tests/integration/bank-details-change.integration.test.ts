@@ -61,6 +61,7 @@ describe.skipIf(!onTestDb)("bank details change (integration)", () => {
         memberNo: `M-${Date.now()}`,
         vorname: "Berta",
         nachname: MARKER,
+        email: "berta@example.test",
         iban1: "DE89370400440532013000",
         iban1Last4: "3000",
       })
@@ -97,7 +98,20 @@ describe.skipIf(!onTestDb)("bank details change (integration)", () => {
 
   it("atomically stores evidence, masked audit data, receipt, and snapshot", async () => {
     const [before] = await db().select().from(membersTable).where(eq(membersTable.id, memberId));
-    await call(
+    const preview = await call(
+      appRouter.bankDetails.confirmationPreview,
+      {
+        memberId,
+        newIbanLast4: "9890",
+        debitAction: "suspend",
+      },
+      { context: context() },
+    );
+    expect(preview.to).toBe("berta@example.test");
+    expect(preview.body).toContain("•••• 9890");
+    expect(preview.body).toContain("Der SEPA-Einzug ist vorerst ausgesetzt.");
+
+    const result = await call(
       appRouter.bankDetails.applyChange,
       {
         memberId,
@@ -109,10 +123,12 @@ describe.skipIf(!onTestDb)("bank details change (integration)", () => {
         note: "Per E-Mail bestätigt",
         debitAction: "suspend",
         evidenceConfirmed: true,
+        sendConfirmationEmail: false,
         expectedUpdatedAt: before!.updatedAt.toISOString(),
       },
       { context: context() },
     );
+    expect(result.confirmation.status).toBe("not_requested");
 
     const [member] = await db().select().from(membersTable).where(eq(membersTable.id, memberId));
     expect(member?.iban1).toBe("DE12500105170648489890");
