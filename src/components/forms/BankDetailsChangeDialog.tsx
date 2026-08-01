@@ -294,7 +294,9 @@ export function BankDetailsChangeDialog({
         </p>
         {affectedMemberCount > 0 ? (
           <p className="rounded-md border border-border bg-background p-2 text-xs">
-            Dieser Zahler ist mit {affectedMemberCount} {affectedMemberCount === 1 ? "weiteren Datensatz" : "weiteren Datensätzen"} verknüpft. Deren künftige Einzüge können ebenfalls diese Bankverbindung verwenden.
+            Dieser Zahler ist mit {affectedMemberCount}{" "}
+            {affectedMemberCount === 1 ? "weiteren Datensatz" : "weiteren Datensätzen"} verknüpft.
+            Deren künftige Einzüge können ebenfalls diese Bankverbindung verwenden.
           </p>
         ) : null}
         {validIban && file ? (
