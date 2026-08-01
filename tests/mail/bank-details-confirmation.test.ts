@@ -13,6 +13,17 @@ import {
   sendBankDetailsConfirmation,
 } from "~/server/mail/send-bank-details-confirmation";
 
+const organization = {
+  displayName: "SV Beispiel",
+  legalName: "Sportverein Beispiel 1945 e. V.",
+  addressLines: ["Vereinsstraße 1", "97440 Beispielstadt"],
+  contactEmail: "mitgliedschaft@sv-beispiel.test",
+  contactPhone: "+49 9726 1234",
+  brandColor: "#b51f2e",
+  logoDataUri:
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC",
+};
+
 describe("bank details confirmation email", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -22,7 +33,7 @@ describe("bank details confirmation email", () => {
     const content = buildBankDetailsConfirmation({
       to: "berta@example.test",
       memberName: "Berta Beispiel",
-      organizationName: "SV Beispiel",
+      organization,
       newIbanLast4: "9890",
       debitSuspended: false,
     });
@@ -34,23 +45,35 @@ describe("bank details confirmation email", () => {
       }),
     );
     expect(content.body).toContain("Guten Tag Berta Beispiel,");
-    expect(content.body).toContain("Kontor² · Automatische Bestätigung");
-    expect(content.body).toContain(
-      "Diese Nachricht wurde automatisch mit Kontor² im Auftrag von SV Beispiel erstellt.",
-    );
+    expect(content.body).toContain("SV Beispiel\nAutomatische Bestätigung");
+    expect(content.body).toContain("Sportverein Beispiel 1945 e. V.");
+    expect(content.body).toContain("Vereinsstraße 1\n97440 Beispielstadt");
+    expect(content.body).toContain("E-Mail: mitgliedschaft@sv-beispiel.test");
+    expect(content.body).toContain("Telefon: +49 9726 1234");
+    expect(content.body).toContain("Technisch versendet über Kontor².");
     expect(content.body).toContain("•••• 9890");
     expect(content.body).toContain("Künftige Beitragseinzüge verwenden die neue Bankverbindung.");
     expect(content.body).not.toContain("DE12500105170648489890");
     expect(content.html).toContain("Automatische Bestätigung");
     expect(content.html).toContain("IBAN endet auf •••• 9890");
-    expect(content.html).toContain("#14223d");
+    expect(content.html).toContain("#b51f2e");
+    expect(content.html).toContain("Sportverein Beispiel 1945 e. V.");
+    expect(content.html).toContain('src="cid:vereinslogo@kontor2"');
+    expect(content.attachments).toEqual([
+      expect.objectContaining({
+        filename: "vereinslogo.png",
+        contentType: "image/png",
+        cid: "vereinslogo@kontor2",
+        contentDisposition: "inline",
+      }),
+    ]);
   });
 
   it("explains when direct debit was suspended", () => {
     const content = buildBankDetailsConfirmation({
       to: "berta@example.test",
       memberName: "Berta Beispiel",
-      organizationName: "SV Beispiel",
+      organization,
       newIbanLast4: "9890",
       debitSuspended: true,
     });
@@ -66,7 +89,7 @@ describe("bank details confirmation email", () => {
     const content = buildBankDetailsConfirmation({
       to: "berta@example.test",
       memberName: "Berta Beispiel",
-      organizationName: "SV Beispiel",
+      organization,
       newIbanLast4: "9890",
       debitSuspended: false,
     });
@@ -77,6 +100,7 @@ describe("bank details confirmation email", () => {
       subject: content.subject,
       text: content.body,
       html: content.html,
+      attachments: content.attachments,
     });
   });
 
@@ -84,13 +108,21 @@ describe("bank details confirmation email", () => {
     const content = buildBankDetailsConfirmation({
       to: "berta@example.test",
       memberName: "Berta <Beispiel>",
-      organizationName: "SV & Partner",
+      organization: {
+        ...organization,
+        displayName: "SV & Partner",
+        legalName: "SV <Partner> e. V.",
+        addressLines: ["A&B <Straße> 1"],
+        contactEmail: "verein+bank@example.test",
+      },
       newIbanLast4: "9890",
       debitSuspended: false,
     });
 
     expect(content.html).toContain("Berta &lt;Beispiel&gt;");
     expect(content.html).toContain("SV &amp; Partner");
+    expect(content.html).toContain("SV &lt;Partner&gt; e. V.");
+    expect(content.html).toContain("A&amp;B &lt;Straße&gt; 1");
     expect(content.html).not.toContain("Berta <Beispiel>");
   });
 
@@ -99,7 +131,7 @@ describe("bank details confirmation email", () => {
     const content = buildBankDetailsConfirmation({
       to: "berta@example.test",
       memberName: "Berta Beispiel",
-      organizationName: "SV Beispiel",
+      organization,
       newIbanLast4: "9890",
       debitSuspended: false,
     });

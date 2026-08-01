@@ -3,7 +3,6 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { loadSmtpConfig } from "~/server/auth/send-invite";
-import { orgDisplayName } from "~/server/branding/org-name";
 import { lastFour } from "~/server/crypto/encrypt";
 import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
 import { memberBankDetailChangesTable } from "~/server/db/schema/bank-detail-changes";
@@ -12,6 +11,7 @@ import { isValidBankChangeEvidence } from "~/server/domain/bank-change-evidence"
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import {
   buildBankDetailsConfirmation,
+  loadBankDetailsConfirmationOrganization,
   sendBankDetailsConfirmation,
 } from "~/server/mail/send-bank-details-confirmation";
 import { vorstandProc } from "~/server/orpc/base";
@@ -52,7 +52,7 @@ export const bankDetailsRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
-      const [member, organizationName, smtp] = await Promise.all([
+      const [member, organization, smtp] = await Promise.all([
         context.db
           .select({
             id: membersTable.id,
@@ -66,7 +66,7 @@ export const bankDetailsRouter = {
           .where(and(eq(membersTable.id, input.memberId), isNull(membersTable.deletedAt)))
           .limit(1)
           .then((rows) => rows[0]),
-        orgDisplayName(context.db),
+        loadBankDetailsConfirmationOrganization(context.db),
         loadSmtpConfig(context.db),
       ]);
       if (!member) {
@@ -76,7 +76,7 @@ export const bankDetailsRouter = {
       const content = buildBankDetailsConfirmation({
         to: to ?? "",
         memberName: memberDisplayName(member),
-        organizationName,
+        organization,
         newIbanLast4: input.newIbanLast4,
         debitSuspended: input.debitAction === "suspend",
       });
@@ -317,11 +317,11 @@ export const bankDetailsRouter = {
         return { ok: true, ...publicResult, confirmation: { status: "not_requested" as const } };
       }
 
-      const organizationName = await orgDisplayName(context.db);
+      const organization = await loadBankDetailsConfirmationOrganization(context.db);
       const content = buildBankDetailsConfirmation({
         to: confirmationRecipient!,
         memberName,
-        organizationName,
+        organization,
         newIbanLast4: iban.slice(-4),
         debitSuspended: input.debitAction === "suspend",
       });

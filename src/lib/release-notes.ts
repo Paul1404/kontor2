@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.1.2",
+    date: "2026-08-01",
+    title: "Verein als E-Mail-Absender",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Bestätigungen zu Bankänderungen zeigen das Vereinslogo, den vollständigen Vereinsnamen, die Anschrift und die hinterlegten Kontaktdaten. Kontor² erscheint nur noch als technischer Versandhinweis.",
+      },
+    ],
+  },
+  {
     version: "2.1.1",
     date: "2026-08-01",
     title: "Kontor²-Bestätigung per E-Mail",

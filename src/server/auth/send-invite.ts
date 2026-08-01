@@ -87,7 +87,19 @@ function transporterFor(cfg: SmtpDispatchConfig): Transporter {
  * so callers can surface a friendly precondition error.
  */
 export async function getMailer(db: DB = primaryDb()): Promise<{
-  send: (opts: { to: string; subject: string; text: string; html?: string }) => Promise<void>;
+  send: (opts: {
+    to: string;
+    subject: string;
+    text: string;
+    html?: string;
+    attachments?: Array<{
+      filename: string;
+      content: Buffer;
+      contentType: string;
+      cid: string;
+      contentDisposition: "inline";
+    }>;
+  }) => Promise<void>;
   from: string;
 } | null> {
   const cfg = await loadSmtpConfig(db);
