@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.2.0",
+    date: "2026-08-01",
+    title: "Versendete E-Mails einsehen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Das Versandprotokoll zeigt den tatsächlich versendeten E-Mail-Inhalt schreibgeschützt an. Text, HTML-Vorschau und Namen der Anhänge werden direkt am Protokolleintrag angezeigt.",
+      },
+    ],
+  },
+  {
     version: "2.1.3",
     date: "2026-08-01",
     title: "Nachweis-Upload repariert",

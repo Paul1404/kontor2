@@ -1938,47 +1938,51 @@ export const applicationsRouter = {
         const records: EmailLogEntry[] = [];
         if (input.email) {
           const subject = `Ihr Papier-Antrag bei ${org.vereinsname}`;
+          const bodyText = [
+            "Hallo,",
+            "",
+            `vielen Dank. Ihr Papier-Antrag beim ${org.vereinsname} ist bei uns eingegangen.`,
+            `Ihre Vorgangsnummer lautet ${inserted.antragsnummer}.`,
+            "",
+            `Den aktuellen Stand sehen Sie hier: ${statusUrlFor(context.tenant, inserted.antragsnummer, inserted.statusToken)}`,
+            "",
+            "Bitte achten Sie darauf, dass auf dem Scan Ihre Kontaktdaten gut lesbar sind.",
+          ].join("\n");
           const res = await sendApplicationDocumentMail(context.db, {
             to: input.email,
             subject,
-            text: [
-              "Hallo,",
-              "",
-              `vielen Dank. Ihr Papier-Antrag beim ${org.vereinsname} ist bei uns eingegangen.`,
-              `Ihre Vorgangsnummer lautet ${inserted.antragsnummer}.`,
-              "",
-              `Den aktuellen Stand sehen Sie hier: ${statusUrlFor(context.tenant, inserted.antragsnummer, inserted.statusToken)}`,
-              "",
-              "Bitte achten Sie darauf, dass auf dem Scan Ihre Kontaktdaten gut lesbar sind.",
-            ].join("\n"),
+            text: bodyText,
           });
           records.push({
             kind: EMAIL_KIND.antragConfirmation,
             status: res.status,
             recipient: input.email,
             subject,
+            bodyText,
             detail: res.detail,
           });
         }
         const clubEmail = org.antragVorstandEmail ?? org.mitgliedschaftEmail ?? org.kontaktEmail;
         if (org.antragBenachrichtigungAktiv && clubEmail) {
           const subject = `Neuer Papier-Antrag: ${inserted.antragsnummer}`;
+          const bodyText = [
+            "Ein neuer Papier-Antrag wurde über das Online-Formular hochgeladen.",
+            `Vorgangsnummer: ${inserted.antragsnummer}.`,
+            input.email ? `Kontakt: ${input.email}` : "Es wurde keine E-Mail angegeben.",
+            "",
+            "Bitte im Bereich Anträge prüfen und die Daten aus dem Scan erfassen.",
+          ].join("\n");
           const res = await sendApplicationDocumentMail(context.db, {
             to: clubEmail,
             subject,
-            text: [
-              "Ein neuer Papier-Antrag wurde über das Online-Formular hochgeladen.",
-              `Vorgangsnummer: ${inserted.antragsnummer}.`,
-              input.email ? `Kontakt: ${input.email}` : "Es wurde keine E-Mail angegeben.",
-              "",
-              "Bitte im Bereich Anträge prüfen und die Daten aus dem Scan erfassen.",
-            ].join("\n"),
+            text: bodyText,
           });
           records.push({
             kind: EMAIL_KIND.antragClubNotification,
             status: res.status,
             recipient: clubEmail,
             subject,
+            bodyText,
             detail: res.detail,
           });
         }
@@ -2482,9 +2486,18 @@ export const applicationsRouter = {
         .where(eq(t.id, input.id));
 
       const subject = `Ihr Aufnahmeantrag (${app.antragsnummer})`;
+      const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+      const declineBody = [
+        `Hallo ${app.vorname} ${app.nachname},`,
+        "",
+        `Ihr Aufnahmeantrag beim ${org?.vereinsname ?? "Verein"} konnte leider nicht angenommen werden.`,
+        "",
+        `Begründung: ${input.reason}`,
+      ].join("\n");
       const base = {
         kind: EMAIL_KIND.antragDecline,
         subject,
+        bodyText: declineBody,
         entityType: "membership_application",
         entityId: app.id,
         actorEmail: context.session!.user.email,
@@ -2493,7 +2506,6 @@ export const applicationsRouter = {
       let record: EmailLogEntry;
       if (app.email) {
         const mailer = await getMailer(context.db);
-        const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
         if (!mailer) {
           record = {
             ...base,
@@ -2506,13 +2518,7 @@ export const applicationsRouter = {
             await mailer.send({
               to: app.email,
               subject,
-              text: [
-                `Hallo ${app.vorname} ${app.nachname},`,
-                "",
-                `Ihr Aufnahmeantrag beim ${org?.vereinsname ?? "Verein"} konnte leider nicht angenommen werden.`,
-                "",
-                `Begründung: ${input.reason}`,
-              ].join("\n"),
+              text: declineBody,
             });
             record = { ...base, status: "sent", recipient: app.email };
           } catch (err) {
@@ -2748,17 +2754,19 @@ export const applicationsRouter = {
       await attachApplicationFilesToMember(context.db, app.id, result.primaryId, actorId);
 
       if (app.email) {
+        const approvalSubject = `Willkommen beim ${org?.vereinsname ?? "Verein"}`;
+        const approvalBody = [
+          `Hallo ${app.vorname} ${app.nachname},`,
+          "",
+          `Ihr Aufnahmeantrag wurde angenommen. Ihre Mitgliedsnummer: ${result.refs.join(", ")}.`,
+          "",
+          ...(approvedPdf ? ["Die genehmigte Beitrittserklärung finden Sie im Anhang.", ""] : []),
+          "Herzlich willkommen.",
+        ].join("\n");
         const sent = await sendApplicationDocumentMail(context.db, {
           to: app.email,
-          subject: `Willkommen beim ${org?.vereinsname ?? "Verein"}`,
-          text: [
-            `Hallo ${app.vorname} ${app.nachname},`,
-            "",
-            `Ihr Aufnahmeantrag wurde angenommen. Ihre Mitgliedsnummer: ${result.refs.join(", ")}.`,
-            "",
-            ...(approvedPdf ? ["Die genehmigte Beitrittserklärung finden Sie im Anhang.", ""] : []),
-            "Herzlich willkommen.",
-          ].join("\n"),
+          subject: approvalSubject,
+          text: approvalBody,
           pdf: approvedPdf
             ? {
                 filename: `Beitrittserklaerung-${app.antragsnummer}-genehmigt.pdf`,
@@ -2772,7 +2780,11 @@ export const applicationsRouter = {
             kind: EMAIL_KIND.antragApproval,
             status: sent.status,
             recipient: app.email,
-            subject: `Willkommen beim ${org?.vereinsname ?? "Verein"}`,
+            subject: approvalSubject,
+            bodyText: approvalBody,
+            attachmentNames: approvedPdf
+              ? [`Beitrittserklaerung-${app.antragsnummer}-genehmigt.pdf`]
+              : null,
             detail: sent.detail,
             entityType: "membership_application",
             entityId: app.id,

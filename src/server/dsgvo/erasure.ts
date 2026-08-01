@@ -333,7 +333,8 @@ export async function executeErasure(
     // 4h. The central mail log intentionally outlives the workflow rows it
     // references, so cascades cannot remove copied recipient addresses. Keep
     // delivery status/timestamps for operational accountability while clearing
-    // recipient, subject and provider error text for every member-linked entity.
+    // recipient, subject, body snapshots, attachment names and provider error
+    // text for every member-linked entity.
     const mailTargets = [
       { entityType: "member", ids: [memberId] },
       { entityType: "membership_application", ids: deletedApplications.map((row) => row.id) },
@@ -345,7 +346,14 @@ export async function executeErasure(
       if (target.ids.length === 0) continue;
       const rows = await tx
         .update(emailLogTable)
-        .set({ recipient: null, subject: null, detail: null })
+        .set({
+          recipient: null,
+          subject: null,
+          bodyText: null,
+          bodyHtml: null,
+          attachmentNames: null,
+          detail: null,
+        })
         .where(
           and(
             eq(emailLogTable.entityType, target.entityType),

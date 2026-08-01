@@ -3,6 +3,8 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import {
   ChevronLeft,
   ChevronRight,
+  Eye,
+  FileText,
   MailCheck,
   MailWarning,
   MailX,
@@ -11,7 +13,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
@@ -24,6 +26,7 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { toast } from "~/components/ui/toaster";
 import { cn } from "~/lib/cn";
 import { formatDateTime, orEmpty } from "~/lib/format";
+import { useModalFocus } from "~/lib/modal-focus";
 import { orpc } from "~/lib/orpc";
 
 type Status = "sent" | "failed" | "skipped";
@@ -119,6 +122,7 @@ function VersandprotokollPage() {
   const [pageSize, setPageSize] = usePersistentPageSize("emailLog.pageSize", 50);
   const [qDraft, setQDraft] = useState(search.q);
   const [purgeOpen, setPurgeOpen] = useState(false);
+  const [selectedMailId, setSelectedMailId] = useState<string | null>(null);
 
   useEffect(() => {
     setQDraft(search.q);
@@ -323,7 +327,9 @@ function VersandprotokollPage() {
               Keine Einträge passen zu diesen Filtern.
             </li>
           ) : (
-            list.data?.rows.map((r) => <MailRow key={r.id} row={r as MailRowData} />)
+            list.data?.rows.map((r) => (
+              <MailRow key={r.id} row={r as MailRowData} onView={() => setSelectedMailId(r.id)} />
+            ))
           )}
         </ul>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-4 py-3 text-sm">
@@ -388,6 +394,14 @@ function VersandprotokollPage() {
           Nur Einträge älter als 90 Tage löschen
         </Button>
       </ConfirmDialog>
+
+      <MailDetailDialog
+        id={selectedMailId}
+        open={selectedMailId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedMailId(null);
+        }}
+      />
     </div>
   );
 }
@@ -445,14 +459,15 @@ type MailRowData = {
   subject: string | null;
   detail: string | null;
   actorEmail: string | null;
+  hasContent: boolean;
   createdAt: string | Date;
 };
 
-function MailRow({ row }: { row: MailRowData }) {
+function MailRow({ row, onView }: { row: MailRowData; onView: () => void }) {
   const meta = STATUS_META[row.status];
   const detail = detailLabel(row.detail);
   return (
-    <li className="flex items-start justify-between gap-3 px-4 py-3">
+    <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <Badge variant="outline" className={cn("font-medium", meta.badge)}>
@@ -469,9 +484,204 @@ function MailRow({ row }: { row: MailRowData }) {
           {detail ? <span className={meta.accent}>{detail}</span> : null}
         </div>
       </div>
-      <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-        {formatDateTime(row.createdAt)}
-      </span>
+      <div className="flex shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-end">
+        <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+          {formatDateTime(row.createdAt)}
+        </span>
+        <Button type="button" variant="outline" size="sm" onClick={onView}>
+          <Eye className="size-3.5" /> {row.hasContent ? "Ansehen" : "Details"}
+        </Button>
+      </div>
     </li>
+  );
+}
+
+type MailDetail = Omit<MailRowData, "hasContent"> & {
+  bodyText: string | null;
+  bodyHtml: string | null;
+  attachmentNames: string[] | null;
+  entityType: string | null;
+  entityId: string | null;
+};
+
+function MailDetailDialog({
+  id,
+  open,
+  onOpenChange,
+}: {
+  id: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const [view, setView] = useState<"html" | "text">("html");
+  const detail = useQuery({
+    queryKey: ["emailLog.get", id],
+    queryFn: () => orpc.emailLog.get({ id: id! }),
+    enabled: open && id !== null,
+  });
+  useModalFocus({
+    open,
+    containerRef: dialogRef,
+    initialFocusRef: closeRef,
+    onEscape: () => onOpenChange(false),
+  });
+  useEffect(() => {
+    if (open) setView("html");
+  }, [open]);
+
+  if (!open) return null;
+  const mail = detail.data as MailDetail | undefined;
+  const meta = mail ? STATUS_META[mail.status] : null;
+  const safeHtml = mail?.bodyHtml
+    ? `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: cid:; style-src 'unsafe-inline'">${mail.bodyHtml}`
+    : null;
+  const showHtml = !!safeHtml && view === "html";
+
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop is dismissible by click; Escape and the close button cover keyboard use.
+    <div
+      className="motion-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mail-detail-title"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onOpenChange(false);
+      }}
+    >
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="motion-zoom-in flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-elevated"
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id="mail-detail-title" className="text-base font-semibold tracking-tight">
+                {mail?.status === "sent" ? "Versendete E-Mail" : "E-Mail-Details"}
+              </h2>
+              {meta ? (
+                <Badge variant="outline" className={cn("font-medium", meta.badge)}>
+                  {meta.label}
+                </Badge>
+              ) : null}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Schreibgeschützte Momentaufnahme aus dem Versandprotokoll
+            </p>
+          </div>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            aria-label="Schließen"
+          >
+            <X className="size-4" />
+          </button>
+        </header>
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {detail.isLoading ? (
+            <div className="flex flex-col gap-3 p-5">
+              <Skeleton className="h-5 w-2/3" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-72 w-full" />
+            </div>
+          ) : detail.isError ? (
+            <div className="p-5">
+              <QueryError error={detail.error} onRetry={() => detail.refetch()} />
+            </div>
+          ) : mail ? (
+            <>
+              <dl className="grid gap-x-6 gap-y-3 border-b border-border bg-muted/20 px-5 py-4 text-sm sm:grid-cols-[7rem_1fr]">
+                <dt className="text-muted-foreground">An</dt>
+                <dd className="break-all font-medium">{orEmpty(mail.recipient)}</dd>
+                <dt className="text-muted-foreground">Betreff</dt>
+                <dd className="break-words font-medium">{orEmpty(mail.subject)}</dd>
+                <dt className="text-muted-foreground">Versand</dt>
+                <dd>{formatDateTime(mail.createdAt)}</dd>
+                <dt className="text-muted-foreground">Typ</dt>
+                <dd>{kindLabel(mail.kind)}</dd>
+                {mail.actorEmail ? (
+                  <>
+                    <dt className="text-muted-foreground">Ausgelöst von</dt>
+                    <dd className="break-all">{mail.actorEmail}</dd>
+                  </>
+                ) : null}
+                {mail.attachmentNames?.length ? (
+                  <>
+                    <dt className="text-muted-foreground">Anhänge</dt>
+                    <dd className="flex flex-wrap gap-2">
+                      {mail.attachmentNames.map((name) => (
+                        <Badge key={name} variant="outline" className="gap-1 font-normal">
+                          <FileText className="size-3" /> {name}
+                        </Badge>
+                      ))}
+                    </dd>
+                  </>
+                ) : null}
+                {detailLabel(mail.detail) ? (
+                  <>
+                    <dt className="text-muted-foreground">Hinweis</dt>
+                    <dd className={meta?.accent}>{detailLabel(mail.detail)}</dd>
+                  </>
+                ) : null}
+              </dl>
+
+              <section className="flex min-h-0 flex-1 flex-col gap-3 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold">E-Mail-Inhalt</h3>
+                  {mail.bodyHtml && mail.bodyText ? (
+                    <div className="flex rounded-lg border border-border p-0.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={view === "html" ? "secondary" : "ghost"}
+                        onClick={() => setView("html")}
+                      >
+                        HTML-Vorschau
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={view === "text" ? "secondary" : "ghost"}
+                        onClick={() => setView("text")}
+                      >
+                        Nur Text
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+                {showHtml ? (
+                  <iframe
+                    title="Schreibgeschützte E-Mail-Vorschau"
+                    sandbox=""
+                    srcDoc={safeHtml}
+                    className="min-h-[28rem] w-full rounded-lg border border-border bg-white"
+                  />
+                ) : mail.bodyText ? (
+                  <pre className="min-h-64 whitespace-pre-wrap break-words rounded-lg border border-border bg-background p-5 font-sans text-sm leading-relaxed">
+                    {mail.bodyText}
+                  </pre>
+                ) : mail.bodyHtml ? (
+                  <iframe
+                    title="Schreibgeschützte E-Mail-Vorschau"
+                    sandbox=""
+                    srcDoc={safeHtml ?? undefined}
+                    className="min-h-[28rem] w-full rounded-lg border border-border bg-white"
+                  />
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                    Für diesen älteren Eintrag wurde noch kein E-Mail-Inhalt archiviert.
+                  </div>
+                )}
+              </section>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }

@@ -138,6 +138,8 @@ export async function sendApplicationMails(
       status: res.ok ? "sent" : res.reason === "smtp_not_configured" ? "skipped" : "failed",
       recipient: opts.applicantEmail,
       subject: applicantSubject,
+      bodyText: lines.join("\n"),
+      attachmentNames: [opts.pdf.filename],
       detail: res.ok ? null : res.reason,
     });
   } else {
@@ -151,18 +153,19 @@ export async function sendApplicationMails(
 
   if (opts.notifyClub) {
     const clubSubject = `Neuer Aufnahmeantrag: ${opts.applicantName} (${opts.antragsnummer})`;
+    const clubText = [
+      "Ein neuer Online-Aufnahmeantrag ist eingegangen.",
+      "",
+      `Antragsteller: ${opts.applicantName}`,
+      `Antragsnummer: ${opts.antragsnummer}`,
+      "",
+      "Die Beitrittserklärung ist angehängt. Bearbeitung im Bereich Anträge.",
+    ].join("\n");
     if (opts.clubEmail) {
       const res = await sendRaw(db, {
         to: opts.clubEmail,
         subject: clubSubject,
-        text: [
-          "Ein neuer Online-Aufnahmeantrag ist eingegangen.",
-          "",
-          `Antragsteller: ${opts.applicantName}`,
-          `Antragsnummer: ${opts.antragsnummer}`,
-          "",
-          "Die Beitrittserklärung ist angehängt. Bearbeitung im Bereich Anträge.",
-        ].join("\n"),
+        text: clubText,
         attachments: [opts.pdf],
       });
       clubSent = res.ok;
@@ -174,6 +177,8 @@ export async function sendApplicationMails(
         status: res.ok ? "sent" : res.reason === "smtp_not_configured" ? "skipped" : "failed",
         recipient: opts.clubEmail,
         subject: clubSubject,
+        bodyText: clubText,
+        attachmentNames: [opts.pdf.filename],
         detail: res.ok ? null : res.reason,
       });
     } else {

@@ -68,6 +68,9 @@ describe.skipIf(!onTestDb)("DSGVO erasure removes derived PII copies (integratio
         status: "failed",
         recipient: `${MARKER}@example.test`,
         subject: `Antrag ${MARKER}`,
+        bodyText: `Hallo ${MARKER}`,
+        bodyHtml: `<p>Hallo ${MARKER}</p>`,
+        attachmentNames: [`${MARKER}.pdf`],
         detail: "private provider error",
         entityType: "membership_application",
         entityId: applicationId,
@@ -146,6 +149,9 @@ describe.skipIf(!onTestDb)("DSGVO erasure removes derived PII copies (integratio
         .select({
           recipient: emailLogTable.recipient,
           subject: emailLogTable.subject,
+          bodyText: emailLogTable.bodyText,
+          bodyHtml: emailLogTable.bodyHtml,
+          attachmentNames: emailLogTable.attachmentNames,
           detail: emailLogTable.detail,
         })
         .from(emailLogTable)
@@ -159,6 +165,13 @@ describe.skipIf(!onTestDb)("DSGVO erasure removes derived PII copies (integratio
       name: null,
       error: null,
     });
-    expect(emailLog).toEqual({ recipient: null, subject: null, detail: null });
+    expect(emailLog).toEqual({
+      recipient: null,
+      subject: null,
+      bodyText: null,
+      bodyHtml: null,
+      attachmentNames: null,
+      detail: null,
+    });
   });
 });

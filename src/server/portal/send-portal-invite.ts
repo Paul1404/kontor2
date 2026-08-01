@@ -11,9 +11,28 @@ export async function sendPortalInvite(
     portalUrl: string;
     expiresAt: Date;
   },
-): Promise<{ ok: true } | { ok: false; reason: string }> {
+): Promise<
+  | { ok: true; subject: string; bodyText: string }
+  | { ok: false; reason: string; subject: string; bodyText: string }
+> {
+  const subject = `${opts.vereinsname}: Zugang zum Mitgliederportal`;
+  const bodyText = [
+    `Hallo ${opts.memberName},`,
+    ``,
+    `der ${opts.vereinsname} hat für Sie einen einmaligen Zugang zum Mitgliederportal`,
+    `freigeschaltet. Über das Portal können Sie Ihre persönlichen Daten einsehen und`,
+    `Änderungen vorschlagen. Die Änderungen werden vom Vorstand geprüft und übernommen.`,
+    ``,
+    `Bitte folgen Sie diesem Link:`,
+    opts.portalUrl,
+    ``,
+    `Der Link ist gültig bis ${opts.expiresAt.toLocaleDateString("de-DE")}.`,
+    `Beim ersten Aufruf wird ein dauerhafter Cookie für 30 Tage gesetzt.`,
+    ``,
+    `Falls Sie diesen Zugang nicht angefordert haben, ignorieren Sie diese Nachricht.`,
+  ].join("\n");
   const cfg = await loadSmtpConfig(db);
-  if (!cfg) return { ok: false, reason: "smtp_not_configured" };
+  if (!cfg) return { ok: false, reason: "smtp_not_configured", subject, bodyText };
   const t = nodemailer.createTransport({
     host: cfg.host,
     port: cfg.port,
@@ -31,25 +50,11 @@ export async function sendPortalInvite(
     await t.sendMail({
       from,
       to: opts.to,
-      subject: `${opts.vereinsname}: Zugang zum Mitgliederportal`,
-      text: [
-        `Hallo ${opts.memberName},`,
-        ``,
-        `der ${opts.vereinsname} hat für Sie einen einmaligen Zugang zum Mitgliederportal`,
-        `freigeschaltet. Über das Portal können Sie Ihre persönlichen Daten einsehen und`,
-        `Änderungen vorschlagen. Die Änderungen werden vom Vorstand geprüft und übernommen.`,
-        ``,
-        `Bitte folgen Sie diesem Link:`,
-        opts.portalUrl,
-        ``,
-        `Der Link ist gültig bis ${opts.expiresAt.toLocaleDateString("de-DE")}.`,
-        `Beim ersten Aufruf wird ein dauerhafter Cookie für 30 Tage gesetzt.`,
-        ``,
-        `Falls Sie diesen Zugang nicht angefordert haben, ignorieren Sie diese Nachricht.`,
-      ].join("\n"),
+      subject,
+      text: bodyText,
     });
-    return { ok: true };
+    return { ok: true, subject, bodyText };
   } catch (err) {
-    return { ok: false, reason: (err as Error).message };
+    return { ok: false, reason: (err as Error).message, subject, bodyText };
   }
 }

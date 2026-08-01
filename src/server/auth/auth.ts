@@ -92,6 +92,7 @@ function buildAuth(tenant: Tenant) {
             ...statusFromSend(result),
             recipient: user.email,
             subject: "Passwort zurücksetzen",
+            bodyText: result.bodyText,
             entityType: "user",
             entityId: user.id,
           },

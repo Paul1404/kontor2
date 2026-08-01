@@ -29,6 +29,9 @@ export type EmailLogEntry = {
   status: EmailStatus;
   recipient?: string | null;
   subject?: string | null;
+  bodyText?: string | null;
+  bodyHtml?: string | null;
+  attachmentNames?: string[] | null;
   detail?: string | null;
   entityType?: string | null;
   entityId?: string | null;
@@ -65,6 +68,9 @@ export async function recordEmail(
         status: e.status,
         recipient: e.recipient ?? null,
         subject: e.subject ?? null,
+        bodyText: e.bodyText ?? null,
+        bodyHtml: e.bodyHtml ?? null,
+        attachmentNames: e.attachmentNames ?? null,
         detail: e.detail ?? null,
         entityType: e.entityType ?? null,
         entityId: e.entityId ?? null,

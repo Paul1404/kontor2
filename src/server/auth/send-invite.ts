@@ -122,11 +122,25 @@ export async function sendInviteEmail(
     invitedByName: string;
     role: string;
   },
-): Promise<{ ok: true; subject: string } | { ok: false; reason: string; subject: string }> {
+): Promise<
+  | { ok: true; subject: string; bodyText: string }
+  | { ok: false; reason: string; subject: string; bodyText: string }
+> {
   const name = await brandName(db);
   const subject = `Einladung zur Vereinsverwaltung – ${name}`;
+  const bodyText = [
+    `Hallo,`,
+    ``,
+    `${opts.invitedByName} lädt Sie zur Vereinsverwaltung von ${name} ein.`,
+    `Rolle: ${opts.role}`,
+    ``,
+    `Bitte folgen Sie dem Link und legen Sie ein Passwort fest:`,
+    opts.acceptUrl,
+    ``,
+    `Der Link ist 7 Tage gültig.`,
+  ].join("\n");
   const cfg = await loadSmtpConfig(db);
-  if (!cfg) return { ok: false, reason: "smtp_not_configured", subject };
+  if (!cfg) return { ok: false, reason: "smtp_not_configured", subject, bodyText };
   const t = transporterFor(cfg);
   const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
   try {
@@ -134,21 +148,11 @@ export async function sendInviteEmail(
       from,
       to: opts.to,
       subject,
-      text: [
-        `Hallo,`,
-        ``,
-        `${opts.invitedByName} lädt Sie zur Vereinsverwaltung von ${name} ein.`,
-        `Rolle: ${opts.role}`,
-        ``,
-        `Bitte folgen Sie dem Link und legen Sie ein Passwort fest:`,
-        opts.acceptUrl,
-        ``,
-        `Der Link ist 7 Tage gültig.`,
-      ].join("\n"),
+      text: bodyText,
     });
-    return { ok: true, subject };
+    return { ok: true, subject, bodyText };
   } catch (err) {
-    return { ok: false, reason: (err as Error).message, subject };
+    return { ok: false, reason: (err as Error).message, subject, bodyText };
   }
 }
 
@@ -158,31 +162,32 @@ export async function sendPasswordResetEmail(
     to: string;
     resetUrl: string;
   },
-): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const cfg = await loadSmtpConfig(db);
-  if (!cfg) return { ok: false, reason: "smtp_not_configured" };
-  const t = transporterFor(cfg);
+): Promise<{ ok: true; bodyText: string } | { ok: false; reason: string; bodyText: string }> {
   const name = await brandName(db);
+  const bodyText = [
+    `Hallo,`,
+    ``,
+    `für Ihr Konto in der Vereinsverwaltung von ${name} wurde das Zurücksetzen des`,
+    `Passworts angefordert. Folgen Sie dem Link und vergeben Sie ein neues Passwort:`,
+    opts.resetUrl,
+    ``,
+    `Der Link ist eine Stunde gültig. Wenn Sie das nicht waren, ignorieren Sie`,
+    `diese E-Mail. Ihr Passwort bleibt dann unverändert.`,
+  ].join("\n");
+  const cfg = await loadSmtpConfig(db);
+  if (!cfg) return { ok: false, reason: "smtp_not_configured", bodyText };
+  const t = transporterFor(cfg);
   const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
   try {
     await t.sendMail({
       from,
       to: opts.to,
       subject: "Passwort zurücksetzen",
-      text: [
-        `Hallo,`,
-        ``,
-        `für Ihr Konto in der Vereinsverwaltung von ${name} wurde das Zurücksetzen des`,
-        `Passworts angefordert. Folgen Sie dem Link und vergeben Sie ein neues Passwort:`,
-        opts.resetUrl,
-        ``,
-        `Der Link ist eine Stunde gültig. Wenn Sie das nicht waren, ignorieren Sie`,
-        `diese E-Mail. Ihr Passwort bleibt dann unverändert.`,
-      ].join("\n"),
+      text: bodyText,
     });
-    return { ok: true };
+    return { ok: true, bodyText };
   } catch (err) {
-    return { ok: false, reason: (err as Error).message };
+    return { ok: false, reason: (err as Error).message, bodyText };
   }
 }
 
@@ -197,10 +202,14 @@ export async function sendTestMail(
     to: string;
     inline?: SmtpDispatchConfig | null;
   },
-): Promise<{ ok: true; subject: string } | { ok: false; reason: string; subject: string }> {
+): Promise<
+  | { ok: true; subject: string; bodyText: string }
+  | { ok: false; reason: string; subject: string; bodyText: string }
+> {
   const subject = `${await brandName(db)}: Test-E-Mail`;
+  const bodyText = "Diese Nachricht bestätigt, dass die SMTP-Konfiguration funktioniert.";
   const cfg = opts.inline ?? (await loadSmtpConfig(db));
-  if (!cfg) return { ok: false, reason: "smtp_not_configured", subject };
+  if (!cfg) return { ok: false, reason: "smtp_not_configured", subject, bodyText };
   // Inline configs skip the transporter cache: the signature would match a
   // saved config and we'd accidentally reuse the wrong transport.
   const t = opts.inline ? buildTransporter(cfg) : transporterFor(cfg);
@@ -210,10 +219,10 @@ export async function sendTestMail(
       from,
       to: opts.to,
       subject,
-      text: "Diese Nachricht bestätigt, dass die SMTP-Konfiguration funktioniert.",
+      text: bodyText,
     });
-    return { ok: true, subject };
+    return { ok: true, subject, bodyText };
   } catch (err) {
-    return { ok: false, reason: (err as Error).message, subject };
+    return { ok: false, reason: (err as Error).message, subject, bodyText };
   }
 }

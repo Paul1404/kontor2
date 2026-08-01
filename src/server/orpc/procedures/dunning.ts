@@ -826,6 +826,8 @@ export const dunningRouter = {
           ...statusFromSend(sent),
           recipient: content.to,
           subject: content.subject,
+          bodyText: content.body,
+          attachmentNames: [content.attachmentName],
           entityType: "dunning_item",
           entityId: input.itemId,
           actorEmail: context.session!.user.email,

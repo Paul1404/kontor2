@@ -206,9 +206,13 @@ export const portalRouter = {
       const baseUrl = authBaseUrl(context.tenant);
       const portalUrl = buildPortalUrl(baseUrl, rawToken);
 
-      let mailResult: { ok: true } | { ok: false; reason: string } = {
+      let mailResult:
+        | { ok: true; subject: string; bodyText: string }
+        | { ok: false; reason: string; subject: string | null; bodyText: string | null } = {
         ok: false,
         reason: "not_sent",
+        subject: null,
+        bodyText: null,
       };
       if (input.sendEmail && targetEmail) {
         const [org] = await context.db
@@ -236,7 +240,8 @@ export const portalRouter = {
               ? statusFromSend(mailResult)
               : { status: "skipped" as const, detail: "no_recipient" }),
             recipient: targetEmail,
-            subject: "Zugang zum Mitgliederportal",
+            subject: mailResult.subject ?? "Zugang zum Mitgliederportal",
+            bodyText: mailResult.bodyText,
             entityType: "member",
             entityId: member.id,
             actorEmail: context.session!.user.email,

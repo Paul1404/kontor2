@@ -26,6 +26,12 @@ export const emailLogTable = pgTable(
     status: emailStatusEnum("status").notNull(),
     recipient: text("recipient"),
     subject: text("subject"),
+    /** Exact plain-text body handed to the mail transport. Stored for read-only audit. */
+    bodyText: text("body_text"),
+    /** Exact HTML body handed to the mail transport, when the message had one. */
+    bodyHtml: text("body_html"),
+    /** Attachment filenames only. Binary attachment data remains in its domain storage. */
+    attachmentNames: text("attachment_names").array(),
     /** Reason on a skipped/failed send, e.g. "smtp_not_configured" or an SMTP error. */
     detail: text("detail"),
     /** What the mail concerns, e.g. "membership_application" | "member" | "user". */

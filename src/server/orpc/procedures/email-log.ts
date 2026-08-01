@@ -1,3 +1,4 @@
+import { ORPCError } from "@orpc/server";
 import { and, between, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import * as v from "valibot";
 import { escapeLike } from "~/server/db/like";
@@ -106,7 +107,17 @@ export const emailLogRouter = {
     const offset = (input.page - 1) * input.pageSize;
     const [rows, [totalRow]] = await Promise.all([
       context.db
-        .select()
+        .select({
+          id: emailLogTable.id,
+          createdAt: emailLogTable.createdAt,
+          kind: emailLogTable.kind,
+          status: emailLogTable.status,
+          recipient: emailLogTable.recipient,
+          subject: emailLogTable.subject,
+          detail: emailLogTable.detail,
+          actorEmail: emailLogTable.actorEmail,
+          hasContent: sql<boolean>`(${emailLogTable.bodyText} is not null or ${emailLogTable.bodyHtml} is not null)`,
+        })
         .from(emailLogTable)
         .where(where)
         .orderBy(desc(emailLogTable.createdAt))
@@ -116,6 +127,21 @@ export const emailLogRouter = {
     ]);
     return { rows, total: totalRow?.c ?? 0 };
   }),
+
+  /** Read-only snapshot of one outbound message. Binary attachments are never returned. */
+  get: adminProc
+    .input(v.object({ id: v.pipe(v.string(), v.uuid()) }))
+    .handler(async ({ context, input }) => {
+      const [row] = await context.db
+        .select()
+        .from(emailLogTable)
+        .where(eq(emailLogTable.id, input.id))
+        .limit(1);
+      if (!row) {
+        throw new ORPCError("NOT_FOUND", { message: "E-Mail-Protokolleintrag nicht gefunden." });
+      }
+      return row;
+    }),
 
   /** Delete mail-log rows older than N days, or clear the whole log. Logged. */
   purge: adminProc.input(PurgeInput).handler(async ({ context, input }) => {

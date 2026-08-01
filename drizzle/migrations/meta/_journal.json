@@ -540,6 +540,13 @@
       "when": 1785600007338,
       "tag": "0076_salty_imperial_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1785606007395,
+      "tag": "0077_fancy_norrin_radd",
+      "breakpoints": true
     }
   ]
 }

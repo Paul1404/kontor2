@@ -183,6 +183,7 @@ export const settingsRouter = {
           ...statusFromSend(result),
           recipient: input.to,
           subject: result.subject,
+          bodyText: result.bodyText,
           actorEmail: context.session!.user.email,
           requestId: context.requestId ?? null,
         },
