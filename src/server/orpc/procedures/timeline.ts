@@ -150,15 +150,19 @@ export const timelineRouter = {
 
       for (const a of audit) {
         const changed = a.changes && typeof a.changes === "object" ? Object.keys(a.changes) : [];
-        const detail =
-          a.action === "update" && changed.length > 0
+        const isBankChange = changed.includes("bankChangeEvidence");
+        const detail = isBankChange
+          ? "Neue Bankdaten mit Nachweis übernommen"
+          : a.action === "update" && changed.length > 0
             ? `${changed.length} ${changed.length === 1 ? "Feld" : "Felder"} geändert`
             : null;
         events.push({
           id: `audit-${a.id}`,
           kind: "audit",
           at: a.createdAt,
-          title: AUDIT_ACTION_LABEL[a.action] ?? a.action,
+          title: isBankChange
+            ? "Bankverbindung geändert"
+            : (AUDIT_ACTION_LABEL[a.action] ?? a.action),
           detail,
           actor: a.source === "import" ? "Import" : (a.actorEmail ?? null),
         });

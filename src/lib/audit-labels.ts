@@ -43,6 +43,9 @@ const FIELD_LABELS: Record<string, string> = {
   iban1: "IBAN",
   iban1Last4: "IBAN (letzte 4)",
   abwKontoInh: "Kontoinhaber (abweichend)",
+  bankChangeEvidence: "Nachweis der Bankänderung",
+  bankChangeRequestedAt: "Anfrage eingegangen am",
+  bankChangeMandateReviewed: "SEPA-Mandat geprüft",
   mandatsrefenz: "Mandatsreferenz",
   mitgliedsnummer: "Mitgliedsnummer",
   adrNr: "AdrNr",
@@ -96,6 +99,7 @@ const DATE_FIELDS = new Set([
   "gultigBis",
   "widerrufenAm",
   "angelegtAm",
+  "bankChangeRequestedAt",
 ]);
 
 export function fieldLabel(name: string): string {

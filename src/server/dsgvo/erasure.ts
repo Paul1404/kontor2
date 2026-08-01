@@ -4,6 +4,7 @@ import { appendAudit, type Changes } from "~/server/audit/log";
 import type { DBOrTx } from "~/server/db/client";
 import { attachmentsTable } from "~/server/db/schema/attachments";
 import { auditLogTable } from "~/server/db/schema/audit";
+import { memberBankDetailChangesTable } from "~/server/db/schema/bank-detail-changes";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { dsgvoConsentLogTable, dsgvoRequestsTable } from "~/server/db/schema/dsgvo";
 import { dunningItemsTable } from "~/server/db/schema/dunning";
@@ -251,6 +252,12 @@ export async function executeErasure(
       .from(attachmentsTable)
       .where(eq(attachmentsTable.memberId, memberId));
     for (const a of memberAttachments) s3KeysToDelete.push(a.s3Key);
+    // Bank-change receipts intentionally protect their evidence during normal
+    // operation. Once the DSGVO retention gate above permits erasure, remove
+    // those linking rows first so the evidence FK no longer blocks deletion.
+    await tx
+      .delete(memberBankDetailChangesTable)
+      .where(eq(memberBankDetailChangesTable.memberId, memberId));
     const deletedAttachments =
       memberAttachments.length > 0
         ? await tx

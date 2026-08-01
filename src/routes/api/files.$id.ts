@@ -27,6 +27,9 @@ const handle = createServerOnlyFn(
     // Anhang aus der DB DIESES Vereins laden, nicht aus der Primär-DB.
     const att = await loadDownloadableAttachment(dbForTenant(tenant.databaseUrl), params.id);
     if (!att) return new Response("Not found", { status: 404 });
+    if (att.kind === "bank_details_change" && session.user.role === "readonly") {
+      return new Response("Forbidden", { status: 403 });
+    }
     const url = await presignDownload({
       key: att.s3Key,
       filename: att.filename,

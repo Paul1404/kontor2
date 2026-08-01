@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.0.0",
+    date: "2026-08-01",
+    title: "Bankverbindungen mit Nachweis ändern",
+    changes: [
+      {
+        category: "breaking",
+        description:
+          "Bankänderungen werden jetzt in einem eigenen Ablauf mit Pflichtnachweis, Eingangsdatum, SEPA-Prüfung und geschütztem Änderungsbeleg erfasst.",
+      },
+      {
+        category: "feature",
+        description:
+          "Änderungsmitteilungen können als PDF, EML, MSG, PNG oder JPG direkt bei der neuen Bankverbindung hinterlegt werden.",
+      },
+    ],
+  },
+  {
     version: "1.0.0",
     date: "2026-07-26",
     title: "Sichere Einzüge und Wiederherstellung",

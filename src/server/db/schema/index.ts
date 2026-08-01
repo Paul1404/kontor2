@@ -3,6 +3,7 @@ export * from "./app-log";
 export * from "./attachments";
 export * from "./audit";
 export * from "./auth";
+export * from "./bank-detail-changes";
 export * from "./bestandserhebungen";
 export * from "./cancellations";
 export * from "./contracts";

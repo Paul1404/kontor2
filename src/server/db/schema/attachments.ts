@@ -1,6 +1,8 @@
-import { bigint, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, index, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
 import { membersTable } from "~/server/db/schema/members";
+
+export const attachmentKindEnum = pgEnum("attachment_kind", ["general", "bank_details_change"]);
 
 export const attachmentsTable = pgTable(
   "attachments",
@@ -9,6 +11,7 @@ export const attachmentsTable = pgTable(
     memberId: uuid("member_id")
       .notNull()
       .references(() => membersTable.id, { onDelete: "cascade" }),
+    kind: attachmentKindEnum("kind").notNull().default("general"),
     filename: text("filename").notNull(),
     mimeType: text("mime_type").notNull(),
     sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
@@ -36,6 +39,7 @@ export const pendingUploadsTable = pgTable(
     memberId: uuid("member_id")
       .notNull()
       .references(() => membersTable.id, { onDelete: "cascade" }),
+    kind: attachmentKindEnum("kind").notNull().default("general"),
     filename: text("filename").notNull(),
     mimeType: text("mime_type").notNull(),
     sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),

@@ -723,6 +723,7 @@ export const membersRouter = {
         sepa,
         anhaenge: anhaenge.map((a) => ({
           id: a.id,
+          kind: a.kind,
           filename: a.filename,
           mimeType: a.mimeType,
           sizeBytes: a.sizeBytes,

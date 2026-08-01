@@ -5,6 +5,7 @@ import { archiveRouter } from "~/server/orpc/procedures/archive";
 import { attachmentsRouter } from "~/server/orpc/procedures/attachments";
 import { auditRouter } from "~/server/orpc/procedures/audit";
 import { authRouter } from "~/server/orpc/procedures/auth";
+import { bankDetailsRouter } from "~/server/orpc/procedures/bank-details";
 import { banksRouter } from "~/server/orpc/procedures/banks";
 import { cancellationsRouter } from "~/server/orpc/procedures/cancellations";
 import { consoleRouter } from "~/server/orpc/procedures/console";
@@ -62,6 +63,7 @@ export const appRouter = {
   logs: logsRouter,
   emailLog: emailLogRouter,
   attachments: attachmentsRouter,
+  bankDetails: bankDetailsRouter,
   banks: banksRouter,
   cancellations: cancellationsRouter,
   settings: settingsRouter,

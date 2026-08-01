@@ -25,6 +25,7 @@ import { AktivitaetTimeline } from "~/components/forms/AktivitaetTimeline";
 import { AttachmentsCard } from "~/components/forms/AttachmentsCard";
 import { AustrittDialog } from "~/components/forms/AustrittDialog";
 import { AustrittsbestaetigungCard } from "~/components/forms/AustrittsbestaetigungCard";
+import { BankDetailsChangeDialog } from "~/components/forms/BankDetailsChangeDialog";
 import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
 import { DsgvoCard } from "~/components/forms/DsgvoCard";
@@ -64,6 +65,7 @@ function MemberDetailPage() {
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmAustritt, setConfirmAustritt] = useState(false);
+  const [bankChangeOpen, setBankChangeOpen] = useState(false);
   const [tab, setTab] = useState("uebersicht");
 
   const me = useQuery({ queryKey: ["me"], queryFn: () => orpc.auth.me() });
@@ -115,6 +117,11 @@ function MemberDetailPage() {
   const canEdit =
     (me.data?.role === "vorstand" || me.data?.role === "admin") &&
     detail.data?.member.deletedAt == null;
+  const bankChanges = useQuery({
+    queryKey: ["bankDetails.recentChanges", detail.data?.member.id],
+    queryFn: () => orpc.bankDetails.recentChanges({ memberId: detail.data!.member.id }),
+    enabled: canEdit && Boolean(detail.data?.member.id),
+  });
 
   usePageShortcut(
     "e",
@@ -497,8 +504,19 @@ function MemberDetailPage() {
             </Card>
 
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-3">
                 <CardTitle>Bankverbindung</CardTitle>
+                {canEdit ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setBankChangeOpen(true)}
+                  >
+                    <Wallet className="size-4" />
+                    {member.iban1 ? "Ändern" : "Hinterlegen"}
+                  </Button>
+                ) : null}
               </CardHeader>
               <CardContent className="flex flex-col gap-3 text-sm">
                 <Field
@@ -515,6 +533,15 @@ function MemberDetailPage() {
                     Bank und BIC werden aus der IBAN abgeleitet (Quelle: Bundesbank
                     BLZ-Verzeichnis).
                   </p>
+                ) : null}
+                {bankChanges.data?.[0] ? (
+                  <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
+                    <p className="font-medium">Zuletzt geändert</p>
+                    <p className="mt-0.5 text-muted-foreground">
+                      {formatDate(bankChanges.data[0].appliedAt)} · IBAN endet auf{" "}
+                      {bankChanges.data[0].newIbanLast4} · {bankChanges.data[0].evidenceFilename}
+                    </p>
+                  </div>
                 ) : null}
               </CardContent>
             </Card>
@@ -648,6 +675,19 @@ function MemberDetailPage() {
           </Card>
         </div>
       ) : null}
+
+      <BankDetailsChangeDialog
+        open={bankChangeOpen}
+        onOpenChange={setBankChangeOpen}
+        memberId={member.id}
+        mitgliedsnummer={mitgliedsnummer}
+        currentIban={member.iban1 as string | null}
+        currentAccountHolder={member.abwKontoInh}
+        expectedUpdatedAt={new Date(member.updatedAt).toISOString()}
+        hasActiveMandate={sepa.some((mandate) => !mandate.widerrufenAm && !mandate.isDeleted)}
+        directDebitBlocked={member.directDebitBlocked}
+        affectedMemberCount={incomingBeziehungenCount}
+      />
     </div>
   );
 }

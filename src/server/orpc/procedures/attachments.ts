@@ -6,6 +6,10 @@ import type { DB } from "~/server/db/client";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
 import { membersTable } from "~/server/db/schema/members";
+import {
+  BANK_CHANGE_MAX_BYTES,
+  bankChangeEvidenceMime,
+} from "~/server/domain/bank-change-evidence";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { headObject, presignDownload, presignUpload } from "~/server/s3/client";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
@@ -20,9 +24,13 @@ import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 export async function loadDownloadableAttachment(
   db: DB,
   id: string,
-): Promise<{ s3Key: string; filename: string } | null> {
+): Promise<{ s3Key: string; filename: string; kind: "general" | "bank_details_change" } | null> {
   const [row] = await db
-    .select({ s3Key: attachmentsTable.s3Key, filename: attachmentsTable.filename })
+    .select({
+      s3Key: attachmentsTable.s3Key,
+      filename: attachmentsTable.filename,
+      kind: attachmentsTable.kind,
+    })
     .from(attachmentsTable)
     .innerJoin(membersTable, eq(membersTable.id, attachmentsTable.memberId))
     .where(and(eq(attachmentsTable.id, id), isNull(attachmentsTable.deletedAt), memberNotDeleted()))
@@ -47,11 +55,21 @@ export const attachmentsRouter = {
         filename: v.pipe(v.string(), v.minLength(1)),
         mimeType: v.string(),
         sizeBytes: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_BYTES)),
+        kind: v.optional(v.picklist(["general", "bank_details_change"]), "general"),
       }),
     )
     .handler(async ({ context, input }) => {
-      if (!ALLOWED_MIME.has(input.mimeType)) {
+      const canonicalMime =
+        input.kind === "bank_details_change"
+          ? bankChangeEvidenceMime(input.filename, input.mimeType)
+          : ALLOWED_MIME.has(input.mimeType)
+            ? input.mimeType
+            : null;
+      if (!canonicalMime) {
         throw new ORPCError("BAD_REQUEST", { message: "Dateityp nicht erlaubt." });
+      }
+      if (input.kind === "bank_details_change" && input.sizeBytes > BANK_CHANGE_MAX_BYTES) {
+        throw new ORPCError("BAD_REQUEST", { message: "Datei zu groß (max. 10 MB)." });
       }
       const exists = await context.db
         .select({ id: membersTable.id })
@@ -82,8 +100,9 @@ export const attachmentsRouter = {
         .insert(pendingUploadsTable)
         .values({
           memberId: input.memberId,
+          kind: input.kind,
           filename: safe,
-          mimeType: input.mimeType,
+          mimeType: canonicalMime,
           sizeBytes: input.sizeBytes,
           // s3Key is set immediately below; we need the row's id first.
           s3Key: "pending",
@@ -104,11 +123,11 @@ export const attachmentsRouter = {
 
       const url = await presignUpload({
         key,
-        contentType: input.mimeType,
+        contentType: canonicalMime,
         contentLength: input.sizeBytes,
         expiresSeconds: 300,
       });
-      return { uploadId: ticket.id, key, url };
+      return { uploadId: ticket.id, key, url, mimeType: canonicalMime };
     }),
 
   finalize: vorstandProc
@@ -121,6 +140,11 @@ export const attachmentsRouter = {
         .limit(1);
       if (!candidate || candidate.requestedBy !== context.session!.user.id) {
         throw new ORPCError("NOT_FOUND", { message: "Upload-Ticket nicht gefunden." });
+      }
+      if (candidate.kind !== "general") {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Dieser Nachweis muss zusammen mit der Bankänderung gespeichert werden.",
+        });
       }
       let metadata: Awaited<ReturnType<typeof headObject>>;
       try {
@@ -172,6 +196,7 @@ export const attachmentsRouter = {
           .values({
             id: ticket.id,
             memberId: ticket.memberId,
+            kind: ticket.kind,
             filename: ticket.filename,
             mimeType: ticket.mimeType,
             sizeBytes: ticket.sizeBytes,
@@ -215,6 +240,11 @@ export const attachmentsRouter = {
       .limit(1);
     const att = rows[0];
     if (!att) throw new ORPCError("NOT_FOUND", { message: "Anhang nicht gefunden." });
+    if (att.kind === "bank_details_change") {
+      throw new ORPCError("FORBIDDEN", {
+        message: "Der Nachweis einer Bankänderung kann nicht als normaler Anhang gelöscht werden.",
+      });
+    }
 
     // Soft-delete the row and retain the object. A later snapshot restore can
     // make the attachment visible again without pointing at a missing S3 key.
@@ -252,6 +282,9 @@ export const attachmentsRouter = {
     .handler(async ({ context, input }) => {
       const att = await loadDownloadableAttachment(context.db, input.id);
       if (!att) throw new ORPCError("NOT_FOUND", { message: "Anhang nicht gefunden." });
+      if (att.kind === "bank_details_change" && context.role === "readonly") {
+        throw new ORPCError("FORBIDDEN", { message: "Keine Berechtigung für diesen Nachweis." });
+      }
       const url = await presignDownload({
         key: att.s3Key,
         filename: att.filename,

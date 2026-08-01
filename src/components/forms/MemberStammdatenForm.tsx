@@ -221,6 +221,8 @@ type Props = {
   focusField?: string | null;
   /** Reports whether the locally edited values differ from the seeded record. */
   onDirtyChange?: (dirty: boolean) => void;
+  /** New records may seed bank data. Existing records use the dedicated evidenced workflow. */
+  includeBankDetails?: boolean;
 };
 
 export function MemberStammdatenForm({
@@ -234,6 +236,7 @@ export function MemberStammdatenForm({
   variant = "member",
   focusField,
   onDirtyChange,
+  includeBankDetails = true,
 }: Props) {
   const isMember = variant === "member";
 
@@ -482,47 +485,56 @@ export function MemberStammdatenForm({
 
         <Card>
           <CardHeader>
-            <CardTitle>Bankverbindung</CardTitle>
+            <CardTitle>{includeBankDetails ? "Bankverbindung" : "SEPA-Einzug"}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 text-sm">
-            <FormField label="IBAN">
-              <Input
-                id="mf-iban1"
-                value={values.iban1}
-                onChange={(e) => update("iban1", e.target.value)}
-                placeholder="DE…"
-                className="font-mono"
-              />
-            </FormField>
-            <div className="flex flex-col gap-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
-              <div className="uppercase tracking-wide text-muted-foreground">
-                Bank (automatisch)
-              </div>
-              <div className="text-foreground">
-                {ibanLookup.isFetching && cleanedIban.length >= 12 ? (
-                  <span className="text-muted-foreground">Wird ermittelt…</span>
-                ) : derived ? (
-                  <>
-                    <div>{derived.name}</div>
-                    <div className="font-mono text-muted-foreground">BIC {derived.bic}</div>
-                  </>
-                ) : cleanedIban.length === 0 ? (
-                  <span className="text-muted-foreground">
-                    Bank und BIC werden aus der IBAN ermittelt.
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">
-                    Kein Treffer im Bundesbank-Verzeichnis. Bitte IBAN prüfen.
-                  </span>
-                )}
-              </div>
-            </div>
-            <FormField label="Kontoinhaber (abweichend)">
-              <Input
-                value={values.abwKontoInh}
-                onChange={(e) => update("abwKontoInh", e.target.value)}
-              />
-            </FormField>
+            {includeBankDetails ? (
+              <>
+                <FormField label="IBAN">
+                  <Input
+                    id="mf-iban1"
+                    value={values.iban1}
+                    onChange={(e) => update("iban1", e.target.value)}
+                    placeholder="DE…"
+                    className="font-mono"
+                  />
+                </FormField>
+                <div className="flex flex-col gap-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
+                  <div className="uppercase tracking-wide text-muted-foreground">
+                    Bank (automatisch)
+                  </div>
+                  <div className="text-foreground">
+                    {ibanLookup.isFetching && cleanedIban.length >= 12 ? (
+                      <span className="text-muted-foreground">Wird ermittelt…</span>
+                    ) : derived ? (
+                      <>
+                        <div>{derived.name}</div>
+                        <div className="font-mono text-muted-foreground">BIC {derived.bic}</div>
+                      </>
+                    ) : cleanedIban.length === 0 ? (
+                      <span className="text-muted-foreground">
+                        Bank und BIC werden aus der IBAN ermittelt.
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Kein Treffer im Bundesbank-Verzeichnis. Bitte IBAN prüfen.
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <FormField label="Kontoinhaber (abweichend)">
+                  <Input
+                    value={values.abwKontoInh}
+                    onChange={(e) => update("abwKontoInh", e.target.value)}
+                  />
+                </FormField>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Bankdaten werden auf der Mitgliedsseite über „Bankverbindung ändern“ mit einem
+                Nachweis aktualisiert.
+              </p>
+            )}
             <FormField label="SEPA-Lastschrift">
               <select
                 value={values.directDebitBlocked ? "blocked" : "active"}

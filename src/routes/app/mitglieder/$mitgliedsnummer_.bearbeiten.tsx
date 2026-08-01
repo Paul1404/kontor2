@@ -160,6 +160,7 @@ function EditMemberPage() {
         submitting={mut.isPending}
         errorMessage={errorMessage}
         onDirtyChange={setDirty}
+        includeBankDetails={false}
         onCancel={() =>
           navigate({
             to: "/app/mitglieder/$mitgliedsnummer",
