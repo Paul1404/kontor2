@@ -11,7 +11,7 @@ import {
   bankChangeEvidenceMime,
 } from "~/server/domain/bank-change-evidence";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
-import { headObject, presignDownload, presignUpload } from "~/server/s3/client";
+import { headObject, presignDownload } from "~/server/s3/client";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 /**
@@ -93,8 +93,8 @@ export const attachmentsRouter = {
 
       const safe = safeFilename(input.filename);
       // Generate a server-side UUID and corresponding key, then persist
-      // the ticket so finalize can verify the request matches what we
-      // actually presigned. Without this, a malicious client could call
+      // the ticket so the same-origin upload route and finalize can verify
+      // the request. Without this, a malicious client could call
       // finalize with arbitrary memberId/key/sizeBytes.
       const [ticket] = await context.db
         .insert(pendingUploadsTable)
@@ -121,12 +121,10 @@ export const attachmentsRouter = {
         .set({ s3Key: key })
         .where(eq(pendingUploadsTable.id, ticket.id));
 
-      const url = await presignUpload({
-        key,
-        contentType: canonicalMime,
-        contentLength: input.sizeBytes,
-        expiresSeconds: 300,
-      });
+      // Keep browser uploads on the Vereins domain. Railway's bucket endpoint
+      // does not expose browser CORS for direct presigned PUTs, which otherwise
+      // surfaces as the unhelpful browser error "Load failed" before finalize.
+      const url = `/api/attachments-upload/${ticket.id}`;
       return { uploadId: ticket.id, key, url, mimeType: canonicalMime };
     }),
 

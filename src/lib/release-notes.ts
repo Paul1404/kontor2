@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.1.3",
+    date: "2026-08-01",
+    title: "Nachweis-Upload repariert",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Nachweise für Bankänderungen und normale Mitgliedsanhänge werden wieder zuverlässig hochgeladen. Der Upload läuft jetzt geschützt über die Vereinsverwaltung.",
+      },
+    ],
+  },
+  {
     version: "2.1.2",
     date: "2026-08-01",
     title: "Verein als E-Mail-Absender",

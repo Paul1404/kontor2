@@ -27,7 +27,7 @@ export type Attachment = typeof attachmentsTable.$inferSelect;
 
 /**
  * Server-issued one-time upload tickets. We persist the exact (memberId,
- * key, mimeType, sizeBytes, requestedBy) here at presign time so finalize
+ * key, mimeType, sizeBytes, requestedBy) when issuing the upload ticket so finalize
  * doesn't have to trust client-supplied identifiers (which would otherwise
  * let a vorstand register an attachment for a different memberId, or
  * lie about the byte count).

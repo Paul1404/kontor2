@@ -85,6 +85,7 @@ import { Route as ApiCronSnapshotsRouteImport } from './api/cron.snapshots'
 import { Route as ApiBrandingManifestRouteImport } from './api/branding.manifest'
 import { Route as ApiBrandingIconRouteImport } from './api/branding.icon'
 import { Route as ApiAuthSplatRouteImport } from './api/auth.$'
+import { Route as ApiAttachmentsUploadIdRouteImport } from './api/attachments-upload.$id'
 import { Route as AntragUploadTokenRouteImport } from './antrag/upload.$token'
 import { Route as AppForderungenMahnungenIndexRouteImport } from './app/forderungen/mahnungen/index'
 import { Route as AppForderungenKulanzIndexRouteImport } from './app/forderungen/kulanz/index'
@@ -484,6 +485,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAttachmentsUploadIdRoute = ApiAttachmentsUploadIdRouteImport.update({
+  id: '/api/attachments-upload/$id',
+  path: '/api/attachments-upload/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AntragUploadTokenRoute = AntragUploadTokenRouteImport.update({
   id: '/upload/$token',
   path: '/upload/$token',
@@ -563,6 +569,7 @@ export interface FileRoutesByFullPath {
   '/console/': typeof ConsoleIndexRoute
   '/portal/': typeof PortalIndexRoute
   '/antrag/upload/$token': typeof AntragUploadTokenRoute
+  '/api/attachments-upload/$id': typeof ApiAttachmentsUploadIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/branding/icon': typeof ApiBrandingIconRoute
   '/api/branding/manifest': typeof ApiBrandingManifestRoute
@@ -644,6 +651,7 @@ export interface FileRoutesByTo {
   '/console': typeof ConsoleIndexRoute
   '/portal': typeof PortalIndexRoute
   '/antrag/upload/$token': typeof AntragUploadTokenRoute
+  '/api/attachments-upload/$id': typeof ApiAttachmentsUploadIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/branding/icon': typeof ApiBrandingIconRoute
   '/api/branding/manifest': typeof ApiBrandingManifestRoute
@@ -730,6 +738,7 @@ export interface FileRoutesById {
   '/console/': typeof ConsoleIndexRoute
   '/portal/': typeof PortalIndexRoute
   '/antrag/upload/$token': typeof AntragUploadTokenRoute
+  '/api/attachments-upload/$id': typeof ApiAttachmentsUploadIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/branding/icon': typeof ApiBrandingIconRoute
   '/api/branding/manifest': typeof ApiBrandingManifestRoute
@@ -817,6 +826,7 @@ export interface FileRouteTypes {
     | '/console/'
     | '/portal/'
     | '/antrag/upload/$token'
+    | '/api/attachments-upload/$id'
     | '/api/auth/$'
     | '/api/branding/icon'
     | '/api/branding/manifest'
@@ -898,6 +908,7 @@ export interface FileRouteTypes {
     | '/console'
     | '/portal'
     | '/antrag/upload/$token'
+    | '/api/attachments-upload/$id'
     | '/api/auth/$'
     | '/api/branding/icon'
     | '/api/branding/manifest'
@@ -983,6 +994,7 @@ export interface FileRouteTypes {
     | '/console/'
     | '/portal/'
     | '/antrag/upload/$token'
+    | '/api/attachments-upload/$id'
     | '/api/auth/$'
     | '/api/branding/icon'
     | '/api/branding/manifest'
@@ -1048,6 +1060,7 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   ApiMcpRoute: typeof ApiMcpRoute
   InviteTokenRoute: typeof InviteTokenRoute
+  ApiAttachmentsUploadIdRoute: typeof ApiAttachmentsUploadIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBrandingIconRoute: typeof ApiBrandingIconRoute
   ApiBrandingManifestRoute: typeof ApiBrandingManifestRoute
@@ -1593,6 +1606,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/attachments-upload/$id': {
+      id: '/api/attachments-upload/$id'
+      path: '/api/attachments-upload/$id'
+      fullPath: '/api/attachments-upload/$id'
+      preLoaderRoute: typeof ApiAttachmentsUploadIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/antrag/upload/$token': {
       id: '/antrag/upload/$token'
       path: '/upload/$token'
@@ -1819,6 +1839,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   ApiMcpRoute: ApiMcpRoute,
   InviteTokenRoute: InviteTokenRoute,
+  ApiAttachmentsUploadIdRoute: ApiAttachmentsUploadIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBrandingIconRoute: ApiBrandingIconRoute,
   ApiBrandingManifestRoute: ApiBrandingManifestRoute,

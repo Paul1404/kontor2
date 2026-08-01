@@ -103,11 +103,16 @@ export function BankDetailsChangeDialog({
         sizeBytes: file.size,
         kind: "bank_details_change",
       });
-      const upload = await fetch(ticket.url, {
-        method: "PUT",
-        headers: { "Content-Type": ticket.mimeType },
-        body: file,
-      });
+      let upload: Response;
+      try {
+        upload = await fetch(ticket.url, {
+          method: "PUT",
+          headers: { "Content-Type": ticket.mimeType },
+          body: file,
+        });
+      } catch {
+        throw new Error("Nachweis konnte nicht hochgeladen werden. Bitte erneut versuchen.");
+      }
       if (!upload.ok) {
         throw new Error(`Nachweis konnte nicht hochgeladen werden (${upload.status}).`);
       }

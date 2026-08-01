@@ -53,11 +53,16 @@ export function AttachmentsCard({
         mimeType: file.type,
         sizeBytes: file.size,
       });
-      const put = await fetch(ticket.url, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
+      let put: Response;
+      try {
+        put = await fetch(ticket.url, {
+          method: "PUT",
+          headers: { "Content-Type": ticket.mimeType },
+          body: file,
+        });
+      } catch {
+        throw new Error("Upload zum Speicher fehlgeschlagen. Bitte erneut versuchen.");
+      }
       if (!put.ok) {
         throw new Error(`Upload zum Speicher fehlgeschlagen (${put.status}).`);
       }

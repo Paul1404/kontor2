@@ -160,4 +160,21 @@ describe.skipIf(!onTestDb)("bank details change (integration)", () => {
       await db().select().from(pendingUploadsTable).where(eq(pendingUploadsTable.id, uploadId)),
     ).toHaveLength(0);
   });
+
+  it("issues a same-origin upload URL instead of a bucket URL", async () => {
+    const ticket = await call(
+      appRouter.attachments.requestUploadUrl,
+      {
+        memberId,
+        filename: "aenderung.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 25,
+        kind: "bank_details_change",
+      },
+      { context: context() },
+    );
+
+    expect(ticket.url).toBe(`/api/attachments-upload/${ticket.uploadId}`);
+    expect(ticket.url).not.toMatch(/^https?:\/\//);
+  });
 });
