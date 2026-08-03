@@ -1,6 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  type Column,
+  type ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  type PaginationState,
+  type RowSelectionState,
+  type SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
+import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
@@ -19,7 +29,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
@@ -42,7 +52,7 @@ import {
   type ViewSearch,
   viewSearchEquals,
 } from "~/lib/saved-views";
-import { headerCheckState, rangeIds } from "~/lib/selection";
+import { rangeIds } from "~/lib/selection";
 import { moveCursor } from "~/lib/table-nav";
 import { isTypingTarget, usePageShortcut } from "~/lib/use-global-shortcuts";
 
@@ -174,14 +184,6 @@ function MembersListPage() {
     });
   }
 
-  function toggleSort(col: SortBy) {
-    if (search.sortBy === col) {
-      updateSearch({ sortDir: search.sortDir === "asc" ? "desc" : "asc" }, false);
-    } else {
-      updateSearch({ sortBy: col, sortDir: "asc" }, false);
-    }
-  }
-
   usePageShortcut("n", canEdit ? () => navigate({ to: "/app/mitglieder/neu" }) : null);
 
   const rows = (list.data?.rows ?? []) as MemberRow[];
@@ -190,7 +192,7 @@ function MembersListPage() {
   // Multi-select lives in page-local state (not the URL): it's a transient
   // working set, not something you'd bookmark. Selection is scoped to the
   // rows currently on screen and clears whenever the view changes.
-  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const anchorRef = useRef<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkAbteilungId, setBulkAbteilungId] = useState("");
@@ -207,48 +209,39 @@ function MembersListPage() {
   const viewKey = JSON.stringify({ ...search, pageSize });
   // biome-ignore lint/correctness/useExhaustiveDependencies: viewKey is the trigger; we intentionally only reset state.
   useEffect(() => {
-    setSelected(new Set());
+    setRowSelection({});
     anchorRef.current = null;
     setCursor(-1);
   }, [viewKey]);
 
-  const headerState = headerCheckState(visibleIds, selected);
+  const selected = useMemo(
+    () => new Set(Object.keys(rowSelection).filter((id) => rowSelection[id])),
+    [rowSelection],
+  );
   const selectedCount = selected.size;
 
-  function toggleRow(id: string, shiftKey: boolean) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (shiftKey && anchorRef.current) {
-        // Shift-click selects the whole inclusive range between the last
-        // clicked row and this one.
-        for (const rid of rangeIds(visibleIds, anchorRef.current, id)) next.add(rid);
-      } else if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-    anchorRef.current = id;
-  }
-
-  function toggleAllOnPage() {
-    setSelected((prev) => {
-      const everySelected = visibleIds.length > 0 && visibleIds.every((id) => prev.has(id));
-      if (everySelected) {
-        const next = new Set(prev);
-        for (const id of visibleIds) next.delete(id);
+  const toggleRow = useCallback(
+    (id: string, shiftKey: boolean) => {
+      setRowSelection((prev) => {
+        const next = { ...prev };
+        if (shiftKey && anchorRef.current) {
+          // Shift-click selects the whole inclusive range between the last
+          // clicked row and this one.
+          for (const rid of rangeIds(visibleIds, anchorRef.current, id)) next[rid] = true;
+        } else if (next[id]) {
+          delete next[id];
+        } else {
+          next[id] = true;
+        }
         return next;
-      }
-      const next = new Set(prev);
-      for (const id of visibleIds) next.add(id);
-      return next;
-    });
-    anchorRef.current = null;
-  }
+      });
+      anchorRef.current = id;
+    },
+    [visibleIds],
+  );
 
   function clearSelection() {
-    setSelected(new Set());
+    setRowSelection({});
     anchorRef.current = null;
   }
 
@@ -295,7 +288,7 @@ function MembersListPage() {
         if (e.shiftKey && canEditRef.current && next >= 0) {
           const row = currentRows[next];
           if (row) {
-            setSelected((prev) => new Set(prev).add(row.id));
+            setRowSelection((prev) => ({ ...prev, [row.id]: true }));
             anchorRef.current = row.id;
           }
         }
@@ -317,21 +310,21 @@ function MembersListPage() {
         const row = cursorRef.current >= 0 ? currentRows[cursorRef.current] : undefined;
         if (!row) return;
         e.preventDefault();
-        setSelected((prev) => {
-          const nextSet = new Set(prev);
-          if (nextSet.has(row.id)) nextSet.delete(row.id);
-          else nextSet.add(row.id);
-          return nextSet;
+        setRowSelection((prev) => {
+          const next = { ...prev };
+          if (next[row.id]) delete next[row.id];
+          else next[row.id] = true;
+          return next;
         });
         anchorRef.current = row.id;
         return;
       }
 
       if (k === "Escape") {
-        setSelected((prev) => {
-          if (prev.size === 0) return prev;
+        setRowSelection((prev) => {
+          if (Object.keys(prev).length === 0) return prev;
           anchorRef.current = null;
-          return new Set();
+          return {};
         });
       }
     }
@@ -437,6 +430,160 @@ function MembersListPage() {
       : search.abteilungId
         ? abteilungen.data?.find((a) => a.id === search.abteilungId)?.name
         : null;
+
+  const sorting = useMemo<SortingState>(
+    () => [{ id: search.sortBy, desc: search.sortDir === "desc" }],
+    [search.sortBy, search.sortDir],
+  );
+  const pagination = useMemo<PaginationState>(
+    () => ({ pageIndex: search.page - 1, pageSize }),
+    [search.page, pageSize],
+  );
+  const columns = useMemo<ColumnDef<MemberRow>[]>(
+    () => [
+      ...(canEdit
+        ? [
+            {
+              id: "select",
+              enableSorting: false,
+              header: ({ table }) => (
+                <TableSelectionCheckbox
+                  ariaLabel="Alle auf dieser Seite auswählen"
+                  checked={table.getIsAllPageRowsSelected()}
+                  indeterminate={table.getIsSomePageRowsSelected()}
+                  onChange={() => {
+                    table.toggleAllPageRowsSelected();
+                    anchorRef.current = null;
+                  }}
+                />
+              ),
+              cell: ({ row }) => {
+                const member = row.original;
+                return (
+                  <TableSelectionCheckbox
+                    ariaLabel={`${[member.nachname, member.vorname].filter(Boolean).join(", ")} auswählen`}
+                    checked={row.getIsSelected()}
+                    onClick={(event) => toggleRow(member.id, event.shiftKey)}
+                  />
+                );
+              },
+            } satisfies ColumnDef<MemberRow>,
+          ]
+        : []),
+      {
+        id: "mitgliedsnummer",
+        accessorFn: (member) => member.memberNo ?? member.kontaktNo,
+        header: ({ column }) => <SortableHeader column={column} label="Mitgl.-Nr." />,
+        cell: ({ row }) => {
+          const member = row.original;
+          return (
+            member.memberNo ?? (
+              <span className="text-muted-foreground/60" title="Kein Mitglied, nur Zahler/Kontakt">
+                {member.kontaktNo}
+              </span>
+            )
+          );
+        },
+        meta: { className: "tabular-nums text-muted-foreground" },
+      },
+      {
+        id: "nachname",
+        accessorFn: (member) => member.nachname,
+        header: ({ column }) => <SortableHeader column={column} label="Name" />,
+        cell: ({ row }) => {
+          const member = row.original;
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                to="/app/mitglieder/$mitgliedsnummer"
+                params={{ mitgliedsnummer: memberRef(member) }}
+                className="text-primary hover:underline"
+              >
+                {member.nachname ? (
+                  <>
+                    <span className="font-semibold">{member.nachname}</span>
+                    {member.vorname ? (
+                      <span className="font-normal opacity-75"> {member.vorname}</span>
+                    ) : null}
+                  </>
+                ) : (
+                  <span className="font-medium">{member.vorname || EMPTY_VALUE}</span>
+                )}
+              </Link>
+              {!member.memberNo ? (
+                <Badge variant="outline" title="Zahlt für ein Mitglied, ist aber selbst keines">
+                  Kontakt
+                </Badge>
+              ) : null}
+            </div>
+          );
+        },
+      },
+      {
+        id: "ort",
+        accessorFn: (member) => member.ort,
+        header: ({ column }) => <SortableHeader column={column} label="Ort" />,
+        cell: ({ row }) =>
+          [row.original.plz, row.original.ort].filter(Boolean).join(" ") || EMPTY_VALUE,
+      },
+      {
+        id: "email",
+        accessorFn: (member) => member.email,
+        header: ({ column }) => <SortableHeader column={column} label="E-Mail" />,
+        cell: ({ row }) => row.original.email || EMPTY_VALUE,
+        meta: { className: "text-muted-foreground" },
+      },
+      {
+        id: "eintritt",
+        accessorFn: (member) => member.eintritt,
+        header: ({ column }) => <SortableHeader column={column} label="Eintritt" />,
+        cell: ({ row }) => formatDate(row.original.eintritt),
+        meta: { className: "text-muted-foreground" },
+      },
+      {
+        id: "status",
+        header: "Status",
+        enableSorting: false,
+        cell: ({ row }) => {
+          const view = memberStatusView(row.original);
+          return <Badge variant={view.variant}>{view.label}</Badge>;
+        },
+      },
+    ],
+    [canEdit, toggleRow],
+  );
+  const table = useReactTable({
+    data: rows,
+    columns,
+    state: { sorting, pagination, rowSelection },
+    getCoreRowModel: getCoreRowModel(),
+    getRowId: (row) => row.id,
+    enableRowSelection: canEdit,
+    manualSorting: true,
+    manualPagination: true,
+    rowCount: list.data?.total ?? 0,
+    enableSortingRemoval: false,
+    sortDescFirst: false,
+    onRowSelectionChange: setRowSelection,
+    onSortingChange: (updater) => {
+      const next = typeof updater === "function" ? updater(sorting) : updater;
+      const nextSort = next[0];
+      if (!nextSort || !SORT_VALUES.includes(nextSort.id as SortBy)) return;
+      updateSearch(
+        { sortBy: nextSort.id as SortBy, sortDir: nextSort.desc ? "desc" : "asc" },
+        false,
+      );
+    },
+    onPaginationChange: (updater) => {
+      const next = typeof updater === "function" ? updater(pagination) : updater;
+      if (next.pageSize !== pageSize) {
+        setPageSize(next.pageSize);
+        updateSearch({ page: 1 }, false);
+        return;
+      }
+      updateSearch({ page: next.pageIndex + 1 }, false);
+    },
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -858,65 +1005,33 @@ function MembersListPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                {canEdit ? (
-                  <th className="w-10 px-4 py-3">
-                    <input
-                      type="checkbox"
-                      aria-label="Alle auf dieser Seite auswählen"
-                      className="size-4 accent-primary align-middle"
-                      checked={headerState === "all"}
-                      ref={(el) => {
-                        if (el) el.indeterminate = headerState === "some";
-                      }}
-                      onChange={toggleAllOnPage}
-                    />
-                  </th>
-                ) : null}
-                <SortHeader
-                  label="Mitgl.-Nr."
-                  col="mitgliedsnummer"
-                  active={search.sortBy}
-                  dir={search.sortDir}
-                  onToggle={toggleSort}
-                />
-                <SortHeader
-                  label="Name"
-                  col="nachname"
-                  active={search.sortBy}
-                  dir={search.sortDir}
-                  onToggle={toggleSort}
-                />
-                <SortHeader
-                  label="Ort"
-                  col="ort"
-                  active={search.sortBy}
-                  dir={search.sortDir}
-                  onToggle={toggleSort}
-                />
-                <SortHeader
-                  label="E-Mail"
-                  col="email"
-                  active={search.sortBy}
-                  dir={search.sortDir}
-                  onToggle={toggleSort}
-                />
-                <SortHeader
-                  label="Eintritt"
-                  col="eintritt"
-                  active={search.sortBy}
-                  dir={search.sortDir}
-                  onToggle={toggleSort}
-                />
-                <th className="px-4 py-3 font-medium">Status</th>
-              </tr>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <th
+                      key={header.id}
+                      className={`${header.column.id === "select" ? "w-10" : ""} px-4 py-3 font-medium`}
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(header.column.columnDef.header, header.getContext())}
+                    </th>
+                  ))}
+                </tr>
+              ))}
             </thead>
             <tbody className="divide-y divide-border">
               {list.isLoading ? (
-                <SkeletonTableRows rows={Math.min(pageSize, 10)} cols={canEdit ? 7 : 6} />
+                <SkeletonTableRows
+                  rows={Math.min(pageSize, 10)}
+                  cols={table.getVisibleLeafColumns().length}
+                />
               ) : list.isError ? (
                 <tr>
-                  <td colSpan={canEdit ? 7 : 6} className="px-4 py-10 text-center">
+                  <td
+                    colSpan={table.getVisibleLeafColumns().length}
+                    className="px-4 py-10 text-center"
+                  >
                     <div className="flex flex-col items-center gap-3 text-muted-foreground">
                       <AlertTriangle className="size-6 text-warning" />
                       <p className="text-sm">Mitglieder konnten nicht geladen werden.</p>
@@ -934,23 +1049,20 @@ function MembersListPage() {
               ) : rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={canEdit ? 7 : 6}
+                    colSpan={table.getVisibleLeafColumns().length}
                     className="px-4 py-8 text-center text-muted-foreground"
                   >
                     Keine Mitglieder gefunden.
                   </td>
                 </tr>
               ) : (
-                rows.map((m, index) => {
-                  // Kontakt = a payer/contact (kontaktNo, no memberNo). Keying on
-                  // the legacy Mitgliedsnummer mislabels app-created members (which
-                  // have an M-number but no legacy number) as Kontakt.
-                  const isKontakt = !m.memberNo;
-                  const isSelected = selected.has(m.id);
-                  const isCursor = index === cursor;
+                table.getRowModel().rows.map((row) => {
+                  const member = row.original;
+                  const isSelected = row.getIsSelected();
+                  const isCursor = row.index === cursor;
                   return (
                     <tr
-                      key={m.id}
+                      key={row.id}
                       ref={isCursor ? cursorRowRef : undefined}
                       className={`cursor-pointer transition-colors ${
                         isCursor ? "bg-primary/10 ring-2 ring-inset ring-primary/40" : ""
@@ -964,71 +1076,20 @@ function MembersListPage() {
                         if ((e.target as HTMLElement).closest("a, button, input, label")) return;
                         navigate({
                           to: "/app/mitglieder/$mitgliedsnummer",
-                          params: { mitgliedsnummer: memberRef(m) },
+                          params: { mitgliedsnummer: memberRef(member) },
                         });
                       }}
                     >
-                      {canEdit ? (
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            aria-label={`${[m.nachname, m.vorname].filter(Boolean).join(", ")} auswählen`}
-                            className="size-4 accent-primary align-middle"
-                            checked={isSelected}
-                            onClick={(e) => toggleRow(m.id, e.shiftKey)}
-                            onChange={() => {
-                              /* handled in onClick to read shiftKey */
-                            }}
-                          />
-                        </td>
-                      ) : null}
-                      <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                        {m.memberNo ?? (
-                          <span
-                            className="text-muted-foreground/60"
-                            title="Kein Mitglied, nur Zahler/Kontakt"
-                          >
-                            {m.kontaktNo}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link
-                            to="/app/mitglieder/$mitgliedsnummer"
-                            params={{ mitgliedsnummer: memberRef(m) }}
-                            className="text-primary hover:underline"
-                          >
-                            {m.nachname ? (
-                              <>
-                                <span className="font-semibold">{m.nachname}</span>
-                                {m.vorname ? (
-                                  <span className="font-normal opacity-75"> {m.vorname}</span>
-                                ) : null}
-                              </>
-                            ) : (
-                              <span className="font-medium">{m.vorname || EMPTY_VALUE}</span>
-                            )}
-                          </Link>
-                          {isKontakt ? (
-                            <Badge
-                              variant="outline"
-                              title="Zahlt für ein Mitglied, ist aber selbst keines"
-                            >
-                              Kontakt
-                            </Badge>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">{[m.plz, m.ort].filter(Boolean).join(" ")}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{m.email || EMPTY_VALUE}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatDate(m.eintritt)}</td>
-                      <td className="px-4 py-3">
-                        {(() => {
-                          const view = memberStatusView(m);
-                          return <Badge variant={view.variant}>{view.label}</Badge>;
-                        })()}
-                      </td>
+                      {row.getVisibleCells().map((cell) => {
+                        const meta = cell.column.columnDef.meta as
+                          | { className?: string }
+                          | undefined;
+                        return (
+                          <td key={cell.id} className={`px-4 py-3 ${meta?.className ?? ""}`}>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        );
+                      })}
                     </tr>
                   );
                 })
@@ -1040,29 +1101,28 @@ function MembersListPage() {
           <span className="text-muted-foreground">{list.data?.total ?? 0} Einträge</span>
           <div className="flex items-center gap-4">
             <PageSizeSelect
-              value={pageSize}
-              onChange={(n) => {
-                setPageSize(n);
-                updateSearch({});
-              }}
+              value={table.getState().pagination.pageSize}
+              onChange={(size) => table.setPageSize(size)}
             />
             <div className="flex items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={search.page <= 1}
-                onClick={() => updateSearch({ page: Math.max(1, search.page - 1) }, false)}
+                disabled={!table.getCanPreviousPage()}
+                onClick={() => table.previousPage()}
               >
                 <ChevronLeft className="size-3.5" /> Zurück
               </Button>
-              <span className="text-muted-foreground">Seite {search.page}</span>
+              <span className="text-muted-foreground">
+                Seite {table.getState().pagination.pageIndex + 1}
+              </span>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={search.page * pageSize >= (list.data?.total ?? 0)}
-                onClick={() => updateSearch({ page: search.page + 1 }, false)}
+                disabled={!table.getCanNextPage()}
+                onClick={() => table.nextPage()}
               >
                 Weiter <ChevronRight className="size-3.5" />
               </Button>
@@ -1172,32 +1232,46 @@ function MemberStatsStrip({
   );
 }
 
-function SortHeader({
-  label,
-  col,
-  active,
-  dir,
-  onToggle,
-}: {
-  label: string;
-  col: SortBy;
-  active: SortBy;
-  dir: SortDir;
-  onToggle: (col: SortBy) => void;
-}) {
-  const isActive = active === col;
-  const Icon = !isActive ? ArrowUpDown : dir === "asc" ? ArrowUp : ArrowDown;
+function SortableHeader({ column, label }: { column: Column<MemberRow>; label: string }) {
+  const sorted = column.getIsSorted();
+  const Icon = !sorted ? ArrowUpDown : sorted === "asc" ? ArrowUp : ArrowDown;
   return (
-    <th className="px-4 py-3 font-medium">
-      <button
-        type="button"
-        onClick={() => onToggle(col)}
-        className="-mx-1 flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted hover:text-foreground"
-      >
-        {label}
-        <Icon className={`size-3 ${isActive ? "text-foreground" : "text-muted-foreground/60"}`} />
-      </button>
-    </th>
+    <button
+      type="button"
+      onClick={column.getToggleSortingHandler()}
+      className="-mx-1 flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted hover:text-foreground"
+    >
+      {label}
+      <Icon className={`size-3 ${sorted ? "text-foreground" : "text-muted-foreground/60"}`} />
+    </button>
+  );
+}
+
+function TableSelectionCheckbox({
+  ariaLabel,
+  checked,
+  indeterminate = false,
+  onChange,
+  onClick,
+}: {
+  ariaLabel: string;
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange?: () => void;
+  onClick?: (event: React.MouseEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <input
+      type="checkbox"
+      aria-label={ariaLabel}
+      className="size-4 accent-primary align-middle"
+      checked={checked}
+      ref={(element) => {
+        if (element) element.indeterminate = indeterminate;
+      }}
+      onClick={onClick}
+      onChange={onChange ?? (() => undefined)}
+    />
   );
 }
 

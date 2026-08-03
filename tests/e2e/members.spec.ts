@@ -1,10 +1,26 @@
-import { createMember, expect, test } from "./fixtures";
+import { createMember, expect, gotoMembersList, test } from "./fixtures";
 
 // `appPage` is signed in and on /app. We reach every screen by clicking
 // (client-side navigation), never by hard-loading a protected URL, because the
 // dev server's SSR path does not carry the session on a full load.
 
 test.describe("members", () => {
+  test("sorts and selects rows through the members table", async ({ appPage }) => {
+    await createMember(appPage, { vorname: "Tanja", nachname: "Tabellentest" });
+    await gotoMembersList(appPage);
+    await appPage.getByRole("button", { name: /Gesamt/ }).click();
+
+    const nameHeader = appPage.getByRole("button", { name: "Name" });
+    await nameHeader.click();
+    await expect(appPage).toHaveURL(/sortBy=nachname/);
+    await expect(appPage).toHaveURL(/sortDir=desc/);
+
+    const firstRowCheckbox = appPage.locator("tbody input[type=checkbox]").first();
+    await firstRowCheckbox.check();
+    await expect(firstRowCheckbox).toBeChecked();
+    await expect(appPage.getByText("1 ausgewählt", { exact: true })).toBeVisible();
+  });
+
   test("adds a new member through the wizard", async ({ appPage }) => {
     await createMember(appPage, { vorname: "Max", nachname: "Neumitglied" });
 
