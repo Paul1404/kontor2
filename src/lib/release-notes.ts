@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.4.0",
+    date: "2026-08-03",
+    title: "Mitgliederliste technisch erneuert",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Mitgliederliste verwendet jetzt ein einheitliches Tabellenmodell für Sortierung, Seitennavigation und Mehrfachauswahl. Filter und Sortierung bleiben weiterhin in der Adresse speicherbar.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Anmeldung, Passwort-Reset und Passwort-vergessen zeigen Eingabefehler direkt am betroffenen Feld.",
+      },
+    ],
+  },
+  {
     version: "2.3.1",
     date: "2026-08-03",
     title: "Alte Bankbestätigung wieder lesbar",

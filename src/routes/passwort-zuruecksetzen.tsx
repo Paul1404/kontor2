@@ -1,6 +1,8 @@
+import { useForm } from "@tanstack/react-form";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, KeyRound, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { FormFieldError } from "~/components/forms/FormFieldError";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -8,6 +10,7 @@ import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { toast } from "~/components/ui/toaster";
 import { authClient } from "~/lib/auth-client";
+import { validateNewPassword, validatePasswordConfirmation } from "~/lib/auth-form-validation";
 import { useBranding } from "~/lib/branding";
 
 export const Route = createFileRoute("/passwort-zuruecksetzen")({
@@ -21,38 +24,28 @@ function ResetPasswordPage() {
   const branding = useBranding();
   const navigate = useNavigate();
   const { token } = Route.useSearch();
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!token) {
-      setError("Der Link ist ungültig oder unvollständig.");
-      return;
-    }
-    if (password.length < 12) {
-      setError("Das Passwort muss mindestens 12 Zeichen haben.");
-      return;
-    }
-    if (password !== confirm) {
-      setError("Die beiden Passwörter stimmen nicht überein.");
-      return;
-    }
-    setBusy(true);
-    const res = await authClient.resetPassword({ newPassword: password, token });
-    setBusy(false);
-    if (res.error) {
-      setError(
-        res.error.message ?? "Zurücksetzen fehlgeschlagen. Der Link ist möglicherweise abgelaufen.",
-      );
-      return;
-    }
-    toast.success("Passwort gesetzt. Bitte melden Sie sich an.");
-    navigate({ to: "/login" });
-  }
+  const form = useForm({
+    defaultValues: { password: "", confirm: "" },
+    onSubmit: async ({ value }) => {
+      setError(null);
+      if (!token) {
+        setError("Der Link ist ungültig oder unvollständig.");
+        return;
+      }
+      const res = await authClient.resetPassword({ newPassword: value.password, token });
+      if (res.error) {
+        setError(
+          res.error.message ??
+            "Zurücksetzen fehlgeschlagen. Der Link ist möglicherweise abgelaufen.",
+        );
+        return;
+      }
+      toast.success("Passwort gesetzt. Bitte melden Sie sich an.");
+      navigate({ to: "/login" });
+    },
+  });
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
@@ -74,44 +67,81 @@ function ResetPasswordPage() {
         </CardHeader>
         <CardContent>
           {token ? (
-            <form onSubmit={onSubmit} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="password">Neues Passwort</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                  minLength={12}
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="confirm">Passwort bestätigen</Label>
-                <Input
-                  id="confirm"
-                  type="password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  autoComplete="new-password"
-                  minLength={12}
-                  required
-                />
-              </div>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void form.handleSubmit();
+              }}
+              className="flex flex-col gap-4"
+            >
+              <form.Field
+                name="password"
+                validators={{
+                  onChange: ({ value }) => validateNewPassword(value),
+                }}
+              >
+                {(field) => (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="password">Neues Passwort</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      autoComplete="new-password"
+                      minLength={12}
+                      aria-invalid={field.state.meta.errors.length > 0}
+                      required
+                    />
+                    <FormFieldError errors={field.state.meta.errors} />
+                  </div>
+                )}
+              </form.Field>
+              <form.Field
+                name="confirm"
+                validators={{
+                  onChangeListenTo: ["password"],
+                  onChange: ({ value, fieldApi }) =>
+                    validatePasswordConfirmation(value, fieldApi.form.getFieldValue("password")),
+                }}
+              >
+                {(field) => (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="confirm">Passwort bestätigen</Label>
+                    <Input
+                      id="confirm"
+                      type="password"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      autoComplete="new-password"
+                      minLength={12}
+                      aria-invalid={field.state.meta.errors.length > 0}
+                      required
+                    />
+                    <FormFieldError errors={field.state.meta.errors} />
+                  </div>
+                )}
+              </form.Field>
               {error ? (
                 <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                   {error}
                 </p>
               ) : null}
-              <Button type="submit" disabled={busy} className="w-full">
-                {busy ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <KeyRound className="size-4" />
+              <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting] as const}>
+                {([canSubmit, isSubmitting]) => (
+                  <Button type="submit" disabled={!canSubmit || isSubmitting} className="w-full">
+                    {isSubmitting ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <KeyRound className="size-4" />
+                    )}
+                    Passwort speichern
+                  </Button>
                 )}
-                Passwort speichern
-              </Button>
+              </form.Subscribe>
             </form>
           ) : (
             <div className="flex flex-col gap-4">

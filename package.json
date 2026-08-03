@@ -1,6 +1,6 @@
 {
   "name": "kontor2",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "author": "Paul Dresch <paul.dresch@untereuerheim.com>",
@@ -59,7 +59,7 @@
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-router": "^1.170.16",
     "@tanstack/react-start": "^1.168.26",
-    "@tanstack/react-store": "^0.11.0",
+    "@tanstack/react-table": "^8.21.3",
     "@valibot/to-json-schema": "^1.7.1",
     "better-auth": "^1.6.20",
     "class-variance-authority": "^0.7.1",

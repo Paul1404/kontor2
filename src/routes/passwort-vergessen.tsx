@@ -1,12 +1,15 @@
+import { useForm } from "@tanstack/react-form";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, CheckCircle2, Loader2, Mail } from "lucide-react";
 import { useState } from "react";
+import { FormFieldError } from "~/components/forms/FormFieldError";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { authClient } from "~/lib/auth-client";
+import { validateRequiredEmail } from "~/lib/auth-form-validation";
 import { useBranding } from "~/lib/branding";
 
 export const Route = createFileRoute("/passwort-vergessen")({
@@ -15,19 +18,17 @@ export const Route = createFileRoute("/passwort-vergessen")({
 
 function ForgotPasswordPage() {
   const branding = useBranding();
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
   // Always land on the same confirmation regardless of whether the address
   // exists, so the page can't be used to probe which emails have an account.
   const [submitted, setSubmitted] = useState(false);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    await authClient.requestPasswordReset({ email }).catch(() => undefined);
-    setBusy(false);
-    setSubmitted(true);
-  }
+  const form = useForm({
+    defaultValues: { email: "" },
+    onSubmit: async ({ value }) => {
+      await authClient.requestPasswordReset({ email: value.email.trim() }).catch(() => undefined);
+      setSubmitted(true);
+    },
+  });
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
@@ -68,22 +69,49 @@ function ForgotPasswordPage() {
               </Link>
             </div>
           ) : (
-            <form onSubmit={onSubmit} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="email">E-Mail</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  required
-                />
-              </div>
-              <Button type="submit" disabled={busy} className="w-full">
-                {busy ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
-                Link senden
-              </Button>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void form.handleSubmit();
+              }}
+              className="flex flex-col gap-4"
+            >
+              <form.Field
+                name="email"
+                validators={{
+                  onBlur: ({ value }) => validateRequiredEmail(value),
+                }}
+              >
+                {(field) => (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="email">E-Mail</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      autoComplete="email"
+                      aria-invalid={field.state.meta.errors.length > 0}
+                      required
+                    />
+                    <FormFieldError errors={field.state.meta.errors} />
+                  </div>
+                )}
+              </form.Field>
+              <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting] as const}>
+                {([canSubmit, isSubmitting]) => (
+                  <Button type="submit" disabled={!canSubmit || isSubmitting} className="w-full">
+                    {isSubmitting ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Mail className="size-4" />
+                    )}
+                    Link senden
+                  </Button>
+                )}
+              </form.Subscribe>
               <Link
                 to="/login"
                 className="inline-flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground"

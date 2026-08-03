@@ -1,7 +1,9 @@
+import { useForm } from "@tanstack/react-form";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Loader2, LogIn } from "lucide-react";
 import { useEffect, useState } from "react";
+import { FormFieldError } from "~/components/forms/FormFieldError";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -9,6 +11,7 @@ import { Label } from "~/components/ui/label";
 import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { VersionChip } from "~/components/ui/version-chip";
 import { signIn } from "~/lib/auth-client";
+import { validateRequiredEmail, validateRequiredPassword } from "~/lib/auth-form-validation";
 import { useBranding } from "~/lib/branding";
 import { orpc } from "~/lib/orpc";
 import { COPYRIGHT } from "~/lib/release-notes";
@@ -33,10 +36,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const branding = useBranding();
   const { expired, redirect } = Route.useSearch();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   // First-boot rescue: if no users exist yet, send the operator to /setup
   // instead of leaving them stranded on a login form for an empty database.
@@ -53,18 +53,21 @@ function LoginPage() {
     }
   }, [setupStatus.data?.needsSetup, navigate]);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    const result = await signIn.email({ email, password });
-    setBusy(false);
-    if (result.error) {
-      setError(result.error.message ?? "Anmeldung fehlgeschlagen.");
-      return;
-    }
-    navigate({ to: redirect ?? "/app" });
-  }
+  const form = useForm({
+    defaultValues: { email: "", password: "" },
+    onSubmit: async ({ value }) => {
+      setError(null);
+      const result = await signIn.email({
+        email: value.email.trim(),
+        password: value.password,
+      });
+      if (result.error) {
+        setError(result.error.message ?? "Anmeldung fehlgeschlagen.");
+        return;
+      }
+      navigate({ to: redirect ?? "/app" });
+    },
+  });
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
@@ -90,51 +93,90 @@ function LoginPage() {
           <CardDescription>Vereinsverwaltung. Bitte anmelden.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              void form.handleSubmit();
+            }}
+            className="flex flex-col gap-4"
+          >
             {expired ? (
               <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
                 Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.
               </p>
             ) : null}
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email">E-Mail</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Passwort</Label>
-                <Link
-                  to="/passwort-vergessen"
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Passwort vergessen?
-                </Link>
-              </div>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </div>
+            <form.Field
+              name="email"
+              validators={{
+                onBlur: ({ value }) => validateRequiredEmail(value),
+              }}
+            >
+              {(field) => (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="email">E-Mail</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                    autoComplete="email"
+                    aria-invalid={field.state.meta.errors.length > 0}
+                    required
+                  />
+                  <FormFieldError errors={field.state.meta.errors} />
+                </div>
+              )}
+            </form.Field>
+            <form.Field
+              name="password"
+              validators={{
+                onBlur: ({ value }) => validateRequiredPassword(value),
+              }}
+            >
+              {(field) => (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Passwort</Label>
+                    <Link
+                      to="/passwort-vergessen"
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Passwort vergessen?
+                    </Link>
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                    autoComplete="current-password"
+                    aria-invalid={field.state.meta.errors.length > 0}
+                    required
+                  />
+                  <FormFieldError errors={field.state.meta.errors} />
+                </div>
+              )}
+            </form.Field>
             {error ? (
               <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 {error}
               </p>
             ) : null}
-            <Button type="submit" disabled={busy} className="w-full">
-              {busy ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
-              {busy ? "Anmelden…" : "Anmelden"}
-            </Button>
+            <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting] as const}>
+              {([canSubmit, isSubmitting]) => (
+                <Button type="submit" disabled={!canSubmit || isSubmitting} className="w-full">
+                  {isSubmitting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <LogIn className="size-4" />
+                  )}
+                  {isSubmitting ? "Anmelden…" : "Anmelden"}
+                </Button>
+              )}
+            </form.Subscribe>
           </form>
         </CardContent>
       </Card>
