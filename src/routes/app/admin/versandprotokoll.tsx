@@ -503,7 +503,7 @@ type MailDetail = Omit<MailRowData, "hasContent"> & {
   attachmentNames: string[] | null;
   entityType: string | null;
   entityId: string | null;
-  contentSource: "archive" | "imap" | "none" | "unavailable";
+  contentSource: "archive" | "imap" | "reconstructed" | "none" | "unavailable";
   imapMailbox?: string;
 };
 
@@ -573,7 +573,9 @@ function MailDetailDialog({
             <p className="mt-1 text-xs text-muted-foreground">
               {mail?.contentSource === "imap"
                 ? `Schreibgeschützt aus dem IMAP-Ordner „${mail.imapMailbox ?? "Gesendet"}“`
-                : "Schreibgeschützte Momentaufnahme aus dem Versandprotokoll"}
+                : mail?.contentSource === "reconstructed"
+                  ? "Aus dem unveränderlichen Änderungseintrag rekonstruiert"
+                  : "Schreibgeschützte Momentaufnahme aus dem Versandprotokoll"}
             </p>
           </div>
           <button
@@ -609,13 +611,17 @@ function MailDetailDialog({
                 <dd>{formatDateTime(mail.createdAt)}</dd>
                 <dt className="text-muted-foreground">Typ</dt>
                 <dd>{kindLabel(mail.kind)}</dd>
-                {mail.contentSource === "archive" || mail.contentSource === "imap" ? (
+                {mail.contentSource === "archive" ||
+                mail.contentSource === "imap" ||
+                mail.contentSource === "reconstructed" ? (
                   <>
                     <dt className="text-muted-foreground">Quelle</dt>
                     <dd>
                       {mail.contentSource === "imap"
                         ? `Gesendet-Ordner (${mail.imapMailbox ?? "automatisch erkannt"})`
-                        : "Kontor²-Versandarchiv"}
+                        : mail.contentSource === "reconstructed"
+                          ? "Rekonstruktion aus Änderungsnachweis und Mitgliedssnapshot"
+                          : "Kontor²-Versandarchiv"}
                     </dd>
                   </>
                 ) : null}
@@ -669,6 +675,13 @@ function MailDetailDialog({
                     </div>
                   ) : null}
                 </div>
+                {mail.contentSource === "reconstructed" ? (
+                  <p className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-xs text-muted-foreground">
+                    Der Mailserver enthält keine Originalkopie. Inhalt und Empfänger wurden aus dem
+                    damaligen Mitgliedssnapshot und dem Bankänderungseintrag rekonstruiert. Logo und
+                    Vereinsangaben entsprechen dem aktuellen Stand.
+                  </p>
+                ) : null}
                 {showHtml ? (
                   <iframe
                     title="Schreibgeschützte E-Mail-Vorschau"
@@ -691,7 +704,7 @@ function MailDetailDialog({
                   <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
                     {mail.contentSource === "unavailable"
                       ? "Der Gesendet-Ordner ist momentan nicht erreichbar. Bitte den IMAP-Zugriff unter E-Mail-Konfiguration prüfen."
-                      : "Im Gesendet-Ordner wurde keine eindeutig passende E-Mail gefunden."}
+                      : "Im Gesendet-Ordner wurde keine passende E-Mail gefunden. Manche Mailserver legen über SMTP versendete Nachrichten dort nicht automatisch ab."}
                   </div>
                 )}
               </section>
