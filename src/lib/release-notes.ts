@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.3.1",
+    date: "2026-08-03",
+    title: "Alte Bankbestätigung wieder lesbar",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Fehlt die Originalkopie im Gesendet-Ordner, rekonstruiert das Versandprotokoll eine frühere Bankbestätigung aus dem Bankänderungseintrag und dem damaligen Mitgliedssnapshot. Die Ansicht kennzeichnet die Quelle eindeutig.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Das Versandprotokoll erklärt jetzt, wenn der Mailserver über SMTP versendete Nachrichten nicht automatisch im Gesendet-Ordner ablegt.",
+      },
+    ],
+  },
+  {
     version: "2.3.0",
     date: "2026-08-01",
     title: "Ältere gesendete E-Mails öffnen",

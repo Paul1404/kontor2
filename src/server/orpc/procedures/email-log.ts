@@ -5,6 +5,7 @@ import { escapeLike } from "~/server/db/like";
 import { emailLogTable } from "~/server/db/schema/email-log";
 import { logger } from "~/server/lib/logger";
 import { findSentMessage } from "~/server/mail/read-sent-mail";
+import { reconstructSentMessage } from "~/server/mail/reconstruct-sent-mail";
 import { adminProc } from "~/server/orpc/base";
 
 const StatusEnum = v.picklist(["sent", "failed", "skipped"]);
@@ -146,27 +147,51 @@ export const emailLogRouter = {
         return { ...row, contentSource: "none" as const };
       }
       try {
+        const reconstructed = await reconstructSentMessage(context.db, {
+          kind: row.kind,
+          entityType: row.entityType,
+          entityId: row.entityId,
+          recipient: row.recipient,
+          subject: row.subject,
+          sentAt: row.createdAt,
+        });
+        if (reconstructed) {
+          return { ...row, ...reconstructed, contentSource: "reconstructed" as const };
+        }
+      } catch (error) {
+        logger.warn("email_log.reconstruction_failed", {
+          emailLogId: row.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      let imapUnavailable = false;
+      try {
         const sent = await findSentMessage(context.db, {
           recipient: row.recipient,
           subject: row.subject,
           sentAt: row.createdAt,
         });
-        if (!sent) return { ...row, contentSource: "none" as const };
-        return {
-          ...row,
-          bodyText: sent.bodyText,
-          bodyHtml: sent.bodyHtml,
-          attachmentNames: sent.attachmentNames,
-          contentSource: "imap" as const,
-          imapMailbox: sent.mailbox,
-        };
+        if (sent) {
+          return {
+            ...row,
+            bodyText: sent.bodyText,
+            bodyHtml: sent.bodyHtml,
+            attachmentNames: sent.attachmentNames,
+            contentSource: "imap" as const,
+            imapMailbox: sent.mailbox,
+          };
+        }
       } catch (error) {
+        imapUnavailable = true;
         logger.warn("email_log.imap_lookup_failed", {
           emailLogId: row.id,
           error: error instanceof Error ? error.message : String(error),
         });
-        return { ...row, contentSource: "unavailable" as const };
       }
+      return {
+        ...row,
+        contentSource: imapUnavailable ? ("unavailable" as const) : ("none" as const),
+      };
     }),
 
   /** Delete mail-log rows older than N days, or clear the whole log. Logged. */
