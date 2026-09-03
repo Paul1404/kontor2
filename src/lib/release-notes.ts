@@ -41,10 +41,20 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
-    version: "2.8.0",
+    version: "2.8.1",
     date: "2026-09-03",
     title: "Austrittserklärung geht mit zurück",
     changes: [
+      {
+        category: "fix",
+        description:
+          "Die E-Mail-Vorschau beim Austritt zeigte die Anhänge immer als beigefügt an, auch wenn sie abgewählt waren. Sie richtet sich jetzt nach der tatsächlichen Auswahl.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Auch bei der Austrittsbestätigung steht der Dateiname vor dem Versand im Dialog.",
+      },
       {
         category: "feature",
         description:

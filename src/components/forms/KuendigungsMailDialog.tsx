@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ChevronDown, Paperclip } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "~/components/ui/toaster";
@@ -29,9 +29,15 @@ export function KuendigungsMailDialog({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Keyed on the selection so the shown text is the text that would be sent.
   const preview = useQuery({
-    queryKey: ["cancellations.confirmationPreview", memberId],
-    queryFn: () => orpc.cancellations.confirmationPreview({ memberId }),
+    queryKey: ["cancellations.confirmationPreview", memberId, attach, attachNotice],
+    queryFn: () =>
+      orpc.cancellations.confirmationPreview({
+        memberId,
+        attachLetter: attach,
+        attachNotice,
+      }),
     enabled: open,
     staleTime: 30_000,
   });
@@ -40,16 +46,23 @@ export function KuendigungsMailDialog({
   const hasLetter = letters.length > 0;
   const notice = preview.data?.notice ?? null;
 
+  // Seed the toggles from what exists, but only once per opening. Re-running
+  // on every load would fight the operator: the query re-fetches whenever a
+  // toggle changes, and the effect would immediately reset it.
+  const seeded = useRef(false);
   useEffect(() => {
     if (!open) {
+      seeded.current = false;
       setPreviewOpen(false);
       setError(null);
       return;
     }
-    setLetterId(letters[0]?.id ?? null);
-    setAttach(hasLetter);
-    setAttachNotice(notice != null);
-  }, [open, letters[0]?.id, hasLetter, notice]);
+    if (seeded.current || preview.data === undefined) return;
+    seeded.current = true;
+    setLetterId(preview.data.letters[0]?.id ?? null);
+    setAttach(preview.data.letters.length > 0);
+    setAttachNotice(preview.data.notice != null);
+  }, [open, preview.data]);
 
   const send = useMutation({
     mutationFn: () =>
@@ -134,6 +147,14 @@ export function KuendigungsMailDialog({
                     : "Noch keine Austrittsbestätigung erstellt. Die E-Mail geht ohne Anhang."
                 }
               />
+              {hasLetter && attach && letters.length === 1 ? (
+                <p className="mt-2 flex items-center gap-2 pl-1 text-xs text-muted-foreground">
+                  <Paperclip className="size-3.5 shrink-0" aria-hidden />
+                  <span className="min-w-0 truncate">
+                    {letters[0]?.docRef ?? letters[0]?.filename}
+                  </span>
+                </p>
+              ) : null}
               {notice ? (
                 <div className="mt-3 border-t border-border pt-3">
                   <Switch
