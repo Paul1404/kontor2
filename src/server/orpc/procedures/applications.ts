@@ -1937,11 +1937,11 @@ export const applicationsRouter = {
       try {
         const records: EmailLogEntry[] = [];
         if (input.email) {
-          const subject = `Ihr Papier-Antrag bei ${org.vereinsname}`;
+          const subject = `${org.vereinsname}: Ihr Papier-Antrag`;
           const bodyText = [
             "Hallo,",
             "",
-            `vielen Dank. Ihr Papier-Antrag beim ${org.vereinsname} ist bei uns eingegangen.`,
+            "vielen Dank. Ihr Papier-Antrag ist bei uns eingegangen.",
             `Ihre Vorgangsnummer lautet ${inserted.antragsnummer}.`,
             "",
             `Den aktuellen Stand sehen Sie hier: ${statusUrlFor(context.tenant, inserted.antragsnummer, inserted.statusToken)}`,
@@ -1952,6 +1952,7 @@ export const applicationsRouter = {
             to: input.email,
             subject,
             text: bodyText,
+            subline: "Aufnahmeantrag",
           });
           records.push({
             kind: EMAIL_KIND.antragConfirmation,
@@ -1976,6 +1977,8 @@ export const applicationsRouter = {
             to: clubEmail,
             subject,
             text: bodyText,
+            subline: "Interne Benachrichtigung",
+            closing: null,
           });
           records.push({
             kind: EMAIL_KIND.antragClubNotification,
@@ -2490,7 +2493,7 @@ export const applicationsRouter = {
       const declineBody = [
         `Hallo ${app.vorname} ${app.nachname},`,
         "",
-        `Ihr Aufnahmeantrag beim ${org?.vereinsname ?? "Verein"} konnte leider nicht angenommen werden.`,
+        "Ihr Aufnahmeantrag konnte leider nicht angenommen werden.",
         "",
         `Begründung: ${input.reason}`,
       ].join("\n");
@@ -2754,7 +2757,7 @@ export const applicationsRouter = {
       await attachApplicationFilesToMember(context.db, app.id, result.primaryId, actorId);
 
       if (app.email) {
-        const approvalSubject = `Willkommen beim ${org?.vereinsname ?? "Verein"}`;
+        const approvalSubject = `${org?.vereinsname ?? "Verein"}: Willkommen`;
         const approvalBody = [
           `Hallo ${app.vorname} ${app.nachname},`,
           "",
@@ -2767,6 +2770,7 @@ export const applicationsRouter = {
           to: app.email,
           subject: approvalSubject,
           text: approvalBody,
+          subline: "Mitgliedschaft",
           pdf: approvedPdf
             ? {
                 filename: `Beitrittserklaerung-${app.antragsnummer}-genehmigt.pdf`,

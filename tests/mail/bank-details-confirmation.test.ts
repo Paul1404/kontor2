@@ -45,7 +45,7 @@ describe("bank details confirmation email", () => {
       }),
     );
     expect(content.body).toContain("Guten Tag Berta Beispiel,");
-    expect(content.body).toContain("SV Beispiel\nAutomatische Bestätigung");
+    expect(content.body).toContain("SV Beispiel\nBankverbindung");
     expect(content.body).toContain("Sportverein Beispiel 1945 e. V.");
     expect(content.body).toContain("Vereinsstraße 1\n97440 Beispielstadt");
     expect(content.body).toContain("E-Mail: mitgliedschaft@sv-beispiel.test");
@@ -54,7 +54,9 @@ describe("bank details confirmation email", () => {
     expect(content.body).toContain("•••• 9890");
     expect(content.body).toContain("Künftige Beitragseinzüge verwenden die neue Bankverbindung.");
     expect(content.body).not.toContain("DE12500105170648489890");
-    expect(content.html).toContain("Automatische Bestätigung");
+    // The member is not the owner of the club's Vereinsverwaltung.
+    expect(content.html).toContain("Bankverbindung");
+    expect(content.html).not.toContain("Ihrer Vereinsverwaltung");
     expect(content.html).toContain("IBAN endet auf •••• 9890");
     expect(content.html).toContain("#b51f2e");
     expect(content.html).toContain("Sportverein Beispiel 1945 e. V.");
