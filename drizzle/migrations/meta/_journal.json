@@ -568,6 +568,13 @@
       "when": 1788449386923,
       "tag": "0080_odd_zarek",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1788465321419,
+      "tag": "0081_charming_caretaker",
+      "breakpoints": true
     }
   ]
 }

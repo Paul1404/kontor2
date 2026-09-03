@@ -7,6 +7,7 @@ import type { MailBlock } from "~/server/mail/layout";
 import { resolveClubLogo } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
 import { MitteilungDocument } from "~/server/pdf/templates/mitteilung";
+import { deleteObject, putObject } from "~/server/s3/client";
 
 export type PostalRecipient = {
   memberId: string;
@@ -87,25 +88,43 @@ export async function notifyByPost(
     }),
   );
 
-  await recordEmail(
-    {
-      kind: input.kind,
-      channel: "post",
-      status: "printed",
-      recipient: input.recipient.recipientLines.join(", "),
-      subject: input.subject,
-      bodyText: input.bodyText,
-      attachmentNames: [`${docRef}.pdf`, ...(input.enclosures ?? [])],
-      detail: docRef,
-      entityType: "member",
-      entityId: input.recipient.memberId,
-      actorEmail: input.actorEmail ?? null,
-      requestId: input.requestId ?? null,
-    },
-    db,
-  );
+  const filename = `${input.subject.replace(/[^\w.-]+/g, "-")}-${docRef}.pdf`;
+  // Keep the letter. Without this it exists only as a download, and a second
+  // attempt mints a second document reference for the same message.
+  const s3Key = `members/${input.recipient.memberId}/letters/${docRef}/${filename}`;
+  await putObject({
+    key: s3Key,
+    body: Buffer.from(base64, "base64"),
+    contentType: "application/pdf",
+  });
 
-  return { docRef, filename: `${input.subject.replace(/[^\w.-]+/g, "-")}-${docRef}.pdf`, base64 };
+  try {
+    await recordEmail(
+      {
+        kind: input.kind,
+        channel: "post",
+        status: "printed",
+        recipient: input.recipient.recipientLines.join(", "),
+        subject: input.subject,
+        bodyText: input.bodyText,
+        attachmentNames: [`${docRef}.pdf`, ...(input.enclosures ?? [])],
+        detail: docRef,
+        entityType: "member",
+        entityId: input.recipient.memberId,
+        documentS3Key: s3Key,
+        documentFilename: filename,
+        actorEmail: input.actorEmail ?? null,
+        requestId: input.requestId ?? null,
+      },
+      db,
+    );
+  } catch (error) {
+    // Leave no orphaned object behind when the row cannot be written.
+    await deleteObject(s3Key).catch(() => {});
+    throw error;
+  }
+
+  return { docRef, filename, base64 };
 }
 
 /** Address block for a member, in the order DIN 5008 expects. */
