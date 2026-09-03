@@ -27,6 +27,8 @@ export const EMAIL_KIND = {
   portalInvite: "portal_invite",
   passwordReset: "password_reset",
   testMail: "test_mail",
+  /** Free-text letter written by the Vorstand to a single member. */
+  letter: "letter",
 } as const;
 
 export type EmailLogEntry = {

@@ -89,6 +89,7 @@ const KIND_LABEL: Record<string, string> = {
   invite: "Benutzereinladung",
   portal_invite: "Portalzugang",
   test_mail: "Test-E-Mail",
+  letter: "Brief",
 };
 
 const DETAIL_LABEL: Record<string, string> = {

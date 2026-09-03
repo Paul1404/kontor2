@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.12.0",
+    date: "2026-09-03",
+    title: "Einzelbrief an ein Mitglied",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Auf der Mitgliedsseite lässt sich jetzt ein einzelner Brief schreiben. Betreff und Text eingeben genügt, Briefkopf, Anschriftfeld und Falzmarken nach DIN 5008 kommen aus den Vereinsdaten.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Der Brief erhält eine Dokumentnummer und erscheint als Postversand im Versandprotokoll, samt Text. Bisher deckte nur das Rundschreiben den Postweg ab, und das nur für ein ganzes Segment.",
+      },
+    ],
+  },
+  {
     version: "2.11.2",
     date: "2026-09-03",
     title: "Portal-Zugang funktioniert wieder",

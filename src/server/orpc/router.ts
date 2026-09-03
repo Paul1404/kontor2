@@ -23,6 +23,7 @@ import { feeTypesRouter } from "~/server/orpc/procedures/fee-types";
 import { importRouter } from "~/server/orpc/procedures/import";
 import { invoicesRouter } from "~/server/orpc/procedures/invoices";
 import { kulanzRouter } from "~/server/orpc/procedures/kulanz";
+import { lettersRouter } from "~/server/orpc/procedures/letters";
 import { logsRouter } from "~/server/orpc/procedures/logs";
 import { membersRouter } from "~/server/orpc/procedures/members";
 import { organizationSettingsRouter } from "~/server/orpc/procedures/organization-settings";
@@ -66,6 +67,7 @@ export const appRouter = {
   bankDetails: bankDetailsRouter,
   banks: banksRouter,
   cancellations: cancellationsRouter,
+  letters: lettersRouter,
   settings: settingsRouter,
   organization: organizationSettingsRouter,
   feeRuns: feeRunsRouter,
