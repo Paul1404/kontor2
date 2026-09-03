@@ -23,11 +23,22 @@ describe("sha256", () => {
 describe("buildPortalUrl", () => {
   it("trims trailing slashes", () => {
     expect(buildPortalUrl("https://app.example.com/", "tok")).toBe(
-      "https://app.example.com/portal/zugang/tok",
+      "https://app.example.com/api/portal/zugang/tok",
     );
     expect(buildPortalUrl("https://app.example.com//", "tok")).toBe(
-      "https://app.example.com/portal/zugang/tok",
+      "https://app.example.com/api/portal/zugang/tok",
     );
+  });
+
+  it("points at the route that actually redeems the token", async () => {
+    // The previous expectation locked in a link that matched no route, so every
+    // magic link 404ed while the test stayed green. Tie it to the route file
+    // instead of to a copy of the string.
+    const routeFile = new URL("../../src/routes/api/portal.zugang.$token.ts", import.meta.url)
+      .pathname;
+    const { existsSync } = await import("node:fs");
+    expect(existsSync(routeFile)).toBe(true);
+    expect(buildPortalUrl("https://app.example.com", "tok")).toContain("/api/portal/zugang/");
   });
 });
 
