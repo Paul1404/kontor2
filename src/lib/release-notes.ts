@@ -41,6 +41,33 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.7.0",
+    date: "2026-09-03",
+    title: "Austritt per E-Mail bestätigen",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Der Reiter Dokumente kann dem Mitglied den Austritt jetzt per E-Mail bestätigen. Die Nachricht nennt das Eingangsdatum der Kündigung, den Austrittstermin und die angewandte Satzungsregel.",
+      },
+      {
+        category: "feature",
+        description:
+          "Die gespeicherte Austrittsbestätigung geht auf Wunsch als PDF mit. Liegen mehrere vor, lässt sich auswählen welche.",
+      },
+      {
+        category: "feature",
+        description:
+          "Der Versand lässt sich jederzeit nachholen, auch für früher erfasste Austritte und für solche ohne hinterlegte Austrittserklärung.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Der Versand erscheint im Versandprotokoll als Austritt: Bestätigung, mit Text und Anhangsnamen.",
+      },
+    ],
+  },
+  {
     version: "2.6.0",
     date: "2026-09-03",
     title: "Einheitliches Layout für alle E-Mails",

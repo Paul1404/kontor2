@@ -72,6 +72,7 @@ const KIND_LABEL: Record<string, string> = {
   antrag_approval: "Antrag: Genehmigung",
   antrag_decline: "Antrag: Ablehnung",
   bank_details_confirmation: "Bankänderung: Bestätigung",
+  cancellation_confirmation: "Austritt: Bestätigung",
   dunning: "Mahnung",
   invite: "Benutzereinladung",
   portal_invite: "Portalzugang",

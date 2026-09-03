@@ -2488,8 +2488,8 @@ export const applicationsRouter = {
         .set({ status: "abgelehnt", adminDeclineReason: input.reason, updatedAt: new Date() })
         .where(eq(t.id, input.id));
 
-      const subject = `Ihr Aufnahmeantrag (${app.antragsnummer})`;
       const [org] = await context.db.select().from(organizationSettingsTable).limit(1);
+      const subject = `${org?.vereinsname ?? "Verein"}: Ihr Aufnahmeantrag (${app.antragsnummer})`;
       const declineBody = [
         `Hallo ${app.vorname} ${app.nachname},`,
         "",

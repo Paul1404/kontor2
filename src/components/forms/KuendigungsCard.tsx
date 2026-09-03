@@ -1,6 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { CalendarClock, FileText, Paperclip } from "lucide-react";
+import { CalendarClock, FileText, Mail, Paperclip } from "lucide-react";
+import { useState } from "react";
+import { KuendigungsMailDialog } from "~/components/forms/KuendigungsMailDialog";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { QueryError } from "~/components/ui/query-error";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -19,7 +22,17 @@ function modeLabel(mode: string): string {
  * derived from it. Rendered next to the Austrittsbestätigung so the outgoing
  * letter and the incoming notice sit together.
  */
-export function KuendigungsCard({ memberId }: { memberId: string }) {
+export function KuendigungsCard({
+  memberId,
+  austrittDatum,
+  canEdit,
+}: {
+  memberId: string;
+  /** The member's Austrittsdatum, if any. Drives the no-receipt fallback. */
+  austrittDatum: string | Date | null | undefined;
+  canEdit: boolean;
+}) {
+  const [mailOpen, setMailOpen] = useState(false);
   const rows = useQuery({
     queryKey: ["cancellations.recordedForMember", memberId],
     queryFn: () => orpc.cancellations.recordedForMember({ memberId }),
@@ -49,15 +62,44 @@ export function KuendigungsCard({ memberId }: { memberId: string }) {
       </Card>
     );
   }
-  if (rows.data.length === 0) return null;
+  // A quick administrative Austritt leaves no receipt. The member can still be
+  // sent a confirmation, so offer the action instead of hiding the card.
+  if (rows.data.length === 0) {
+    if (!austrittDatum) return null;
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2">
+            <CalendarClock className="size-4" aria-hidden />
+            Austritt
+          </CardTitle>
+          {canEdit ? (
+            <Button variant="outline" size="sm" onClick={() => setMailOpen(true)}>
+              <Mail className="size-4" /> Bestätigung senden
+            </Button>
+          ) : null}
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          Austritt zum {formatDate(austrittDatum)}. Ohne erfasste Kündigung, also ohne hinterlegte
+          Austrittserklärung.
+        </CardContent>
+        <KuendigungsMailDialog open={mailOpen} onOpenChange={setMailOpen} memberId={memberId} />
+      </Card>
+    );
+  }
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle className="flex items-center gap-2">
           <CalendarClock className="size-4" aria-hidden />
           Erfasste Kündigung
         </CardTitle>
+        {canEdit ? (
+          <Button variant="outline" size="sm" onClick={() => setMailOpen(true)}>
+            <Mail className="size-4" /> Bestätigung senden
+          </Button>
+        ) : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {rows.data.map((row) => (
@@ -135,6 +177,7 @@ export function KuendigungsCard({ memberId }: { memberId: string }) {
           </div>
         ))}
       </CardContent>
+      <KuendigungsMailDialog open={mailOpen} onOpenChange={setMailOpen} memberId={memberId} />
     </Card>
   );
 }
