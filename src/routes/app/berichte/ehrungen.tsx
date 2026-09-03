@@ -8,7 +8,7 @@ import { Card, CardContent } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
 import { QueryError } from "~/components/ui/query-error";
 import { toast } from "~/components/ui/toaster";
-import { triggerDownloadBase64 } from "~/lib/download";
+import { triggerDocumentDownload } from "~/lib/download";
 import { STANDARD_JUBILAEEN } from "~/lib/ehrungen";
 import { exportCsvFile } from "~/lib/export";
 import { EMPTY_VALUE, formatDate } from "~/lib/format";
@@ -83,7 +83,7 @@ function EhrungenPage() {
   const urkunde = useMutation({
     mutationFn: (id: string) => orpc.ehrungen.urkunde({ id }),
     onSuccess: async (r) => {
-      triggerDownloadBase64(r.filename, r.base64, "application/pdf");
+      triggerDocumentDownload(r);
       await invalidateStatus();
     },
     onError: (e: Error) => toast.error("Urkunde fehlgeschlagen", { description: e.message }),

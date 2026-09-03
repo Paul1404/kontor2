@@ -6,7 +6,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { toast } from "~/components/ui/toaster";
-import { triggerDownloadBase64 } from "~/lib/download";
+import { triggerDocumentDownload } from "~/lib/download";
 import { orpc } from "~/lib/orpc";
 
 const DEFAULT_CLOSING = "Freundliche Grüße";
@@ -94,7 +94,7 @@ export function BriefDialog({
           .map((entry) => ({ source: entry.source, id: entry.id })),
       }),
     onSuccess: async (res) => {
-      triggerDownloadBase64(res.base64, res.filename, "application/pdf");
+      triggerDocumentDownload(res);
       toast.success(`Brief ${res.docRef} erzeugt.`, {
         description:
           res.enclosures.length > 0

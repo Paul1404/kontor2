@@ -22,7 +22,7 @@ import { QueryError } from "~/components/ui/query-error";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "~/components/ui/toaster";
 import { cn } from "~/lib/cn";
-import { triggerDownloadBase64 } from "~/lib/download";
+import { triggerDocumentDownload } from "~/lib/download";
 import { formatDate, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -295,7 +295,7 @@ export function AustrittsbestaetigungCard({
           : [],
       }),
     onSuccess: async (res) => {
-      triggerDownloadBase64(res.filename, res.base64, "application/pdf");
+      triggerDocumentDownload(res);
       toast.success("Austrittsbestätigung erstellt");
       setOpen(false);
       resetForm();

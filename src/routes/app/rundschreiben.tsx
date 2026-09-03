@@ -10,7 +10,7 @@ import { Label } from "~/components/ui/label";
 import { QueryError } from "~/components/ui/query-error";
 import { Textarea } from "~/components/ui/textarea";
 import { toast } from "~/components/ui/toaster";
-import { triggerDownloadBase64 } from "~/lib/download";
+import { triggerDocumentDownload } from "~/lib/download";
 import { EMPTY_VALUE, formatDateTime } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 import { MERGE_FIELDS, renderTemplate, SAMPLE_VARS } from "~/lib/rundschreiben";
@@ -122,7 +122,7 @@ function RundschreibenPage() {
   const serienbrief = useMutation({
     mutationFn: () => orpc.rundschreiben.serienbrief({ subject, body, filter }),
     onSuccess: (r) => {
-      triggerDownloadBase64(r.filename, r.base64, "application/pdf");
+      triggerDocumentDownload(r);
       toast.success(`Serienbrief erstellt: ${r.count} Schreiben.`);
     },
     onError: (e: Error) => toast.error("Serienbrief fehlgeschlagen", { description: e.message }),

@@ -12,7 +12,7 @@ import { QueryError } from "~/components/ui/query-error";
 import { SkeletonText } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "~/components/ui/toaster";
-import { triggerDownloadBase64 } from "~/lib/download";
+import { triggerDocumentDownload } from "~/lib/download";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -59,7 +59,7 @@ function KulanzPage() {
         mitUnterschrift,
       }),
     onSuccess: (r) => {
-      triggerDownloadBase64(r.filename, r.base64, "application/pdf");
+      triggerDocumentDownload(r);
       toast.success(`${r.docRef} erstellt: ${r.recipientCount} Schreiben.`);
       setConfirmOpen(false);
       qc.invalidateQueries({ queryKey: ["kulanz.list"] });

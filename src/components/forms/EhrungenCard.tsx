@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { toast } from "~/components/ui/toaster";
-import { triggerDownloadBase64 } from "~/lib/download";
+import { triggerDocumentDownload } from "~/lib/download";
 import { SONDEREHRUNG_VORSCHLAEGE } from "~/lib/ehrungen";
 import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
@@ -59,7 +59,7 @@ export function EhrungenCard({ memberId, canEdit }: { memberId: string; canEdit:
   const urkunde = useMutation({
     mutationFn: (id: string) => orpc.ehrungen.urkunde({ id }),
     onSuccess: async (r) => {
-      triggerDownloadBase64(r.filename, r.base64, "application/pdf");
+      triggerDocumentDownload(r);
       await invalidate();
     },
     onError: (e: Error) => toast.error("Urkunde fehlgeschlagen", { description: e.message }),
