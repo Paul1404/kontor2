@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import * as v from "valibot";
 import { normalizeTenantPolicy } from "~/lib/tenant-settings";
 import { appendAudit } from "~/server/audit/log";
+import { loadSmtpConfig, type MailSendAttachment } from "~/server/auth/send-invite";
 import { allocateDocRef } from "~/server/db/doc-ref";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
@@ -15,6 +16,14 @@ import { executeAustritt } from "~/server/domain/austritt";
 import { isValidEvidence } from "~/server/domain/document-evidence";
 import { memberRef } from "~/server/domain/member";
 import { computeCancellationDate } from "~/server/lib/cancellation-frist";
+import { loadMailOrganization } from "~/server/mail/branding";
+import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
+import { renderMail } from "~/server/mail/layout";
+import {
+  buildCancellationConfirmation,
+  type CancellationConfirmationParams,
+  sendCancellationConfirmation,
+} from "~/server/mail/send-cancellation-confirmation";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { buildCancellationModel } from "~/server/pdf/cancellation-model";
 import { resolveClubLogo } from "~/server/pdf/logo";
@@ -72,6 +81,78 @@ function describeDateMode(mode: "anytime" | "month_end" | "year_end"): string {
   if (mode === "year_end") return "Austritt nur zum Jahresende";
   if (mode === "month_end") return "Austritt nur zum Monatsende";
   return "Austritt zu jedem Datum";
+}
+
+/**
+ * The facts a confirmation mail needs, preferring the evidence-backed receipt
+ * and falling back to the plain Austrittsdatum on the member. A quick
+ * administrative Austritt leaves no receipt, but the member should still be
+ * able to receive a confirmation.
+ */
+async function loadCancellationFacts(
+  db: Parameters<typeof loadMailOrganization>[0],
+  memberId: string,
+): Promise<
+  | (Omit<CancellationConfirmationParams, "to" | "clubDisplayName" | "hasLetter"> & {
+      to: string | null;
+    })
+  | null
+> {
+  const [member] = await db
+    .select({
+      vorname: membersTable.vorname,
+      nachname: membersTable.nachname,
+      kurzname: membersTable.kurzname,
+      firma1: membersTable.firma1,
+      email: membersTable.email,
+      austritt: membersTable.austritt,
+    })
+    .from(membersTable)
+    .where(and(eq(membersTable.id, memberId), memberNotDeleted()))
+    .limit(1);
+  if (!member) return null;
+
+  const [receipt] = await db
+    .select({
+      noticeReceivedOn: memberCancellationsTable.noticeReceivedOn,
+      effectiveDate: memberCancellationsTable.effectiveDate,
+      dateMode: memberCancellationsTable.dateMode,
+      noticeDays: memberCancellationsTable.noticeDays,
+      statuteReference: memberCancellationsTable.statuteReference,
+    })
+    .from(memberCancellationsTable)
+    .where(
+      and(
+        eq(memberCancellationsTable.memberId, memberId),
+        isNull(memberCancellationsTable.revokedAt),
+      ),
+    )
+    .orderBy(desc(memberCancellationsTable.recordedAt))
+    .limit(1);
+
+  const effectiveDate = receipt?.effectiveDate ?? member.austritt?.toISOString().slice(0, 10);
+  if (!effectiveDate) return null;
+
+  const [org] = await db.select().from(organizationSettingsTable).limit(1);
+  const policy = normalizeTenantPolicy(org?.tenantPolicy);
+  return {
+    to: member.email?.trim() || null,
+    memberName:
+      [member.vorname, member.nachname].filter(Boolean).join(" ") ||
+      member.kurzname?.trim() ||
+      member.firma1?.trim() ||
+      "Mitglied",
+    noticeReceivedOn: receipt?.noticeReceivedOn ?? null,
+    effectiveDate,
+    // The receipt keeps the rule that applied at the time; without one, fall
+    // back to what is configured today.
+    dateMode:
+      (receipt?.dateMode as CancellationConfirmationParams["dateMode"]) ??
+      policy.cancellationDateMode,
+    noticeDays: receipt?.noticeDays ?? (org?.kuendigungsfristAktiv ? org.kuendigungsfristTage : 0),
+    statuteReference: receipt?.statuteReference ?? policy.cancellationStatuteReference,
+    outstandingClaimsStatuteReference: policy.outstandingClaimsStatuteReference,
+  };
 }
 
 export const cancellationsRouter = {
@@ -296,6 +377,148 @@ export const cancellationsRouter = {
 
       await invalidateMemberCaches(context.tenant.key);
       return { ok: true, effectiveDate, computedEffectiveDate: plan.effectiveDate, ...result };
+    }),
+
+  /**
+   * Everything the confirmation dialog needs: who would receive the mail, the
+   * exact text, and which stored Austrittsbestätigung could be attached.
+   * Works long after the fact, so a Kündigung recorded weeks ago can still be
+   * confirmed.
+   */
+  confirmationPreview: vorstandProc
+    .input(v.object({ memberId: v.pipe(v.string(), v.uuid()) }))
+    .handler(async ({ context, input }) => {
+      const [facts, organization, smtp] = await Promise.all([
+        loadCancellationFacts(context.db, input.memberId),
+        loadMailOrganization(context.db),
+        loadSmtpConfig(context.db),
+      ]);
+      if (!facts) {
+        throw new ORPCError("NOT_FOUND", {
+          message: "Für dieses Mitglied ist kein Austritt hinterlegt.",
+        });
+      }
+
+      const letters = await context.db
+        .select({
+          id: cancellationLettersTable.id,
+          docRef: cancellationLettersTable.docRef,
+          filename: cancellationLettersTable.filename,
+          createdAt: cancellationLettersTable.createdAt,
+        })
+        .from(cancellationLettersTable)
+        .where(eq(cancellationLettersTable.memberId, input.memberId))
+        .orderBy(desc(cancellationLettersTable.createdAt))
+        .limit(10);
+
+      const content = buildCancellationConfirmation({
+        ...facts,
+        to: facts.to ?? "",
+        clubDisplayName: organization.displayName,
+        hasLetter: letters.length > 0,
+      });
+      const { text } = renderMail({ ...content.document, organization });
+      return {
+        canSend: Boolean(facts.to && smtp),
+        reason: !facts.to ? "no_recipient" : !smtp ? "smtp_not_configured" : null,
+        to: facts.to,
+        subject: content.subject,
+        body: text,
+        effectiveDate: facts.effectiveDate,
+        noticeReceivedOn: facts.noticeReceivedOn,
+        letters,
+      };
+    }),
+
+  /**
+   * Send the Austritt confirmation to the member, optionally with a stored
+   * Austrittsbestätigung attached. Separate from `record` on purpose: the
+   * letter is usually generated after the cascade, and an operator must be
+   * able to send (or resend) once the paperwork is complete.
+   */
+  sendConfirmation: vorstandProc
+    .input(
+      v.object({
+        memberId: v.pipe(v.string(), v.uuid()),
+        /** Stored Austrittsbestätigung to attach; null sends without one. */
+        letterId: v.optional(v.nullable(v.pipe(v.string(), v.minLength(1))), null),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const facts = await loadCancellationFacts(context.db, input.memberId);
+      if (!facts) {
+        throw new ORPCError("NOT_FOUND", {
+          message: "Für dieses Mitglied ist kein Austritt hinterlegt.",
+        });
+      }
+      if (!facts.to) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Für dieses Mitglied ist keine E-Mail-Adresse hinterlegt.",
+        });
+      }
+      if (!(await loadSmtpConfig(context.db))) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "SMTP ist nicht konfiguriert. Bitte unter Einstellungen, E-Mail einrichten.",
+        });
+      }
+
+      const attachments: MailSendAttachment[] = [];
+      if (input.letterId) {
+        const [letter] = await context.db
+          .select({
+            s3Key: cancellationLettersTable.s3Key,
+            filename: cancellationLettersTable.filename,
+            memberId: cancellationLettersTable.memberId,
+          })
+          .from(cancellationLettersTable)
+          .where(eq(cancellationLettersTable.id, input.letterId))
+          .limit(1);
+        if (!letter || letter.memberId !== input.memberId) {
+          throw new ORPCError("NOT_FOUND", { message: "Austrittsbestätigung nicht gefunden." });
+        }
+        try {
+          attachments.push({
+            filename: letter.filename,
+            content: await getObject(letter.s3Key),
+            contentType: "application/pdf",
+          });
+        } catch {
+          throw new ORPCError("PRECONDITION_FAILED", {
+            message: "Die Austrittsbestätigung konnte nicht geladen werden.",
+          });
+        }
+      }
+
+      const organization = await loadMailOrganization(context.db);
+      const params: CancellationConfirmationParams = {
+        ...facts,
+        to: facts.to,
+        clubDisplayName: organization.displayName,
+        hasLetter: attachments.length > 0,
+      };
+      const sent = await sendCancellationConfirmation(context.db, params, attachments);
+      await recordEmail(
+        {
+          kind: EMAIL_KIND.cancellationConfirmation,
+          ...statusFromSend(sent),
+          recipient: params.to,
+          subject: sent.subject,
+          bodyText: sent.bodyText,
+          bodyHtml: sent.bodyHtml,
+          attachmentNames: attachments.map((a) => a.filename),
+          entityType: "member",
+          entityId: input.memberId,
+          actorEmail: context.session!.user.email,
+          requestId: context.requestId ?? null,
+        },
+        context.db,
+      );
+      if (!sent.ok) {
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: `Versand fehlgeschlagen: ${sent.reason}`,
+        });
+      }
+      return { ok: true, to: params.to, letterAttached: attachments.length > 0 };
     }),
 
   /** Recorded Kündigungen for a member, newest first. */

@@ -1,0 +1,185 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, ChevronDown, Paperclip } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog";
+import { Switch } from "~/components/ui/switch";
+import { toast } from "~/components/ui/toaster";
+import { formatDateTime } from "~/lib/format";
+import { orpc } from "~/lib/orpc";
+
+/**
+ * Send the member their Austritt confirmation, optionally with a stored
+ * Austrittsbestätigung attached. Deliberately usable long after the Kündigung
+ * was recorded: the letter is normally generated afterwards, and a member who
+ * was never informed should still be reachable.
+ */
+export function KuendigungsMailDialog({
+  open,
+  onOpenChange,
+  memberId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  memberId: string;
+}) {
+  const qc = useQueryClient();
+  const [attach, setAttach] = useState(true);
+  const [letterId, setLetterId] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const preview = useQuery({
+    queryKey: ["cancellations.confirmationPreview", memberId],
+    queryFn: () => orpc.cancellations.confirmationPreview({ memberId }),
+    enabled: open,
+    staleTime: 30_000,
+  });
+
+  const letters = preview.data?.letters ?? [];
+  const hasLetter = letters.length > 0;
+
+  useEffect(() => {
+    if (!open) {
+      setPreviewOpen(false);
+      setError(null);
+      return;
+    }
+    setLetterId(letters[0]?.id ?? null);
+    setAttach(hasLetter);
+  }, [open, letters[0]?.id, hasLetter]);
+
+  const send = useMutation({
+    mutationFn: () =>
+      orpc.cancellations.sendConfirmation({
+        memberId,
+        letterId: attach ? letterId : null,
+      }),
+    onSuccess: async (res) => {
+      toast.success(`Bestätigung an ${res.to} gesendet.`, {
+        description: res.letterAttached
+          ? "Die Austrittsbestätigung war angehängt."
+          : "Ohne Anhang versendet.",
+      });
+      await qc.invalidateQueries({ queryKey: ["timeline.forMember", memberId] });
+      onOpenChange(false);
+    },
+    onError: (cause: unknown) => {
+      setError(cause instanceof Error ? cause.message : "Versand fehlgeschlagen.");
+    },
+  });
+
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!send.isPending) onOpenChange(next);
+      }}
+      title="Austritt bestätigen"
+      description="Das Mitglied erhält den Austrittstermin und die angewandte Satzungsregel."
+      confirmLabel="E-Mail senden"
+      cancelLabel="Abbrechen"
+      loading={send.isPending}
+      confirmDisabled={!preview.data?.canSend}
+      onConfirm={() => {
+        setError(null);
+        send.mutate();
+      }}
+    >
+      <div className="flex flex-col gap-4">
+        {preview.isPending ? (
+          <p className="text-sm text-muted-foreground">Vorschau wird geladen…</p>
+        ) : preview.isError ? (
+          <p className="text-sm text-destructive">
+            {preview.error instanceof Error ? preview.error.message : "Vorschau nicht verfügbar."}
+          </p>
+        ) : preview.data ? (
+          <>
+            <div className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Empfänger
+              </p>
+              <p className="mt-1">
+                {preview.data.to ?? (
+                  <span className="text-destructive">Keine E-Mail-Adresse hinterlegt</span>
+                )}
+              </p>
+            </div>
+
+            {preview.data.reason === "smtp_not_configured" ? (
+              <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-xs">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                <span className="text-foreground">
+                  SMTP ist nicht konfiguriert. Bitte unter Einstellungen, E-Mail einrichten.
+                </span>
+              </p>
+            ) : null}
+
+            <div className="rounded-md border border-border bg-background p-3">
+              <Switch
+                id="kuendigung-mail-anhang"
+                checked={attach && hasLetter}
+                disabled={!hasLetter}
+                onChange={(e) => setAttach(e.target.checked)}
+                label="Austrittsbestätigung anhängen"
+                description={
+                  hasLetter
+                    ? "Das gespeicherte PDF geht als Anhang mit."
+                    : "Noch keine Austrittsbestätigung erstellt. Die E-Mail geht ohne Anhang."
+                }
+              />
+              {attach && letters.length > 1 ? (
+                <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+                  {letters.map((letter) => (
+                    <label
+                      key={letter.id}
+                      className="flex items-center gap-2 text-sm text-muted-foreground"
+                    >
+                      <input
+                        type="radio"
+                        name="kuendigung-mail-letter"
+                        checked={letterId === letter.id}
+                        onChange={() => setLetterId(letter.id)}
+                      />
+                      <Paperclip className="size-3.5 shrink-0" aria-hidden />
+                      <span className="min-w-0 flex-1 truncate text-foreground">
+                        {letter.docRef ?? letter.filename}
+                      </span>
+                      <span className="shrink-0 text-xs">{formatDateTime(letter.createdAt)}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="rounded-md border border-border bg-background p-3">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between text-left text-xs font-medium"
+                aria-expanded={previewOpen}
+                onClick={() => setPreviewOpen((current) => !current)}
+              >
+                E-Mail-Vorschau
+                <ChevronDown
+                  className={`size-4 transition-transform ${previewOpen ? "rotate-180" : ""}`}
+                  aria-hidden
+                />
+              </button>
+              {previewOpen ? (
+                <div className="mt-3 space-y-2 text-xs">
+                  <p>
+                    <span className="font-medium">Betreff:</span> {preview.data.subject}
+                  </p>
+                  <pre className="whitespace-pre-wrap rounded-md bg-muted p-3 font-sans text-xs leading-relaxed">
+                    {preview.data.body}
+                  </pre>
+                </div>
+              ) : null}
+            </div>
+          </>
+        ) : null}
+
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      </div>
+    </ConfirmDialog>
+  );
+}

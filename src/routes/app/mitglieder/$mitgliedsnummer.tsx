@@ -617,7 +617,7 @@ function MemberDetailPage() {
             canEdit={canEdit}
           />
 
-          <KuendigungsCard memberId={member.id} />
+          <KuendigungsCard memberId={member.id} austrittDatum={member.austritt} canEdit={canEdit} />
 
           <AustrittsbestaetigungCard
             memberId={member.id}
