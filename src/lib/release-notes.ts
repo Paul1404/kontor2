@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.8.0",
+    date: "2026-09-03",
+    title: "Austrittserklärung geht mit zurück",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Austrittsbestätigung per E-Mail kann jetzt beide Schreiben mitschicken: die Bestätigung des Vereins und die Austrittserklärung des Mitglieds, so wie sie eingegangen ist. Das Mitglied sieht damit, welches Dokument angekommen ist.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Der Dialog zeigt den Dateinamen der Austrittserklärung vor dem Versand an. Beide Anhänge lassen sich einzeln abwählen.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Zu große Anhänge werden vor dem Versand abgefangen, statt beim Mailserver aufzulaufen.",
+      },
+    ],
+  },
+  {
     version: "2.7.0",
     date: "2026-09-03",
     title: "Austritt per E-Mail bestätigen",

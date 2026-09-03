@@ -28,7 +28,7 @@ function params(overrides: Partial<CancellationConfirmationParams> = {}) {
     noticeDays: 42,
     statuteReference: "§ 3 Abs. 2",
     outstandingClaimsStatuteReference: "§ 3 Abs. 5",
-    hasLetter: false,
+    attached: { letter: false, notice: false },
     ...overrides,
   };
 }
@@ -73,9 +73,16 @@ describe("cancellation confirmation mail", () => {
     expect(text).toContain("Es gilt: Ein Austritt ist nur zum Jahresende möglich");
   });
 
-  it("mentions the attachment only when one travels along", () => {
-    expect(textOf(params({ hasLetter: true }))).toContain(
+  it("names exactly the documents that travel along", () => {
+    expect(textOf(params({ attached: { letter: true, notice: false } }))).toContain(
       "Die schriftliche Austrittsbestätigung finden Sie im Anhang.",
+    );
+    expect(textOf(params({ attached: { letter: false, notice: true } }))).toContain(
+      "Im Anhang finden Sie Ihre Austrittserklärung, wie sie bei uns eingegangen ist.",
+    );
+    // The whole point of the move: our document and theirs, in one mail.
+    expect(textOf(params({ attached: { letter: true, notice: true } }))).toContain(
+      "Im Anhang finden Sie unsere Austrittsbestätigung sowie Ihre Austrittserklärung, wie sie bei uns eingegangen ist.",
     );
     expect(textOf(params())).not.toContain("im Anhang");
   });

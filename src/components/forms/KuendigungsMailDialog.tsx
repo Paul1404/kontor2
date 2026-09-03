@@ -24,6 +24,7 @@ export function KuendigungsMailDialog({
 }) {
   const qc = useQueryClient();
   const [attach, setAttach] = useState(true);
+  const [attachNotice, setAttachNotice] = useState(true);
   const [letterId, setLetterId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export function KuendigungsMailDialog({
 
   const letters = preview.data?.letters ?? [];
   const hasLetter = letters.length > 0;
+  const notice = preview.data?.notice ?? null;
 
   useEffect(() => {
     if (!open) {
@@ -46,19 +48,24 @@ export function KuendigungsMailDialog({
     }
     setLetterId(letters[0]?.id ?? null);
     setAttach(hasLetter);
-  }, [open, letters[0]?.id, hasLetter]);
+    setAttachNotice(notice != null);
+  }, [open, letters[0]?.id, hasLetter, notice]);
 
   const send = useMutation({
     mutationFn: () =>
       orpc.cancellations.sendConfirmation({
         memberId,
         letterId: attach ? letterId : null,
+        attachNotice: attachNotice && notice != null,
       }),
     onSuccess: async (res) => {
+      const enclosed = [
+        res.letterAttached ? "Austrittsbestätigung" : null,
+        res.noticeAttached ? "Austrittserklärung" : null,
+      ].filter(Boolean);
       toast.success(`Bestätigung an ${res.to} gesendet.`, {
-        description: res.letterAttached
-          ? "Die Austrittsbestätigung war angehängt."
-          : "Ohne Anhang versendet.",
+        description:
+          enclosed.length > 0 ? `Anhang: ${enclosed.join(", ")}` : "Ohne Anhang versendet.",
       });
       await qc.invalidateQueries({ queryKey: ["timeline.forMember", memberId] });
       onOpenChange(false);
@@ -127,6 +134,21 @@ export function KuendigungsMailDialog({
                     : "Noch keine Austrittsbestätigung erstellt. Die E-Mail geht ohne Anhang."
                 }
               />
+              {notice ? (
+                <div className="mt-3 border-t border-border pt-3">
+                  <Switch
+                    id="kuendigung-mail-erklaerung"
+                    checked={attachNotice}
+                    onChange={(e) => setAttachNotice(e.target.checked)}
+                    label="Austrittserklärung zurücksenden"
+                    description="Das Mitglied sieht, welches Schreiben bei uns eingegangen ist."
+                  />
+                  <p className="mt-2 flex items-center gap-2 pl-1 text-xs text-muted-foreground">
+                    <Paperclip className="size-3.5 shrink-0" aria-hidden />
+                    <span className="min-w-0 truncate">{notice.filename}</span>
+                  </p>
+                </div>
+              ) : null}
               {attach && letters.length > 1 ? (
                 <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
                   {letters.map((letter) => (
