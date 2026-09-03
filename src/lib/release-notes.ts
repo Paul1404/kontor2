@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.12.2",
+    date: "2026-09-03",
+    title: "Auch einfache Unzustellbarkeitsmeldungen werden gelesen",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die Bounce-Prüfung verlangte einen maschinenlesbaren Berichtsteil. Viele Mailserver schicken stattdessen eine reine Textmeldung, und genau so kam die Meldung zur Austrittsbestätigung zurück. Solche Meldungen werden jetzt ebenfalls ausgewertet.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Rückmeldung nennt zusätzlich, wie viele der gefundenen Nachrichten sich tatsächlich als Bericht lesen ließen.",
+      },
+    ],
+  },
+  {
     version: "2.12.1",
     date: "2026-09-03",
     title: "Bounce-Prüfung erkennt Berichte wirklich",

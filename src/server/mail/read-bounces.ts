@@ -129,7 +129,6 @@ export async function readBounces(db: DB, opts: { since: Date }): Promise<Bounce
       );
       if (fetched === false || !fetched.source) continue;
       const parts = extractReportParts(fetched.source.toString("utf8"));
-      if (!parts.deliveryStatus) continue;
       const dsn = parseDsn(parts);
       if (dsn.recipients.length === 0) continue;
       reports.push({
