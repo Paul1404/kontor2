@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { and, desc, eq } from "drizzle-orm";
 import * as v from "valibot";
+import { formatDate } from "~/lib/format";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { attachmentsTable } from "~/server/db/schema/attachments";
 import { cancellationLettersTable } from "~/server/db/schema/cancellations";
@@ -11,6 +12,23 @@ import { EMAIL_KIND } from "~/server/mail/email-log";
 import { paragraphsFromText } from "~/server/mail/layout";
 import { hasPostalAddress, notifyByPost, recipientLinesFor } from "~/server/mail/notify-by-post";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
+import { presignDownload } from "~/server/s3/client";
+
+/**
+ * A stored file is named for the filesystem, not for a reader. On a letter the
+ * Anlagenvermerk should say what the document is, so the kind leads and the
+ * file name only follows when it adds something.
+ */
+function attachmentLabel(kind: string, filename: string): string {
+  if (kind === "cancellation_notice") return "Ihre Austrittserklärung";
+  if (kind === "bank_details_change") return "Nachweis zur Bankverbindung";
+  return (
+    filename
+      .replace(/\.[a-z0-9]+$/i, "")
+      .replace(/[_-]+/g, " ")
+      .trim() || filename
+  );
+}
 
 const Subject = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120));
 const Body = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(20_000));
@@ -40,6 +58,8 @@ export const lettersRouter = {
             v.object({
               source: v.picklist(["cancellation_letter", "attachment"]),
               id: v.pipe(v.string(), v.minLength(1)),
+              /** Wording for the Anlagenvermerk; a readable default is derived. */
+              label: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120))), null),
             }),
           ),
           [],
@@ -88,19 +108,27 @@ export const lettersRouter = {
           }
           enclosures.push({
             ...entry,
-            label: `Austrittsbestätigung ${row.docRef ?? ""}`.trim(),
+            label:
+              entry.label || `Austrittsbestätigung, Austritt zum ${formatDate(row.austrittDatum)}`,
           });
           continue;
         }
         const [row] = await context.db
-          .select({ filename: attachmentsTable.filename, memberId: attachmentsTable.memberId })
+          .select({
+            filename: attachmentsTable.filename,
+            kind: attachmentsTable.kind,
+            memberId: attachmentsTable.memberId,
+          })
           .from(attachmentsTable)
           .where(eq(attachmentsTable.id, entry.id))
           .limit(1);
         if (!row || row.memberId !== member.id) {
           throw new ORPCError("NOT_FOUND", { message: "Anlage nicht gefunden." });
         }
-        enclosures.push({ ...entry, label: row.filename });
+        enclosures.push({
+          ...entry,
+          label: entry.label || attachmentLabel(row.kind, row.filename),
+        });
       }
 
       const letter = await notifyByPost(context.db, {
@@ -124,6 +152,32 @@ export const lettersRouter = {
       return { ...letter, enclosures };
     }),
 
+  /** Presigned link to a stored letter, for reading it again or reprinting. */
+  download: authedProc
+    .input(v.object({ id: v.pipe(v.string(), v.uuid()) }))
+    .handler(async ({ context, input }) => {
+      const [row] = await context.db
+        .select({
+          s3Key: emailLogTable.documentS3Key,
+          filename: emailLogTable.documentFilename,
+        })
+        .from(emailLogTable)
+        .where(eq(emailLogTable.id, input.id))
+        .limit(1);
+      if (!row?.s3Key) {
+        throw new ORPCError("NOT_FOUND", {
+          message:
+            "Für diesen Eintrag ist kein Dokument hinterlegt. Briefe vor dieser Version wurden nur heruntergeladen.",
+        });
+      }
+      const url = await presignDownload({
+        key: row.s3Key,
+        filename: row.filename ?? "Brief.pdf",
+        expiresSeconds: 300,
+      });
+      return { url, filename: row.filename ?? "Brief.pdf" };
+    }),
+
   /** Letters written to this member, newest first. */
   listForMember: authedProc
     .input(v.object({ memberId: v.pipe(v.string(), v.uuid()) }))
@@ -135,6 +189,8 @@ export const lettersRouter = {
           docRef: emailLogTable.detail,
           createdAt: emailLogTable.createdAt,
           actorEmail: emailLogTable.actorEmail,
+          attachmentNames: emailLogTable.attachmentNames,
+          hasDocument: emailLogTable.documentS3Key,
         })
         .from(emailLogTable)
         .where(

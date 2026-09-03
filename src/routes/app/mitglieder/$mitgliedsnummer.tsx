@@ -30,6 +30,7 @@ import { AustrittsbestaetigungCard } from "~/components/forms/Austrittsbestaetig
 import { BankDetailsChangeDialog } from "~/components/forms/BankDetailsChangeDialog";
 import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { BriefDialog } from "~/components/forms/BriefDialog";
+import { BriefeCard } from "~/components/forms/BriefeCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
 import { DsgvoCard } from "~/components/forms/DsgvoCard";
 import { EhrungenCard } from "~/components/forms/EhrungenCard";
@@ -656,6 +657,8 @@ function MemberDetailPage() {
             anhaenge={anhaenge}
             canEdit={canEdit}
           />
+
+          <BriefeCard memberId={member.id} />
 
           <KuendigungsCard memberId={member.id} austrittDatum={member.austritt} canEdit={canEdit} />
 

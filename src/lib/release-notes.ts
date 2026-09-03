@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.15.0",
+    date: "2026-09-03",
+    title: "Briefe bleiben beim Mitglied",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Ein erzeugter Brief wird jetzt gespeichert und erscheint auf der Mitgliedsseite unter Dokumente. Bisher gab es ihn nur als Download, ein verlorener Brief musste also neu geschrieben werden und bekam dabei eine zweite Dokumentnummer.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Anlagen tragen im Brief-Dialog jetzt sprechende Bezeichnungen statt der Dateinamen, etwa Ihre Austrittserklärung. Die Bezeichnung lässt sich vor dem Erzeugen ändern.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Karte zeigt zu jedem Brief die vermerkten Anlagen und wer ihn erzeugt hat.",
+      },
+    ],
+  },
+  {
     version: "2.14.1",
     date: "2026-09-03",
     title: "Briefe lassen sich wieder erzeugen",

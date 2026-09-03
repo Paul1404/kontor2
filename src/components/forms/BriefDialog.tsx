@@ -7,9 +7,26 @@ import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { toast } from "~/components/ui/toaster";
 import { triggerDocumentDownload } from "~/lib/download";
+import { formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 const DEFAULT_CLOSING = "Freundliche Grüße";
+
+/**
+ * A stored file is named for the filesystem, not for a reader. On a letter the
+ * Anlagenvermerk should say what the document is; the operator can still
+ * override the wording per enclosure.
+ */
+function readableAttachmentLabel(kind: string | undefined, filename: string): string {
+  if (kind === "cancellation_notice") return "Ihre Austrittserklärung";
+  if (kind === "bank_details_change") return "Nachweis zur Bankverbindung";
+  return (
+    filename
+      .replace(/\.[a-z0-9]+$/i, "")
+      .replace(/[_-]+/g, " ")
+      .trim() || filename
+  );
+}
 
 /**
  * Write one free-text letter to a member. The Serienbrief covers a segment;
@@ -30,7 +47,7 @@ export function BriefDialog({
   memberName: string;
   hasAddress: boolean;
   /** The member's stored documents, offered as enclosures. */
-  anhaenge?: { id: string; filename: string }[];
+  anhaenge?: { id: string; filename: string; kind?: string }[];
 }) {
   const qc = useQueryClient();
   const [subject, setSubject] = useState("");
@@ -39,6 +56,8 @@ export function BriefDialog({
   const [closing, setClosing] = useState(DEFAULT_CLOSING);
   const [error, setError] = useState<string | null>(null);
   const [enclosures, setEnclosures] = useState<string[]>([]);
+  /** Per-enclosure wording for the Anlagenvermerk, keyed like the selection. */
+  const [labels, setLabels] = useState<Record<string, string>>({});
 
   // The Austrittsbestätigung is the document most letters go out with, so the
   // list starts there rather than making the operator hunt for it.
@@ -53,13 +72,13 @@ export function BriefDialog({
       key: `cancellation_letter:${row.id}`,
       source: "cancellation_letter" as const,
       id: row.id,
-      label: `Austrittsbestätigung ${row.docRef ?? ""}`.trim(),
+      label: `Austrittsbestätigung, Austritt zum ${formatDate(row.austrittDatum)}`,
     })),
     ...anhaenge.map((row) => ({
       key: `attachment:${row.id}`,
       source: "attachment" as const,
       id: row.id,
-      label: row.filename,
+      label: readableAttachmentLabel(row.kind, row.filename),
     })),
   ];
 
@@ -72,6 +91,7 @@ export function BriefDialog({
     setBody("");
     setClosing(DEFAULT_CLOSING);
     setEnclosures([]);
+    setLabels({});
     setError(null);
   }, [open, memberName]);
 
@@ -91,7 +111,11 @@ export function BriefDialog({
         closing: closing.trim() || null,
         enclosures: available
           .filter((entry) => enclosures.includes(entry.key))
-          .map((entry) => ({ source: entry.source, id: entry.id })),
+          .map((entry) => ({
+            source: entry.source,
+            id: entry.id,
+            label: labels[entry.key]?.trim() || entry.label,
+          })),
       }),
     onSuccess: async (res) => {
       triggerDocumentDownload(res);
@@ -189,21 +213,34 @@ export function BriefDialog({
             <Label>Anlagen</Label>
             <div className="flex flex-col gap-1 rounded-md border border-border bg-background p-2">
               {available.map((entry) => (
-                <label key={entry.key} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={enclosures.includes(entry.key)}
-                    onChange={(e) =>
-                      setEnclosures((current) =>
-                        e.target.checked
-                          ? [...current, entry.key]
-                          : current.filter((key) => key !== entry.key),
-                      )
-                    }
-                  />
-                  <Paperclip className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="min-w-0 truncate">{entry.label}</span>
-                </label>
+                <div key={entry.key} className="flex flex-col gap-1">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={enclosures.includes(entry.key)}
+                      onChange={(e) =>
+                        setEnclosures((current) =>
+                          e.target.checked
+                            ? [...current, entry.key]
+                            : current.filter((key) => key !== entry.key),
+                        )
+                      }
+                    />
+                    <Paperclip className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="min-w-0 truncate">{entry.label}</span>
+                  </label>
+                  {enclosures.includes(entry.key) ? (
+                    <Input
+                      value={labels[entry.key] ?? entry.label}
+                      onChange={(e) =>
+                        setLabels((current) => ({ ...current, [entry.key]: e.target.value }))
+                      }
+                      maxLength={120}
+                      aria-label={`Bezeichnung für ${entry.label}`}
+                      className="ml-6 h-8 text-xs"
+                    />
+                  ) : null}
+                </div>
               ))}
             </div>
             <p className="text-xs text-muted-foreground">

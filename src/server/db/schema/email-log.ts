@@ -52,6 +52,14 @@ export const emailLogTable = pgTable(
     bodyHtml: text("body_html"),
     /** Attachment filenames only. Binary attachment data remains in its domain storage. */
     attachmentNames: text("attachment_names").array(),
+    /**
+     * Stored PDF for a postal notification. A letter that only ever existed as
+     * a download is gone the moment the browser loses it, and regenerating one
+     * mints a second document reference for the same message. Keeping it makes
+     * the entry the document rather than a note about one.
+     */
+    documentS3Key: text("document_s3_key"),
+    documentFilename: text("document_filename"),
     /** Reason on a skipped/failed send, e.g. "smtp_not_configured" or an SMTP error. */
     detail: text("detail"),
     /**
