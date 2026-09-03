@@ -51,7 +51,13 @@ function buildRestorePatch(snapshotMember: Record<string, unknown>): Record<stri
   return patch;
 }
 
-const DATE_HINT_KEYS = new Set([
+/**
+ * Columns whose snapshot value is a string that must become a `Date` again on
+ * restore. Exported so a test can check the real list instead of a copy: the
+ * copy in the test had drifted nineteen keys behind, and a missing key writes a
+ * string into a date column, which the driver rejects at runtime.
+ */
+export const DATE_HINT_KEYS = new Set([
   "geburtsdatum",
   "eintritt",
   "austritt",
@@ -79,12 +85,13 @@ const DATE_HINT_KEYS = new Set([
   "gueltigAb",
   "letzteVerwendungAlt",
   "gultigBisAlt",
+  "emailUndeliverableAt",
   "uploadedAt",
   "datVon",
   "datBis",
 ]);
 
-function coerce(key: string, value: unknown): unknown {
+export function coerce(key: string, value: unknown): unknown {
   if (value == null) return null;
   if (typeof value === "string" && DATE_HINT_KEYS.has(key)) {
     const d = new Date(value);

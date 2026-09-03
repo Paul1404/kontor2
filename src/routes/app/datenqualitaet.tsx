@@ -263,7 +263,7 @@ function KeineAbteilungBackfillCard() {
         description: `${r.assigned} Mitglied(er) der Abteilung "Keine Abteilung" zugeordnet.`,
       });
       setConfirmOpen(false);
-      qc.invalidateQueries({ queryKey: ["abteilungen.list"] });
+      qc.invalidateQueries({ queryKey: ["abteilungen", "list"] });
       qc.invalidateQueries({ queryKey: ["abteilungen"] });
       qc.invalidateQueries({ queryKey: ["members.list"] });
       qc.invalidateQueries({ queryKey: ["dataQuality.summary"] });
@@ -436,7 +436,10 @@ function FeeTypeMergeCard() {
 
 function AbteilungMergeCard() {
   const qc = useQueryClient();
-  const list = useQuery({ queryKey: ["abteilungen.list"], queryFn: () => orpc.abteilungen.list() });
+  const list = useQuery({
+    queryKey: ["abteilungen", "list"],
+    queryFn: () => orpc.abteilungen.list(),
+  });
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -450,7 +453,7 @@ function AbteilungMergeCard() {
       setConfirmOpen(false);
       setFromId("");
       setToId("");
-      qc.invalidateQueries({ queryKey: ["abteilungen.list"] });
+      qc.invalidateQueries({ queryKey: ["abteilungen", "list"] });
       qc.invalidateQueries({ queryKey: ["dataQuality.summary"] });
     },
     onError: (e: Error) => toast.error("Zusammenführen fehlgeschlagen", { description: e.message }),

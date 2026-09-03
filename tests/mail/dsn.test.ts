@@ -340,3 +340,53 @@ describe("plain-text bounces", () => {
     expect(parsed.recipients[0]?.recipient).toBe("hls-gock@t-online.de");
   });
 });
+
+/**
+ * Mail servers routinely encode the body. Quoted-printable turns the address
+ * into `=3Cadr=3E`, base64 makes the whole block unreadable, and both used to
+ * parse as "no recipients" and drop the bounce without a trace.
+ */
+describe("transfer-encoded bounces", () => {
+  const inner = [
+    "|------------------------- Failed addresses follow: --------------------|",
+    "<alt.mitglied@t-online.de>",
+    "  550 5.1.1 <alt.mitglied@t-online.de> User unknown",
+    "",
+  ].join("\r\n");
+
+  function wrap(encoding: string, body: string) {
+    return [
+      "From: MAILER-DAEMON@example.test",
+      "To: svu@kontor2.com",
+      "Subject: Mail delivery failed",
+      "Content-Type: text/plain; charset=utf-8",
+      `Content-Transfer-Encoding: ${encoding}`,
+      "",
+      body,
+    ].join("\r\n");
+  }
+
+  it("reads a quoted-printable bounce", () => {
+    const qp = inner
+      .replace(/</g, "=3C")
+      .replace(/>/g, "=3E")
+      // A soft line break in the middle of the diagnostic, as servers produce.
+      .replace("User unknown", "User=\r\n unknown");
+    const parsed = parseDsn(extractReportParts(wrap("quoted-printable", qp)));
+    expect(parsed.recipients[0]?.recipient).toBe("alt.mitglied@t-online.de");
+    expect(parsed.recipients[0]?.status).toBe("5.1.1");
+  });
+
+  it("reads a base64 bounce", () => {
+    const encoded = Buffer.from(inner, "utf8")
+      .toString("base64")
+      .replace(/(.{76})/g, "$1\r\n");
+    const parsed = parseDsn(extractReportParts(wrap("base64", encoded)));
+    expect(parsed.recipients[0]?.recipient).toBe("alt.mitglied@t-online.de");
+  });
+
+  it("leaves an unencoded bounce untouched", () => {
+    const parsed = parseDsn(extractReportParts(wrap("7bit", inner)));
+    expect(parsed.recipients[0]?.recipient).toBe("alt.mitglied@t-online.de");
+  });
+});

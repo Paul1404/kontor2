@@ -28,6 +28,7 @@ import { cn } from "~/lib/cn";
 import { formatDateTime, orEmpty } from "~/lib/format";
 import { useModalFocus } from "~/lib/modal-focus";
 import { orpc } from "~/lib/orpc";
+import type { EMAIL_KIND } from "~/server/mail/email-log";
 
 type Status = "sent" | "failed" | "skipped" | "bounced" | "printed";
 
@@ -78,7 +79,9 @@ const STATUS_META: Record<
 };
 
 // Human labels for the documented mail kinds; an unknown kind falls back to itself.
-const KIND_LABEL: Record<string, string> = {
+// Typed against EMAIL_KIND so a new mail kind cannot ship without a label; the
+// password reset had been showing its raw value for exactly that reason.
+const KIND_LABEL: Record<(typeof EMAIL_KIND)[keyof typeof EMAIL_KIND], string> = {
   antrag_confirmation: "Antrag: Bestätigung",
   antrag_club_notification: "Antrag: Vereinsbenachrichtigung",
   antrag_approval: "Antrag: Genehmigung",
@@ -88,6 +91,7 @@ const KIND_LABEL: Record<string, string> = {
   dunning: "Mahnung",
   invite: "Benutzereinladung",
   portal_invite: "Portalzugang",
+  password_reset: "Passwort zurücksetzen",
   test_mail: "Test-E-Mail",
   letter: "Brief",
 };
@@ -99,7 +103,7 @@ const DETAIL_LABEL: Record<string, string> = {
 };
 
 function kindLabel(kind: string): string {
-  return KIND_LABEL[kind] ?? kind;
+  return KIND_LABEL[kind as keyof typeof KIND_LABEL] ?? kind;
 }
 
 function detailLabel(detail: string | null): string | null {

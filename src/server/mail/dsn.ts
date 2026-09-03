@@ -119,6 +119,34 @@ function splitHeadersAndBody(block: string): { headers: string; body: string } {
   };
 }
 
+/**
+ * Undo the transfer encoding of a part. A plain-text bounce is routinely sent
+ * quoted-printable, where the addresses read `=3Caddr=3E` and no pattern
+ * matches, or base64, where the whole block is unreadable. Both then parsed as
+ * "no recipients" and the bounce was silently dropped.
+ */
+function decodePart(headers: string, body: string): string {
+  const encoding = (fieldsOf(headers).get("content-transfer-encoding")?.[0] ?? "")
+    .trim()
+    .toLowerCase();
+  if (encoding === "base64") {
+    try {
+      return Buffer.from(body.replace(/\s+/g, ""), "base64").toString("utf8");
+    } catch {
+      return body;
+    }
+  }
+  if (encoding === "quoted-printable") {
+    return (
+      body
+        // A trailing "=" is a soft line break and joins the next line.
+        .replace(/=\r?\n/g, "")
+        .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+    );
+  }
+  return body;
+}
+
 function boundaryOf(headers: string): string | null {
   const contentType = fieldsOf(headers).get("content-type")?.[0] ?? "";
   const match = /boundary\s*=\s*("([^"]+)"|([^;\s]+))/i.exec(contentType);
@@ -169,14 +197,14 @@ export function extractReportParts(raw: string): {
     }
 
     if (type === "text/plain" || (type === "" && depth > 0)) {
-      text ??= body;
+      text ??= decodePart(headers, body);
       return;
     }
 
     const boundary = type.startsWith("multipart/") ? boundaryOf(headers) : null;
     if (!boundary) {
       // A single-part bounce carries everything in its body.
-      if (depth === 0) text ??= body;
+      if (depth === 0) text ??= decodePart(headers, body);
       return;
     }
     for (const part of body.split(`--${boundary}`)) {

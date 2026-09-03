@@ -215,6 +215,12 @@ function PortalProfilePage() {
   );
 }
 
+/** Empty, "DE", "D" or "Deutschland" all mean a German address. */
+function isGermanAddress(land: string): boolean {
+  const value = land.trim().toLowerCase();
+  return value === "" || value === "de" || value === "d" || value === "deutschland";
+}
+
 function validateForm(
   form: Record<FieldKey, string>,
   original: Partial<Record<FieldKey, string | null>> | null,
@@ -228,9 +234,11 @@ function validateForm(
   if (changed("email") && form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
     errors.email = "Bitte eine gültige E-Mail-Adresse eingeben.";
   }
-  if (changed("plz") && form.plz.trim() && !form.land.trim().match(/^(?!de$|d$|deutschland$)/i)) {
-    // Foreign postal codes are intentionally not constrained to five digits.
-  } else if (changed("plz") && form.plz.trim()) {
+  // Five digits is a German rule, so it applies to German addresses only. The
+  // condition used to be inverted: members abroad could not save their postal
+  // code at all, while German ones went unchecked. An empty country means
+  // Germany, as everywhere else here.
+  if (changed("plz") && form.plz.trim() && isGermanAddress(form.land)) {
     errors.plz = validatePlzMessage(form.plz) ?? undefined;
   }
   for (const key of ["telefon1", "telefon2"] as const) {

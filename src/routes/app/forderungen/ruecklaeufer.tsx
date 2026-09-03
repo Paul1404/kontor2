@@ -24,7 +24,11 @@ import { toast } from "~/components/ui/toaster";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { orpc } from "~/lib/orpc";
-import { SEPA_RETURN_REASON_OPTIONS, sepaReturnReasonLabel } from "~/lib/sepa-reason";
+import {
+  SEPA_RETURN_REASON_OPTIONS,
+  type SepaReturnReasonCode,
+  sepaReturnReasonLabel,
+} from "~/lib/sepa-reason";
 
 export const Route = createFileRoute("/app/forderungen/ruecklaeufer")({
   component: RuecklaeuferPage,
@@ -217,7 +221,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
         ? orpc.sepaReturns.createForPosting({
             sollStellungId: selected!.id,
             returnedOn,
-            reasonCode: reasonCode ? (reasonCode as "AM04") : null,
+            reasonCode: reasonCode ? (reasonCode as SepaReturnReasonCode) : null,
             reasonText: reasonText.trim() || null,
             rueckgebuhr: rueckgebuhr.trim() || "0",
             notes: notes.trim() || null,
@@ -225,7 +229,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
         : orpc.sepaReturns.create({
             feeRunItemId: selected!.id,
             returnedOn,
-            reasonCode: reasonCode ? (reasonCode as "AM04") : null,
+            reasonCode: reasonCode ? (reasonCode as SepaReturnReasonCode) : null,
             reasonText: reasonText.trim() || null,
             rueckgebuhr: rueckgebuhr.trim() || "0",
             notes: notes.trim() || null,

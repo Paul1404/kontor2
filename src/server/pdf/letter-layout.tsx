@@ -1,5 +1,6 @@
 import { Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactNode } from "react";
+import { winAnsiSafe } from "~/server/pdf/winansi";
 
 /**
  * Shared DIN 5008 (Form B) business-letter scaffold for the mailed letters
@@ -164,6 +165,11 @@ const DIN_REFERENCE_MM = 98.46;
  * The address field, info block and letterhead render on the first page only;
  * the fold marks and footer repeat on every page.
  */
+/**
+ * Every string that reaches a built-in PDF font passes through here. The
+ * address block carries member-supplied names, which is exactly where a
+ * silently wrong glyph does the most damage.
+ */
 export function LetterPage({
   logoDataUri,
   orgName,
@@ -183,37 +189,41 @@ export function LetterPage({
 
       <View style={styles.header}>
         {logoDataUri ? <Image src={logoDataUri} style={styles.logo} /> : <View />}
-        <Text style={styles.orgName}>{orgName}</Text>
+        <Text style={styles.orgName}>{winAnsiSafe(orgName)}</Text>
       </View>
 
       <View style={styles.addressField}>
-        <Text style={styles.returnLine}>{returnLine}</Text>
+        <Text style={styles.returnLine}>{winAnsiSafe(returnLine)}</Text>
         {recipientLines.map((line, i) => (
           <Text key={String(i)} style={styles.recipientLine}>
-            {line}
+            {winAnsiSafe(line)}
           </Text>
         ))}
-        {recipientNote ? <Text style={styles.recipientNote}>{recipientNote}</Text> : null}
+        {recipientNote ? (
+          <Text style={styles.recipientNote}>{winAnsiSafe(recipientNote)}</Text>
+        ) : null}
       </View>
 
       <View style={styles.infoBlock}>
         {infoRows.map((row, i) => (
           <View key={String(i)} style={styles.infoRow}>
-            <Text style={styles.infoLabel}>{row.label}</Text>
-            <Text style={styles.infoValue}>{row.value}</Text>
+            <Text style={styles.infoLabel}>{winAnsiSafe(row.label)}</Text>
+            <Text style={styles.infoValue}>{winAnsiSafe(row.value)}</Text>
           </View>
         ))}
       </View>
 
       <View style={styles.body}>
         <View style={{ height: leadHeight }} />
-        <Text style={styles.subject}>{subject}</Text>
+        <Text style={styles.subject}>{winAnsiSafe(subject)}</Text>
         {children}
       </View>
 
       <Text
         style={styles.footer}
-        render={({ pageNumber, totalPages }) => `${footerText} · Seite ${pageNumber}/${totalPages}`}
+        render={({ subPageNumber, subPageTotalPages }) =>
+          `${winAnsiSafe(footerText)} · Seite ${subPageNumber}/${subPageTotalPages}`
+        }
         fixed
       />
     </Page>

@@ -42,3 +42,22 @@ describe("SEPA_RETURN_REASON_OPTIONS", () => {
     expect(am04?.label).toBe("AM04: Konto ohne Deckung");
   });
 });
+
+/**
+ * The UI offered 28 codes while the server accepted 16, so picking one of the
+ * other twelve failed on save and the return could not be recorded. The old
+ * test only compared the option list with itself, which is why nobody noticed.
+ */
+describe("Katalog und Server-Prüfung", () => {
+  it("akzeptiert serverseitig genau die Codes, die die Oberfläche anbietet", async () => {
+    const { SEPA_RETURN_REASON_CODES } = await import("~/lib/sepa-reason");
+    const { sepaReturnsRouter } = await import("~/server/orpc/procedures/sepa-returns");
+    const schema = (sepaReturnsRouter.create as unknown as { "~orpc": { inputSchema: unknown } })[
+      "~orpc"
+    ].inputSchema as { entries: { reasonCode: unknown } };
+    const serialised = JSON.stringify(schema.entries.reasonCode);
+    for (const code of SEPA_RETURN_REASON_CODES) {
+      expect(serialised).toContain(`"${code}"`);
+    }
+  });
+});

@@ -53,7 +53,7 @@ function RundschreibenPage() {
   );
 
   const abteilungen = useQuery({
-    queryKey: ["abteilungen.list"],
+    queryKey: ["abteilungen", "list"],
     queryFn: () => orpc.abteilungen.list(),
   });
   const preview = useQuery({
