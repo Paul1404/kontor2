@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.9.1",
+    date: "2026-09-03",
+    title: "Schaltflächen bleiben lesbar",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Schaltflächen in E-Mails dunkeln die Vereinsfarbe jetzt so weit ab, dass die weiße Beschriftung sicher lesbar bleibt. Kräftige Vereinsfarben wie ein sattes Rot lagen knapp unter der Lesbarkeitsschwelle. Farbleiste und Hervorhebungen behalten den unveränderten Vereinston.",
+      },
+    ],
+  },
+  {
     version: "2.9.0",
     date: "2026-09-03",
     title: "E-Mail-Vorschau zeigt die fertige Nachricht",

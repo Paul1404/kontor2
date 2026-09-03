@@ -24,6 +24,34 @@ function luminance(hex: string): number {
   return 0.2126 * channels[0]! + 0.7152 * channels[1]! + 0.0722 * channels[2]!;
 }
 
+/** Kontrastverhältnis zwischen zwei Hex-Farben nach WCAG (1..21). */
+export function contrastRatio(a: string, b: string): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  const [hi, lo] = la > lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/**
+ * Dunkelt die Markenfarbe so weit ab, bis weiße Schrift darauf `minRatio`
+ * erreicht. Gesättigte Vereinsfarben liegen oft knapp unter der Lesbarkeits-
+ * schwelle: reines Rot #f80000 kommt auf 4,21:1. Statt dem Verein eine andere
+ * Farbe abzuverlangen, bekommt nur die Fläche mit Schrift darauf einen
+ * dunkleren Ton. Gibt die Eingabe unverändert zurück, wenn sie schon reicht.
+ */
+export function darkenForWhiteText(input: string, minRatio = 4.5): string {
+  const hex = normalizeHex(input);
+  if (!hex) return input;
+  const n = Number.parseInt(hex.slice(1), 16);
+  const rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  for (let factor = 100; factor >= 40; factor -= 1) {
+    const [r, g, b] = rgb.map((c) => Math.round((c * factor) / 100)) as [number, number, number];
+    const candidate = `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+    if (contrastRatio(candidate, "#ffffff") >= minRatio) return candidate;
+  }
+  return "#000000";
+}
+
 /** Lesbarer Vordergrund auf der Markenfarbe: nahezu weiß oder fast schwarz. */
 export function contrastForeground(hex: string): string {
   return luminance(hex) > 0.5 ? "#0a0a0a" : "#ffffff";
