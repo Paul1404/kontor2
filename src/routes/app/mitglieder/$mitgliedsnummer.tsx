@@ -15,6 +15,7 @@ import {
   LogOut,
   MailWarning,
   Pencil,
+  PenLine,
   RotateCcw,
   Trash2,
   User,
@@ -28,6 +29,7 @@ import { AustrittDialog } from "~/components/forms/AustrittDialog";
 import { AustrittsbestaetigungCard } from "~/components/forms/AustrittsbestaetigungCard";
 import { BankDetailsChangeDialog } from "~/components/forms/BankDetailsChangeDialog";
 import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
+import { BriefDialog } from "~/components/forms/BriefDialog";
 import { ContractsCard } from "~/components/forms/ContractsCard";
 import { DsgvoCard } from "~/components/forms/DsgvoCard";
 import { EhrungenCard } from "~/components/forms/EhrungenCard";
@@ -74,6 +76,7 @@ function MemberDetailPage() {
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmAustritt, setConfirmAustritt] = useState(false);
+  const [briefOpen, setBriefOpen] = useState(false);
   const [bankChangeOpen, setBankChangeOpen] = useState(false);
   const [tab, setTab] = useState("uebersicht");
 
@@ -333,6 +336,11 @@ function MemberDetailPage() {
           {canEdit ? (
             <PortalAccessButton memberId={detail.data!.member.id} email={member.email} />
           ) : null}
+          {canEdit ? (
+            <Button variant="outline" size="sm" onClick={() => setBriefOpen(true)}>
+              <PenLine className="size-4" /> Brief
+            </Button>
+          ) : null}
           {canEdit && member.memberNo && !member.verstorbenAm ? (
             member.austritt ? (
               <Button
@@ -380,6 +388,14 @@ function MemberDetailPage() {
         destructive
         loading={softDelete.isPending}
         onConfirm={() => softDelete.mutate(member.id)}
+      />
+
+      <BriefDialog
+        open={briefOpen}
+        onOpenChange={setBriefOpen}
+        memberId={member.id}
+        memberName={memberDisplayName}
+        hasAddress={Boolean(member.strasse?.trim() && member.plz?.trim() && member.ort?.trim())}
       />
 
       <AustrittDialog
