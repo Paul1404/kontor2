@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.9.2",
+    date: "2026-09-03",
+    title: "Vereinslogo auch im Versandprotokoll",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Im Versandprotokoll fehlte in jeder Nachricht das Vereinslogo. Es reist in der E-Mail als Anhang mit, den nur ein E-Mail-Programm auflösen kann. Die Ansicht setzt jetzt das hinterlegte Logo ein und zeigt die Nachricht so, wie der Empfänger sie gesehen hat.",
+      },
+    ],
+  },
+  {
     version: "2.9.1",
     date: "2026-09-03",
     title: "Schaltflächen bleiben lesbar",
