@@ -1130,8 +1130,9 @@ function BrandingCard() {
           <Palette className="size-5 text-brand" /> Erscheinungsbild
         </CardTitle>
         <CardDescription>
-          Anzeigename, Logo und Markenfarbe für die gesamte Oberfläche, Anmeldung und das
-          Mitgliederportal. Leer lassen für das Standard-Aussehen.
+          Anzeigename und Logo gelten überall. Die Markenfarbe färbt, wo der Verein nach außen
+          auftritt: Anmeldung, Mitgliederportal, E-Mails und Briefe. Die Verwaltungsoberfläche
+          behält ihr eigenes Farbschema.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -1144,7 +1145,10 @@ function BrandingCard() {
             />
           </Field>
 
-          <Field label="Markenfarbe" hint="Färbt Schaltflächen und Akzente. Leer = Standardrot.">
+          <Field
+            label="Markenfarbe"
+            hint="Gilt für Anmeldung, Portal, E-Mails und Briefe. Leer = Standardton."
+          >
             <div className="flex items-center gap-2">
               <input
                 type="color"
