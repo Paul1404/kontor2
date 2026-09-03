@@ -32,10 +32,15 @@ const handle = createServerOnlyFn(
     if (isEvidenceKind(att.kind) && session.user.role === "readonly") {
       return new Response("Forbidden", { status: 403 });
     }
+    // `?inline=1` renders the file in the browser instead of downloading it,
+    // which is what an in-app preview pane needs.
+    const inline = new URL(request.url).searchParams.get("inline") === "1";
     const url = await presignDownload({
       key: att.s3Key,
       filename: att.filename,
       expiresSeconds: 300,
+      inline,
+      contentType: inline ? att.mimeType : undefined,
     });
     return new Response(null, { status: 302, headers: { Location: url } });
   },

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ChevronDown, Paperclip } from "lucide-react";
+import { AlertTriangle, Paperclip } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { MailPreview, type MailPreviewAttachment } from "~/components/mail/MailPreview";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "~/components/ui/toaster";
@@ -26,7 +27,6 @@ export function KuendigungsMailDialog({
   const [attach, setAttach] = useState(true);
   const [attachNotice, setAttachNotice] = useState(true);
   const [letterId, setLetterId] = useState<string | null>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Keyed on the selection so the shown text is the text that would be sent.
@@ -53,7 +53,6 @@ export function KuendigungsMailDialog({
   useEffect(() => {
     if (!open) {
       seeded.current = false;
-      setPreviewOpen(false);
       setError(null);
       return;
     }
@@ -63,6 +62,31 @@ export function KuendigungsMailDialog({
     setAttach(preview.data.letters.length > 0);
     setAttachNotice(preview.data.notice != null);
   }, [open, preview.data]);
+
+  // Exactly the files that would be attached, resolvable to a viewable URL.
+  const previewAttachments: MailPreviewAttachment[] = [
+    ...(attach && letterId
+      ? [
+          {
+            id: letterId,
+            filename:
+              letters.find((l) => l.id === letterId)?.filename ?? "Austrittsbestaetigung.pdf",
+            resolveUrl: async () => (await orpc.cancellations.download({ id: letterId })).url,
+          },
+        ]
+      : []),
+    ...(attachNotice && notice
+      ? [
+          {
+            id: notice.attachmentId,
+            filename: notice.filename,
+            sizeBytes: notice.sizeBytes,
+            mimeType: notice.mimeType,
+            resolveUrl: async () => `/api/files/${notice.attachmentId}?inline=1`,
+          },
+        ]
+      : []),
+  ];
 
   const send = useMutation({
     mutationFn: () =>
@@ -194,30 +218,13 @@ export function KuendigungsMailDialog({
               ) : null}
             </div>
 
-            <div className="rounded-md border border-border bg-background p-3">
-              <button
-                type="button"
-                className="flex w-full items-center justify-between text-left text-xs font-medium"
-                aria-expanded={previewOpen}
-                onClick={() => setPreviewOpen((current) => !current)}
-              >
-                E-Mail-Vorschau
-                <ChevronDown
-                  className={`size-4 transition-transform ${previewOpen ? "rotate-180" : ""}`}
-                  aria-hidden
-                />
-              </button>
-              {previewOpen ? (
-                <div className="mt-3 space-y-2 text-xs">
-                  <p>
-                    <span className="font-medium">Betreff:</span> {preview.data.subject}
-                  </p>
-                  <pre className="whitespace-pre-wrap rounded-md bg-muted p-3 font-sans text-xs leading-relaxed">
-                    {preview.data.body}
-                  </pre>
-                </div>
-              ) : null}
-            </div>
+            <MailPreview
+              to={preview.data.to}
+              subject={preview.data.subject}
+              html={preview.data.html}
+              text={preview.data.body}
+              attachments={previewAttachments}
+            />
           </>
         ) : null}
 

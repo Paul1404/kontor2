@@ -9,6 +9,7 @@ import { memberBankDetailChangesTable } from "~/server/db/schema/bank-detail-cha
 import { membersTable } from "~/server/db/schema/members";
 import { isValidEvidence } from "~/server/domain/document-evidence";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
+import { inlineLogoForPreview } from "~/server/mail/layout";
 import {
   buildBankDetailsConfirmation,
   loadBankDetailsConfirmationOrganization,
@@ -86,6 +87,7 @@ export const bankDetailsRouter = {
         to,
         subject: content.subject,
         body: content.body,
+        html: inlineLogoForPreview(content.html, organization),
       };
     }),
 

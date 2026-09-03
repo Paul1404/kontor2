@@ -27,11 +27,12 @@ import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 export async function loadDownloadableAttachment(
   db: DB,
   id: string,
-): Promise<{ s3Key: string; filename: string; kind: AttachmentKind } | null> {
+): Promise<{ s3Key: string; filename: string; mimeType: string; kind: AttachmentKind } | null> {
   const [row] = await db
     .select({
       s3Key: attachmentsTable.s3Key,
       filename: attachmentsTable.filename,
+      mimeType: attachmentsTable.mimeType,
       kind: attachmentsTable.kind,
     })
     .from(attachmentsTable)

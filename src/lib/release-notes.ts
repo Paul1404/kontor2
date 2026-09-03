@@ -41,6 +41,28 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.9.0",
+    date: "2026-09-03",
+    title: "E-Mail-Vorschau zeigt die fertige Nachricht",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Vorschau vor dem Versand zeigt die Nachricht jetzt so, wie das Mitglied sie sieht, mit Logo, Farben und Layout. Zwischen Darstellung und reinem Text lässt sich umschalten.",
+      },
+      {
+        category: "feature",
+        description:
+          "Anhänge lassen sich direkt in der Vorschau öffnen. Austrittsbestätigung und Austrittserklärung erscheinen als PDF im Dialog, bevor die E-Mail rausgeht.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Betrifft beide Vorschauen, Bankänderung und Austritt. Bisher gab es dort nur den Textentwurf.",
+      },
+    ],
+  },
+  {
     version: "2.8.1",
     date: "2026-09-03",
     title: "Austrittserklärung geht mit zurück",
