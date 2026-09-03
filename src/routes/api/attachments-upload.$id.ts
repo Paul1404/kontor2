@@ -18,8 +18,8 @@ const handle = createServerOnlyFn(
     const [
       { auth },
       { dbForTenant },
-      { pendingUploadsTable },
-      { bankChangeEvidenceMime, isValidBankChangeEvidence },
+      { isEvidenceKind, pendingUploadsTable },
+      { evidenceMimeFor, isValidEvidence },
       { putObject },
       { logger },
       { requestHost },
@@ -29,7 +29,7 @@ const handle = createServerOnlyFn(
       import("~/server/auth/auth"),
       import("~/server/db/client"),
       import("~/server/db/schema/attachments"),
-      import("~/server/domain/bank-change-evidence"),
+      import("~/server/domain/document-evidence"),
       import("~/server/s3/client"),
       import("~/server/lib/logger"),
       import("~/server/tenants/request-host"),
@@ -76,9 +76,8 @@ const handle = createServerOnlyFn(
       return response("Dateigröße stimmt nicht mit dem Upload-Ticket überein.", 400);
     }
     if (
-      ticket.kind === "bank_details_change" &&
-      (!bankChangeEvidenceMime(ticket.filename, contentType) ||
-        !isValidBankChangeEvidence(bytes, contentType))
+      isEvidenceKind(ticket.kind) &&
+      (!evidenceMimeFor(ticket.filename, contentType) || !isValidEvidence(bytes, contentType))
     ) {
       return response("Datei entspricht nicht dem ausgewählten Nachweistyp.", 400);
     }

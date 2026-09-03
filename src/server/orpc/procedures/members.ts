@@ -21,10 +21,12 @@ import { attachmentsTable } from "~/server/db/schema/attachments";
 import { auditLogTable } from "~/server/db/schema/audit";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
+import { memberCancellationsTable } from "~/server/db/schema/member-cancellations";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { executeAustritt } from "~/server/domain/austritt";
 import {
   deriveGeschlecht,
   deriveStatus,
@@ -34,11 +36,7 @@ import {
 import { onboardMember } from "~/server/domain/member/onboard";
 import { generateMemberNumber } from "~/server/domain/member-number";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
-import {
-  planAustrittCascade,
-  planReactivateCascade,
-  toIsoDay,
-} from "~/server/lib/member-lifecycle";
+import { planReactivateCascade, toIsoDay } from "~/server/lib/member-lifecycle";
 import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import {
   CACHE_NS,
@@ -1758,153 +1756,25 @@ export const membersRouter = {
    * member and cascades it to every still-open department membership, open
    * contract and (optionally) active SEPA mandate, so the member's records
    * end up internally consistent instead of half-closed. Reversible via
-   * `reactivate`. Pure decision logic lives in `~/server/lib/member-lifecycle`.
+   * `reactivate`. Pure decision logic lives in `~/server/lib/member-lifecycle`,
+   * the write half in `~/server/domain/austritt`.
+   *
+   * This is the quick, ad-hoc entry (death, backdated correction). A voluntary
+   * Kündigung with a written Austrittserklärung goes through
+   * `cancellations.record`, which keeps the scan and the Fristberechnung.
    */
   austritt: vorstandProc.input(AustrittInput).handler(async ({ context, input }) => {
-    const austrittTs = new Date(`${input.austrittDatum}T00:00:00Z`);
-    const today = new Date();
-
     const result = await context.db.transaction(async (tx) => {
-      const [member] = await tx
-        .select()
-        .from(membersTable)
-        .where(and(eq(membersTable.id, input.memberId), memberNotDeleted()))
-        .limit(1);
-      if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
-
-      // Kündigungsfrist applies to a voluntary Austritt, not to recording a
-      // death (which is typically backdated).
-      if (input.reason === "austritt") {
-        const [settings] = await tx.select().from(organizationSettingsTable).limit(1);
-        assertCancellationAllowed(settings, austrittTs);
-      }
-
-      const [abteilungen, contracts, sepa] = await Promise.all([
-        tx
-          .select({
-            abteilungId: memberAbteilungenTable.abteilungId,
-            eintrittsdatum: memberAbteilungenTable.eintrittsdatum,
-            austrittsdatum: memberAbteilungenTable.austrittsdatum,
-          })
-          .from(memberAbteilungenTable)
-          .where(eq(memberAbteilungenTable.memberId, input.memberId)),
-        tx
-          .select({ id: contractsTable.id, gekuendZum: contractsTable.gekuendZum })
-          .from(contractsTable)
-          .where(eq(contractsTable.memberId, input.memberId)),
-        tx
-          .select({
-            id: sepaMandatesTable.id,
-            isDeleted: sepaMandatesTable.isDeleted,
-            widerrufenAm: sepaMandatesTable.widerrufenAm,
-          })
-          .from(sepaMandatesTable)
-          .where(eq(sepaMandatesTable.memberId, input.memberId)),
-      ]);
-
-      const plan = planAustrittCascade({
+      const { member, counts } = await executeAustritt(tx, {
+        memberId: input.memberId,
         austrittDatum: input.austrittDatum,
-        abteilungen,
-        contracts,
-        sepa,
+        reason: input.reason,
         revokeSepa: input.revokeSepa,
         abteilungIds: input.abteilungIds,
-      });
-
-      // Member row: stamp the leave/death date.
-      const memberSet: Record<string, unknown> = { updatedAt: today };
-      if (input.reason === "verstorben") {
-        memberSet.verstorbenAm = austrittTs;
-      } else {
-        memberSet.austritt = austrittTs;
-      }
-      // Normalized status as of today: a leave date that has arrived flips the
-      // member to ausgetreten/verstorben, but a *future* leave date leaves them
-      // live (notice given, still a member until then). The nightly reconcile
-      // flips them once the date passes.
-      memberSet.status = deriveStatus({
-        austritt: (memberSet.austritt as Date | null) ?? member.austritt,
-        verstorbenAm: (memberSet.verstorbenAm as Date | null) ?? member.verstorbenAm,
-      });
-      await tx
-        .update(membersTable)
-        .set(memberSet as never)
-        .where(eq(membersTable.id, input.memberId));
-
-      // Department memberships: close the open ones on the leave date.
-      for (const a of plan.abteilungClose) {
-        await tx
-          .update(memberAbteilungenTable)
-          .set({ austrittsdatum: input.austrittDatum })
-          .where(
-            and(
-              eq(memberAbteilungenTable.memberId, input.memberId),
-              eq(memberAbteilungenTable.abteilungId, a.abteilungId),
-              eq(memberAbteilungenTable.eintrittsdatum, a.eintrittsdatum),
-            ),
-          );
-      }
-
-      // Contracts: terminate to the leave date; record the notice date only
-      // when it is not already set.
-      if (plan.contractClose.length > 0) {
-        await tx
-          .update(contractsTable)
-          .set({
-            gekuendZum: austrittTs,
-            vertragEnde: austrittTs,
-            // Raw SQL bypasses the `date` column mapper, so pass the ISO string
-            // (input.austrittDatum), not the Date -- a Date crashes the driver.
-            gekuendAm: sql`coalesce(${contractsTable.gekuendAm}, ${input.austrittDatum})`,
-            updatedAt: today,
-          } as never)
-          .where(inArray(contractsTable.id, plan.contractClose));
-      }
-
-      // SEPA mandates: revoke as of the leave date so no further debits run.
-      if (plan.sepaRevoke.length > 0) {
-        await tx
-          .update(sepaMandatesTable)
-          .set({ widerrufenAm: austrittTs, gultigBis: austrittTs, updatedAt: today } as never)
-          .where(inArray(sepaMandatesTable.id, plan.sepaRevoke));
-      }
-
-      const auditId = await appendAudit(tx, {
-        entityType: "member",
-        entityId: input.memberId,
-        action: "update",
-        source: "ui",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        changes: {
-          [input.reason === "verstorben" ? "verstorbenAm" : "austritt"]: {
-            before: input.reason === "verstorben" ? member.verstorbenAm : member.austritt,
-            after: input.austrittDatum,
-          },
-          austrittKaskade: {
-            before: null,
-            after: {
-              abteilungen: plan.abteilungClose.length,
-              vertraege: plan.contractClose.length,
-              sepaMandate: plan.sepaRevoke.length,
-            },
-          },
-        },
+        actor: { id: context.session!.user.id, email: context.session!.user.email },
         requestId: context.requestId ?? null,
       });
-      await takeMemberSnapshot(tx, input.memberId, {
-        trigger: "mutation",
-        actorId: context.session!.user.id,
-        actorEmail: context.session!.user.email,
-        auditId,
-      });
-
-      return {
-        mitgliedsnummer: member.mitgliedsnummer,
-        abteilungen: plan.abteilungClose.length,
-        vertraege: plan.contractClose.length,
-        sepaMandate: plan.sepaRevoke.length,
-      };
+      return { mitgliedsnummer: member.mitgliedsnummer, ...counts };
     });
 
     await invalidateMemberCaches(context.tenant.key);
@@ -2017,6 +1887,20 @@ export const membersRouter = {
             .where(eq(sepaMandatesTable.id, s.id));
         }
 
+        // Mark the matching Kündigungs-Quittung as withdrawn. The receipt stays
+        // as history; only its "this cancellation is in force" flag drops.
+        const revokedReceipts = await tx
+          .update(memberCancellationsTable)
+          .set({ revokedAt: now })
+          .where(
+            and(
+              eq(memberCancellationsTable.memberId, input.memberId),
+              eq(memberCancellationsTable.effectiveDate, day),
+              isNull(memberCancellationsTable.revokedAt),
+            ),
+          )
+          .returning({ id: memberCancellationsTable.id });
+
         const auditId = await appendAudit(tx, {
           entityType: "member",
           entityId: input.memberId,
@@ -2026,6 +1910,11 @@ export const membersRouter = {
           actorEmail: context.session!.user.email,
           changes: {
             austritt: { before: day, after: null },
+            ...(revokedReceipts.length > 0
+              ? {
+                  kuendigungWiderrufen: { before: null, after: revokedReceipts.length },
+                }
+              : {}),
             reaktivierung: {
               before: null,
               after: {

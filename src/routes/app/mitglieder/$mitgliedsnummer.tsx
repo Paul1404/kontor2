@@ -31,6 +31,7 @@ import { ContractsCard } from "~/components/forms/ContractsCard";
 import { DsgvoCard } from "~/components/forms/DsgvoCard";
 import { EhrungenCard } from "~/components/forms/EhrungenCard";
 import { FamilieCard } from "~/components/forms/FamilieCard";
+import { KuendigungsCard } from "~/components/forms/KuendigungsCard";
 import { SepaCard } from "~/components/forms/SepaCard";
 import { WiedervorlagenCard } from "~/components/forms/WiedervorlagenCard";
 import { SnapshotsTab } from "~/components/snapshots/SnapshotsTab";
@@ -378,6 +379,7 @@ function MemberDetailPage() {
         onOpenChange={setConfirmAustritt}
         memberId={member.id}
         memberName={memberDisplayName}
+        expectedUpdatedAt={new Date(member.updatedAt).toISOString()}
         abteilungen={abteilungen}
         vertraege={vertraege}
         sepa={sepa}
@@ -614,6 +616,8 @@ function MemberDetailPage() {
             anhaenge={anhaenge}
             canEdit={canEdit}
           />
+
+          <KuendigungsCard memberId={member.id} />
 
           <AustrittsbestaetigungCard
             memberId={member.id}

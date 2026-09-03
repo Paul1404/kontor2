@@ -445,7 +445,7 @@ function VereinsdatenPage() {
                   <>
                     <Field
                       label="Kündigungsfrist in Tagen"
-                      hint="Frühester Austrittstermin ab heute. 0 = sofort."
+                      hint="Zählt ab Eingang der Austrittserklärung. 6 Wochen = 42. 0 = sofort."
                     >
                       <Input
                         type="number"
@@ -638,7 +638,10 @@ function VereinsdatenPage() {
                     <option value="ja">An</option>
                   </Select>
                 </Field>
-                <Field label="Zulässiger Austrittstermin">
+                <Field
+                  label="Zulässiger Austrittstermin"
+                  hint="Auf diesen Termin rundet die Kündigungserfassung vor."
+                >
                   <Select
                     value={form.tenantPolicy.cancellationDateMode}
                     onChange={(e) =>

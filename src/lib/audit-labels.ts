@@ -46,6 +46,13 @@ const FIELD_LABELS: Record<string, string> = {
   bankChangeEvidence: "Nachweis der Bankänderung",
   bankChangeRequestedAt: "Anfrage eingegangen am",
   bankChangeMandateReviewed: "SEPA-Mandat geprüft",
+  austrittKaskade: "Austrittskaskade",
+  kuendigungNachweis: "Austrittserklärung",
+  kuendigungEingang: "Kündigung eingegangen am",
+  kuendigungBerechneterTermin: "Austrittstermin nach Satzung",
+  kuendigungAbweichung: "Abweichender Austrittstermin",
+  kuendigungWiderrufen: "Kündigung widerrufen",
+  reaktivierung: "Reaktivierung",
   mandatsrefenz: "Mandatsreferenz",
   mitgliedsnummer: "Mitgliedsnummer",
   adrNr: "AdrNr",
@@ -100,6 +107,8 @@ const DATE_FIELDS = new Set([
   "widerrufenAm",
   "angelegtAm",
   "bankChangeRequestedAt",
+  "kuendigungEingang",
+  "kuendigungBerechneterTermin",
 ]);
 
 export function fieldLabel(name: string): string {

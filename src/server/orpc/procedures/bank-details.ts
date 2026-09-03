@@ -7,7 +7,7 @@ import { lastFour } from "~/server/crypto/encrypt";
 import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
 import { memberBankDetailChangesTable } from "~/server/db/schema/bank-detail-changes";
 import { membersTable } from "~/server/db/schema/members";
-import { isValidBankChangeEvidence } from "~/server/domain/bank-change-evidence";
+import { isValidEvidence } from "~/server/domain/document-evidence";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import {
   buildBankDetailsConfirmation,
@@ -163,7 +163,7 @@ export const bankDetailsRouter = {
         metadata.contentLength !== candidate.sizeBytes ||
         metadata.contentType !== candidate.mimeType ||
         bytes.byteLength !== candidate.sizeBytes ||
-        !isValidBankChangeEvidence(bytes, candidate.mimeType)
+        !isValidEvidence(bytes, candidate.mimeType)
       ) {
         throw new ORPCError("VALIDATION_FAILED", {
           message: "Die Datei entspricht nicht dem ausgewählten Nachweistyp.",

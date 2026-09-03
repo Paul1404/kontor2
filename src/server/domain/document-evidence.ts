@@ -1,4 +1,4 @@
-export const BANK_CHANGE_MAX_BYTES = 10 * 1024 * 1024;
+export const EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   ".pdf": "application/pdf",
@@ -9,9 +9,9 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   ".msg": "application/vnd.ms-outlook",
 };
 
-export const BANK_CHANGE_ACCEPT = Object.keys(MIME_BY_EXTENSION).join(",");
+export const EVIDENCE_ACCEPT = Object.keys(MIME_BY_EXTENSION).join(",");
 
-export function bankChangeEvidenceMime(filename: string, reportedMime: string): string | null {
+export function evidenceMimeFor(filename: string, reportedMime: string): string | null {
   const dot = filename.lastIndexOf(".");
   const extension = dot >= 0 ? filename.slice(dot).toLowerCase() : "";
   const expected = MIME_BY_EXTENSION[extension];
@@ -27,7 +27,7 @@ export function bankChangeEvidenceMime(filename: string, reportedMime: string): 
   return null;
 }
 
-export function isValidBankChangeEvidence(bytes: Uint8Array, mimeType: string): boolean {
+export function isValidEvidence(bytes: Uint8Array, mimeType: string): boolean {
   if (bytes.byteLength === 0) return false;
   if (mimeType === "application/pdf") {
     return startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d]);

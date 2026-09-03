@@ -2,7 +2,26 @@ import { bigint, index, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-o
 import { users } from "~/server/db/schema/auth";
 import { membersTable } from "~/server/db/schema/members";
 
-export const attachmentKindEnum = pgEnum("attachment_kind", ["general", "bank_details_change"]);
+/**
+ * `general` is a free-form member document. The other kinds are evidence tied
+ * to a documented workflow: they are validated against their magic bytes on
+ * upload, referenced by an append-only receipt row, and hidden from readonly
+ * users because they usually contain bank or signature data.
+ */
+export const attachmentKindEnum = pgEnum("attachment_kind", [
+  "general",
+  "bank_details_change",
+  "cancellation_notice",
+]);
+
+/** Attachment kinds that carry workflow evidence rather than a plain document. */
+export const EVIDENCE_ATTACHMENT_KINDS = ["bank_details_change", "cancellation_notice"] as const;
+
+export type AttachmentKind = (typeof attachmentKindEnum.enumValues)[number];
+
+export function isEvidenceKind(kind: AttachmentKind): boolean {
+  return (EVIDENCE_ATTACHMENT_KINDS as readonly string[]).includes(kind);
+}
 
 export const attachmentsTable = pgTable(
   "attachments",
