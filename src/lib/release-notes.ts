@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.12.1",
+    date: "2026-09-03",
+    title: "Bounce-Prüfung erkennt Berichte wirklich",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die Bounce-Prüfung hat jeden gefundenen Bericht wieder verworfen. Der maschinenlesbare Teil einer Unzustellbarkeitsmeldung wurde beim Einlesen der Nachricht verschluckt, sodass jeder Bericht als leer galt. Er wird jetzt direkt aus der Nachricht gelesen.",
+      },
+    ],
+  },
+  {
     version: "2.12.0",
     date: "2026-09-03",
     title: "Einzelbrief an ein Mitglied",

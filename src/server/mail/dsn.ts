@@ -109,6 +109,75 @@ export function parseOriginalMessageId(headers: string): string | null {
   return trimmed.startsWith("<") && trimmed.endsWith(">") ? trimmed.slice(1, -1) : trimmed || null;
 }
 
+/** Split a raw MIME block into its header text and its body text. */
+function splitHeadersAndBody(block: string): { headers: string; body: string } {
+  const match = /\r?\n\r?\n/.exec(block);
+  if (!match) return { headers: block, body: "" };
+  return {
+    headers: block.slice(0, match.index),
+    body: block.slice(match.index + match[0].length),
+  };
+}
+
+function boundaryOf(headers: string): string | null {
+  const contentType = fieldsOf(headers).get("content-type")?.[0] ?? "";
+  const match = /boundary\s*=\s*("([^"]+)"|([^;\s]+))/i.exec(contentType);
+  return match?.[2] ?? match?.[3] ?? null;
+}
+
+function contentTypeOf(headers: string): string {
+  return (fieldsOf(headers).get("content-type")?.[0] ?? "").split(";", 1)[0]!.trim().toLowerCase();
+}
+
+/**
+ * Pull the report parts straight out of the raw message.
+ *
+ * Written by hand on purpose: a general-purpose mail parser drops the
+ * `message/delivery-status` part, because it is neither body text nor a
+ * conventional attachment. Relying on one meant every bounce was read as
+ * "no report" and silently discarded. The structure here is small and fixed by
+ * RFC 3464, so splitting it directly is both shorter and more dependable.
+ */
+export function extractReportParts(raw: string): {
+  deliveryStatus: string | null;
+  originalHeaders: string | null;
+} {
+  let deliveryStatus: string | null = null;
+  let originalHeaders: string | null = null;
+
+  const walk = (block: string, depth: number): void => {
+    if (depth > 5) return;
+    const { headers, body } = splitHeadersAndBody(block);
+    const type = contentTypeOf(headers);
+
+    if (type === "message/delivery-status") {
+      deliveryStatus ??= body;
+      return;
+    }
+    if (type === "text/rfc822-headers") {
+      originalHeaders ??= body;
+      return;
+    }
+    if (type === "message/rfc822") {
+      // Only the returned header block is of interest; the body may be the
+      // entire original message.
+      originalHeaders ??= splitHeadersAndBody(body).headers;
+      return;
+    }
+
+    const boundary = type.startsWith("multipart/") ? boundaryOf(headers) : null;
+    if (!boundary) return;
+    for (const part of body.split(`--${boundary}`)) {
+      const trimmed = part.replace(/^\r?\n/, "");
+      if (!trimmed.trim() || trimmed.startsWith("--")) continue;
+      walk(trimmed, depth + 1);
+    }
+  };
+
+  walk(raw.replace(/\r\n/g, "\n"), 0);
+  return { deliveryStatus, originalHeaders };
+}
+
 export function parseDsn(parts: {
   deliveryStatus: string | null;
   originalHeaders: string | null;

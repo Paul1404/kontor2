@@ -1,8 +1,7 @@
 import { ImapFlow } from "imapflow";
-import { simpleParser } from "mailparser";
 import { loadSmtpConfig } from "~/server/auth/send-invite";
 import type { DB } from "~/server/db/client";
-import { type DsnRecipient, parseDsn } from "~/server/mail/dsn";
+import { type DsnRecipient, extractReportParts, parseDsn } from "~/server/mail/dsn";
 
 const IMAPS_PORT = 993;
 const MAX_MESSAGES = 200;
@@ -71,30 +70,6 @@ function isDaemonSender(address: string | undefined): boolean {
 }
 
 /**
- * Pull the machine-readable parts out of a parsed report. RFC 3464 puts the
- * per-recipient fields in a `message/delivery-status` part and the returned
- * headers in a `text/rfc822-headers` or `message/rfc822` part.
- */
-function extractParts(parsed: Awaited<ReturnType<typeof simpleParser>>): {
-  deliveryStatus: string | null;
-  originalHeaders: string | null;
-} {
-  let deliveryStatus: string | null = null;
-  let originalHeaders: string | null = null;
-  for (const attachment of parsed.attachments ?? []) {
-    const type = attachment.contentType?.toLowerCase() ?? "";
-    const content = attachment.content?.toString("utf8") ?? "";
-    if (type === "message/delivery-status") deliveryStatus ??= content;
-    else if (type === "text/rfc822-headers") originalHeaders ??= content;
-    else if (type === "message/rfc822") {
-      // Only the header block is needed; the body may be the whole mail back.
-      originalHeaders ??= content.split(/\r?\n\r?\n/, 1)[0] ?? null;
-    }
-  }
-  return { deliveryStatus, originalHeaders };
-}
-
-/**
  * Read delivery failure reports from the configured mailbox.
  *
  * The bounce lands in the same inbox the club sends from, so no extra address
@@ -153,8 +128,7 @@ export async function readBounces(db: DB, opts: { since: Date }): Promise<Bounce
         { uid: true },
       );
       if (fetched === false || !fetched.source) continue;
-      const parsed = await simpleParser(fetched.source, { skipImageLinks: true });
-      const parts = extractParts(parsed);
+      const parts = extractReportParts(fetched.source.toString("utf8"));
       if (!parts.deliveryStatus) continue;
       const dsn = parseDsn(parts);
       if (dsn.recipients.length === 0) continue;
