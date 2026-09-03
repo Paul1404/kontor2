@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.14.1",
+    date: "2026-09-03",
+    title: "Briefe lassen sich wieder erzeugen",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Der Brief und der Brief zur Bankänderung brachen mit einer technischen Fehlermeldung ab, sobald der Dateiname Umlaute enthielt. Beide werden jetzt wieder erzeugt und heruntergeladen.",
+      },
+    ],
+  },
+  {
     version: "2.14.0",
     date: "2026-09-03",
     title: "Anlagen zum Brief",

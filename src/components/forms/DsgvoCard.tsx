@@ -13,7 +13,7 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { toast } from "~/components/ui/toaster";
-import { triggerDownload, triggerDownloadBase64 } from "~/lib/download";
+import { triggerDocumentDownload, triggerDownload } from "~/lib/download";
 import { EMPTY_VALUE, formatDate } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
@@ -50,7 +50,7 @@ export function DsgvoCard({
     mutationFn: () => orpc.dsgvo.createAuskunftRequest({ memberId, notes: "" }),
     onSuccess: (res) => {
       triggerDownload(res.json.filename, res.json.content, "application/json");
-      triggerDownloadBase64(res.pdf.filename, res.pdf.base64, "application/pdf");
+      triggerDocumentDownload(res.pdf);
       toast.success("DSGVO-Auskunft erstellt", {
         description: `SHA-256: ${res.sha256.slice(0, 12)}…`,
       });

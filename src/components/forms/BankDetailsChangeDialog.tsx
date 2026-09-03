@@ -9,7 +9,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { toast } from "~/components/ui/toaster";
-import { triggerDownloadBase64 } from "~/lib/download";
+import { triggerDocumentDownload } from "~/lib/download";
 import { orpc } from "~/lib/orpc";
 import { formatIbanGrouped, normalizeIban, validateIban } from "~/server/sepa/iban";
 
@@ -178,7 +178,7 @@ export function BankDetailsChangeDialog({
         debitAction,
       }),
     onSuccess: (res) => {
-      triggerDownloadBase64(res.base64, res.filename, "application/pdf");
+      triggerDocumentDownload(res);
       toast.success(`Brief ${res.docRef} erzeugt.`, {
         description: "Der Vorgang steht als Postversand im Versandprotokoll.",
       });

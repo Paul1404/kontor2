@@ -50,7 +50,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { isKeineAbteilung } from "~/lib/abteilung-filter";
 import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/audit-labels";
 import { formatLand } from "~/lib/country";
-import { triggerDownload, triggerDownloadBase64 } from "~/lib/download";
+import { triggerDocumentDownload, triggerDownload } from "~/lib/download";
 import {
   EMPTY_VALUE,
   formatCurrency,
@@ -944,7 +944,7 @@ function SollstellungenCard({
   const rechnung = useMutation({
     mutationFn: () => orpc.invoices.renderForMember({ memberId }),
     onSuccess: (res) => {
-      triggerDownloadBase64(res.filename, res.base64, "application/pdf");
+      triggerDocumentDownload(res);
       toast.success(`Rechnung ${res.docRef} erzeugt`);
     },
     onError: (e: Error) => toast.error("Rechnung fehlgeschlagen", { description: e.message }),

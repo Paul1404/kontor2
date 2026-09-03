@@ -16,7 +16,14 @@ export function triggerDownload(
 
 /**
  * Decode a base64 string into a Blob and trigger a download. Used for
- * server-rendered PDFs that travel as base64 across the oRPC JSON boundary.
+ * server-rendered documents that travel as base64 across the oRPC JSON
+ * boundary.
+ *
+ * Prefer `triggerDocumentDownload` where the server hands back a
+ * `{ filename, base64 }` object. Two adjacent string parameters are easy to
+ * swap, and swapping them decodes the filename as base64, which fails with the
+ * opaque "The string contains invalid characters" instead of anything that
+ * points at the mistake.
  */
 export function triggerDownloadBase64(
   filename: string,
@@ -35,4 +42,16 @@ export function triggerDownloadBase64(
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Download a document the server returned as `{ filename, base64 }`. Taking the
+ * object rather than two strings makes the argument order impossible to get
+ * wrong.
+ */
+export function triggerDocumentDownload(
+  doc: { filename: string; base64: string },
+  mimeType = "application/pdf",
+) {
+  triggerDownloadBase64(doc.filename, doc.base64, mimeType);
 }
