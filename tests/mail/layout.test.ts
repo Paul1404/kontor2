@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MailOrganization } from "~/server/mail/branding";
-import { paragraphsFromText, renderMail } from "~/server/mail/layout";
+import { inlineLogoForPreview, paragraphsFromText, renderMail } from "~/server/mail/layout";
 
 const organization: MailOrganization = {
   displayName: "SV Beispiel",
@@ -150,6 +150,27 @@ describe("mail layout", () => {
     // The Kontor² credit stays either way.
     expect(written.text).toContain("Technisch versendet über Kontor².");
     expect(written.html).toContain('href="https://kontor2.com"');
+  });
+
+  it("swaps the cid logo for a data URI so a browser preview can show it", () => {
+    const mail = render();
+    expect(mail.html).toContain("cid:vereinslogo@kontor2");
+    const preview = inlineLogoForPreview(mail.html, organization);
+    expect(preview).not.toContain("cid:vereinslogo@kontor2");
+    expect(preview).toContain(organization.logoDataUri as string);
+    // The mail itself must keep the cid; only the preview copy is rewritten.
+    expect(mail.html).toContain("cid:vereinslogo@kontor2");
+  });
+
+  it("leaves preview HTML untouched when the club has no logo", () => {
+    const noLogo = { ...organization, logoDataUri: null };
+    const mail = renderMail({
+      organization: noLogo,
+      preheader: "x",
+      subline: "y",
+      blocks: [{ kind: "paragraph", text: "z" }],
+    });
+    expect(inlineLogoForPreview(mail.html, noLogo)).toBe(mail.html);
   });
 
   it("never leaves a run of blank lines in the text part", () => {

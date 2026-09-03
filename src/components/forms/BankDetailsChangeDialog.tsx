@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ChevronDown, FileUp, Mail } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { MailPreview } from "~/components/mail/MailPreview";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
@@ -366,16 +367,12 @@ export function BankDetailsChangeDialog({
           </button>
           {emailPreviewOpen && emailPreview.data ? (
             <div className="mt-3 space-y-2 text-xs">
-              <p>
-                <span className="font-medium">An:</span>{" "}
-                {emailPreview.data.to ?? "Keine E-Mail-Adresse hinterlegt"}
-              </p>
-              <p>
-                <span className="font-medium">Betreff:</span> {emailPreview.data.subject}
-              </p>
-              <pre className="whitespace-pre-wrap rounded-md bg-muted p-3 font-sans text-xs leading-relaxed">
-                {emailPreview.data.body}
-              </pre>
+              <MailPreview
+                to={emailPreview.data.to}
+                subject={emailPreview.data.subject}
+                html={emailPreview.data.html}
+                text={emailPreview.data.body}
+              />
               {!validIban ? (
                 <p className="text-muted-foreground">
                   Die Vorschau zeigt XXXX, bis eine gültige neue IBAN eingegeben wurde.

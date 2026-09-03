@@ -18,7 +18,7 @@ import { memberRef } from "~/server/domain/member";
 import { computeCancellationDate } from "~/server/lib/cancellation-frist";
 import { loadMailOrganization } from "~/server/mail/branding";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
-import { renderMail } from "~/server/mail/layout";
+import { inlineLogoForPreview, renderMail } from "~/server/mail/layout";
 import {
   buildCancellationConfirmation,
   type CancellationConfirmationParams,
@@ -99,7 +99,12 @@ async function loadCancellationFacts(
   | (Omit<CancellationConfirmationParams, "to" | "clubDisplayName" | "attached"> & {
       to: string | null;
       /** The member's own Austrittserklärung from the newest live receipt. */
-      notice: { attachmentId: string; filename: string; sizeBytes: number } | null;
+      notice: {
+        attachmentId: string;
+        filename: string;
+        sizeBytes: number;
+        mimeType: string;
+      } | null;
     })
   | null
 > {
@@ -127,6 +132,7 @@ async function loadCancellationFacts(
       evidenceAttachmentId: memberCancellationsTable.evidenceAttachmentId,
       evidenceFilename: attachmentsTable.filename,
       evidenceSizeBytes: attachmentsTable.sizeBytes,
+      evidenceMimeType: attachmentsTable.mimeType,
       evidenceMemberId: attachmentsTable.memberId,
       evidenceDeletedAt: attachmentsTable.deletedAt,
     })
@@ -175,6 +181,7 @@ async function loadCancellationFacts(
             attachmentId: receipt.evidenceAttachmentId,
             filename: receipt.evidenceFilename,
             sizeBytes: receipt.evidenceSizeBytes,
+            mimeType: receipt.evidenceMimeType,
           }
         : null,
   };
@@ -454,13 +461,14 @@ export const cancellationsRouter = {
           notice: input.attachNotice && facts.notice != null,
         },
       });
-      const { text } = renderMail({ ...content.document, organization });
+      const { text, html } = renderMail({ ...content.document, organization });
       return {
         canSend: Boolean(facts.to && smtp),
         reason: !facts.to ? "no_recipient" : !smtp ? "smtp_not_configured" : null,
         to: facts.to,
         subject: content.subject,
         body: text,
+        html: inlineLogoForPreview(html, organization),
         effectiveDate: facts.effectiveDate,
         noticeReceivedOn: facts.noticeReceivedOn,
         letters,
@@ -776,7 +784,13 @@ export const cancellationsRouter = {
 
   /** Presigned download URL for a stored letter. */
   download: authedProc
-    .input(v.object({ id: v.pipe(v.string(), v.minLength(1)) }))
+    .input(
+      v.object({
+        id: v.pipe(v.string(), v.minLength(1)),
+        /** Render in the browser instead of downloading. Used by the preview. */
+        inline: v.optional(v.boolean(), false),
+      }),
+    )
     .handler(async ({ context, input }) => {
       const [row] = await context.db
         .select({
@@ -787,7 +801,12 @@ export const cancellationsRouter = {
         .where(eq(cancellationLettersTable.id, input.id))
         .limit(1);
       if (!row) throw new ORPCError("NOT_FOUND", { message: "Dokument nicht gefunden." });
-      const url = await presignDownload({ key: row.s3Key, filename: row.filename });
+      const url = await presignDownload({
+        key: row.s3Key,
+        filename: row.filename,
+        inline: input.inline,
+        contentType: input.inline ? "application/pdf" : undefined,
+      });
       return { url };
     }),
 };

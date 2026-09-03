@@ -218,3 +218,14 @@ export function paragraphsFromText(value: string): MailBlock[] {
     .filter(Boolean)
     .map((text) => ({ kind: "paragraph", text }) as MailBlock);
 }
+
+/**
+ * Make rendered mail HTML displayable in a browser. The logo travels as an
+ * inline attachment, so `cid:` only resolves inside a mail client; a preview
+ * pane would show a broken image instead. Swapping in the stored data URI
+ * makes the preview look like the mail the member receives.
+ */
+export function inlineLogoForPreview(html: string, organization: MailOrganization): string {
+  if (!organization.logoDataUri) return html;
+  return html.replaceAll(`cid:${MAIL_LOGO_CID}`, organization.logoDataUri);
+}
