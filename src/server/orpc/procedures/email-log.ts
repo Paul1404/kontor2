@@ -188,7 +188,9 @@ export const emailLogRouter = {
       const outcome = await applyBounces(context.db, reports.reports, {
         actorEmail: context.session!.user.email,
       });
-      return { ...outcome, days };
+      // Report what was looked at, not just what was found. "0 gefunden" alone
+      // cannot tell an empty mailbox from a search that matched nothing.
+      return { ...outcome, days, examined: reports.examined, candidates: reports.candidates };
     }),
 
   /** Read-only snapshot of one outbound message. Binary attachments are never returned. */

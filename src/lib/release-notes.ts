@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.11.1",
+    date: "2026-09-03",
+    title: "Bounce-Prüfung findet zuverlässig",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die Bounce-Prüfung suchte serverseitig nach einem Kopfzeilenmerkmal. Server, die diese Kopfzeile nicht durchsuchbar machen, lieferten dabei nichts zurück, was wie Keine Bounces vorhanden aussah. Jetzt entscheidet der Aufbau der Nachricht.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Meldung nennt jetzt, wie viele Nachrichten geprüft wurden und wie viele davon als Bericht in Frage kamen. Ein leeres Ergebnis lässt sich damit von einer erfolglosen Suche unterscheiden.",
+      },
+    ],
+  },
+  {
     version: "2.11.0",
     date: "2026-09-03",
     title: "Bestätigungen auch auf dem Postweg",
