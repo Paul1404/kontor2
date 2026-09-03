@@ -208,6 +208,11 @@ function RundschreibenPage() {
                   {previewBody || <span className="text-muted-foreground">Kein Text</span>}
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Der Text wird beim Versand in das Vereinslayout gesetzt: Logo, Farbe und
+                Kontaktangaben aus den Vereinsdaten. Leerzeilen trennen Absätze. Eine Testmail zeigt
+                das fertige Ergebnis.
+              </p>
             </CardContent>
           </Card>
         </div>

@@ -125,6 +125,14 @@ changelog stuck at 0.4.0 while many features shipped.
 - Icon-only buttons need an `aria-label` (a `title` tooltip is not an
   accessible name).
 - German UI copy: short, direct, human. No "leverage", "seamless", "robust".
+- Mail copy has two audiences and must address the right one. Member-facing
+  mail (Bankbestätigung, Portal, Antrag, Mahnung, Rundschreiben) is the club
+  writing to a person: never call the admin system "Ihre Vereinsverwaltung"
+  there, and name the topic in the `subline` ("Bankverbindung", "Offene
+  Beiträge"). Verwaltungs-facing mail (Benutzer-Einladung, Passwort-Reset,
+  Test-Mail) may talk about the Vereinsverwaltung, because the recipient works
+  in it. A notice the club sends to itself passes `closing: null` so it does
+  not sign off to itself.
 - Errors from procedures use `ORPCError` with uppercase codes, never plain
   `Error`.
 

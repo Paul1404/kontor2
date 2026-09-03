@@ -41,6 +41,47 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.6.0",
+    date: "2026-09-03",
+    title: "Einheitliches Layout für alle E-Mails",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Alle ausgehenden E-Mails erscheinen jetzt im selben Vereinslayout: Logo, Vereinsfarbe, Anschrift und Kontaktangaben aus den Vereinsdaten. Bisher war nur die Bankbestätigung gestaltet, alles andere reiner Text.",
+      },
+      {
+        category: "feature",
+        description:
+          "Links in Einladungen, Portal-Zugängen und Anträgen sind jetzt Schaltflächen. Die vollständige Adresse steht weiterhin darunter, damit sie sich kopieren lässt.",
+      },
+      {
+        category: "feature",
+        description:
+          "Das Rundschreiben wird beim Versand in dasselbe Layout gesetzt. Leerzeilen trennen Absätze. Die Testmail zeigt das fertige Ergebnis.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Jede E-Mail enthält weiterhin eine reine Textfassung für Programme ohne HTML-Anzeige. Das Versandprotokoll speichert beide Fassungen.",
+      },
+      {
+        category: "improvement",
+        description: "Die Fußzeile verweist mit einem kleinen Link auf kontor2.com.",
+      },
+      {
+        category: "fix",
+        description:
+          "Die Texte sprechen jetzt den tatsächlichen Empfänger an. Die Bankbestätigung nennt dem Mitglied nicht mehr \u201eIhre Vereinsverwaltung\u201c, und interne Benachrichtigungen an den Verein grüßen sich nicht mehr selbst.",
+      },
+      {
+        category: "internal",
+        description:
+          "Text und HTML entstehen aus derselben Bausteinliste und können nicht mehr auseinanderlaufen. Alle Mails nutzen jetzt einen gemeinsamen Versandweg statt vier eigener Verbindungen.",
+      },
+    ],
+  },
+  {
     version: "2.5.0",
     date: "2026-09-03",
     title: "Kündigung mit Nachweis und Fristberechnung",

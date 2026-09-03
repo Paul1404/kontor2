@@ -1,6 +1,6 @@
-import nodemailer from "nodemailer";
-import { loadSmtpConfig } from "~/server/auth/send-invite";
+import { sendBrandedMail } from "~/server/auth/send-invite";
 import type { DB } from "~/server/db/client";
+import type { MailBlock } from "~/server/mail/layout";
 
 const LEVEL_TITLES: Record<1 | 2 | 3, string> = {
   1: "Zahlungserinnerung",
@@ -17,7 +17,12 @@ const LEVEL_PHRASE: Record<1 | 2 | 3, string> = {
 export type DunningEmailContent = {
   to: string;
   subject: string;
+  /** Message body as the Vorstand previews it, without the club header/footer. */
   body: string;
+  /** Inbox preview line. Says something the subject does not already say. */
+  preheader: string;
+  greeting: string;
+  blocks: MailBlock[];
   attachmentName: string;
 };
 
@@ -52,8 +57,28 @@ function fmtDate(s: string): string {
  */
 export function buildDunningEmail(p: DunningEmailParams): DunningEmailContent {
   const title = LEVEL_TITLES[p.level];
+  const greeting = `Guten Tag ${p.recipientName},`;
+  const blocks: MailBlock[] = [
+    {
+      kind: "paragraph",
+      text: `anbei erhalten Sie ${LEVEL_PHRASE[p.level]} zu noch offenen Beiträgen.`,
+    },
+    {
+      kind: "callout",
+      label: "Offener Betrag",
+      value: `${fmtMoney(p.totalDue)} · fällig bis ${fmtDate(p.dueDate)}`,
+    },
+    {
+      kind: "paragraph",
+      text: "Die einzelnen Posten und unsere Bankverbindung finden Sie im angehängten PDF.",
+    },
+    {
+      kind: "note",
+      text: "Sollte sich Ihre Zahlung mit diesem Schreiben überschnitten haben, betrachten Sie es bitte als gegenstandslos.",
+    },
+  ];
   const body = [
-    `Guten Tag ${p.recipientName},`,
+    greeting,
     ``,
     `anbei erhalten Sie ${LEVEL_PHRASE[p.level]} zu noch offenen Beiträgen.`,
     `Der offene Gesamtbetrag beträgt ${fmtMoney(p.totalDue)} und ist bis zum ${fmtDate(p.dueDate)} zu begleichen.`,
@@ -66,16 +91,20 @@ export function buildDunningEmail(p: DunningEmailParams): DunningEmailContent {
   ].join("\n");
   return {
     to: p.to,
-    subject: `${title} - Mitgliedsnummer ${p.mitgliedsnummer}`,
+    preheader: `${fmtMoney(p.totalDue)} offen, fällig bis ${fmtDate(p.dueDate)}.`,
+    subject: `${title}: Mitgliedsnummer ${p.mitgliedsnummer}`,
     body,
+    greeting,
+    blocks,
     attachmentName: p.attachmentName,
   };
 }
 
 /**
- * Send a dunning email with the rendered Mahnung PDF attached. The PDF is
- * already stored base64-encoded on the dunning item, so we attach it
- * directly without re-rendering.
+ * Send a dunning email with the rendered Mahnung PDF attached, in the shared
+ * club design. The PDF is already stored base64-encoded on the dunning item,
+ * so we attach it directly without re-rendering. The returned body is what
+ * actually went out, so the caller logs the exact message.
  */
 export async function sendDunningEmail(
   db: DB,
@@ -83,38 +112,28 @@ export async function sendDunningEmail(
     content: DunningEmailContent;
     pdfBase64: string;
   },
-): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const cfg = await loadSmtpConfig(db);
-  if (!cfg) return { ok: false, reason: "smtp_not_configured" };
-  const t = nodemailer.createTransport({
-    host: cfg.host,
-    port: cfg.port,
-    secure: cfg.secure,
-    requireTLS: !cfg.secure && cfg.requireTls,
-    auth: cfg.username ? { user: cfg.username, pass: cfg.password ?? "" } : undefined,
-    tls: {
-      servername: cfg.host,
-      rejectUnauthorized: !cfg.allowInvalidCerts,
-      minVersion: "TLSv1.2",
+): Promise<
+  | { ok: true; bodyText: string; bodyHtml: string }
+  | { ok: false; reason: string; bodyText: string; bodyHtml: string }
+> {
+  const res = await sendBrandedMail(db, {
+    to: opts.content.to,
+    subject: opts.content.subject,
+    attachments: [
+      {
+        filename: opts.content.attachmentName,
+        content: Buffer.from(opts.pdfBase64, "base64"),
+        contentType: "application/pdf",
+      },
+    ],
+    document: {
+      preheader: opts.content.preheader,
+      subline: "Offene Beiträge",
+      greeting: opts.content.greeting,
+      closing: "Mit freundlichen Grüßen",
+      blocks: opts.content.blocks,
     },
   });
-  const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
-  try {
-    await t.sendMail({
-      from,
-      to: opts.content.to,
-      subject: opts.content.subject,
-      text: opts.content.body,
-      attachments: [
-        {
-          filename: opts.content.attachmentName,
-          content: Buffer.from(opts.pdfBase64, "base64"),
-          contentType: "application/pdf",
-        },
-      ],
-    });
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, reason: (err as Error).message };
-  }
+  if (res.ok) return { ok: true, bodyText: res.bodyText, bodyHtml: res.bodyHtml };
+  return { ok: false, reason: res.reason, bodyText: res.bodyText, bodyHtml: res.bodyHtml };
 }

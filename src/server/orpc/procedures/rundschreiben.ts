@@ -18,6 +18,8 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { rundschreibenRecipientsTable, rundschreibenTable } from "~/server/db/schema/rundschreiben";
 import { altMitgliedsnummer, memberDisplayName, memberRef } from "~/server/domain/member";
+import { loadMailOrganization } from "~/server/mail/branding";
+import { paragraphsFromText, renderMail } from "~/server/mail/layout";
 import { vorstandProc } from "~/server/orpc/base";
 import { resolveClubLogo } from "~/server/pdf/logo";
 import { renderPdfBase64 } from "~/server/pdf/renderer";
@@ -229,10 +231,27 @@ export const rundschreibenRouter = {
           message: "SMTP ist nicht konfiguriert. Bitte unter Einstellungen > SMTP einrichten.",
         });
       }
+      const organization = await loadMailOrganization(context.db);
       const subject = `[Test] ${renderTemplate(input.subject, SAMPLE_VARS)}`;
-      const text = renderTemplate(input.body, SAMPLE_VARS);
+      const rendered = renderMail({
+        organization,
+        preheader: renderTemplate(input.subject, SAMPLE_VARS),
+        subline: "Rundschreiben",
+        // The Vorstand writes the full text including its own sign-off, and a
+        // person typed it: neither an appended greeting nor the automatic
+        // notice would be true here.
+        closing: null,
+        automated: false,
+        blocks: paragraphsFromText(renderTemplate(input.body, SAMPLE_VARS)),
+      });
       try {
-        await mailer.send({ to, subject, text });
+        await mailer.send({
+          to,
+          subject,
+          text: rendered.text,
+          html: rendered.html,
+          attachments: rendered.attachments,
+        });
       } catch (err) {
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
           message: `Testmail fehlgeschlagen: ${(err as Error).message}`,
@@ -297,15 +316,28 @@ export const rundschreibenRouter = {
       // partial failure is visible and never silently swallowed.
       let sent = 0;
       let failed = 0;
+      // Loaded once: the club identity is identical for every recipient, and
+      // the logo attachment is rebuilt per message from the same source.
+      const organization = await loadMailOrganization(context.db);
       const recipientRows: (typeof rundschreibenRecipientsTable.$inferInsert)[] = [];
       for (const r of rows) {
         const vars = varsFor(r);
         const to = r.email!.trim();
         try {
+          const rendered = renderMail({
+            organization,
+            preheader: renderTemplate(input.subject, vars),
+            subline: "Rundschreiben",
+            closing: null,
+            automated: false,
+            blocks: paragraphsFromText(renderTemplate(input.body, vars)),
+          });
           await mailer.send({
             to,
             subject: renderTemplate(input.subject, vars),
-            text: renderTemplate(input.body, vars),
+            text: rendered.text,
+            html: rendered.html,
+            attachments: rendered.attachments,
           });
           sent += 1;
           recipientRows.push({

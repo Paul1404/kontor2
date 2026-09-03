@@ -562,6 +562,7 @@ export const authRouter = {
           recipient: input.email,
           subject: result.subject,
           bodyText: result.bodyText,
+          bodyHtml: result.bodyHtml,
           entityType: "invitation",
           entityId: inv!.id,
           actorEmail: context.session!.user.email,

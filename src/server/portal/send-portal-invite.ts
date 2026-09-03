@@ -1,5 +1,5 @@
-import nodemailer from "nodemailer";
-import { loadSmtpConfig } from "~/server/auth/send-invite";
+import { formatDate } from "~/lib/format";
+import { type BrandedMailResult, sendBrandedMail } from "~/server/auth/send-invite";
 import type { DB } from "~/server/db/client";
 
 export async function sendPortalInvite(
@@ -11,50 +11,29 @@ export async function sendPortalInvite(
     portalUrl: string;
     expiresAt: Date;
   },
-): Promise<
-  | { ok: true; subject: string; bodyText: string }
-  | { ok: false; reason: string; subject: string; bodyText: string }
-> {
-  const subject = `${opts.vereinsname}: Zugang zum Mitgliederportal`;
-  const bodyText = [
-    `Hallo ${opts.memberName},`,
-    ``,
-    `der ${opts.vereinsname} hat für Sie einen einmaligen Zugang zum Mitgliederportal`,
-    `freigeschaltet. Über das Portal können Sie Ihre persönlichen Daten einsehen und`,
-    `Änderungen vorschlagen. Die Änderungen werden vom Vorstand geprüft und übernommen.`,
-    ``,
-    `Bitte folgen Sie diesem Link:`,
-    opts.portalUrl,
-    ``,
-    `Der Link ist gültig bis ${opts.expiresAt.toLocaleDateString("de-DE")}.`,
-    `Beim ersten Aufruf wird ein dauerhafter Cookie für 30 Tage gesetzt.`,
-    ``,
-    `Falls Sie diesen Zugang nicht angefordert haben, ignorieren Sie diese Nachricht.`,
-  ].join("\n");
-  const cfg = await loadSmtpConfig(db);
-  if (!cfg) return { ok: false, reason: "smtp_not_configured", subject, bodyText };
-  const t = nodemailer.createTransport({
-    host: cfg.host,
-    port: cfg.port,
-    secure: cfg.secure,
-    requireTLS: !cfg.secure && cfg.requireTls,
-    auth: cfg.username ? { user: cfg.username, pass: cfg.password ?? "" } : undefined,
-    tls: {
-      servername: cfg.host,
-      rejectUnauthorized: !cfg.allowInvalidCerts,
-      minVersion: "TLSv1.2",
+): Promise<BrandedMailResult> {
+  return sendBrandedMail(db, {
+    to: opts.to,
+    subject: `${opts.vereinsname}: Zugang zum Mitgliederportal`,
+    document: {
+      preheader: "Ihr persönlicher Zugang zum Mitgliederportal.",
+      subline: "Mitgliederportal",
+      greeting: `Hallo ${opts.memberName},`,
+      blocks: [
+        {
+          kind: "paragraph",
+          text: `${opts.vereinsname} hat für Sie einen persönlichen Zugang zum Mitgliederportal freigeschaltet. Dort können Sie Ihre Daten einsehen und Änderungen vorschlagen. Der Vorstand prüft die Änderungen und übernimmt sie.`,
+        },
+        { kind: "button", label: "Portal öffnen", url: opts.portalUrl },
+        {
+          kind: "note",
+          text: `Der Link ist gültig bis ${formatDate(opts.expiresAt)}. Danach bleiben Sie auf diesem Gerät 30 Tage angemeldet.`,
+        },
+        {
+          kind: "note",
+          text: "Falls Sie diesen Zugang nicht angefordert haben, ignorieren Sie diese Nachricht.",
+        },
+      ],
     },
   });
-  const from = cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
-  try {
-    await t.sendMail({
-      from,
-      to: opts.to,
-      subject,
-      text: bodyText,
-    });
-    return { ok: true, subject, bodyText };
-  } catch (err) {
-    return { ok: false, reason: (err as Error).message, subject, bodyText };
-  }
 }
