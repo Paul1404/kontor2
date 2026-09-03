@@ -16,8 +16,13 @@ export type CancellationConfirmationParams = {
   noticeDays: number | null;
   statuteReference: string | null;
   outstandingClaimsStatuteReference: string | null;
-  /** Whether the Austrittsbestätigung travels with the mail. */
-  hasLetter: boolean;
+  /** Which documents travel with the mail. */
+  attached: {
+    /** The club's Austrittsbestätigung. */
+    letter: boolean;
+    /** The member's own Austrittserklärung, as it reached the club. */
+    notice: boolean;
+  };
 };
 
 function ruleSentence(params: CancellationConfirmationParams): string | null {
@@ -37,6 +42,23 @@ function ruleSentence(params: CancellationConfirmationParams): string | null {
     ? `Nach ${params.statuteReference} der Satzung gilt`
     : "Es gilt";
   return `${source}: ${parts}. Daraus ergibt sich der genannte Austrittstermin.`;
+}
+
+/**
+ * Name the enclosures. Returning the member's own Austrittserklärung alongside
+ * the club's confirmation closes the loop: the member sees exactly which
+ * document arrived, so neither the receipt date nor the derived Austrittstermin
+ * is open to argument later.
+ */
+function attachmentSentence(attached: { letter: boolean; notice: boolean }): string | null {
+  if (attached.letter && attached.notice) {
+    return "Im Anhang finden Sie unsere Austrittsbestätigung sowie Ihre Austrittserklärung, wie sie bei uns eingegangen ist.";
+  }
+  if (attached.letter) return "Die schriftliche Austrittsbestätigung finden Sie im Anhang.";
+  if (attached.notice) {
+    return "Im Anhang finden Sie Ihre Austrittserklärung, wie sie bei uns eingegangen ist.";
+  }
+  return null;
 }
 
 /**
@@ -69,10 +91,8 @@ export function buildCancellationConfirmation(params: CancellationConfirmationPa
         ? `Bis zu diesem Tag bleiben Ihre Rechte und Pflichten als Mitglied bestehen. Bereits entstandene Beitragsforderungen bleiben auch danach offen (${params.outstandingClaimsStatuteReference} der Satzung).`
         : "Bis zu diesem Tag bleiben Ihre Rechte und Pflichten als Mitglied bestehen. Bereits entstandene Beitragsforderungen bleiben auch danach offen.",
     },
-    ...(params.hasLetter
-      ? ([
-          { kind: "note", text: "Die schriftliche Austrittsbestätigung finden Sie im Anhang." },
-        ] as MailBlock[])
+    ...(attachmentSentence(params.attached)
+      ? ([{ kind: "note", text: attachmentSentence(params.attached) as string }] as MailBlock[])
       : []),
     {
       kind: "paragraph",

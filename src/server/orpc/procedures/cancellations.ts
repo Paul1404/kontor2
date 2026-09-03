@@ -67,6 +67,9 @@ const GenerateInput = v.object({
   familienmitglieder: v.optional(v.array(FamilyMember), []),
 });
 
+/** Combined attachment budget before base64 expansion. */
+const MAX_ATTACHMENT_BYTES = 12 * 1024 * 1024;
+
 function safeFilenamePart(s: string): string {
   return s
     .replace(/[^\w.-]+/g, "-")
@@ -93,8 +96,10 @@ async function loadCancellationFacts(
   db: Parameters<typeof loadMailOrganization>[0],
   memberId: string,
 ): Promise<
-  | (Omit<CancellationConfirmationParams, "to" | "clubDisplayName" | "hasLetter"> & {
+  | (Omit<CancellationConfirmationParams, "to" | "clubDisplayName" | "attached"> & {
       to: string | null;
+      /** The member's own Austrittserklärung from the newest live receipt. */
+      notice: { attachmentId: string; filename: string; sizeBytes: number } | null;
     })
   | null
 > {
@@ -119,8 +124,17 @@ async function loadCancellationFacts(
       dateMode: memberCancellationsTable.dateMode,
       noticeDays: memberCancellationsTable.noticeDays,
       statuteReference: memberCancellationsTable.statuteReference,
+      evidenceAttachmentId: memberCancellationsTable.evidenceAttachmentId,
+      evidenceFilename: attachmentsTable.filename,
+      evidenceSizeBytes: attachmentsTable.sizeBytes,
+      evidenceMemberId: attachmentsTable.memberId,
+      evidenceDeletedAt: attachmentsTable.deletedAt,
     })
     .from(memberCancellationsTable)
+    .innerJoin(
+      attachmentsTable,
+      eq(attachmentsTable.id, memberCancellationsTable.evidenceAttachmentId),
+    )
     .where(
       and(
         eq(memberCancellationsTable.memberId, memberId),
@@ -152,6 +166,17 @@ async function loadCancellationFacts(
     noticeDays: receipt?.noticeDays ?? (org?.kuendigungsfristAktiv ? org.kuendigungsfristTage : 0),
     statuteReference: receipt?.statuteReference ?? policy.cancellationStatuteReference,
     outstandingClaimsStatuteReference: policy.outstandingClaimsStatuteReference,
+    // Only offer the scan when it still belongs to this member and is live.
+    // Mailing a document is irreversible, so the ownership check happens here
+    // rather than being trusted from the request.
+    notice:
+      receipt && receipt.evidenceMemberId === memberId && receipt.evidenceDeletedAt == null
+        ? {
+            attachmentId: receipt.evidenceAttachmentId,
+            filename: receipt.evidenceFilename,
+            sizeBytes: receipt.evidenceSizeBytes,
+          }
+        : null,
   };
 }
 
@@ -415,7 +440,7 @@ export const cancellationsRouter = {
         ...facts,
         to: facts.to ?? "",
         clubDisplayName: organization.displayName,
-        hasLetter: letters.length > 0,
+        attached: { letter: letters.length > 0, notice: facts.notice != null },
       });
       const { text } = renderMail({ ...content.document, organization });
       return {
@@ -427,6 +452,7 @@ export const cancellationsRouter = {
         effectiveDate: facts.effectiveDate,
         noticeReceivedOn: facts.noticeReceivedOn,
         letters,
+        notice: facts.notice,
       };
     }),
 
@@ -442,6 +468,8 @@ export const cancellationsRouter = {
         memberId: v.pipe(v.string(), v.uuid()),
         /** Stored Austrittsbestätigung to attach; null sends without one. */
         letterId: v.optional(v.nullable(v.pipe(v.string(), v.minLength(1))), null),
+        /** Send the member's own Austrittserklärung back with the mail. */
+        attachNotice: v.optional(v.boolean(), false),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -489,12 +517,51 @@ export const cancellationsRouter = {
         }
       }
 
+      let noticeAttached = false;
+      if (input.attachNotice) {
+        if (!facts.notice) {
+          throw new ORPCError("PRECONDITION_FAILED", {
+            message: "Für diesen Austritt ist keine Austrittserklärung hinterlegt.",
+          });
+        }
+        const [evidence] = await context.db
+          .select({ s3Key: attachmentsTable.s3Key })
+          .from(attachmentsTable)
+          .where(eq(attachmentsTable.id, facts.notice.attachmentId))
+          .limit(1);
+        if (!evidence) {
+          throw new ORPCError("NOT_FOUND", { message: "Austrittserklärung nicht gefunden." });
+        }
+        try {
+          attachments.push({
+            filename: facts.notice.filename,
+            content: await getObject(evidence.s3Key),
+          });
+        } catch {
+          throw new ORPCError("PRECONDITION_FAILED", {
+            message: "Die Austrittserklärung konnte nicht geladen werden.",
+          });
+        }
+        noticeAttached = true;
+      }
+
+      // Base64 inflates attachments by roughly a third, and most mailboxes
+      // reject well before 25 MB. Fail with a usable message instead of
+      // handing the MTA something it will bounce.
+      const totalBytes = attachments.reduce((sum, a) => sum + a.content.byteLength, 0);
+      if (totalBytes > MAX_ATTACHMENT_BYTES) {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message:
+            "Die Anhänge sind zusammen zu groß für den E-Mail-Versand. Bitte einen der beiden abwählen.",
+        });
+      }
+
       const organization = await loadMailOrganization(context.db);
       const params: CancellationConfirmationParams = {
         ...facts,
         to: facts.to,
         clubDisplayName: organization.displayName,
-        hasLetter: attachments.length > 0,
+        attached: { letter: attachments.length > (noticeAttached ? 1 : 0), notice: noticeAttached },
       };
       const sent = await sendCancellationConfirmation(context.db, params, attachments);
       await recordEmail(
@@ -518,7 +585,12 @@ export const cancellationsRouter = {
           message: `Versand fehlgeschlagen: ${sent.reason}`,
         });
       }
-      return { ok: true, to: params.to, letterAttached: attachments.length > 0 };
+      return {
+        ok: true,
+        to: params.to,
+        letterAttached: params.attached.letter,
+        noticeAttached,
+      };
     }),
 
   /** Recorded Kündigungen for a member, newest first. */
