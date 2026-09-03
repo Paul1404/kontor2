@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { needsUnicodeFont, winAnsiSafe } from "~/server/pdf/winansi";
+import { needsUnicodeFont, pdfText, winAnsiSafe } from "~/server/pdf/winansi";
 
 /**
  * The built-in PDF fonts map anything outside WinAnsi through
  * `codepoint & 0xFF`, so "Łukasz" rendered as "Aukasz" with no error at all.
  * These cases are the ones that were verified to be broken in a real PDF.
  */
+describe("pdfText", () => {
+  it("lässt den Text unangetastet, solange die Unicode-Schrift da ist", () => {
+    // Transliterieren wäre jetzt der Fehler: die Schrift kann den Namen schreiben.
+    expect(pdfText("Łukasz Ćwikła")).toBe("Łukasz Ćwikła");
+    expect(pdfText("Grüße")).toBe("Grüße");
+  });
+});
+
 describe("winAnsiSafe", () => {
   it("keeps what WinAnsi can actually represent", () => {
     expect(winAnsiSafe("Grüße aus Untereuerheim")).toBe("Grüße aus Untereuerheim");

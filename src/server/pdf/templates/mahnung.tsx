@@ -1,6 +1,7 @@
 import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { DEFAULT_DUNNING_TEXTS, type DunningLevelText } from "~/lib/tenant-settings";
 import { altMitgliedsnummer, memberRef } from "~/server/domain/member";
+import { pdfBoldFamily, pdfBoldWeight, pdfFamily } from "~/server/pdf/fonts";
 import { LetterPage } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
@@ -11,7 +12,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderColor: "#999",
     paddingVertical: 4,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
     fontSize: 9,
     backgroundColor: "#f4f4f5",
   },
@@ -28,7 +30,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 0.5,
     borderColor: "#444",
     marginTop: 4,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
   },
   c1: { flex: 1.2 },
   c2: { flex: 2.4 },
@@ -51,7 +54,7 @@ const styles = StyleSheet.create({
   },
   paymentRow: { flexDirection: "row", marginBottom: 2 },
   paymentKey: { width: 110, color: "#555" },
-  paymentValue: { flex: 1, fontFamily: "Helvetica-Bold" },
+  paymentValue: { flex: 1, fontFamily: pdfBoldFamily(), fontWeight: pdfBoldWeight() },
 });
 
 type MahnungPosting = {
@@ -236,7 +239,11 @@ export function MahnungDocument({ pkg, docRef }: { pkg: MahnungInput; docRef: st
         </View>
 
         <View style={styles.paymentBox}>
-          <Text style={{ marginBottom: 4, fontFamily: "Helvetica-Bold" }}>Bankverbindung</Text>
+          <Text
+            style={{ marginBottom: 4, fontFamily: pdfBoldFamily(), fontWeight: pdfBoldWeight() }}
+          >
+            Bankverbindung
+          </Text>
           <View style={styles.paymentRow}>
             <Text style={styles.paymentKey}>Empfänger</Text>
             <Text style={styles.paymentValue}>{org.vereinsname}</Text>

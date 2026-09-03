@@ -1,6 +1,7 @@
 import { Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactNode } from "react";
-import { winAnsiSafe } from "~/server/pdf/winansi";
+import { pdfBoldFamily, pdfBoldWeight, pdfFamily } from "~/server/pdf/fonts";
+import { pdfText } from "~/server/pdf/winansi";
 
 /**
  * Shared DIN 5008 (Form B) business-letter scaffold for the mailed letters
@@ -36,7 +37,7 @@ const styles = StyleSheet.create({
     paddingTop: mm(25),
     paddingBottom: mm(18),
     fontSize: 10,
-    fontFamily: "Helvetica",
+    fontFamily: pdfFamily(),
     color: "#111",
     lineHeight: 1.4,
   },
@@ -51,7 +52,13 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   logo: { height: mm(15), objectFit: "contain" },
-  orgName: { fontFamily: "Helvetica-Bold", fontSize: 11, color: "#111", textAlign: "right" },
+  orgName: {
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
+    fontSize: 11,
+    color: "#111",
+    textAlign: "right",
+  },
   // Anschriftfeld (DIN 676 Form B): 85 x 40 mm at 45/25 mm.
   addressField: {
     position: "absolute",
@@ -79,12 +86,22 @@ const styles = StyleSheet.create({
   },
   infoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 2 },
   infoLabel: { fontSize: 8, color: "#666" },
-  infoValue: { fontSize: 9, fontFamily: "Helvetica-Bold", textAlign: "right" },
+  infoValue: {
+    fontSize: 9,
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
+    textAlign: "right",
+  },
   // Textbereich: 25 mm left / 20 mm right margins. A lead spacer drops the first
   // line to `bodyStartMm` (DIN reference line 98,46 mm by default) on page 1
   // only; on continuation pages the page padding (25 mm) carries the margin.
   body: { marginLeft: mm(25), marginRight: mm(20) },
-  subject: { fontFamily: "Helvetica-Bold", fontSize: 11, marginBottom: mm(6) },
+  subject: {
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
+    fontSize: 11,
+    marginBottom: mm(6),
+  },
   // Falz- und Lochmarken at the very left edge.
   foldMark: {
     position: "absolute",
@@ -189,40 +206,38 @@ export function LetterPage({
 
       <View style={styles.header}>
         {logoDataUri ? <Image src={logoDataUri} style={styles.logo} /> : <View />}
-        <Text style={styles.orgName}>{winAnsiSafe(orgName)}</Text>
+        <Text style={styles.orgName}>{pdfText(orgName)}</Text>
       </View>
 
       <View style={styles.addressField}>
-        <Text style={styles.returnLine}>{winAnsiSafe(returnLine)}</Text>
+        <Text style={styles.returnLine}>{pdfText(returnLine)}</Text>
         {recipientLines.map((line, i) => (
           <Text key={String(i)} style={styles.recipientLine}>
-            {winAnsiSafe(line)}
+            {pdfText(line)}
           </Text>
         ))}
-        {recipientNote ? (
-          <Text style={styles.recipientNote}>{winAnsiSafe(recipientNote)}</Text>
-        ) : null}
+        {recipientNote ? <Text style={styles.recipientNote}>{pdfText(recipientNote)}</Text> : null}
       </View>
 
       <View style={styles.infoBlock}>
         {infoRows.map((row, i) => (
           <View key={String(i)} style={styles.infoRow}>
-            <Text style={styles.infoLabel}>{winAnsiSafe(row.label)}</Text>
-            <Text style={styles.infoValue}>{winAnsiSafe(row.value)}</Text>
+            <Text style={styles.infoLabel}>{pdfText(row.label)}</Text>
+            <Text style={styles.infoValue}>{pdfText(row.value)}</Text>
           </View>
         ))}
       </View>
 
       <View style={styles.body}>
         <View style={{ height: leadHeight }} />
-        <Text style={styles.subject}>{winAnsiSafe(subject)}</Text>
+        <Text style={styles.subject}>{pdfText(subject)}</Text>
         {children}
       </View>
 
       <Text
         style={styles.footer}
         render={({ subPageNumber, subPageTotalPages }) =>
-          `${winAnsiSafe(footerText)} · Seite ${subPageNumber}/${subPageTotalPages}`
+          `${pdfText(footerText)} · Seite ${subPageNumber}/${subPageTotalPages}`
         }
         fixed
       />

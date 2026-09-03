@@ -1,19 +1,21 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { BestandserhebungBreakdown } from "~/server/db/schema/bestandserhebungen";
+import { pdfBoldFamily, pdfBoldWeight, pdfFamily } from "~/server/pdf/fonts";
 
 const styles = StyleSheet.create({
   page: {
     padding: 36,
     fontSize: 9,
-    fontFamily: "Helvetica",
+    fontFamily: pdfFamily(),
     color: "#111",
     lineHeight: 1.35,
   },
-  h1: { fontSize: 16, fontFamily: "Helvetica-Bold", marginBottom: 4 },
+  h1: { fontSize: 16, fontFamily: pdfBoldFamily(), fontWeight: pdfBoldWeight(), marginBottom: 4 },
   meta: { fontSize: 8, color: "#555", marginBottom: 12 },
   sectionTitle: {
     fontSize: 11,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
     marginTop: 14,
     marginBottom: 4,
   },
@@ -22,7 +24,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#000",
     paddingBottom: 2,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
     fontSize: 8,
   },
   tableRow: {
@@ -37,7 +40,8 @@ const styles = StyleSheet.create({
     borderTopColor: "#000",
     paddingVertical: 3,
     marginTop: 1,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
   },
   cName: { flex: 2, paddingRight: 4 },
   cSport: { flex: 1.5, paddingRight: 4 },

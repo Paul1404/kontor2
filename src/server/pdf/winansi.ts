@@ -1,5 +1,8 @@
+import { ensurePdfFont } from "~/server/pdf/fonts";
+
 /**
- * The built-in PDF fonts encode WinAnsi only. Anything outside it is silently
+ * Fallback for when the embedded Unicode font cannot be loaded. The built-in
+ * PDF fonts encode WinAnsi only. Anything outside it is silently
  * mapped by `codepoint & 0xFF`, so "Łukasz Ćwikła" prints as "Aukasz wikBa"
  * with no error, no warning and no replacement glyph. On a Mahnung or a DSGVO
  * response that is a formal document naming the wrong person.
@@ -116,4 +119,15 @@ export function winAnsiSafe(value: string): string {
 /** True when the text would lose information in a built-in PDF font. */
 export function needsUnicodeFont(value: string): boolean {
   return winAnsiSafe(value) !== value;
+}
+
+/**
+ * Text on its way into a PDF. With the embedded Unicode font present it passes
+ * through untouched, which is the point: transliterating "Łukasz" once the font
+ * can spell it would throw away the correct name. Only when the font files are
+ * missing does the fallback take over, so a document is never worse than
+ * approximated and never silently wrong.
+ */
+export function pdfText(value: string): string {
+  return ensurePdfFont() ? value : winAnsiSafe(value);
 }
