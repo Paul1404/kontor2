@@ -23,9 +23,18 @@ function randomToken(bytes = 32): string {
   return randomBytes(bytes).toString("base64url");
 }
 
+/**
+ * Path of the route that redeems a portal token. Kept next to the builder so
+ * the link and the handler cannot drift apart again.
+ */
+export const PORTAL_ACCESS_PATH = "/api/portal/zugang";
+
 export function buildPortalUrl(baseUrl: string, token: string): string {
   const trimmed = baseUrl.replace(/\/+$/, "");
-  return `${trimmed}/portal/zugang/${token}`;
+  // Must match the route that consumes the token, `api/portal.zugang.$token`.
+  // The link is minted here but redeemed there; pointing at `/portal/zugang`
+  // matched no route at all, so every magic link 404ed.
+  return `${trimmed}${PORTAL_ACCESS_PATH}/${token}`;
 }
 
 /**

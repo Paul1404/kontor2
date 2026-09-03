@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.11.2",
+    date: "2026-09-03",
+    title: "Portal-Zugang funktioniert wieder",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Der Link im Portal-Zugang zeigte auf eine Adresse, die es nicht gibt. Jeder Zugang endete deshalb mit Nicht gefunden. Der Link zeigt jetzt auf die Stelle, die den Zugang tatsächlich einlöst.",
+      },
+    ],
+  },
+  {
     version: "2.11.1",
     date: "2026-09-03",
     title: "Bounce-Prüfung findet zuverlässig",
