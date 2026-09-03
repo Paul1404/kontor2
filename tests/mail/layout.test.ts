@@ -178,3 +178,36 @@ describe("mail layout", () => {
     expect(mail.text).not.toMatch(/\n{3,}/);
   });
 });
+
+/**
+ * The renderer picks its decoder from the MIME label and drops an image whose
+ * bytes do not match, without an error. A mislabelled upload would therefore
+ * vanish from every letter and mail with no feedback to the admin.
+ */
+describe("validLogoDataUri", () => {
+  const PNG_BYTES =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC";
+
+  it("accepts a PNG that really is a PNG", async () => {
+    const { validLogoDataUri } = await import("~/server/mail/branding");
+    const uri = `data:image/png;base64,${PNG_BYTES}`;
+    expect(validLogoDataUri(uri)).toBe(uri);
+  });
+
+  it("rejects PNG bytes declared as JPEG", async () => {
+    const { validLogoDataUri } = await import("~/server/mail/branding");
+    expect(validLogoDataUri(`data:image/jpeg;base64,${PNG_BYTES}`)).toBeNull();
+  });
+
+  it("rejects bytes that are no image at all", async () => {
+    const { validLogoDataUri } = await import("~/server/mail/branding");
+    const junk = Buffer.from("kein bild").toString("base64");
+    expect(validLogoDataUri(`data:image/png;base64,${junk}`)).toBeNull();
+  });
+
+  it("rejects anything that is not a data URI", async () => {
+    const { validLogoDataUri } = await import("~/server/mail/branding");
+    expect(validLogoDataUri("https://example.test/logo.png")).toBeNull();
+    expect(validLogoDataUri(null)).toBeNull();
+  });
+});

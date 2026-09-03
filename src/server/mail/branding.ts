@@ -81,10 +81,28 @@ export async function loadMailOrganization(db: DB): Promise<MailOrganization> {
   }
 }
 
-/** Only PNG/JPEG data URIs are accepted; anything else is treated as no logo. */
+/**
+ * Only PNG/JPEG data URIs are accepted, and the bytes have to match the label.
+ * The renderer decides the decoder from the MIME type and, when the bytes do
+ * not fit, drops the image without an error, so a mislabelled upload would
+ * silently disappear from every letter and mail.
+ */
 export function validLogoDataUri(value: string | null | undefined): string | null {
   const trimmed = value?.trim() ?? "";
-  return /^data:image\/(png|jpeg);base64,[a-z0-9+/]+=*$/i.test(trimmed) ? trimmed : null;
+  const match = /^data:image\/(png|jpeg);base64,([a-z0-9+/]+=*)$/i.exec(trimmed);
+  if (!match) return null;
+  let bytes: Buffer;
+  try {
+    bytes = Buffer.from(match[2]!, "base64");
+  } catch {
+    return null;
+  }
+  const isPng = bytes
+    .subarray(0, 8)
+    .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  const declaredPng = match[1]!.toLowerCase() === "png";
+  return (declaredPng ? isPng : isJpeg) ? trimmed : null;
 }
 
 export function buildLogoAttachment(dataUri: string): MailInlineAttachment {

@@ -566,8 +566,10 @@ ship in the runtime image.
 
 The nightly snapshot scheduler runs in-process by default. To move it to an
 external scheduler (Railway Cron, GitHub Actions and the like), set
-`SNAPSHOT_CRON_DISABLED=1` and hit `POST /api/cron/snapshots` with the same HMAC
-headers used for the legacy push.
+`SNAPSHOT_CRON_DISABLED=1` and hit `POST /api/cron/snapshots` with
+`X-Kontor-Timestamp` and `X-Kontor-Signature`, signed with `SNAPSHOT_CRON_SECRET`.
+These are deliberately not the legacy push headers documented below; wiring a
+scheduler with those returns 401.
 
 ## Environment
 

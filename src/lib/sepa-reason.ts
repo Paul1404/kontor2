@@ -7,7 +7,12 @@
  * Not exhaustive: unknown codes fall through to the raw code so nothing is
  * hidden. Keep labels short and direct.
  */
-export const SEPA_RETURN_REASONS: Record<string, string> = {
+/**
+ * The catalogue is the single source of truth for which codes exist. The server
+ * used to keep its own shorter picklist, so twelve codes the UI offered were
+ * rejected on save and the return could not be recorded at all.
+ */
+export const SEPA_RETURN_REASONS = {
   AC01: "Kontonummer fehlerhaft",
   AC04: "Konto geschlossen",
   AC06: "Konto gesperrt",
@@ -39,9 +44,17 @@ export const SEPA_RETURN_REASONS: Record<string, string> = {
 };
 
 /** Plain German label for a reason code, or `null` if the code is unknown. */
+export type SepaReturnReasonCode = keyof typeof SEPA_RETURN_REASONS;
+
+/** Every known code, for building validators that cannot drift from the list. */
+export const SEPA_RETURN_REASON_CODES = Object.keys(SEPA_RETURN_REASONS) as [
+  SepaReturnReasonCode,
+  ...SepaReturnReasonCode[],
+];
+
 export function sepaReturnReasonLabel(code: string | null | undefined): string | null {
   if (!code) return null;
-  return SEPA_RETURN_REASONS[code.trim().toUpperCase()] ?? null;
+  return SEPA_RETURN_REASONS[code.trim().toUpperCase() as SepaReturnReasonCode] ?? null;
 }
 
 /**
@@ -51,7 +64,7 @@ export function sepaReturnReasonLabel(code: string | null | undefined): string |
 export function formatSepaReturnReason(code: string | null | undefined): string | null {
   if (!code) return null;
   const c = code.trim().toUpperCase();
-  const label = SEPA_RETURN_REASONS[c];
+  const label = SEPA_RETURN_REASONS[c as SepaReturnReasonCode];
   return label ? `${c}: ${label}` : c;
 }
 

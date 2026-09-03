@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { SEPA_RETURN_REASON_CODES } from "~/lib/sepa-reason";
 import { appendAudit } from "~/server/audit/log";
 import { matchCamtReturns, parseCamt054, type ReturnableItem } from "~/server/bank/camt054";
 import type { DB } from "~/server/db/client";
@@ -136,24 +137,8 @@ async function recordReturn(
   );
 }
 
-const KnownReasonCodes = v.picklist([
-  "AC04", // closed account
-  "AC06", // blocked account
-  "AC13", // invalid debtor account type
-  "AG01", // transaction forbidden
-  "AM04", // insufficient funds
-  "AM05", // duplicate collection
-  "BE05", // unrecognised initiating party
-  "FF01", // operation/transaction code incorrect, invalid file format
-  "MD01", // no mandate
-  "MD06", // refund request by debtor
-  "MD07", // debtor deceased
-  "MS02", // refusal by debtor
-  "MS03", // reason not specified
-  "RC01", // bank identifier incorrect
-  "RR01", // missing debtor name or address
-  "SL01", // specific service offered by debtor agent
-] as const);
+// Derived from the catalogue the UI offers, so the two cannot drift apart.
+const KnownReasonCodes = v.picklist(SEPA_RETURN_REASON_CODES);
 
 const MoneyString = v.pipe(v.string(), v.regex(/^-?\d+(\.\d{1,2})?$/));
 

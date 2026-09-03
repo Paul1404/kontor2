@@ -41,6 +41,58 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.16.0",
+    date: "2026-09-03",
+    title: "Sammelkorrektur aus der Codeprüfung",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Namen mit polnischen, tschechischen oder türkischen Sonderzeichen wurden in allen PDF-Dokumenten still verfälscht. Aus Łukasz Ćwikła wurde Aukasz wikBa, ohne Fehlermeldung. Solche Zeichen werden jetzt lesbar übertragen statt entstellt.",
+      },
+      {
+        category: "fix",
+        description:
+          "Bei der Erfassung von Rücklastschriften bot die Auswahl 28 Rückgabegründe an, gespeichert wurden aber nur 16. Zwölf Gründe, darunter Kontonummer fehlerhaft und Mandatsangaben fehlen, brachen beim Speichern ab. Auswahl und Prüfung stammen jetzt aus derselben Liste.",
+      },
+      {
+        category: "fix",
+        description:
+          "Unzustellbarkeitsmeldungen in kodierter Form wurden nicht erkannt und stillschweigend verworfen. Sie werden jetzt gelesen.",
+      },
+      {
+        category: "fix",
+        description:
+          "Im Serienbrief trug jeder Brief die Seitenzahl des Gesamtdokuments, ein Mitglied bekam also Seite 43 von 60. Jeder Brief zählt jetzt seine eigenen Seiten.",
+      },
+      {
+        category: "fix",
+        description:
+          "Im Mitgliederportal konnten Mitglieder mit Auslandsadresse ihre Postleitzahl nicht ändern, während deutsche Adressen ungeprüft blieben. Die Prüfung war vertauscht.",
+      },
+      {
+        category: "fix",
+        description:
+          "Ein beschädigtes oder falsch benanntes Vereinslogo verschwand kommentarlos aus Briefen und E-Mails. Es wird jetzt beim Speichern abgelehnt.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Nach dem Anlegen oder Umbenennen einer Abteilung sind die Auswahllisten in Rundschreiben und Datenqualität sofort aktuell.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Das Versandprotokoll zeigt für Passwort-Zurücksetzungen jetzt eine Bezeichnung statt des technischen Werts.",
+      },
+      {
+        category: "internal",
+        description:
+          "Die Datumsfelder für das Zurückspielen von Snapshots werden gegen das Datenbankschema geprüft. Ein heute ergänztes Feld fehlte bereits.",
+      },
+    ],
+  },
+  {
     version: "2.15.0",
     date: "2026-09-03",
     title: "Briefe bleiben beim Mitglied",
