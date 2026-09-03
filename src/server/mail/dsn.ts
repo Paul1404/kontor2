@@ -141,9 +141,12 @@ function contentTypeOf(headers: string): string {
 export function extractReportParts(raw: string): {
   deliveryStatus: string | null;
   originalHeaders: string | null;
+  /** Human-readable body, used when a server sends no machine-readable part. */
+  text: string | null;
 } {
   let deliveryStatus: string | null = null;
   let originalHeaders: string | null = null;
+  let text: string | null = null;
 
   const walk = (block: string, depth: number): void => {
     if (depth > 5) return;
@@ -165,8 +168,17 @@ export function extractReportParts(raw: string): {
       return;
     }
 
+    if (type === "text/plain" || (type === "" && depth > 0)) {
+      text ??= body;
+      return;
+    }
+
     const boundary = type.startsWith("multipart/") ? boundaryOf(headers) : null;
-    if (!boundary) return;
+    if (!boundary) {
+      // A single-part bounce carries everything in its body.
+      if (depth === 0) text ??= body;
+      return;
+    }
     for (const part of body.split(`--${boundary}`)) {
       const trimmed = part.replace(/^\r?\n/, "");
       if (!trimmed.trim() || trimmed.startsWith("--")) continue;
@@ -175,16 +187,72 @@ export function extractReportParts(raw: string): {
   };
 
   walk(raw.replace(/\r\n/g, "\n"), 0);
-  return { deliveryStatus, originalHeaders };
+  return { deliveryStatus, originalHeaders, text };
+}
+
+/**
+ * Read a bounce that carries no machine-readable part at all.
+ *
+ * Not every mail server sends RFC 3464. Plenty still return a plain-text
+ * notice, and the one that rejected the Austrittsbestätigung is among them: a
+ * "Failed addresses follow:" block with the address on one line and the SMTP
+ * response on the next. Insisting on the standard meant discarding exactly the
+ * bounces this club actually receives.
+ *
+ * Deliberately conservative: an address only counts when a 4xx or 5xx response
+ * sits with it, so ordinary prose mentioning an address is not mistaken for a
+ * delivery failure.
+ */
+export function parseTextBounce(text: string): DsnRecipient[] {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const found = new Map<string, DsnRecipient>();
+  let pending: string | null = null;
+
+  for (const line of lines) {
+    // Stop at the returned original message: addresses below belong to it.
+    if (/^\|?-*\s*(message headers? follows?|original message)/i.test(line.trim())) break;
+
+    const addresses = [...line.matchAll(/<([^<>@\s]+@[^<>\s]+)>/g)].map((m) => m[1]!.toLowerCase());
+    const code = /(?:^|\s)([45]\d\d)(?:\s|$|-)/.exec(line);
+    const enhanced = /(?:^|\s)([45]\.\d{1,3}\.\d{1,3})(?:\s|$)/.exec(line);
+
+    if (!code && !enhanced) {
+      // A line that is only an address announces the recipient of the next line.
+      if (addresses.length === 1 && line.trim() === `<${addresses[0]}>`) pending = addresses[0]!;
+      continue;
+    }
+
+    const target = addresses[0] ?? pending;
+    if (!target) continue;
+    pending = null;
+    if (found.has(target)) continue;
+    found.set(target, {
+      recipient: target,
+      action: "failed",
+      status: enhanced?.[1] ?? null,
+      diagnostic: line.trim().slice(0, 300) || null,
+    });
+  }
+
+  return [...found.values()];
 }
 
 export function parseDsn(parts: {
   deliveryStatus: string | null;
   originalHeaders: string | null;
+  text?: string | null;
 }): ParsedDsn {
+  const structured = parts.deliveryStatus ? parseDeliveryStatus(parts.deliveryStatus) : [];
+  // Fall back to the prose only when the standard part is absent or empty, so a
+  // proper report is never second-guessed by a text heuristic.
+  const recipients = structured.length > 0 ? structured : parseTextBounce(parts.text ?? "");
   return {
-    recipients: parts.deliveryStatus ? parseDeliveryStatus(parts.deliveryStatus) : [],
-    originalMessageId: parts.originalHeaders ? parseOriginalMessageId(parts.originalHeaders) : null,
+    recipients,
+    originalMessageId: parts.originalHeaders
+      ? parseOriginalMessageId(parts.originalHeaders)
+      : parts.text
+        ? parseOriginalMessageId(parts.text)
+        : null,
   };
 }
 

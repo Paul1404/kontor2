@@ -6,6 +6,7 @@ import {
   parseDeliveryStatus,
   parseDsn,
   parseOriginalMessageId,
+  parseTextBounce,
 } from "~/server/mail/dsn";
 
 /** The report t-online returned for the Austrittsbestätigung. */
@@ -249,7 +250,7 @@ describe("extractReportParts", () => {
     expect(extractReportParts(headersOnly).originalHeaders).toContain("Message-ID:");
   });
 
-  it("finds nothing in an ordinary mail", () => {
+  it("finds no report in an ordinary mail", () => {
     const plain = [
       "From: a@example.test",
       "To: b@example.test",
@@ -259,6 +260,83 @@ describe("extractReportParts", () => {
       "Hallo",
       "",
     ].join("\r\n");
-    expect(extractReportParts(plain)).toEqual({ deliveryStatus: null, originalHeaders: null });
+    const parts = extractReportParts(plain);
+    expect(parts.deliveryStatus).toBeNull();
+    expect(parts.originalHeaders).toBeNull();
+    // The body is handed over for the text fallback, but it names no failure.
+    expect(parseDsn(parts).recipients).toEqual([]);
+  });
+});
+
+/**
+ * The bounce that actually arrived for the Austrittsbestätigung. No
+ * machine-readable part at all: the address on one line, the SMTP response on
+ * the next. Requiring RFC 3464 meant discarding exactly this.
+ */
+const TEXT_BOUNCE = [
+  "From: MAILER-DAEMON@eu-central-1.amazonses.com",
+  "To: svu@kontor2.com",
+  "Subject: Mail delivery failed: returning message to sender",
+  "Content-Type: text/plain; charset=utf-8",
+  "",
+  "|------------------------- Failed addresses follow: --------------------|",
+  "<hls-gock@t-online.de>",
+  "  552 5.2.2 <hls-gock@t-online.de> Quota exceeded (mailbox for user is full)",
+  "",
+  "|------------------------- Message header follows: ---------------------|",
+  "Message-ID: <010701a06719dbe9@eu-central-1.amazonses.com>",
+  "To: hls-gock@t-online.de",
+  "Subject: SV Untereuerheim: Austritt zum 31.12.2026",
+  "",
+].join("\r\n");
+
+describe("plain-text bounces", () => {
+  it("reads the failed recipient out of the real report", () => {
+    const parsed = parseDsn(extractReportParts(TEXT_BOUNCE));
+    expect(parsed.recipients).toHaveLength(1);
+    expect(parsed.recipients[0]?.recipient).toBe("hls-gock@t-online.de");
+    expect(parsed.recipients[0]?.action).toBe("failed");
+    expect(parsed.recipients[0]?.status).toBe("5.2.2");
+    expect(parsed.recipients[0]?.diagnostic).toContain("Quota exceeded");
+  });
+
+  it("counts as permanent and reads as a full mailbox", () => {
+    const [row] = parseDsn(extractReportParts(TEXT_BOUNCE)).recipients;
+    expect(isPermanent(row!)).toBe(true);
+    expect(describeBounce(row!)).toBe("Postfach voll");
+  });
+
+  it("still finds the original message id", () => {
+    expect(parseDsn(extractReportParts(TEXT_BOUNCE)).originalMessageId).toBe(
+      "010701a06719dbe9@eu-central-1.amazonses.com",
+    );
+  });
+
+  it("ignores addresses below the returned original message", () => {
+    // "To: hls-gock@..." appears again in the quoted headers; it must not
+    // produce a second recipient, and neither must the subject line.
+    expect(parseDsn(extractReportParts(TEXT_BOUNCE)).recipients).toHaveLength(1);
+  });
+
+  it("needs a status code, not just an address", () => {
+    expect(parseTextBounce("Bitte wenden Sie sich an <info@example.test> für Rückfragen.")).toEqual(
+      [],
+    );
+  });
+
+  it("reads an address and code on the same line", () => {
+    const rows = parseTextBounce("550 5.1.1 <weg@example.test>: Recipient address rejected");
+    expect(rows[0]?.recipient).toBe("weg@example.test");
+    expect(rows[0]?.status).toBe("5.1.1");
+  });
+
+  it("does not let the text heuristic override a proper report", () => {
+    const parsed = parseDsn({
+      deliveryStatus: QUOTA_EXCEEDED,
+      originalHeaders: null,
+      text: "550 <ganz-anders@example.test> abgelehnt",
+    });
+    expect(parsed.recipients).toHaveLength(1);
+    expect(parsed.recipients[0]?.recipient).toBe("hls-gock@t-online.de");
   });
 });

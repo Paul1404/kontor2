@@ -190,7 +190,7 @@ function VersandprotokollPage() {
     onSuccess: (res) => {
       if (res.failures === 0) {
         toast.success("Keine neuen Unzustellbarkeiten gefunden.", {
-          description: `${res.examined} Nachricht(en) der letzten ${res.days} Tage geprüft, davon ${res.candidates} mögliche Berichte.`,
+          description: `${res.examined} Nachricht(en) der letzten ${res.days} Tage geprüft, davon ${res.candidates} mögliche und ${res.scanned} lesbare Berichte.`,
         });
       } else {
         toast.info(`${res.failures} Unzustellbarkeit(en) gefunden.`, {
