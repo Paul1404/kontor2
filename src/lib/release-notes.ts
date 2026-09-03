@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.14.0",
+    date: "2026-09-03",
+    title: "Anlagen zum Brief",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Beim Brief lassen sich jetzt vorhandene Dokumente des Mitglieds als Anlage auswählen, etwa die Austrittsbestätigung. Der Brief trägt dann einen Anlagenvermerk nach DIN 5008.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die vermerkten Anlagen stehen mit im Versandprotokoll, damit später nachvollziehbar ist, was im Umschlag lag.",
+      },
+    ],
+  },
+  {
     version: "2.13.0",
     date: "2026-09-03",
     title: "Vereinsfarbe wirkt nach außen",

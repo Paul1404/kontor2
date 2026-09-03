@@ -27,6 +27,7 @@ const styles = StyleSheet.create({
   calloutLabel: { fontSize: 8, color: "#5b6472", textTransform: "uppercase" },
   calloutValue: { fontSize: 12, marginTop: 2 },
   closing: { marginTop: 16 },
+  enclosures: { marginTop: 18, fontSize: 9 },
 });
 
 export type MitteilungClub = {
@@ -44,6 +45,12 @@ export type MitteilungModel = {
   greeting: string | null;
   blocks: MailBlock[];
   closing: string | null;
+  /**
+   * Anlagenvermerk per DIN 5008. An enclosure travels in the same envelope as
+   * a separate document; naming it on the letter is what ties the two together
+   * once they are out of the printer.
+   */
+  enclosures?: string[];
 };
 
 function Block({ block }: { block: MailBlock }) {
@@ -109,6 +116,14 @@ export function MitteilungDocument({
           <View style={styles.closing}>
             <Text>{model.closing}</Text>
             <Text>{club.vereinsname}</Text>
+          </View>
+        ) : null}
+        {model.enclosures && model.enclosures.length > 0 ? (
+          <View style={styles.enclosures}>
+            <Text>{model.enclosures.length === 1 ? "Anlage" : "Anlagen"}</Text>
+            {model.enclosures.map((entry) => (
+              <Text key={entry}>{entry}</Text>
+            ))}
           </View>
         ) : null}
       </LetterPage>

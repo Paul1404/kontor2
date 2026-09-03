@@ -51,6 +51,8 @@ export async function notifyByPost(
     closing?: string | null;
     /** Plain text of the same content, stored so the protocol can show it. */
     bodyText: string;
+    /** Documents travelling in the same envelope, named on the letter. */
+    enclosures?: string[];
     actorEmail?: string | null;
     requestId?: string | null;
   },
@@ -80,6 +82,7 @@ export async function notifyByPost(
         greeting: input.greeting,
         blocks: input.blocks,
         closing: input.closing === undefined ? "Freundliche Grüße" : input.closing,
+        enclosures: input.enclosures,
       },
     }),
   );
@@ -92,7 +95,7 @@ export async function notifyByPost(
       recipient: input.recipient.recipientLines.join(", "),
       subject: input.subject,
       bodyText: input.bodyText,
-      attachmentNames: [`${docRef}.pdf`],
+      attachmentNames: [`${docRef}.pdf`, ...(input.enclosures ?? [])],
       detail: docRef,
       entityType: "member",
       entityId: input.recipient.memberId,
