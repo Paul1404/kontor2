@@ -14,7 +14,12 @@ import { index, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-co
  * link a row to whatever it concerns (a membership application, a member, …),
  * so a detail page can show just that entity's mail history.
  */
-export const emailStatusEnum = pgEnum("email_status", ["sent", "failed", "skipped"]);
+/**
+ * `sent` means the mail server accepted the message, not that it arrived. A
+ * later bounce report moves the row to `bounced`, which is the only status that
+ * proves the member did not get it.
+ */
+export const emailStatusEnum = pgEnum("email_status", ["sent", "failed", "skipped", "bounced"]);
 
 export const emailLogTable = pgTable(
   "email_log",
@@ -34,6 +39,16 @@ export const emailLogTable = pgTable(
     attachmentNames: text("attachment_names").array(),
     /** Reason on a skipped/failed send, e.g. "smtp_not_configured" or an SMTP error. */
     detail: text("detail"),
+    /**
+     * RFC 5322 Message-ID handed back by the transport. A bounce report quotes
+     * it, so it is what lets an asynchronous delivery failure find its way back
+     * to the row it belongs to.
+     */
+    messageId: text("message_id"),
+    /** When a delivery failure report for this message was recorded. */
+    bouncedAt: timestamp("bounced_at", { withTimezone: true }),
+    /** RFC 3463 status like "5.2.2", plus the server's diagnostic text. */
+    bounceCode: text("bounce_code"),
     /** What the mail concerns, e.g. "membership_application" | "member" | "user". */
     entityType: text("entity_type"),
     entityId: text("entity_id"),
@@ -47,6 +62,8 @@ export const emailLogTable = pgTable(
     index("email_log_kind_created_idx").on(t.kind, t.createdAt),
     index("email_log_status_created_idx").on(t.status, t.createdAt),
     index("email_log_entity_idx").on(t.entityType, t.entityId, t.createdAt),
+    index("email_log_message_id_idx").on(t.messageId),
+    index("email_log_recipient_created_idx").on(t.recipient, t.createdAt),
   ],
 );
 

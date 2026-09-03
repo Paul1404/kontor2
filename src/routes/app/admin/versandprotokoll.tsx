@@ -29,7 +29,7 @@ import { formatDateTime, orEmpty } from "~/lib/format";
 import { useModalFocus } from "~/lib/modal-focus";
 import { orpc } from "~/lib/orpc";
 
-type Status = "sent" | "failed" | "skipped";
+type Status = "sent" | "failed" | "skipped" | "bounced";
 
 type MailSearch = {
   q: string;
@@ -62,6 +62,12 @@ const STATUS_META: Record<
     badge: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
     icon: MailWarning,
     accent: "text-amber-600 dark:text-amber-400",
+  },
+  bounced: {
+    label: "Unzustellbar",
+    badge: "border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300",
+    icon: MailX,
+    accent: "text-orange-600 dark:text-orange-400",
   },
 };
 
@@ -171,6 +177,30 @@ function VersandprotokollPage() {
     queryClient.invalidateQueries({ queryKey: ["emailLog.stats"] });
   }
 
+  // Bounces arrive asynchronously in the mailbox; nothing pushes them to us.
+  const scanBounces = useMutation({
+    mutationFn: () => orpc.emailLog.scanBounces({}),
+    onSuccess: (res) => {
+      if (res.failures === 0) {
+        toast.success("Keine neuen Unzustellbarkeiten gefunden.", {
+          description: `${res.scanned} Bericht(e) der letzten ${res.days} Tage geprüft.`,
+        });
+      } else {
+        toast.info(`${res.failures} Unzustellbarkeit(en) gefunden.`, {
+          description: [
+            `${res.matchedLogRows} Protokolleintrag/-einträge korrigiert`,
+            `${res.markedMembers} Mitglied(er) markiert`,
+            `${res.tasksCreated} Wiedervorlage(n) angelegt`,
+          ].join(", "),
+          durationMs: 10_000,
+        });
+      }
+      refreshNow();
+    },
+    onError: (err: Error) =>
+      toast.error("Bounce-Prüfung fehlgeschlagen", { description: err.message }),
+  });
+
   const hasFilter = !!search.q || !!search.status || !!search.kind || !!search.from || !!search.to;
 
   return (
@@ -194,6 +224,16 @@ function VersandprotokollPage() {
             aria-label="Aktualisieren"
           >
             <RefreshCw className={cn("size-3.5", list.isFetching && "animate-spin")} />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => scanBounces.mutate()}
+            disabled={scanBounces.isPending}
+          >
+            <MailX className={cn("size-3.5", scanBounces.isPending && "animate-pulse")} />
+            {scanBounces.isPending ? "Prüfe…" : "Bounces prüfen"}
           </Button>
           <Button
             type="button"

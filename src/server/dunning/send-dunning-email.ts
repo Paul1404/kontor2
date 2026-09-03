@@ -113,8 +113,8 @@ export async function sendDunningEmail(
     pdfBase64: string;
   },
 ): Promise<
-  | { ok: true; bodyText: string; bodyHtml: string }
-  | { ok: false; reason: string; bodyText: string; bodyHtml: string }
+  | { ok: true; bodyText: string; bodyHtml: string; messageId: string | null }
+  | { ok: false; reason: string; bodyText: string; bodyHtml: string; messageId: null }
 > {
   const res = await sendBrandedMail(db, {
     to: opts.content.to,
@@ -134,6 +134,14 @@ export async function sendDunningEmail(
       blocks: opts.content.blocks,
     },
   });
-  if (res.ok) return { ok: true, bodyText: res.bodyText, bodyHtml: res.bodyHtml };
-  return { ok: false, reason: res.reason, bodyText: res.bodyText, bodyHtml: res.bodyHtml };
+  if (res.ok) {
+    return { ok: true, bodyText: res.bodyText, bodyHtml: res.bodyHtml, messageId: res.messageId };
+  }
+  return {
+    ok: false,
+    reason: res.reason,
+    bodyText: res.bodyText,
+    bodyHtml: res.bodyHtml,
+    messageId: null,
+  };
 }

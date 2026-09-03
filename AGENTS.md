@@ -71,6 +71,13 @@ on Railway via Dockerfile.
   a new kind to `EVIDENCE_ATTACHMENT_KINDS` and the rest follows.
 - Direct-debit detection: a blank `lastschrift` counts as direct debit (that is
   how Linear stored it); only `aufRechnung = 'J'` is a true invoice payer.
+- `email_log.status = sent` only means the MTA accepted the message. A bounce
+  arrives asynchronously in the configured mailbox; `emailLog.scanBounces` reads
+  those DSNs (RFC 3464, parsed in `src/server/mail/dsn.ts`), flips the row to
+  `bounced` and, for a permanent 5.x.x failure, stamps
+  `members.emailUndeliverableAt` and raises a Wiedervorlage. Matching prefers
+  the stored `messageId`; the recipient plus time window is a bounded fallback.
+  A changed address clears the flag.
 
 ## Commands
 

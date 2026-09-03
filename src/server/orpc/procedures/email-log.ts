@@ -5,13 +5,15 @@ import type { DB } from "~/server/db/client";
 import { escapeLike } from "~/server/db/like";
 import { emailLogTable } from "~/server/db/schema/email-log";
 import { logger } from "~/server/lib/logger";
+import { applyBounces } from "~/server/mail/apply-bounces";
 import { loadMailOrganization } from "~/server/mail/branding";
 import { inlineLogoForPreview } from "~/server/mail/layout";
+import { readBounces } from "~/server/mail/read-bounces";
 import { findSentMessage } from "~/server/mail/read-sent-mail";
 import { reconstructSentMessage } from "~/server/mail/reconstruct-sent-mail";
 import { adminProc } from "~/server/orpc/base";
 
-const StatusEnum = v.picklist(["sent", "failed", "skipped"]);
+const StatusEnum = v.picklist(["sent", "failed", "skipped", "bounced"]);
 
 const ListInput = v.object({
   page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
@@ -86,17 +88,18 @@ export const emailLogRouter = {
         .orderBy(emailLogTable.kind),
     ]);
 
-    const byStatus = { sent: 0, failed: 0, skipped: 0 };
+    const byStatus = { sent: 0, failed: 0, skipped: 0, bounced: 0 };
     let lastEventAt: string | null = null;
     for (const r of statusRows) {
       byStatus[r.status] = r.count;
       if (r.last && (!lastEventAt || r.last > lastEventAt)) lastEventAt = r.last;
     }
     return {
-      total: byStatus.sent + byStatus.failed + byStatus.skipped,
+      total: byStatus.sent + byStatus.failed + byStatus.skipped + byStatus.bounced,
       sent: byStatus.sent,
       failed: byStatus.failed,
       skipped: byStatus.skipped,
+      bounced: byStatus.bounced,
       lastEventAt,
       kinds: kindRows.map((r) => r.kind),
     };
@@ -143,6 +146,48 @@ export const emailLogRouter = {
     ]);
     return { rows, total: totalRow?.c ?? 0 };
   }),
+
+  /**
+   * Read delivery failure reports from the mailbox and record them: correct the
+   * affected log rows, flag members whose address is permanently unreachable,
+   * and raise a Wiedervorlage for each. "Versendet" only ever meant the mail
+   * server accepted the message, so without this a bounce stays invisible.
+   */
+  scanBounces: adminProc
+    .input(
+      v.optional(
+        v.object({
+          /** How many days back to look. Reports arrive within minutes. */
+          days: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(90)), 14),
+        }),
+        {},
+      ),
+    )
+    .handler(async ({ context, input }) => {
+      const days = input?.days ?? 14;
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      let reports: Awaited<ReturnType<typeof readBounces>>;
+      try {
+        reports = await readBounces(context.db, { since });
+      } catch (error) {
+        logger.warn("email_log.bounce_scan_failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message:
+            "Das Postfach konnte nicht gelesen werden. Bitte den IMAP-Zugang unter Einstellungen, E-Mail prüfen.",
+        });
+      }
+      if (reports.mailbox === null) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Für IMAP werden Benutzername und Passwort benötigt.",
+        });
+      }
+      const outcome = await applyBounces(context.db, reports.reports, {
+        actorEmail: context.session!.user.email,
+      });
+      return { ...outcome, days };
+    }),
 
   /** Read-only snapshot of one outbound message. Binary attachments are never returned. */
   get: adminProc

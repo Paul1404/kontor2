@@ -32,6 +32,8 @@ export type EmailLogEntry = {
   subject?: string | null;
   bodyText?: string | null;
   bodyHtml?: string | null;
+  /** Transport Message-ID, so a later bounce report can find this row. */
+  messageId?: string | null;
   attachmentNames?: string[] | null;
   detail?: string | null;
   entityType?: string | null;
@@ -71,6 +73,7 @@ export async function recordEmail(
         subject: e.subject ?? null,
         bodyText: e.bodyText ?? null,
         bodyHtml: e.bodyHtml ?? null,
+        messageId: e.messageId ?? null,
         attachmentNames: e.attachmentNames ?? null,
         detail: e.detail ?? null,
         entityType: e.entityType ?? null,

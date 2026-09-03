@@ -37,6 +37,7 @@ type Filter = v.InferOutput<typeof FilterInput>;
 
 type RecipientRow = {
   id: string;
+  emailUndeliverableAt: Date | null;
   anrede: string | null;
   vorname: string | null;
   nachname: string | null;
@@ -93,6 +94,7 @@ async function loadSegment(db: DB, filter: Filter): Promise<RecipientRow[]> {
       hausnummer: membersTable.hausnummer,
       plz: membersTable.plz,
       ort: membersTable.ort,
+      emailUndeliverableAt: membersTable.emailUndeliverableAt,
     })
     .from(membersTable)
     .where(and(...conditions))
@@ -101,6 +103,15 @@ async function loadSegment(db: DB, filter: Filter): Promise<RecipientRow[]> {
 
 function hasEmail(r: RecipientRow): boolean {
   return !!(r.email?.trim() && r.email.includes("@"));
+}
+
+/**
+ * An address a mail server already rejected as permanently unreachable. Still
+ * counted as a recipient, because the Vorstand may know better than the last
+ * bounce, but surfaced so a whole run is not sent into the void unnoticed.
+ */
+function isUndeliverable(r: RecipientRow): boolean {
+  return hasEmail(r) && r.emailUndeliverableAt != null;
 }
 
 function varsFor(r: RecipientRow): MergeVars {
@@ -121,10 +132,15 @@ export const rundschreibenRouter = {
       const rows = await loadSegment(context.db, input.filter);
       const withEmail = rows.filter(hasEmail);
       const withoutEmail = rows.filter((r) => !hasEmail(r));
+      const undeliverable = rows.filter(isUndeliverable);
       return {
         total: rows.length,
         withEmail: withEmail.length,
         withoutEmail: withoutEmail.length,
+        undeliverable: undeliverable.length,
+        undeliverableSample: undeliverable
+          .slice(0, 6)
+          .map((r) => ({ name: memberDisplayName(r), email: r.email })),
         sample: withEmail.slice(0, 6).map((r) => ({ name: memberDisplayName(r), email: r.email })),
       };
     }),

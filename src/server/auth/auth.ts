@@ -94,6 +94,7 @@ function buildAuth(tenant: Tenant) {
             subject: result.subject,
             bodyText: result.bodyText,
             bodyHtml: result.bodyHtml,
+            messageId: result.messageId,
             entityType: "user",
             entityId: user.id,
           },

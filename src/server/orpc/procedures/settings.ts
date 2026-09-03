@@ -199,6 +199,7 @@ export const settingsRouter = {
           subject: result.subject,
           bodyText: result.bodyText,
           bodyHtml: result.bodyHtml,
+          messageId: result.messageId,
           actorEmail: context.session!.user.email,
           requestId: context.requestId ?? null,
         },

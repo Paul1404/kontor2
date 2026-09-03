@@ -115,6 +115,14 @@ export const membersTable = pgTable(
     mitgliedsnummer: text("mitgliedsnummer"),
     /** Clean name for `e_mail_name`, with the legacy `telefon3` fallback. */
     email: text("email"),
+    /**
+     * Set when a delivery failure report proved this address unreachable.
+     * Cleared as soon as the address changes, because a new address has not
+     * failed yet. Dunning runs and Rundschreiben warn before sending again.
+     */
+    emailUndeliverableAt: timestamp("email_undeliverable_at", { withTimezone: true }),
+    /** The bounce reason, so an operator can tell "full" from "unknown user". */
+    emailUndeliverableReason: text("email_undeliverable_reason"),
     /** Normalized lifecycle status (was `aktiv_pasiv` + the exit/death dates). */
     status: memberStatusEnum("status"),
     /** Normalized dunning block (was the free-form `mahn_sperre` text flag). */
