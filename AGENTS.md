@@ -48,6 +48,27 @@ on Railway via Dockerfile.
   must be excluded from dunning, reports, and Bestandserhebung.
 - Dunning escalates per Sollstellung via `mahnstufe` (0 = not yet dunned). A run
   at level N targets postings currently at N-1. `mahnSperre` blocks a member.
+- Austritt has two entry points, both writing the same cascade through
+  `executeAustritt` (`src/server/domain/austritt.ts`): `cancellations.record`
+  is the evidence-backed Kündigung (scan of the Austrittserklärung, receipt row
+  in `member_cancellations`), `members.austritt` is the quick administrative
+  entry (death, backdated correction). Never duplicate the cascade; extend the
+  shared function.
+- The Austrittstermin is derived, not typed: `computeCancellationDate`
+  (`src/server/lib/cancellation-frist.ts`) counts the Kündigungsfrist from the
+  day the written notice arrived, then rounds forward to the configured period
+  end. Counting from "today" would silently push a letter recorded late into
+  the next period. A deviating date is allowed but needs a reason and is
+  recorded as `overridden`.
+- The cancellation rule is tenant configuration, never hardcoded. SV
+  Untereuerheim, § 3 Abs. 2: Kündigungsfrist aktiv, 42 Tage, Zulässiger
+  Austrittstermin "Nur zum Jahresende". `tenantPolicy.cancellationDateMode`
+  applies on its own; the legacy `kuendigungZumMonatsende` boolean only while
+  `kuendigungsfristAktiv` is on, matching how the settings form nests it.
+- Workflow evidence uploads (`attachment_kind` other than `general`) are
+  validated against their magic bytes, referenced by an append-only receipt
+  row, undeletable as a normal attachment and hidden from readonly users. Add
+  a new kind to `EVIDENCE_ATTACHMENT_KINDS` and the rest follows.
 - Direct-debit detection: a blank `lastschrift` counts as direct debit (that is
   how Linear stored it); only `aufRechnung = 'J'` is a true invoice payer.
 

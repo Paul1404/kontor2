@@ -12,6 +12,7 @@ const handle = createServerOnlyFn(
       { resolveTenantFromHost },
       { dbForTenant },
       { loadDownloadableAttachment },
+      { isEvidenceKind },
       { presignDownload },
     ] = await Promise.all([
       import("~/server/auth/auth"),
@@ -19,6 +20,7 @@ const handle = createServerOnlyFn(
       import("~/server/tenants/resolve"),
       import("~/server/db/client"),
       import("~/server/orpc/procedures/attachments"),
+      import("~/server/db/schema/attachments"),
       import("~/server/s3/client"),
     ]);
     const tenant = resolveTenantFromHost(requestHost(request.headers));
@@ -27,7 +29,7 @@ const handle = createServerOnlyFn(
     // Anhang aus der DB DIESES Vereins laden, nicht aus der Primär-DB.
     const att = await loadDownloadableAttachment(dbForTenant(tenant.databaseUrl), params.id);
     if (!att) return new Response("Not found", { status: 404 });
-    if (att.kind === "bank_details_change" && session.user.role === "readonly") {
+    if (isEvidenceKind(att.kind) && session.user.role === "readonly") {
       return new Response("Forbidden", { status: 403 });
     }
     const url = await presignDownload({

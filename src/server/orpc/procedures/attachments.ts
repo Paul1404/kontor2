@@ -4,12 +4,15 @@ import * as v from "valibot";
 import { appendAudit } from "~/server/audit/log";
 import type { DB } from "~/server/db/client";
 import { memberNotDeleted } from "~/server/db/member-filters";
-import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attachments";
-import { membersTable } from "~/server/db/schema/members";
 import {
-  BANK_CHANGE_MAX_BYTES,
-  bankChangeEvidenceMime,
-} from "~/server/domain/bank-change-evidence";
+  type AttachmentKind,
+  attachmentsTable,
+  EVIDENCE_ATTACHMENT_KINDS,
+  isEvidenceKind,
+  pendingUploadsTable,
+} from "~/server/db/schema/attachments";
+import { membersTable } from "~/server/db/schema/members";
+import { EVIDENCE_MAX_BYTES, evidenceMimeFor } from "~/server/domain/document-evidence";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { headObject, presignDownload } from "~/server/s3/client";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
@@ -24,7 +27,7 @@ import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 export async function loadDownloadableAttachment(
   db: DB,
   id: string,
-): Promise<{ s3Key: string; filename: string; kind: "general" | "bank_details_change" } | null> {
+): Promise<{ s3Key: string; filename: string; kind: AttachmentKind } | null> {
   const [row] = await db
     .select({
       s3Key: attachmentsTable.s3Key,
@@ -55,20 +58,20 @@ export const attachmentsRouter = {
         filename: v.pipe(v.string(), v.minLength(1)),
         mimeType: v.string(),
         sizeBytes: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_BYTES)),
-        kind: v.optional(v.picklist(["general", "bank_details_change"]), "general"),
+        kind: v.optional(v.picklist(["general", ...EVIDENCE_ATTACHMENT_KINDS]), "general"),
       }),
     )
     .handler(async ({ context, input }) => {
-      const canonicalMime =
-        input.kind === "bank_details_change"
-          ? bankChangeEvidenceMime(input.filename, input.mimeType)
-          : ALLOWED_MIME.has(input.mimeType)
-            ? input.mimeType
-            : null;
+      const isEvidence = isEvidenceKind(input.kind);
+      const canonicalMime = isEvidence
+        ? evidenceMimeFor(input.filename, input.mimeType)
+        : ALLOWED_MIME.has(input.mimeType)
+          ? input.mimeType
+          : null;
       if (!canonicalMime) {
         throw new ORPCError("BAD_REQUEST", { message: "Dateityp nicht erlaubt." });
       }
-      if (input.kind === "bank_details_change" && input.sizeBytes > BANK_CHANGE_MAX_BYTES) {
+      if (isEvidence && input.sizeBytes > EVIDENCE_MAX_BYTES) {
         throw new ORPCError("BAD_REQUEST", { message: "Datei zu groß (max. 10 MB)." });
       }
       const exists = await context.db
@@ -141,7 +144,7 @@ export const attachmentsRouter = {
       }
       if (candidate.kind !== "general") {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Dieser Nachweis muss zusammen mit der Bankänderung gespeichert werden.",
+          message: "Dieser Nachweis muss zusammen mit dem zugehörigen Vorgang gespeichert werden.",
         });
       }
       let metadata: Awaited<ReturnType<typeof headObject>>;
@@ -238,9 +241,9 @@ export const attachmentsRouter = {
       .limit(1);
     const att = rows[0];
     if (!att) throw new ORPCError("NOT_FOUND", { message: "Anhang nicht gefunden." });
-    if (att.kind === "bank_details_change") {
+    if (isEvidenceKind(att.kind)) {
       throw new ORPCError("FORBIDDEN", {
-        message: "Der Nachweis einer Bankänderung kann nicht als normaler Anhang gelöscht werden.",
+        message: "Ein Nachweis kann nicht als normaler Anhang gelöscht werden.",
       });
     }
 
@@ -280,7 +283,7 @@ export const attachmentsRouter = {
     .handler(async ({ context, input }) => {
       const att = await loadDownloadableAttachment(context.db, input.id);
       if (!att) throw new ORPCError("NOT_FOUND", { message: "Anhang nicht gefunden." });
-      if (att.kind === "bank_details_change" && context.role === "readonly") {
+      if (isEvidenceKind(att.kind) && context.role === "readonly") {
         throw new ORPCError("FORBIDDEN", { message: "Keine Berechtigung für diesen Nachweis." });
       }
       const url = await presignDownload({

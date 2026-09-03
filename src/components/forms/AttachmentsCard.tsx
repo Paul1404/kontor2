@@ -9,7 +9,7 @@ import { orpc } from "~/lib/orpc";
 
 type Attachment = {
   id: string;
-  kind: "general" | "bank_details_change";
+  kind: "general" | "bank_details_change" | "cancellation_notice";
   filename: string;
   mimeType: string;
   sizeBytes: number;
@@ -187,6 +187,7 @@ export function AttachmentsCard({
                   </a>
                   <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                     {a.kind === "bank_details_change" ? "Nachweis Bankänderung · " : null}
+                    {a.kind === "cancellation_notice" ? "Austrittserklärung · " : null}
                     {(a.sizeBytes / 1024).toFixed(0)} KB · {formatDate(a.uploadedAt)}
                   </span>
                   {canEdit && a.kind === "general" ? (

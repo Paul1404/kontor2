@@ -41,6 +41,43 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.5.0",
+    date: "2026-09-03",
+    title: "Kündigung mit Nachweis und Fristberechnung",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Der Austritt eines Mitglieds wird jetzt wie eine Bankänderung erfasst: Eingangsdatum der schriftlichen Austrittserklärung, Scan als Nachweis und daraus abgeleiteter Austrittstermin. Der Dialog zeigt die angewandte Satzungsregel und das Fristende an.",
+      },
+      {
+        category: "feature",
+        description:
+          "Der Austrittstermin folgt der hinterlegten Kündigungsregel. Die Frist zählt ab dem Eingang der Erklärung, nicht ab dem Tag der Erfassung. Ein Brief, der rechtzeitig ankam, behält seinen früheren Termin auch bei später Erfassung.",
+      },
+      {
+        category: "feature",
+        description:
+          "Ein abweichender Austrittstermin ist weiterhin möglich, verlangt aber eine Begründung und wird als Abweichung protokolliert. Ohne Nachweis bleibt der bisherige Weg als Verwaltungseintrag erhalten.",
+      },
+      {
+        category: "feature",
+        description:
+          "Der Reiter Dokumente zeigt die erfasste Kündigung mit Eingangsdatum, angewandter Regel, Bearbeiter und der hinterlegten Austrittserklärung.",
+      },
+      {
+        category: "fix",
+        description:
+          "Die Einstellung Zulässiger Austrittstermin wirkt jetzt auch dann, wenn keine Kündigungsfrist in Tagen aktiv ist. Bisher wurde sie in diesem Fall stillschweigend ignoriert.",
+      },
+      {
+        category: "internal",
+        description:
+          "Die Austrittskaskade liegt in einer gemeinsamen Funktion, die der Schnelleintrag und die Kündigungserfassung teilen.",
+      },
+    ],
+  },
+  {
     version: "2.4.0",
     date: "2026-08-03",
     title: "Mitgliederliste technisch erneuert",
