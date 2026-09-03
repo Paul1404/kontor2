@@ -1,4 +1,11 @@
-import { createRootRoute, HeadContent, Outlet, redirect, Scripts } from "@tanstack/react-router";
+import {
+  createRootRoute,
+  HeadContent,
+  Outlet,
+  redirect,
+  Scripts,
+  useRouterState,
+} from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { ErrorPanel, NotFoundPanel } from "~/components/layout/ErrorPanel";
 import { Toaster } from "~/components/ui/toaster";
@@ -146,7 +153,14 @@ function RootDocument({
   branding: Branding | null;
   children?: ReactNode;
 }): ReactNode {
-  const brandCss = brandColorCss(branding?.primaryColor);
+  // The club colour marks where the club appears: login, the member portal,
+  // the application form, and the mail and letters rendered on the server. The
+  // administration is a tool, not a shopfront, and keeps its own navy palette;
+  // a saturated club colour on every primary button there fights the interface
+  // instead of identifying the club.
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const isAdminSurface = pathname.startsWith("/app") || pathname.startsWith("/console");
+  const brandCss = isAdminSurface ? "" : brandColorCss(branding?.primaryColor);
   return (
     <html lang="de" className="h-full" suppressHydrationWarning>
       <head>

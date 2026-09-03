@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.13.0",
+    date: "2026-09-03",
+    title: "Vereinsfarbe wirkt nach außen",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Markenfarbe färbt jetzt dort, wo der Verein nach außen auftritt: Anmeldung, Mitgliederportal, E-Mails und Briefe. Die Verwaltungsoberfläche behält ihr eigenes Farbschema, damit eine kräftige Vereinsfarbe die tägliche Arbeit nicht überlagert.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Beschreibung in den Vereinsdaten sagt jetzt, wofür die Markenfarbe gilt. Bisher versprach sie die gesamte Oberfläche.",
+      },
+    ],
+  },
+  {
     version: "2.12.2",
     date: "2026-09-03",
     title: "Auch einfache Unzustellbarkeitsmeldungen werden gelesen",
