@@ -7,6 +7,15 @@ import { type DsnRecipient, parseDsn } from "~/server/mail/dsn";
 const IMAPS_PORT = 993;
 const MAX_MESSAGES = 200;
 
+export type BounceScan = {
+  reports: BounceReport[];
+  mailbox: string | null;
+  /** Messages looked at in the window. Tells "nothing there" from "found nothing". */
+  examined: number;
+  /** Messages whose structure or sender suggested a delivery report. */
+  candidates: number;
+};
+
 export type BounceReport = {
   /** IMAP UID, so a caller can tell two identical-looking reports apart. */
   uid: number;
@@ -35,6 +44,30 @@ function createClient(config: {
     greetingTimeout: 10_000,
     socketTimeout: 20_000,
   });
+}
+
+/**
+ * True when a message structure contains a delivery-status part, which is what
+ * actually makes something a DSN. Walks the whole tree, because servers nest
+ * reports differently.
+ */
+function looksLikeReport(node: unknown): boolean {
+  if (!node || typeof node !== "object") return false;
+  const candidate = node as { type?: unknown; childNodes?: unknown };
+  const type = typeof candidate.type === "string" ? candidate.type.toLowerCase() : "";
+  if (type === "message/delivery-status" || type === "multipart/report") return true;
+  return Array.isArray(candidate.childNodes) && candidate.childNodes.some(looksLikeReport);
+}
+
+/** Mail servers announce bounces under a handful of well-known local parts. */
+function isDaemonSender(address: string | undefined): boolean {
+  const value = address?.toLowerCase() ?? "";
+  return (
+    value.startsWith("mailer-daemon@") ||
+    value.startsWith("postmaster@") ||
+    value.startsWith("bounce") ||
+    value.includes("@bounce.")
+  );
 }
 
 /**
@@ -72,12 +105,11 @@ function extractParts(parsed: Awaited<ReturnType<typeof simpleParser>>): {
  * Returns an empty list when IMAP is not configured, so a caller can run this
  * unconditionally.
  */
-export async function readBounces(
-  db: DB,
-  opts: { since: Date },
-): Promise<{ reports: BounceReport[]; mailbox: string | null }> {
+export async function readBounces(db: DB, opts: { since: Date }): Promise<BounceScan> {
   const config = await loadSmtpConfig(db);
-  if (!config?.username || !config.password) return { reports: [], mailbox: null };
+  if (!config?.username || !config.password) {
+    return { reports: [], mailbox: null, examined: 0, candidates: 0 };
+  }
 
   const client = createClient({
     host: config.host,
@@ -90,16 +122,31 @@ export async function readBounces(
     await client.connect();
     await client.mailboxOpen("INBOX", { readOnly: true });
 
-    // `header` narrows to report messages server-side; the content check below
-    // is what actually decides, since servers differ in how they index this.
-    const uids = await client.search(
-      { since: opts.since, header: { "content-type": "report" } },
+    // Search by date only. Narrowing server-side on the Content-Type header
+    // looked cheaper, but a server that does not index that header returns
+    // nothing, which is indistinguishable from having no bounces. The structure
+    // of each message is what decides, and reading it is cheap: envelope and
+    // body structure come without the message body.
+    const uids = await client.search({ since: opts.since }, { uid: true });
+    if (!uids || uids.length === 0) {
+      return { reports: [], mailbox: "INBOX", examined: 0, candidates: 0 };
+    }
+
+    const window = uids.slice(-MAX_MESSAGES);
+    const candidates: number[] = [];
+    for await (const message of client.fetch(
+      window,
+      { uid: true, envelope: true, bodyStructure: true },
       { uid: true },
-    );
-    if (!uids || uids.length === 0) return { reports: [], mailbox: "INBOX" };
+    )) {
+      const from = message.envelope?.from?.[0]?.address;
+      if (looksLikeReport(message.bodyStructure) || isDaemonSender(from)) {
+        candidates.push(message.uid);
+      }
+    }
 
     const reports: BounceReport[] = [];
-    for (const uid of uids.slice(-MAX_MESSAGES)) {
+    for (const uid of candidates) {
       const fetched = await client.fetchOne(
         uid,
         { source: true, internalDate: true },
@@ -118,7 +165,12 @@ export async function readBounces(
         recipients: dsn.recipients,
       });
     }
-    return { reports, mailbox: "INBOX" };
+    return {
+      reports,
+      mailbox: "INBOX",
+      examined: window.length,
+      candidates: candidates.length,
+    };
   } finally {
     if (client.usable) await client.logout().catch(() => client.close());
     else client.close();
