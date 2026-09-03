@@ -411,7 +411,16 @@ export const cancellationsRouter = {
    * confirmed.
    */
   confirmationPreview: vorstandProc
-    .input(v.object({ memberId: v.pipe(v.string(), v.uuid()) }))
+    .input(
+      v.object({
+        memberId: v.pipe(v.string(), v.uuid()),
+        // The preview must describe the mail that would actually go out, so it
+        // takes the same selection the send takes. Computing it from what is
+        // merely available would promise enclosures the operator deselected.
+        attachLetter: v.optional(v.boolean(), true),
+        attachNotice: v.optional(v.boolean(), true),
+      }),
+    )
     .handler(async ({ context, input }) => {
       const [facts, organization, smtp] = await Promise.all([
         loadCancellationFacts(context.db, input.memberId),
@@ -440,7 +449,10 @@ export const cancellationsRouter = {
         ...facts,
         to: facts.to ?? "",
         clubDisplayName: organization.displayName,
-        attached: { letter: letters.length > 0, notice: facts.notice != null },
+        attached: {
+          letter: input.attachLetter && letters.length > 0,
+          notice: input.attachNotice && facts.notice != null,
+        },
       });
       const { text } = renderMail({ ...content.document, organization });
       return {
