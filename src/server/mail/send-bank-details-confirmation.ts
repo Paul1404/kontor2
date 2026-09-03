@@ -5,7 +5,7 @@ import {
   type MailInlineAttachment,
   type MailOrganization,
 } from "~/server/mail/branding";
-import { renderMail } from "~/server/mail/layout";
+import { type MailBlock, renderMail } from "~/server/mail/layout";
 
 export type BankDetailsConfirmationContent = {
   to: string;
@@ -35,18 +35,19 @@ export async function loadBankDetailsConfirmationOrganization(db: DB): Promise<M
  * Only the final four IBAN characters are accepted so account data cannot
  * accidentally leak into a member-facing email or its delivery log.
  */
-export function buildBankDetailsConfirmation(
-  params: BankDetailsConfirmationParams,
-): BankDetailsConfirmationContent {
-  const { organization } = params;
+/**
+ * The message itself, independent of channel. Email and letter are both built
+ * from this, so a member reached by post is told exactly what one reached by
+ * email is told.
+ */
+export function bankDetailsConfirmationContent(params: BankDetailsConfirmationParams): {
+  greeting: string;
+  blocks: MailBlock[];
+} {
   const debitText = params.debitSuspended
     ? "Der SEPA-Einzug ist vorerst ausgesetzt. Bitte setzen Sie sich mit uns in Verbindung, bevor der nächste Beitrag eingezogen werden soll."
     : "Künftige Beitragseinzüge verwenden die neue Bankverbindung.";
-
-  const rendered = renderMail({
-    organization,
-    preheader: "Ihre Bankverbindung wurde aktualisiert.",
-    subline: "Bankverbindung",
+  return {
     greeting: `Guten Tag ${params.memberName},`,
     blocks: [
       {
@@ -64,6 +65,20 @@ export function buildBankDetailsConfirmation(
         text: "Falls Sie diese Änderung nicht veranlasst haben, melden Sie sich bitte umgehend bei uns.",
       },
     ],
+  };
+}
+
+export function buildBankDetailsConfirmation(
+  params: BankDetailsConfirmationParams,
+): BankDetailsConfirmationContent {
+  const { organization } = params;
+  const content = bankDetailsConfirmationContent(params);
+  const rendered = renderMail({
+    organization,
+    preheader: "Ihre Bankverbindung wurde aktualisiert.",
+    subline: "Bankverbindung",
+    greeting: content.greeting,
+    blocks: content.blocks,
   });
 
   return {

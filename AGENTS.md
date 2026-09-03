@@ -71,6 +71,13 @@ on Railway via Dockerfile.
   a new kind to `EVIDENCE_ATTACHMENT_KINDS` and the rest follows.
 - Direct-debit detection: a blank `lastschrift` counts as direct debit (that is
   how Linear stored it); only `aufRechnung = 'J'` is a true invoice payer.
+- Member notifications have two equal channels, not a channel and a fallback:
+  `canReachByEmail` decides, and `notify-by-post.ts` renders the same
+  `MailBlock[]` into a DIN 5008 letter (`templates/mitteilung.tsx`). Both land
+  in `email_log`, distinguished by `channel`; a letter is `printed`, never
+  `sent`, because posting it stays a human act. A workflow with its own letter
+  (the Austrittsbestätigung) keeps it and records that letter as its postal
+  channel instead of generating a second one.
 - `email_log.status = sent` only means the MTA accepted the message. A bounce
   arrives asynchronously in the configured mailbox; `emailLog.scanBounces` reads
   those DSNs (RFC 3464, parsed in `src/server/mail/dsn.ts`), flips the row to

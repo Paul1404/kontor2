@@ -19,6 +19,7 @@ import { computeCancellationDate } from "~/server/lib/cancellation-frist";
 import { loadMailOrganization } from "~/server/mail/branding";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { inlineLogoForPreview, renderMail } from "~/server/mail/layout";
+import { canReachByEmail, hasPostalAddress } from "~/server/mail/notify-by-post";
 import {
   buildCancellationConfirmation,
   type CancellationConfirmationParams,
@@ -98,6 +99,10 @@ async function loadCancellationFacts(
 ): Promise<
   | (Omit<CancellationConfirmationParams, "to" | "clubDisplayName" | "attached"> & {
       to: string | null;
+      /** False when no mail can reach this member, which is the postal case. */
+      reachable: boolean;
+      /** Whether a letter could actually be addressed. */
+      canPost: boolean;
       /** The member's own Austrittserklärung from the newest live receipt. */
       notice: {
         attachmentId: string;
@@ -115,6 +120,10 @@ async function loadCancellationFacts(
       kurzname: membersTable.kurzname,
       firma1: membersTable.firma1,
       email: membersTable.email,
+      emailUndeliverableAt: membersTable.emailUndeliverableAt,
+      strasse: membersTable.strasse,
+      plz: membersTable.plz,
+      ort: membersTable.ort,
       austritt: membersTable.austritt,
     })
     .from(membersTable)
@@ -157,6 +166,8 @@ async function loadCancellationFacts(
   const policy = normalizeTenantPolicy(org?.tenantPolicy);
   return {
     to: member.email?.trim() || null,
+    reachable: canReachByEmail(member),
+    canPost: hasPostalAddress(member),
     memberName:
       [member.vorname, member.nachname].filter(Boolean).join(" ") ||
       member.kurzname?.trim() ||
@@ -463,7 +474,9 @@ export const cancellationsRouter = {
       });
       const { text, html } = renderMail({ ...content.document, organization });
       return {
-        canSend: Boolean(facts.to && smtp),
+        channel: facts.reachable ? ("email" as const) : ("post" as const),
+        canPost: facts.canPost,
+        canSend: Boolean(facts.to && smtp && facts.reachable),
         reason: !facts.to ? "no_recipient" : !smtp ? "smtp_not_configured" : null,
         to: facts.to,
         subject: content.subject,

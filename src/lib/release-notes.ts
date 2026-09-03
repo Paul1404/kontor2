@@ -41,6 +41,38 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.11.0",
+    date: "2026-09-03",
+    title: "Bestätigungen auch auf dem Postweg",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Bankänderung und Austritt haben jetzt zwei gleichwertige Wege. Liegt eine erreichbare E-Mail-Adresse vor, geht die Bestätigung per E-Mail. Sonst führt der Dialog zum Brief, statt bei einem Hinweis stehen zu bleiben.",
+      },
+      {
+        category: "feature",
+        description:
+          "Die Bankbestätigung gibt es erstmals als Brief. Er enthält denselben Text wie die E-Mail, weil beide aus derselben Vorlage entstehen.",
+      },
+      {
+        category: "feature",
+        description:
+          "Das Versandprotokoll führt jetzt auch Postversand. Ein erzeugter Brief erscheint als eigener Eintrag, damit die Frage ob ein Mitglied informiert wurde für beide Wege beantwortbar ist.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Beim Austritt bleibt die vorhandene Austrittsbestätigung der Brief. Sie wird beim Erstellen als Postversand protokolliert, statt dass ein zweites Schreiben daneben entsteht.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Eine als unzustellbar erkannte Adresse zählt wie keine Adresse und führt ebenfalls auf den Postweg.",
+      },
+    ],
+  },
+  {
     version: "2.10.0",
     date: "2026-09-03",
     title: "Unzustellbare E-Mails werden erkannt",

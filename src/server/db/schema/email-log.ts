@@ -19,7 +19,21 @@ import { index, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-co
  * later bounce report moves the row to `bounced`, which is the only status that
  * proves the member did not get it.
  */
-export const emailStatusEnum = pgEnum("email_status", ["sent", "failed", "skipped", "bounced"]);
+export const emailStatusEnum = pgEnum("email_status", [
+  "sent",
+  "failed",
+  "skipped",
+  "bounced",
+  /** A postal notification was generated. Posting it stays a human act. */
+  "printed",
+]);
+
+/**
+ * How the member was notified. A club has members without an email address, so
+ * post is not a fallback but the second regular channel; the log has to answer
+ * "was this member informed" for both.
+ */
+export const notificationChannelEnum = pgEnum("notification_channel", ["email", "post"]);
 
 export const emailLogTable = pgTable(
   "email_log",
@@ -29,6 +43,7 @@ export const emailLogTable = pgTable(
     /** Mail type, e.g. "antrag_confirmation", "dunning", "invite". See EMAIL_KIND. */
     kind: text("kind").notNull(),
     status: emailStatusEnum("status").notNull(),
+    channel: notificationChannelEnum("channel").notNull().default("email"),
     recipient: text("recipient"),
     subject: text("subject"),
     /** Exact plain-text body handed to the mail transport. Stored for read-only audit. */
@@ -61,6 +76,7 @@ export const emailLogTable = pgTable(
     index("email_log_created_idx").on(t.createdAt),
     index("email_log_kind_created_idx").on(t.kind, t.createdAt),
     index("email_log_status_created_idx").on(t.status, t.createdAt),
+    index("email_log_channel_created_idx").on(t.channel, t.createdAt),
     index("email_log_entity_idx").on(t.entityType, t.entityId, t.createdAt),
     index("email_log_message_id_idx").on(t.messageId),
     index("email_log_recipient_created_idx").on(t.recipient, t.createdAt),
@@ -70,3 +86,5 @@ export const emailLogTable = pgTable(
 export type EmailLogRow = typeof emailLogTable.$inferSelect;
 export type NewEmailLogRow = typeof emailLogTable.$inferInsert;
 export type EmailStatus = (typeof emailStatusEnum.enumValues)[number];
+
+export type NotificationChannel = (typeof notificationChannelEnum.enumValues)[number];

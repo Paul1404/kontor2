@@ -29,7 +29,7 @@ import { formatDateTime, orEmpty } from "~/lib/format";
 import { useModalFocus } from "~/lib/modal-focus";
 import { orpc } from "~/lib/orpc";
 
-type Status = "sent" | "failed" | "skipped" | "bounced";
+type Status = "sent" | "failed" | "skipped" | "bounced" | "printed";
 
 type MailSearch = {
   q: string;
@@ -62,6 +62,12 @@ const STATUS_META: Record<
     badge: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
     icon: MailWarning,
     accent: "text-amber-600 dark:text-amber-400",
+  },
+  printed: {
+    label: "Brief erzeugt",
+    badge: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+    icon: MailCheck,
+    accent: "text-sky-600 dark:text-sky-400",
   },
   bounced: {
     label: "Unzustellbar",
