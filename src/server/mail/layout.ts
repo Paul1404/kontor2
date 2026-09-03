@@ -1,3 +1,4 @@
+import { darkenForWhiteText } from "~/lib/branding-color";
 import {
   buildLogoAttachment,
   MAIL_LOGO_CID,
@@ -112,8 +113,11 @@ function blockToHtml(block: MailBlock, brandColor: string): string {
     return `<p style="margin:0 0 18px;">${escapeHtml(block.label)}: ${escapeHtml(block.url)}</p>`;
   }
   const safeHref = escapeHtml(href);
+  // The bar and the callout border carry no text and keep the exact club
+  // colour; only this button needs white labels to stay readable on it.
+  const buttonColor = escapeHtml(darkenForWhiteText(brandColor));
   return `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 20px;"><tr>
-          <td style="border-radius:6px;background:${escapeHtml(brandColor)};">
+          <td style="border-radius:6px;background:${buttonColor};">
             <a href="${safeHref}" style="display:inline-block;padding:12px 22px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">${escapeHtml(block.label)}</a>
           </td></tr></table>
         <p style="margin:0 0 18px;color:#5b6472;font-size:12px;word-break:break-all;">Falls der Button nicht funktioniert: ${safeHref}</p>`;

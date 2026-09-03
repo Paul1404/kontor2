@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { brandColorCss, contrastForeground, normalizeHex } from "~/lib/branding-color";
+import {
+  brandColorCss,
+  contrastForeground,
+  contrastRatio,
+  darkenForWhiteText,
+  normalizeHex,
+} from "~/lib/branding-color";
 
 describe("normalizeHex", () => {
   it("normalisiert auf #rrggbb klein", () => {
@@ -36,5 +42,30 @@ describe("brandColorCss", () => {
   it("leerer String ohne gültige Farbe (kein Override)", () => {
     expect(brandColorCss(null)).toBe("");
     expect(brandColorCss("kaputt")).toBe("");
+  });
+});
+
+describe("darkenForWhiteText", () => {
+  it("darkens the SVU crest red until white labels are readable", () => {
+    // #f80000 sits at 4.21:1 against white, just under the AA threshold.
+    expect(contrastRatio("#f80000", "#ffffff")).toBeLessThan(4.5);
+    const button = darkenForWhiteText("#f80000");
+    expect(contrastRatio(button, "#ffffff")).toBeGreaterThanOrEqual(4.5);
+    // Still recognisably the same red, not a different colour.
+    expect(button).toMatch(/^#e[0-9a-f]0000$/);
+  });
+
+  it("leaves a colour alone when it already passes", () => {
+    expect(darkenForWhiteText("#14223d")).toBe("#14223d");
+  });
+
+  it("returns invalid input untouched", () => {
+    expect(darkenForWhiteText("nonsense")).toBe("nonsense");
+  });
+
+  it("never returns something white text cannot sit on", () => {
+    for (const hex of ["#ffff00", "#00ff00", "#ffffff", "#a6864e"]) {
+      expect(contrastRatio(darkenForWhiteText(hex), "#ffffff")).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });
