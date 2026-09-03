@@ -1,5 +1,6 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { BeitrittDetailRow, BeitrittModel } from "~/server/pdf/beitrittserklaerung-model";
+import { pdfBoldFamily, pdfBoldWeight, pdfFamily } from "~/server/pdf/fonts";
 import { FoldAndHoleMarks, mm } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
@@ -12,7 +13,7 @@ const styles = StyleSheet.create({
     paddingBottom: mm(18),
     paddingLeft: mm(25),
     paddingRight: mm(20),
-    fontFamily: "Helvetica",
+    fontFamily: pdfFamily(),
     fontSize: 10,
     color: "#1a1a1a",
     lineHeight: 1.4,
@@ -20,12 +21,13 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "flex-start", marginBottom: 16, gap: 12 },
   logo: { width: 46, height: 46, objectFit: "contain" },
   headerText: { flex: 1 },
-  clubName: { fontFamily: "Helvetica-Bold", fontSize: 13 },
+  clubName: { fontFamily: pdfBoldFamily(), fontWeight: pdfBoldWeight(), fontSize: 13 },
   title: { fontSize: 11, color: "#444", marginTop: 2 },
   antragNr: { fontSize: 9, color: "#666", textAlign: "right" },
   para: { marginBottom: 8, textAlign: "left" },
   sectionHeading: {
-    fontFamily: "Helvetica-Bold",
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
     fontSize: 10,
     marginTop: 14,
     marginBottom: 6,
@@ -39,12 +41,23 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   detailRow: { flexDirection: "row", marginBottom: 3 },
-  detailLabel: { width: 130, fontFamily: "Helvetica-Bold", fontSize: 9 },
+  detailLabel: {
+    width: 130,
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
+    fontSize: 9,
+  },
   detailValue: { flex: 1, fontSize: 9 },
   feeRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
-  feeLabel: { fontFamily: "Helvetica-Bold" },
+  feeLabel: { fontFamily: pdfBoldFamily(), fontWeight: pdfBoldWeight() },
   small: { fontSize: 8.5, color: "#444", marginTop: 6, lineHeight: 1.45 },
-  approvedNote: { marginTop: 14, fontFamily: "Helvetica-Bold", fontSize: 9.5, color: "#15803d" },
+  approvedNote: {
+    marginTop: 14,
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
+    fontSize: 9.5,
+    color: "#15803d",
+  },
   signBlock: { marginTop: 26, flexDirection: "row", gap: 24 },
   signCol: { flex: 1 },
   signImage: { height: 48, objectFit: "contain", marginBottom: 4 },

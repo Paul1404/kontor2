@@ -1,17 +1,24 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { formatDate, formatDateTime } from "~/lib/format";
 import type { AuskunftsPackage } from "~/server/dsgvo/auskunft";
+import { pdfBoldFamily, pdfBoldWeight, pdfFamily } from "~/server/pdf/fonts";
 
 const styles = StyleSheet.create({
   page: {
     padding: 36,
     fontSize: 9,
-    fontFamily: "Helvetica",
+    fontFamily: pdfFamily(),
     color: "#111",
     lineHeight: 1.4,
   },
-  h1: { fontSize: 18, fontFamily: "Helvetica-Bold", marginBottom: 8 },
-  h2: { fontSize: 12, fontFamily: "Helvetica-Bold", marginTop: 14, marginBottom: 4 },
+  h1: { fontSize: 18, fontFamily: pdfBoldFamily(), fontWeight: pdfBoldWeight(), marginBottom: 8 },
+  h2: {
+    fontSize: 12,
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
+    marginTop: 14,
+    marginBottom: 4,
+  },
   meta: { fontSize: 8, color: "#555", marginBottom: 12 },
   notice: {
     backgroundColor: "#f4f4f5",
@@ -29,7 +36,8 @@ const styles = StyleSheet.create({
     borderBottomColor: "#999",
     paddingBottom: 2,
     marginTop: 4,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
   },
   tableRow: {
     flexDirection: "row",

@@ -1,7 +1,7 @@
 import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { MailBlock } from "~/server/mail/layout";
 import { LetterPage } from "~/server/pdf/letter-layout";
-import { winAnsiSafe } from "~/server/pdf/winansi";
+import { pdfText } from "~/server/pdf/winansi";
 
 /**
  * A member notification on paper, built from the same block list that drives the
@@ -55,13 +55,13 @@ export type MitteilungModel = {
 };
 
 function Block({ block }: { block: MailBlock }) {
-  if (block.kind === "paragraph") return <Text style={styles.para}>{winAnsiSafe(block.text)}</Text>;
-  if (block.kind === "note") return <Text style={styles.note}>{winAnsiSafe(block.text)}</Text>;
+  if (block.kind === "paragraph") return <Text style={styles.para}>{pdfText(block.text)}</Text>;
+  if (block.kind === "note") return <Text style={styles.note}>{pdfText(block.text)}</Text>;
   if (block.kind === "callout") {
     return (
       <View style={styles.calloutBox}>
-        <Text style={styles.calloutLabel}>{winAnsiSafe(block.label)}</Text>
-        <Text style={styles.calloutValue}>{winAnsiSafe(block.value)}</Text>
+        <Text style={styles.calloutLabel}>{pdfText(block.label)}</Text>
+        <Text style={styles.calloutValue}>{pdfText(block.value)}</Text>
       </View>
     );
   }
@@ -70,14 +70,14 @@ function Block({ block }: { block: MailBlock }) {
       <View style={styles.para}>
         {block.items.map((item) => (
           <Text key={item} style={styles.bullet}>
-            {winAnsiSafe(`•  ${item}`)}
+            {pdfText(`•  ${item}`)}
           </Text>
         ))}
       </View>
     );
   }
   // A button has nothing to click on paper, so the destination is spelled out.
-  return <Text style={styles.para}>{winAnsiSafe(`${block.label}: ${block.url}`)}</Text>;
+  return <Text style={styles.para}>{pdfText(`${block.label}: ${block.url}`)}</Text>;
 }
 
 export function MitteilungDocument({
@@ -109,13 +109,13 @@ export function MitteilungDocument({
         subject={model.subject}
         footerText={`${club.vereinsname} · ${docRef}`}
       >
-        {model.greeting ? <Text style={styles.para}>{winAnsiSafe(model.greeting)}</Text> : null}
+        {model.greeting ? <Text style={styles.para}>{pdfText(model.greeting)}</Text> : null}
         {model.blocks.map((block, index) => (
           <Block key={String(index)} block={block} />
         ))}
         {model.closing ? (
           <View style={styles.closing}>
-            <Text>{winAnsiSafe(model.closing)}</Text>
+            <Text>{pdfText(model.closing)}</Text>
             <Text>{club.vereinsname}</Text>
           </View>
         ) : null}
@@ -123,7 +123,7 @@ export function MitteilungDocument({
           <View style={styles.enclosures}>
             <Text>{model.enclosures.length === 1 ? "Anlage" : "Anlagen"}</Text>
             {model.enclosures.map((entry) => (
-              <Text key={entry}>{winAnsiSafe(entry)}</Text>
+              <Text key={entry}>{pdfText(entry)}</Text>
             ))}
           </View>
         ) : null}

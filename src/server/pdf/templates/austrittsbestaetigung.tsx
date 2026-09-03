@@ -1,5 +1,6 @@
 import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { CancellationModel } from "~/server/pdf/cancellation-model";
+import { pdfBoldFamily, pdfBoldWeight, pdfFamily } from "~/server/pdf/fonts";
 import { LetterPage } from "~/server/pdf/letter-layout";
 
 const styles = StyleSheet.create({
@@ -13,12 +14,23 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   detailRow: { flexDirection: "row", marginBottom: 2 },
-  detailLabel: { width: 130, fontFamily: "Helvetica-Bold", fontSize: 9.5 },
+  detailLabel: {
+    width: 130,
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
+    fontSize: 9.5,
+  },
   detailValue: { flex: 1, fontSize: 9.5 },
-  bold: { fontFamily: "Helvetica-Bold" },
+  bold: { fontFamily: pdfBoldFamily(), fontWeight: pdfBoldWeight() },
   infoBlock: { marginTop: 10, fontSize: 8.5, color: "#444", lineHeight: 1.35 },
   hr: { borderTopWidth: 0.5, borderColor: "#ccc", marginBottom: 6 },
-  infoHeading: { fontFamily: "Helvetica-Bold", fontSize: 9.5, color: "#1a1a1a", marginBottom: 4 },
+  infoHeading: {
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
+    fontSize: 9.5,
+    color: "#1a1a1a",
+    marginBottom: 4,
+  },
   infoPara: { marginBottom: 4 },
   closing: { marginTop: 10 },
   signLine: { marginTop: 6, fontSize: 9 },

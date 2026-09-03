@@ -1,5 +1,6 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { EhrungsurkundeModel } from "~/server/pdf/ehrungsurkunde-model";
+import { pdfBoldFamily, pdfBoldWeight, pdfFamily } from "~/server/pdf/fonts";
 
 /**
  * A4 portrait honor certificate. Unlike the mailed letters this is a centered,
@@ -20,7 +21,7 @@ const makeStyles = (brand: string) =>
     page: {
       paddingVertical: 56,
       paddingHorizontal: 56,
-      fontFamily: "Helvetica",
+      fontFamily: pdfFamily(),
       color: INK,
     },
     outerFrame: {
@@ -49,7 +50,8 @@ const makeStyles = (brand: string) =>
     },
     logo: { height: 64, objectFit: "contain", marginBottom: 18 },
     vereinKopf: {
-      fontFamily: "Helvetica-Bold",
+      fontFamily: pdfBoldFamily(),
+      fontWeight: pdfBoldWeight(),
       fontSize: 13,
       letterSpacing: 1,
       textAlign: "center",
@@ -58,7 +60,8 @@ const makeStyles = (brand: string) =>
     },
     rule: { width: 90, height: 2, backgroundColor: brand, marginVertical: 18 },
     ueberschrift: {
-      fontFamily: "Helvetica-Bold",
+      fontFamily: pdfBoldFamily(),
+      fontWeight: pdfBoldWeight(),
       fontSize: 36,
       letterSpacing: 3,
       color: brand,
@@ -67,7 +70,8 @@ const makeStyles = (brand: string) =>
     },
     verleihtZeile: { fontSize: 12, color: "#444", textAlign: "center", marginTop: 14 },
     empfaenger: {
-      fontFamily: "Helvetica-Bold",
+      fontFamily: pdfBoldFamily(),
+      fontWeight: pdfBoldWeight(),
       fontSize: 26,
       color: INK,
       textAlign: "center",
@@ -76,7 +80,8 @@ const makeStyles = (brand: string) =>
     },
     ehrungTitelLabel: { fontSize: 11, color: "#666", textAlign: "center" },
     ehrungTitel: {
-      fontFamily: "Helvetica-Bold",
+      fontFamily: pdfBoldFamily(),
+      fontWeight: pdfBoldWeight(),
       fontSize: 18,
       color: brand,
       textAlign: "center",

@@ -1,5 +1,6 @@
 import { Document, Image, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { Fragment } from "react";
+import { pdfBoldFamily, pdfBoldWeight, pdfFamily } from "~/server/pdf/fonts";
 import type { KulanzClubModel, KulanzLetterModel } from "~/server/pdf/kulanz-model";
 import { LetterPage } from "~/server/pdf/letter-layout";
 
@@ -11,7 +12,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderColor: "#999",
     paddingVertical: 2.5,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
     fontSize: 9,
     backgroundColor: "#f4f4f5",
   },
@@ -28,7 +30,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 0.5,
     borderColor: "#444",
     marginTop: 2,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: pdfBoldFamily(),
+    fontWeight: pdfBoldWeight(),
   },
   c1: { flex: 1.3 },
   c2: { flex: 2.4 },
@@ -50,7 +53,7 @@ const styles = StyleSheet.create({
   },
   paymentRow: { flexDirection: "row", marginBottom: 1 },
   paymentKey: { width: 110, color: "#555" },
-  paymentValue: { flex: 1, fontFamily: "Helvetica-Bold" },
+  paymentValue: { flex: 1, fontFamily: pdfBoldFamily(), fontWeight: pdfBoldWeight() },
   slipFieldRow: { flexDirection: "row", marginTop: 28, gap: 18 },
   slipField: {
     flex: 1,
@@ -162,7 +165,9 @@ function KulanzLetterPage({
       {letter.feeWaiverNote ? <Text style={styles.para}>{letter.feeWaiverNote}</Text> : null}
 
       <View style={styles.paymentBox} wrap={false}>
-        <Text style={{ marginBottom: 4, fontFamily: "Helvetica-Bold" }}>Bankverbindung</Text>
+        <Text style={{ marginBottom: 4, fontFamily: pdfBoldFamily(), fontWeight: pdfBoldWeight() }}>
+          Bankverbindung
+        </Text>
         <View style={styles.paymentRow}>
           <Text style={styles.paymentKey}>Empfänger</Text>
           <Text style={styles.paymentValue}>{club.bank.empfaenger}</Text>

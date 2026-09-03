@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.17.0",
+    date: "2026-09-03",
+    title: "Namen stehen richtig in jedem Dokument",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Alle PDF-Dokumente betten jetzt eine Schrift ein, die polnische, tschechische, türkische und weitere Zeichen darstellen kann. Namen wie Łukasz Ćwikła stehen damit korrekt auf Mahnung, Austrittsbestätigung, Rechnung und Auskunft, statt verfälscht oder angenähert.",
+      },
+      {
+        category: "internal",
+        description:
+          "Fehlt die Schriftdatei, weicht die Erzeugung auf eine lesbare Umschrift aus, statt Zeichen falsch darzustellen.",
+      },
+    ],
+  },
+  {
     version: "2.16.0",
     date: "2026-09-03",
     title: "Sammelkorrektur aus der Codeprüfung",
