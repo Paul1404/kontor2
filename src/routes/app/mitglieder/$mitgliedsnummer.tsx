@@ -396,6 +396,7 @@ function MemberDetailPage() {
         memberId={member.id}
         memberName={memberDisplayName}
         hasAddress={Boolean(member.strasse?.trim() && member.plz?.trim() && member.ort?.trim())}
+        anhaenge={anhaenge}
       />
 
       <AustrittDialog

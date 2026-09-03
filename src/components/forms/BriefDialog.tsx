@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, FileDown } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, FileDown, Paperclip } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Input } from "~/components/ui/input";
@@ -22,12 +22,15 @@ export function BriefDialog({
   memberId,
   memberName,
   hasAddress,
+  anhaenge = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   memberId: string;
   memberName: string;
   hasAddress: boolean;
+  /** The member's stored documents, offered as enclosures. */
+  anhaenge?: { id: string; filename: string }[];
 }) {
   const qc = useQueryClient();
   const [subject, setSubject] = useState("");
@@ -35,6 +38,30 @@ export function BriefDialog({
   const [body, setBody] = useState("");
   const [closing, setClosing] = useState(DEFAULT_CLOSING);
   const [error, setError] = useState<string | null>(null);
+  const [enclosures, setEnclosures] = useState<string[]>([]);
+
+  // The Austrittsbestätigung is the document most letters go out with, so the
+  // list starts there rather than making the operator hunt for it.
+  const letters = useQuery({
+    queryKey: ["cancellations.listForMember", memberId],
+    queryFn: () => orpc.cancellations.listForMember({ memberId }),
+    enabled: open,
+  });
+
+  const available = [
+    ...(letters.data ?? []).map((row) => ({
+      key: `cancellation_letter:${row.id}`,
+      source: "cancellation_letter" as const,
+      id: row.id,
+      label: `Austrittsbestätigung ${row.docRef ?? ""}`.trim(),
+    })),
+    ...anhaenge.map((row) => ({
+      key: `attachment:${row.id}`,
+      source: "attachment" as const,
+      id: row.id,
+      label: row.filename,
+    })),
+  ];
 
   useEffect(() => {
     if (open) {
@@ -44,6 +71,7 @@ export function BriefDialog({
     setSubject("");
     setBody("");
     setClosing(DEFAULT_CLOSING);
+    setEnclosures([]);
     setError(null);
   }, [open, memberName]);
 
@@ -61,11 +89,18 @@ export function BriefDialog({
         body,
         greeting: greeting.trim() || null,
         closing: closing.trim() || null,
+        enclosures: available
+          .filter((entry) => enclosures.includes(entry.key))
+          .map((entry) => ({ source: entry.source, id: entry.id })),
       }),
     onSuccess: async (res) => {
       triggerDownloadBase64(res.base64, res.filename, "application/pdf");
       toast.success(`Brief ${res.docRef} erzeugt.`, {
-        description: "Der Vorgang steht als Postversand im Versandprotokoll.",
+        description:
+          res.enclosures.length > 0
+            ? `Als Anlage vermerkt: ${res.enclosures.map((e) => e.label).join(", ")}. Die Dokumente liegen im Reiter Dokumente zum Ausdrucken.`
+            : "Der Vorgang steht als Postversand im Versandprotokoll.",
+        durationMs: res.enclosures.length > 0 ? 10_000 : undefined,
       });
       await qc.invalidateQueries({ queryKey: ["letters.listForMember", memberId] });
       onOpenChange(false);
@@ -148,6 +183,35 @@ export function BriefDialog({
             maxLength={60}
           />
         </div>
+
+        {available.length > 0 ? (
+          <div className="flex flex-col gap-1.5">
+            <Label>Anlagen</Label>
+            <div className="flex flex-col gap-1 rounded-md border border-border bg-background p-2">
+              {available.map((entry) => (
+                <label key={entry.key} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={enclosures.includes(entry.key)}
+                    onChange={(e) =>
+                      setEnclosures((current) =>
+                        e.target.checked
+                          ? [...current, entry.key]
+                          : current.filter((key) => key !== entry.key),
+                      )
+                    }
+                  />
+                  <Paperclip className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="min-w-0 truncate">{entry.label}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Wird auf dem Brief als Anlage vermerkt. Das Dokument selbst drucken Sie aus dem Reiter
+              Dokumente und legen es bei.
+            </p>
+          </div>
+        ) : null}
 
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
           <FileDown className="size-3.5 shrink-0" aria-hidden />
