@@ -220,9 +220,10 @@ function VersandprotokollPage() {
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">Versandprotokoll</h1>
           <p className="text-sm text-muted-foreground">
-            Alle von Kontor2 versendeten E-Mails an einer Stelle: Antragsbestätigungen, Mahnungen,
-            Einladungen und Portalzugänge. Zeigt, ob eine Nachricht versendet, übersprungen oder
-            fehlgeschlagen ist.
+            Jede Nachricht, die Kontor2 an Mitglieder oder Benutzer richtet, an einer Stelle:
+            E-Mails und erzeugte Briefe. Zeigt, ob eine Nachricht versendet wurde, übersprungen oder
+            fehlgeschlagen ist, ob sie nachträglich als unzustellbar zurückkam, und welche Briefe
+            zum Ausdrucken erzeugt wurden.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -258,7 +259,7 @@ function VersandprotokollPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard
           label="Gesamt"
           value={stats.data?.total ?? 0}
@@ -289,6 +290,22 @@ function VersandprotokollPage() {
           status="failed"
           active={search.status === "failed"}
           onClick={() => updateSearch({ status: search.status === "failed" ? "" : "failed" })}
+        />
+        <StatCard
+          label="Unzustellbar"
+          value={stats.data?.bounced ?? 0}
+          loading={stats.isLoading}
+          status="bounced"
+          active={search.status === "bounced"}
+          onClick={() => updateSearch({ status: search.status === "bounced" ? "" : "bounced" })}
+        />
+        <StatCard
+          label="Brief erzeugt"
+          value={stats.data?.printed ?? 0}
+          loading={stats.isLoading}
+          status="printed"
+          active={search.status === "printed"}
+          onClick={() => updateSearch({ status: search.status === "printed" ? "" : "printed" })}
         />
       </div>
 
