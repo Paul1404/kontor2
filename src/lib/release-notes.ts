@@ -41,6 +41,23 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.17.1",
+    date: "2026-09-03",
+    title: "Versandprotokoll zählt alle Zustände",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die Übersichtskarten im Versandprotokoll kannten nur Versendet, Übersprungen und Fehlgeschlagen. Unzustellbare Nachrichten und erzeugte Briefe zählten zwar zur Gesamtsumme, waren aber in keiner Karte zu sehen. Beide haben jetzt eine eigene Karte und lassen sich darüber filtern.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Die Beschreibung der Seite nennt jetzt auch Briefe und die nachträgliche Unzustellbarkeit, statt nur von E-Mails zu sprechen.",
+      },
+    ],
+  },
+  {
     version: "2.17.0",
     date: "2026-09-03",
     title: "Namen stehen richtig in jedem Dokument",
