@@ -7,7 +7,11 @@
  */
 
 import type { DBOrTx } from "~/server/db/client";
-import { type EmailStatus, emailLogTable } from "~/server/db/schema/email-log";
+import {
+  type EmailStatus,
+  emailLogTable,
+  type NotificationChannel,
+} from "~/server/db/schema/email-log";
 import { logger } from "~/server/lib/logger";
 
 /** Canonical mail kinds. Free-form text in the column; use these constants. */
@@ -28,6 +32,8 @@ export const EMAIL_KIND = {
 export type EmailLogEntry = {
   kind: string;
   status: EmailStatus;
+  /** Defaults to email; postal notifications pass "post". */
+  channel?: NotificationChannel;
   recipient?: string | null;
   subject?: string | null;
   bodyText?: string | null;
@@ -69,6 +75,7 @@ export async function recordEmail(
       list.map((e) => ({
         kind: e.kind,
         status: e.status,
+        channel: e.channel ?? "email",
         recipient: e.recipient ?? null,
         subject: e.subject ?? null,
         bodyText: e.bodyText ?? null,

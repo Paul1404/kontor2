@@ -1,13 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ChevronDown, FileUp, Mail } from "lucide-react";
+import { AlertTriangle, ChevronDown, FileDown, FileUp, Mail, Mailbox } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { MailPreview } from "~/components/mail/MailPreview";
+import { Button } from "~/components/ui/button";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { DateField } from "~/components/ui/date-field";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { toast } from "~/components/ui/toaster";
+import { triggerDownloadBase64 } from "~/lib/download";
 import { orpc } from "~/lib/orpc";
 import { formatIbanGrouped, normalizeIban, validateIban } from "~/server/sepa/iban";
 
@@ -161,6 +163,28 @@ export function BankDetailsChangeDialog({
     onError: (cause: unknown) => {
       setError(cause instanceof Error ? cause.message : "Bankverbindung wurde nicht geändert.");
     },
+  });
+
+  const isPostal = emailPreview.data?.channel === "post";
+  const canPost = emailPreview.data?.canPost ?? false;
+
+  // The postal half of the same confirmation. Produced after the change is
+  // applied, because the letter states the new IBAN as a fact.
+  const letter = useMutation({
+    mutationFn: () =>
+      orpc.bankDetails.confirmationLetter({
+        memberId,
+        newIbanLast4: previewLast4,
+        debitAction,
+      }),
+    onSuccess: (res) => {
+      triggerDownloadBase64(res.base64, res.filename, "application/pdf");
+      toast.success(`Brief ${res.docRef} erzeugt.`, {
+        description: "Der Vorgang steht als Postversand im Versandprotokoll.",
+      });
+    },
+    onError: (cause: Error) =>
+      toast.error("Brief konnte nicht erzeugt werden", { description: cause.message }),
   });
 
   const holderChanged =
@@ -342,8 +366,8 @@ export function BankDetailsChangeDialog({
               <span className="mt-0.5 block text-xs text-muted-foreground">
                 {emailPreview.isLoading
                   ? "E-Mail-Einstellungen werden geprüft…"
-                  : emailPreview.data?.reason === "no_recipient"
-                    ? "Für dieses Mitglied ist keine E-Mail-Adresse hinterlegt."
+                  : isPostal
+                    ? "Keine erreichbare E-Mail-Adresse. Bestätigung per Post, siehe unten."
                     : emailPreview.data?.reason === "smtp_not_configured"
                       ? "SMTP ist nicht konfiguriert."
                       : emailPreview.data?.to
@@ -381,6 +405,30 @@ export function BankDetailsChangeDialog({
             </div>
           ) : null}
         </div>
+
+        {isPostal ? (
+          <div className="flex flex-col gap-2 rounded-md border border-border bg-background p-3">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <Mailbox className="size-4" aria-hidden /> Bestätigung per Post
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {canPost
+                ? "Der Brief enthält denselben Text wie die E-Mail und wird als Postversand protokolliert. Bitte erst die Änderung übernehmen, danach den Brief erzeugen: er nennt die neue Bankverbindung als Tatsache."
+                : "Für dieses Mitglied ist weder eine erreichbare E-Mail-Adresse noch eine vollständige Anschrift hinterlegt. Bitte zuerst die Stammdaten ergänzen."}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="self-start"
+              disabled={!canPost || !validIban || letter.isPending}
+              onClick={() => letter.mutate()}
+            >
+              <FileDown className="size-4" />
+              {letter.isPending ? "Brief wird erzeugt…" : "Brief erzeugen"}
+            </Button>
+          </div>
+        ) : null}
 
         <p className="text-xs text-muted-foreground">
           Bereits erzeugte SEPA-Dateien bleiben unverändert. Künftige Läufe verwenden die neue

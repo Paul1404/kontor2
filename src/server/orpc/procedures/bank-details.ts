@@ -8,9 +8,17 @@ import { attachmentsTable, pendingUploadsTable } from "~/server/db/schema/attach
 import { memberBankDetailChangesTable } from "~/server/db/schema/bank-detail-changes";
 import { membersTable } from "~/server/db/schema/members";
 import { isValidEvidence } from "~/server/domain/document-evidence";
+import { memberRef } from "~/server/domain/member";
 import { EMAIL_KIND, recordEmail, statusFromSend } from "~/server/mail/email-log";
 import { inlineLogoForPreview } from "~/server/mail/layout";
 import {
+  canReachByEmail,
+  hasPostalAddress,
+  notifyByPost,
+  recipientLinesFor,
+} from "~/server/mail/notify-by-post";
+import {
+  bankDetailsConfirmationContent,
   buildBankDetailsConfirmation,
   loadBankDetailsConfirmationOrganization,
   sendBankDetailsConfirmation,
@@ -62,6 +70,10 @@ export const bankDetailsRouter = {
             kurzname: membersTable.kurzname,
             firma1: membersTable.firma1,
             email: membersTable.email,
+            emailUndeliverableAt: membersTable.emailUndeliverableAt,
+            strasse: membersTable.strasse,
+            plz: membersTable.plz,
+            ort: membersTable.ort,
           })
           .from(membersTable)
           .where(and(eq(membersTable.id, input.memberId), isNull(membersTable.deletedAt)))
@@ -81,14 +93,72 @@ export const bankDetailsRouter = {
         newIbanLast4: input.newIbanLast4,
         debitSuspended: input.debitAction === "suspend",
       });
+      const reachable = member ? canReachByEmail(member) : false;
       return {
-        canSend: Boolean(to && smtp),
+        channel: reachable ? ("email" as const) : ("post" as const),
+        canPost: member ? hasPostalAddress(member) : false,
+        canSend: Boolean(to && smtp && reachable),
         reason: !to ? "no_recipient" : !smtp ? "smtp_not_configured" : null,
         to,
         subject: content.subject,
         body: content.body,
         html: inlineLogoForPreview(content.html, organization),
       };
+    }),
+
+  /**
+   * The postal half of the confirmation. A member without a reachable email
+   * address is not an exception to handle later: the change still has to be
+   * confirmed, and on paper it is the only signal they get that their bank
+   * details moved. Same content as the mail, produced from the same blocks.
+   */
+  confirmationLetter: vorstandProc
+    .input(
+      v.object({
+        memberId: v.pipe(v.string(), v.uuid()),
+        newIbanLast4: v.pipe(v.string(), v.regex(/^[A-Z0-9]{4}$/)),
+        debitAction: v.picklist(["keep", "suspend"]),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const [member] = await context.db
+        .select()
+        .from(membersTable)
+        .where(and(eq(membersTable.id, input.memberId), isNull(membersTable.deletedAt)))
+        .limit(1);
+      if (!member) throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
+      if (!hasPostalAddress(member)) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Für dieses Mitglied ist keine vollständige Anschrift hinterlegt.",
+        });
+      }
+
+      const organization = await loadBankDetailsConfirmationOrganization(context.db);
+      const params = {
+        to: "",
+        memberName: memberDisplayName(member),
+        organization,
+        newIbanLast4: input.newIbanLast4,
+        debitSuspended: input.debitAction === "suspend",
+      };
+      const content = bankDetailsConfirmationContent(params);
+      const mail = buildBankDetailsConfirmation(params);
+
+      const letter = await notifyByPost(context.db, {
+        kind: EMAIL_KIND.bankDetailsConfirmation,
+        recipient: {
+          memberId: member.id,
+          recipientLines: recipientLinesFor(member),
+          reference: memberRef(member),
+        },
+        subject: `${organization.displayName}: Bankverbindung geändert`,
+        greeting: content.greeting,
+        blocks: content.blocks,
+        bodyText: mail.body,
+        actorEmail: context.session!.user.email,
+        requestId: context.requestId ?? null,
+      });
+      return letter;
     }),
 
   applyChange: vorstandProc

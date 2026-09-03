@@ -13,7 +13,7 @@ import { findSentMessage } from "~/server/mail/read-sent-mail";
 import { reconstructSentMessage } from "~/server/mail/reconstruct-sent-mail";
 import { adminProc } from "~/server/orpc/base";
 
-const StatusEnum = v.picklist(["sent", "failed", "skipped", "bounced"]);
+const StatusEnum = v.picklist(["sent", "failed", "skipped", "bounced", "printed"]);
 
 const ListInput = v.object({
   page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
@@ -88,18 +88,20 @@ export const emailLogRouter = {
         .orderBy(emailLogTable.kind),
     ]);
 
-    const byStatus = { sent: 0, failed: 0, skipped: 0, bounced: 0 };
+    const byStatus = { sent: 0, failed: 0, skipped: 0, bounced: 0, printed: 0 };
     let lastEventAt: string | null = null;
     for (const r of statusRows) {
       byStatus[r.status] = r.count;
       if (r.last && (!lastEventAt || r.last > lastEventAt)) lastEventAt = r.last;
     }
     return {
-      total: byStatus.sent + byStatus.failed + byStatus.skipped + byStatus.bounced,
+      total:
+        byStatus.sent + byStatus.failed + byStatus.skipped + byStatus.bounced + byStatus.printed,
       sent: byStatus.sent,
       failed: byStatus.failed,
       skipped: byStatus.skipped,
       bounced: byStatus.bounced,
+      printed: byStatus.printed,
       lastEventAt,
       kinds: kindRows.map((r) => r.kind),
     };

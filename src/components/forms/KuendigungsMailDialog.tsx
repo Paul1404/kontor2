@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Paperclip } from "lucide-react";
+import { AlertTriangle, Mailbox, Paperclip } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { MailPreview, type MailPreviewAttachment } from "~/components/mail/MailPreview";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
@@ -42,6 +42,7 @@ export function KuendigungsMailDialog({
     staleTime: 30_000,
   });
 
+  const isPostal = preview.data?.channel === "post";
   const letters = preview.data?.letters ?? [];
   const hasLetter = letters.length > 0;
   const notice = preview.data?.notice ?? null;
@@ -119,11 +120,15 @@ export function KuendigungsMailDialog({
         if (!send.isPending) onOpenChange(next);
       }}
       title="Austritt bestätigen"
-      description="Das Mitglied erhält den Austrittstermin und die angewandte Satzungsregel."
+      description={
+        isPostal
+          ? "Für dieses Mitglied ist keine erreichbare E-Mail-Adresse hinterlegt. Die Bestätigung geht per Post."
+          : "Das Mitglied erhält den Austrittstermin und die angewandte Satzungsregel."
+      }
       confirmLabel="E-Mail senden"
       cancelLabel="Abbrechen"
       loading={send.isPending}
-      confirmDisabled={!preview.data?.canSend}
+      confirmDisabled={!preview.data?.canSend || isPostal}
       onConfirm={() => {
         setError(null);
         send.mutate();
@@ -138,16 +143,28 @@ export function KuendigungsMailDialog({
           </p>
         ) : preview.data ? (
           <>
-            <div className="rounded-md border border-border bg-background px-3 py-2 text-sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Empfänger
-              </p>
-              <p className="mt-1">
-                {preview.data.to ?? (
-                  <span className="text-destructive">Keine E-Mail-Adresse hinterlegt</span>
-                )}
-              </p>
-            </div>
+            {isPostal ? (
+              <div className="flex flex-col gap-2 rounded-md border border-border bg-background p-3 text-sm">
+                <p className="flex items-center gap-2 font-medium text-foreground">
+                  <Mailbox className="size-4" aria-hidden /> Postweg
+                </p>
+                <p className="text-muted-foreground">
+                  {preview.data.to
+                    ? "Die hinterlegte Adresse wurde vom Mailserver als nicht erreichbar zurückgewiesen."
+                    : "Für dieses Mitglied ist keine E-Mail-Adresse hinterlegt."}{" "}
+                  {preview.data.canPost
+                    ? "Die Austrittsbestätigung eine Karte tiefer ist der Brief für dieses Mitglied. Sobald sie erstellt ist, gilt der Austritt als schriftlich bestätigt und erscheint so im Versandprotokoll."
+                    : "Es ist auch keine vollständige Anschrift hinterlegt, ein Brief lässt sich daher nicht adressieren."}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Empfänger
+                </p>
+                <p className="mt-1">{preview.data.to}</p>
+              </div>
+            )}
 
             {preview.data.reason === "smtp_not_configured" ? (
               <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-xs">
