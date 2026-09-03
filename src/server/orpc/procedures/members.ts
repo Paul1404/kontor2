@@ -947,6 +947,15 @@ export const membersRouter = {
         patch.status = nextStatus;
         projected.status = nextStatus;
 
+        // A changed address has not bounced yet. Carrying the old warning over
+        // would train operators to ignore it.
+        if ("email" in patch && (patch.email ?? null) !== (existing.email ?? null)) {
+          patch.emailUndeliverableAt = null;
+          patch.emailUndeliverableReason = null;
+          projected.emailUndeliverableAt = null;
+          projected.emailUndeliverableReason = null;
+        }
+
         await tx
           .update(membersTable)
           .set({ ...patch, updatedAt: new Date() } as never)

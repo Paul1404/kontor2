@@ -86,6 +86,13 @@ function transporterFor(cfg: SmtpDispatchConfig): Transporter {
   return t;
 }
 
+/** Strip the angle brackets so a stored id matches what a bounce report quotes. */
+export function normalizeMessageId(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return null;
+  return trimmed.startsWith("<") && trimmed.endsWith(">") ? trimmed.slice(1, -1) : trimmed;
+}
+
 export function mailFrom(cfg: SmtpDispatchConfig): string {
   return cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress;
 }
@@ -102,7 +109,7 @@ export async function getMailer(db: DB = primaryDb()): Promise<{
     text: string;
     html?: string;
     attachments?: MailSendAttachment[];
-  }) => Promise<void>;
+  }) => Promise<{ messageId: string | null }>;
   from: string;
 } | null> {
   const cfg = await loadSmtpConfig(db);
@@ -112,14 +119,22 @@ export async function getMailer(db: DB = primaryDb()): Promise<{
   return {
     from,
     send: async (opts) => {
-      await t.sendMail({ ...opts, from });
+      const info = await t.sendMail({ ...opts, from });
+      return { messageId: normalizeMessageId(info?.messageId) };
     },
   };
 }
 
 export type BrandedMailResult =
-  | { ok: true; subject: string; bodyText: string; bodyHtml: string }
-  | { ok: false; reason: string; subject: string; bodyText: string; bodyHtml: string };
+  | { ok: true; subject: string; bodyText: string; bodyHtml: string; messageId: string | null }
+  | {
+      ok: false;
+      reason: string;
+      subject: string;
+      bodyText: string;
+      bodyHtml: string;
+      messageId: null;
+    };
 
 /**
  * Render a mail in the shared club design and dispatch it. The rendered text
@@ -142,12 +157,12 @@ export async function sendBrandedMail(
   const base = { subject: opts.subject, bodyText: rendered.text, bodyHtml: rendered.html };
 
   const cfg = opts.inlineConfig ?? (await loadSmtpConfig(db));
-  if (!cfg) return { ok: false, reason: "smtp_not_configured", ...base };
+  if (!cfg) return { ok: false, reason: "smtp_not_configured", messageId: null, ...base };
   // Inline configs skip the transporter cache: the signature would match a
   // saved config and we'd accidentally reuse the wrong transport.
   const t = opts.inlineConfig ? buildTransporter(cfg) : transporterFor(cfg);
   try {
-    await t.sendMail({
+    const info = await t.sendMail({
       from: mailFrom(cfg),
       to: opts.to,
       subject: opts.subject,
@@ -155,9 +170,9 @@ export async function sendBrandedMail(
       html: rendered.html,
       attachments: [...rendered.attachments, ...(opts.attachments ?? [])],
     });
-    return { ok: true, ...base };
+    return { ok: true, messageId: normalizeMessageId(info?.messageId), ...base };
   } catch (err) {
-    return { ok: false, reason: (err as Error).message, ...base };
+    return { ok: false, reason: (err as Error).message, messageId: null, ...base };
   }
 }
 

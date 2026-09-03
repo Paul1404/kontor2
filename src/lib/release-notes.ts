@@ -41,6 +41,38 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.10.0",
+    date: "2026-09-03",
+    title: "Unzustellbare E-Mails werden erkannt",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Das Versandprotokoll kann jetzt Unzustellbarkeitsberichte aus dem Postfach lesen. Bisher hieß Versendet nur, dass der Mailserver die Nachricht angenommen hat. Ein späterer Bounce blieb unsichtbar.",
+      },
+      {
+        category: "feature",
+        description:
+          "Betroffene Einträge wechseln auf Unzustellbar und nennen den Grund, etwa Postfach voll oder Adresse existiert nicht.",
+      },
+      {
+        category: "feature",
+        description:
+          "Ist eine Adresse dauerhaft nicht erreichbar, wird das Mitglied entsprechend markiert und es entsteht eine Wiedervorlage. Die Mitgliedsseite warnt sichtbar, das Rundschreiben zeigt betroffene Empfänger vor dem Versand.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Der Hinweis verschwindet automatisch, sobald die E-Mail-Adresse geändert wird.",
+      },
+      {
+        category: "internal",
+        description:
+          "Jede versendete Nachricht speichert ihre Message-ID, damit ein Bericht dem richtigen Eintrag zugeordnet werden kann statt über Empfänger und Zeitfenster geraten zu werden.",
+      },
+    ],
+  },
+  {
     version: "2.9.2",
     date: "2026-09-03",
     title: "Vereinslogo auch im Versandprotokoll",

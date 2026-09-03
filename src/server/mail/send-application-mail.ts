@@ -131,6 +131,7 @@ export async function sendApplicationMails(
       subject: applicantSubject,
       bodyText: res.bodyText,
       bodyHtml: res.bodyHtml,
+      messageId: res.messageId,
       attachmentNames: [opts.pdf.filename],
       detail: res.ok ? null : res.reason,
     });
@@ -182,6 +183,7 @@ export async function sendApplicationMails(
         subject: clubSubject,
         bodyText: res.bodyText,
         bodyHtml: res.bodyHtml,
+        messageId: res.messageId,
         attachmentNames: [opts.pdf.filename],
         detail: res.ok ? null : res.reason,
       });

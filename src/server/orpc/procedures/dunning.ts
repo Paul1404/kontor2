@@ -828,6 +828,7 @@ export const dunningRouter = {
           subject: content.subject,
           bodyText: sent.bodyText,
           bodyHtml: sent.bodyHtml,
+          messageId: sent.messageId,
           attachmentNames: [content.attachmentName],
           entityType: "dunning_item",
           entityId: input.itemId,

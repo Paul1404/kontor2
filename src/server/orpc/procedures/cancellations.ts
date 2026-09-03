@@ -592,6 +592,7 @@ export const cancellationsRouter = {
           subject: sent.subject,
           bodyText: sent.bodyText,
           bodyHtml: sent.bodyHtml,
+          messageId: sent.messageId,
           attachmentNames: attachments.map((a) => a.filename),
           entityType: "member",
           entityId: input.memberId,

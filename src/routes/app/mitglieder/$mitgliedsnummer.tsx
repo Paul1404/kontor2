@@ -13,6 +13,7 @@ import {
   KeyRound,
   Loader2,
   LogOut,
+  MailWarning,
   Pencil,
   RotateCcw,
   Trash2,
@@ -48,7 +49,14 @@ import { isKeineAbteilung } from "~/lib/abteilung-filter";
 import { actionLabel, fieldLabel, formatAuditValue, isHiddenField } from "~/lib/audit-labels";
 import { formatLand } from "~/lib/country";
 import { triggerDownload, triggerDownloadBase64 } from "~/lib/download";
-import { EMPTY_VALUE, formatCurrency, formatDate, formatDateTime, formatPhone } from "~/lib/format";
+import {
+  EMPTY_VALUE,
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+  formatPhone,
+  orEmpty,
+} from "~/lib/format";
 import { memberRef } from "~/lib/member-ref";
 import { memberStatusView } from "~/lib/member-status";
 import { orpc } from "~/lib/orpc";
@@ -392,6 +400,21 @@ function MemberDetailPage() {
           setTab("dokumente");
         }}
       />
+
+      {member.emailUndeliverableAt ? (
+        <div className="flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+          <MailWarning className="mt-0.5 size-4 shrink-0 text-warning" />
+          <div className="flex flex-col gap-1">
+            <p className="font-medium text-foreground">E-Mail nicht zustellbar</p>
+            <p className="text-muted-foreground">
+              Ein Mailserver hat {orEmpty(member.email)} zurückgewiesen
+              {member.emailUndeliverableReason ? `: ${member.emailUndeliverableReason}` : ""}. Seit{" "}
+              {formatDate(member.emailUndeliverableAt)}. Weitere E-Mails an diese Adresse kommen
+              voraussichtlich nicht an. Der Hinweis verschwindet, sobald die Adresse geändert wird.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {isDeleted ? (
         <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
