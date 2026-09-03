@@ -539,7 +539,7 @@ function MailDetailDialog({
   const mail = detail.data as MailDetail | undefined;
   const meta = mail ? STATUS_META[mail.status] : null;
   const safeHtml = mail?.bodyHtml
-    ? `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: cid:; style-src 'unsafe-inline'">${mail.bodyHtml}`
+    ? `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">${mail.bodyHtml}`
     : null;
   const showHtml = !!safeHtml && view === "html";
 

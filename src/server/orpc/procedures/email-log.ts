@@ -1,9 +1,12 @@
 import { ORPCError } from "@orpc/server";
 import { and, between, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import * as v from "valibot";
+import type { DB } from "~/server/db/client";
 import { escapeLike } from "~/server/db/like";
 import { emailLogTable } from "~/server/db/schema/email-log";
 import { logger } from "~/server/lib/logger";
+import { loadMailOrganization } from "~/server/mail/branding";
+import { inlineLogoForPreview } from "~/server/mail/layout";
 import { findSentMessage } from "~/server/mail/read-sent-mail";
 import { reconstructSentMessage } from "~/server/mail/reconstruct-sent-mail";
 import { adminProc } from "~/server/orpc/base";
@@ -49,6 +52,17 @@ function rangeConditions(from: string | null, to: string | null) {
   else if (lo) out.push(gte(emailLogTable.createdAt, lo) as never);
   else if (hi) out.push(lte(emailLogTable.createdAt, hi) as never);
   return out;
+}
+
+/**
+ * The archive stores the message exactly as sent, logo included as a `cid:`
+ * reference. No browser can resolve that, so a stored mail would always render
+ * with a hole where the crest belongs. Swapping in the club's current logo is
+ * cosmetic identity, not message content; a club that later changes its logo
+ * will see the new one on old mail, which beats a broken image on all of them.
+ */
+async function displayableHtml(db: DB, html: string): Promise<string> {
+  return inlineLogoForPreview(html, await loadMailOrganization(db));
 }
 
 export const emailLogRouter = {
@@ -142,7 +156,13 @@ export const emailLogRouter = {
       if (!row) {
         throw new ORPCError("NOT_FOUND", { message: "E-Mail-Protokolleintrag nicht gefunden." });
       }
-      if (row.bodyText || row.bodyHtml) return { ...row, contentSource: "archive" as const };
+      if (row.bodyText || row.bodyHtml) {
+        return {
+          ...row,
+          bodyHtml: row.bodyHtml ? await displayableHtml(context.db, row.bodyHtml) : null,
+          contentSource: "archive" as const,
+        };
+      }
       if (row.status !== "sent" || !row.recipient || !row.subject) {
         return { ...row, contentSource: "none" as const };
       }
@@ -175,7 +195,7 @@ export const emailLogRouter = {
           return {
             ...row,
             bodyText: sent.bodyText,
-            bodyHtml: sent.bodyHtml,
+            bodyHtml: sent.bodyHtml ? await displayableHtml(context.db, sent.bodyHtml) : null,
             attachmentNames: sent.attachmentNames,
             contentSource: "imap" as const,
             imapMailbox: sent.mailbox,
