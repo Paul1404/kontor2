@@ -12,7 +12,6 @@ import {
   Clock,
   Copy,
   CreditCard,
-  HelpCircle,
   Loader2,
   Mail,
   Pencil,
@@ -22,17 +21,10 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import {
-  cloneElement,
-  isValidElement,
-  type ReactElement,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AbteilungPicker } from "~/components/antrag/abteilung-picker";
-import { AddressFields } from "~/components/antrag/address-fields";
+import { type AddressFieldKey, AddressFields } from "~/components/antrag/address-fields";
+import { Field, FieldHelper, fieldStateOf, HelpTip, Reveal } from "~/components/antrag/field";
 import { IbanField } from "~/components/antrag/iban-field";
 import { SignaturePad } from "~/components/antrag/signature-pad";
 import { Button } from "~/components/ui/button";
@@ -58,6 +50,7 @@ type Anrede = "Herr" | "Frau" | "keine Angabe";
 type KindRow = { vorname: string; nachname: string; geburtsdatum: string; abteilungen: string[] };
 
 const STEPS = ["Mitgliedsdaten", "SEPA-Lastschrift", "Zusammenfassung"];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Order in which invalid fields are surfaced (drives scroll-to-first-error).
 const ERROR_ORDER = [
@@ -212,6 +205,14 @@ function AntragForm() {
       delete next[key];
       return next;
     });
+  }
+  // Blur validation for a filled field: a value that does not make sense is
+  // flagged right away, an empty field waits for the step check so tabbing
+  // through the form does not light everything up.
+  function touch(key: string, value: string) {
+    if (!value.trim()) return;
+    const message = computeErrors(step)[key];
+    if (message) setErrors((prev) => (prev[key] === message ? prev : { ...prev, [key]: message }));
   }
 
   // Which child card is expanded; collapse the rest once there is more than one.
@@ -487,8 +488,7 @@ function AntragForm() {
       if (ort.trim().length < 2) e.ort = "Ort ist erforderlich.";
       const phoneErr = validatePhoneMessage(telefon, telefonOptOut);
       if (phoneErr) e.telefon = phoneErr;
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
-        e.email = "Bitte eine gültige E-Mail-Adresse angeben.";
+      if (!EMAIL_RE.test(email.trim())) e.email = "Bitte eine gültige E-Mail-Adresse angeben.";
       if (isMinor) {
         const erzVorErr = validateNameMessage(erzVorname, "Vorname");
         if (erzVorErr) e.erzVorname = erzVorErr;
@@ -534,6 +534,10 @@ function AntragForm() {
     }
     return e;
   }
+
+  const emailValid = EMAIL_RE.test(email.trim());
+  const addressErrors = { strasse: errors.strasse, plz: errors.plz, ort: errors.ort };
+  const addressValues: Record<AddressFieldKey, string> = { strasse, plz, ort };
 
   function goTo(target: number) {
     setDir(target > step ? "forward" : "backward");
@@ -597,12 +601,16 @@ function AntragForm() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <Stepper step={step} onJump={(i) => i < step && goTo(i)} />
-        {draftState !== "idle" ? (
-          <p className="motion-fade-in flex items-center gap-1.5 self-end text-xs text-muted-foreground">
-            <Check className="size-3.5 text-success" />
-            {draftState === "restored" ? "Entwurf wiederhergestellt" : "Entwurf gespeichert"}
-          </p>
-        ) : null}
+        <p
+          aria-live="polite"
+          className={cn(
+            "flex min-h-4 items-center gap-1.5 self-end text-xs text-muted-foreground transition-opacity duration-300",
+            draftState === "idle" ? "opacity-0" : "opacity-100",
+          )}
+        >
+          <Check className="size-3.5 text-success" />
+          {draftState === "restored" ? "Entwurf wiederhergestellt" : "Entwurf gespeichert"}
+        </p>
       </div>
 
       <div
@@ -629,7 +637,7 @@ function AntragForm() {
                 </p>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
-                {!isMinor ? (
+                <Reveal open={!isMinor} collapsedClassName="-mb-4">
                   <div id="f-geschlecht" className="flex scroll-mt-24 flex-col gap-1.5">
                     <Label>Anrede *</Label>
                     <div className="flex flex-wrap gap-2">
@@ -652,46 +660,61 @@ function AntragForm() {
                         </button>
                       ))}
                     </div>
-                    {errors.geschlecht ? (
-                      <span className="text-xs text-destructive">{errors.geschlecht}</span>
-                    ) : null}
+                    <FieldHelper error={errors.geschlecht} />
                   </div>
-                ) : null}
+                </Reveal>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field
                     label="Vorname *"
                     anchorId="f-vorname"
-                    valid={vorname.trim().length >= 2}
+                    state={fieldStateOf(
+                      vorname,
+                      validateNameMessage(vorname, "Vorname") === null,
+                      errors.vorname,
+                    )}
                     error={errors.vorname}
                     pulseNonce={pulseNonce}
                   >
                     <Input
                       value={vorname}
+                      autoComplete="given-name"
                       onChange={(e) => {
                         setVorname(e.target.value);
                         clearError("vorname");
                       }}
+                      onBlur={() => touch("vorname", vorname)}
                     />
                   </Field>
                   <Field
                     label="Nachname *"
                     anchorId="f-nachname"
-                    valid={nachname.trim().length >= 2}
+                    state={fieldStateOf(
+                      nachname,
+                      validateNameMessage(nachname, "Nachname") === null,
+                      errors.nachname,
+                    )}
                     error={errors.nachname}
                     pulseNonce={pulseNonce}
                   >
                     <Input
                       value={nachname}
+                      autoComplete="family-name"
                       onChange={(e) => {
                         setNachname(e.target.value);
                         clearError("nachname");
                       }}
+                      onBlur={() => touch("nachname", nachname)}
                     />
                   </Field>
                   <Field
                     label="Geburtsdatum *"
                     anchorId="f-geburtsdatum"
-                    valid={age != null}
+                    state={fieldStateOf(
+                      geburtsdatum,
+                      validatePastDateMessage(geburtsdatum, "Geburtsdatum", { maxAge: 120 }) ===
+                        null,
+                      errors.geburtsdatum,
+                    )}
                     error={errors.geburtsdatum}
                     pulseNonce={pulseNonce}
                   >
@@ -705,36 +728,60 @@ function AntragForm() {
                   </Field>
                   <div />
                 </div>
-                {dupHint ? (
-                  <p className="motion-fade-in flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
+                <Reveal open={Boolean(dupHint)} collapsedClassName="-mt-4">
+                  <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
                     <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
                     {dupHint}
                   </p>
-                ) : null}
+                </Reveal>
 
                 <AddressFields
                   strasse={strasse}
                   hausnummer={hausnummer}
                   plz={plz}
                   ort={ort}
-                  onStrasse={setStrasse}
+                  onStrasse={(v) => {
+                    setStrasse(v);
+                    clearError("strasse");
+                  }}
                   onHausnummer={setHausnummer}
-                  onPlz={setPlz}
-                  onOrt={setOrt}
+                  onPlz={(v) => {
+                    setPlz(v);
+                    clearError("plz");
+                  }}
+                  onOrt={(v) => {
+                    setOrt(v);
+                    clearError("ort");
+                  }}
+                  errors={addressErrors}
+                  onBlurField={(key) => touch(key, addressValues[key])}
+                  pulseNonce={pulseNonce}
                 />
-                {(errors.strasse || errors.plz || errors.ort) && (
-                  <p className="text-xs text-destructive">
-                    {errors.strasse ?? errors.plz ?? errors.ort}
-                  </p>
-                )}
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
-                    <Field label="Telefon">
+                    <Field
+                      label="Telefon *"
+                      anchorId="f-telefon"
+                      state={fieldStateOf(
+                        telefon,
+                        !telefonOptOut && validatePhoneMessage(telefon) === null,
+                        errors.telefon,
+                      )}
+                      error={errors.telefon}
+                      pulseNonce={pulseNonce}
+                      hint={telefonOptOut ? "Keine Telefonnummer gewünscht." : undefined}
+                    >
                       <Input
+                        type="tel"
                         value={telefon}
+                        autoComplete="tel"
                         disabled={telefonOptOut}
-                        onChange={(e) => setTelefon(e.target.value)}
+                        onChange={(e) => {
+                          setTelefon(e.target.value);
+                          clearError("telefon");
+                        }}
+                        onBlur={() => touch("telefon", telefon)}
                       />
                     </Field>
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -744,45 +791,45 @@ function AntragForm() {
                         onChange={(e) => {
                           setTelefonOptOut(e.target.checked);
                           if (e.target.checked) setTelefon("");
+                          clearError("telefon");
                         }}
                       />
                       Ich möchte keine Telefonnummer angeben
                     </label>
-                    {errors.telefon ? (
-                      <span className="text-xs text-destructive">{errors.telefon}</span>
-                    ) : null}
                   </div>
                   <Field
                     label="E-Mail *"
                     anchorId="f-email"
-                    valid={/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())}
+                    state={fieldStateOf(email, emailValid, errors.email)}
                     error={errors.email}
                     pulseNonce={pulseNonce}
-                    hint="Wir benötigen Ihre E-Mail für die Bestätigung und die Kommunikation zum Antrag."
+                    hint="Für die Bestätigung und Rückfragen zum Antrag."
                   >
                     <Input
                       type="email"
                       value={email}
+                      autoComplete="email"
                       onChange={(e) => {
                         setEmail(e.target.value);
                         clearError("email");
                       }}
+                      onBlur={() => touch("email", email)}
                     />
                   </Field>
                 </div>
 
-                {age != null ? (
+                <Reveal open={age != null} collapsedClassName="-mt-4">
                   <FeeCard
                     tarif={tarifLabel}
                     betrag={fee.data ? formatCurrency(fee.data.jahresbeitrag) : null}
                     isMinor={isMinor}
                     loading={fee.isLoading}
                   />
-                ) : null}
+                </Reveal>
               </CardContent>
             </Card>
 
-            {isMinor ? (
+            <Reveal open={isMinor} collapsedClassName="-mt-6">
               <Card className="glass-card">
                 <CardHeader>
                   <CardTitle>Gesetzliche Vertretung</CardTitle>
@@ -796,7 +843,11 @@ function AntragForm() {
                     <Field
                       label="Vorname *"
                       anchorId="f-erzVorname"
-                      valid={erzVorname.trim().length >= 2}
+                      state={fieldStateOf(
+                        erzVorname,
+                        validateNameMessage(erzVorname, "Vorname") === null,
+                        errors.erzVorname,
+                      )}
                       error={errors.erzVorname}
                       pulseNonce={pulseNonce}
                     >
@@ -806,12 +857,17 @@ function AntragForm() {
                           setErzVorname(e.target.value);
                           clearError("erzVorname");
                         }}
+                        onBlur={() => touch("erzVorname", erzVorname)}
                       />
                     </Field>
                     <Field
                       label="Nachname *"
                       anchorId="f-erzNachname"
-                      valid={erzNachname.trim().length >= 2}
+                      state={fieldStateOf(
+                        erzNachname,
+                        validateNameMessage(erzNachname, "Nachname") === null,
+                        errors.erzNachname,
+                      )}
                       error={errors.erzNachname}
                       pulseNonce={pulseNonce}
                     >
@@ -821,6 +877,7 @@ function AntragForm() {
                           setErzNachname(e.target.value);
                           clearError("erzNachname");
                         }}
+                        onBlur={() => touch("erzNachname", erzNachname)}
                       />
                     </Field>
                   </div>
@@ -839,7 +896,7 @@ function AntragForm() {
                   </div>
                 </CardContent>
               </Card>
-            ) : null}
+            </Reveal>
 
             <Card id="f-abteilung" className="glass-card scroll-mt-24">
               <CardHeader>
@@ -865,13 +922,13 @@ function AntragForm() {
                     clearError("abteilung");
                   }}
                 />
-                {errors.abteilung ? (
-                  <p className="mt-2 text-xs text-destructive">{errors.abteilung}</p>
-                ) : null}
+                <div className="mt-2">
+                  <FieldHelper error={errors.abteilung} />
+                </div>
               </CardContent>
             </Card>
 
-            {!isMinor ? (
+            <Reveal open={!isMinor} collapsedClassName="-mt-6">
               <Card className="glass-card">
                 <CardHeader>
                   <CardTitle>Familie (optional)</CardTitle>
@@ -881,7 +938,7 @@ function AntragForm() {
                     ein zweites Elternteil und mindestens ein Kind ein.
                   </p>
                 </CardHeader>
-                {!familieExpanded ? (
+                <Reveal open={!familieExpanded}>
                   <CardContent>
                     <Button
                       type="button"
@@ -893,28 +950,61 @@ function AntragForm() {
                       <Users className="size-4" /> Familienmitglieder hinzufügen
                     </Button>
                   </CardContent>
-                ) : (
-                  <CardContent className="motion-reveal-up flex flex-col gap-4">
+                </Reveal>
+                <Reveal open={familieExpanded}>
+                  <CardContent className="flex flex-col gap-4">
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <Field label="Partner Vorname" error={errors.partnerVorname}>
+                      <Field
+                        label="Partner Vorname"
+                        anchorId="f-partnerVorname"
+                        error={errors.partnerVorname}
+                        pulseNonce={pulseNonce}
+                        state={fieldStateOf(
+                          partnerVorname,
+                          validateNameMessage(partnerVorname, "Vorname") === null,
+                          errors.partnerVorname,
+                        )}
+                      >
                         <Input
                           value={partnerVorname}
                           onChange={(e) => {
                             setPartnerVorname(e.target.value);
                             clearError("partnerVorname");
                           }}
+                          onBlur={() => touch("partnerVorname", partnerVorname)}
                         />
                       </Field>
-                      <Field label="Partner Nachname" error={errors.partnerNachname}>
+                      <Field
+                        label="Partner Nachname"
+                        anchorId="f-partnerNachname"
+                        error={errors.partnerNachname}
+                        pulseNonce={pulseNonce}
+                        state={fieldStateOf(
+                          partnerNachname,
+                          validateNameMessage(partnerNachname, "Nachname") === null,
+                          errors.partnerNachname,
+                        )}
+                      >
                         <Input
                           value={partnerNachname}
                           onChange={(e) => {
                             setPartnerNachname(e.target.value);
                             clearError("partnerNachname");
                           }}
+                          onBlur={() => touch("partnerNachname", partnerNachname)}
                         />
                       </Field>
-                      <Field label="Partner Geburtsdatum" error={errors.partnerGeburtsdatum}>
+                      <Field
+                        label="Partner Geburtsdatum"
+                        anchorId="f-partnerGeburtsdatum"
+                        error={errors.partnerGeburtsdatum}
+                        pulseNonce={pulseNonce}
+                        state={fieldStateOf(
+                          partnerGeburtsdatum,
+                          (realAgeFromIso(partnerGeburtsdatum) ?? 0) >= 18,
+                          errors.partnerGeburtsdatum,
+                        )}
+                      >
                         <DateField
                           value={partnerGeburtsdatum}
                           onChange={(v) => {
@@ -986,34 +1076,68 @@ function AntragForm() {
                                 <Trash2 className="size-4" />
                               </button>
                             </div>
-                            {open ? (
-                              <div className="motion-reveal-up mt-3 flex flex-col gap-2">
+                            <Reveal open={open}>
+                              <div className="mt-3 flex flex-col gap-2">
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                  <Input
-                                    placeholder="Vorname"
-                                    value={k.vorname}
-                                    onChange={(e) => {
-                                      updateKind(setKinder, i, { vorname: e.target.value });
-                                      clearError(`kind_${i}_vorname`);
-                                    }}
-                                    aria-invalid={Boolean(errors[`kind_${i}_vorname`])}
-                                  />
-                                  <Input
-                                    placeholder="Nachname"
-                                    value={k.nachname}
-                                    onChange={(e) => {
-                                      updateKind(setKinder, i, { nachname: e.target.value });
-                                      clearError(`kind_${i}_nachname`);
-                                    }}
-                                    aria-invalid={Boolean(errors[`kind_${i}_nachname`])}
-                                  />
-                                  <DateField
-                                    value={k.geburtsdatum}
-                                    onChange={(v) => {
-                                      updateKind(setKinder, i, { geburtsdatum: v });
-                                      clearError(`kind_${i}_geburtsdatum`);
-                                    }}
-                                  />
+                                  <Field
+                                    label="Vorname"
+                                    anchorId={`f-kind_${i}_vorname`}
+                                    error={errors[`kind_${i}_vorname`]}
+                                    pulseNonce={pulseNonce}
+                                    state={fieldStateOf(
+                                      k.vorname,
+                                      validateNameMessage(k.vorname, "Vorname") === null,
+                                      errors[`kind_${i}_vorname`],
+                                    )}
+                                  >
+                                    <Input
+                                      value={k.vorname}
+                                      onChange={(e) => {
+                                        updateKind(setKinder, i, { vorname: e.target.value });
+                                        clearError(`kind_${i}_vorname`);
+                                      }}
+                                      onBlur={() => touch(`kind_${i}_vorname`, k.vorname)}
+                                    />
+                                  </Field>
+                                  <Field
+                                    label="Nachname"
+                                    anchorId={`f-kind_${i}_nachname`}
+                                    error={errors[`kind_${i}_nachname`]}
+                                    pulseNonce={pulseNonce}
+                                    state={fieldStateOf(
+                                      k.nachname,
+                                      validateNameMessage(k.nachname, "Nachname") === null,
+                                      errors[`kind_${i}_nachname`],
+                                    )}
+                                  >
+                                    <Input
+                                      value={k.nachname}
+                                      onChange={(e) => {
+                                        updateKind(setKinder, i, { nachname: e.target.value });
+                                        clearError(`kind_${i}_nachname`);
+                                      }}
+                                      onBlur={() => touch(`kind_${i}_nachname`, k.nachname)}
+                                    />
+                                  </Field>
+                                  <Field
+                                    label="Geburtsdatum"
+                                    anchorId={`f-kind_${i}_geburtsdatum`}
+                                    error={errors[`kind_${i}_geburtsdatum`]}
+                                    pulseNonce={pulseNonce}
+                                    state={fieldStateOf(
+                                      k.geburtsdatum,
+                                      (childAge(k.geburtsdatum) ?? 99) <= 18,
+                                      errors[`kind_${i}_geburtsdatum`],
+                                    )}
+                                  >
+                                    <DateField
+                                      value={k.geburtsdatum}
+                                      onChange={(v) => {
+                                        updateKind(setKinder, i, { geburtsdatum: v });
+                                        clearError(`kind_${i}_geburtsdatum`);
+                                      }}
+                                    />
+                                  </Field>
                                 </div>
                                 <AbteilungPicker
                                   abteilungen={abteilungen}
@@ -1027,25 +1151,9 @@ function AntragForm() {
                                     clearError(`kind_${i}_abteilungen`);
                                   }}
                                 />
-                                {[
-                                  errors[`kind_${i}_vorname`],
-                                  errors[`kind_${i}_nachname`],
-                                  errors[`kind_${i}_geburtsdatum`],
-                                  errors[`kind_${i}_abteilungen`],
-                                ].filter(Boolean)[0] ? (
-                                  <p className="text-xs text-destructive">
-                                    {
-                                      [
-                                        errors[`kind_${i}_vorname`],
-                                        errors[`kind_${i}_nachname`],
-                                        errors[`kind_${i}_geburtsdatum`],
-                                        errors[`kind_${i}_abteilungen`],
-                                      ].filter(Boolean)[0]
-                                    }
-                                  </p>
-                                ) : null}
+                                <FieldHelper error={errors[`kind_${i}_abteilungen`]} />
                               </div>
-                            ) : null}
+                            </Reveal>
                           </div>
                         );
                       })}
@@ -1091,9 +1199,9 @@ function AntragForm() {
                       </button>
                     ) : null}
                   </CardContent>
-                )}
+                </Reveal>
               </Card>
-            ) : null}
+            </Reveal>
           </div>
         ) : null}
 
@@ -1139,43 +1247,54 @@ function AntragForm() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field
                   label="Kontoinhaber"
-                  hint="Nur ausfüllen, wenn das Konto auf einen anderen Namen läuft."
+                  hint="Nur ändern, wenn das Konto auf einen anderen Namen läuft."
+                  state={fieldStateOf(kontoinhaber, kontoinhaber.trim().length >= 2)}
                 >
                   <Input
                     value={kontoinhaber}
                     placeholder={payerName}
+                    autoComplete="name"
                     onChange={(e) => setKontoinhaber(e.target.value)}
                   />
                 </Field>
                 <div />
-                <div id="f-iban" className="scroll-mt-24">
-                  <IbanField
-                    value={iban}
-                    onChange={(v) => {
-                      setIban(v);
-                      clearError("iban");
-                    }}
-                    error={errors.iban}
-                    onResolved={(info) => {
-                      if (info.bic) setBic(info.bic);
-                      if (info.name) setKreditinstitut(info.name);
-                    }}
-                  />
-                </div>
-                <Field label="BIC" hint="Wird nach IBAN-Eingabe automatisch ergänzt.">
+                <IbanField
+                  value={iban}
+                  onChange={(v) => {
+                    setIban(v);
+                    clearError("iban");
+                  }}
+                  error={errors.iban}
+                  pulseNonce={pulseNonce}
+                  onResolved={(info) => {
+                    if (info.bic) setBic(info.bic);
+                    if (info.name) setKreditinstitut(info.name);
+                    clearError("bic");
+                  }}
+                />
+                <Field
+                  label="BIC"
+                  anchorId="f-bic"
+                  hint="Wird nach IBAN-Eingabe automatisch ergänzt."
+                  error={errors.bic}
+                  pulseNonce={pulseNonce}
+                  state={fieldStateOf(bic, validateBicMessage(bic) === null, errors.bic)}
+                >
                   <Input
                     value={bic}
-                    aria-invalid={Boolean(errors.bic)}
+                    autoComplete="off"
                     onChange={(e) => {
                       setBic(e.target.value.toUpperCase());
                       clearError("bic");
                     }}
+                    onBlur={() => touch("bic", bic)}
                   />
-                  {errors.bic ? (
-                    <span className="text-xs text-destructive">{errors.bic}</span>
-                  ) : null}
                 </Field>
-                <Field label="Kreditinstitut" hint="Wird nach IBAN-Eingabe automatisch ergänzt.">
+                <Field
+                  label="Kreditinstitut"
+                  hint="Wird nach IBAN-Eingabe automatisch ergänzt."
+                  state={fieldStateOf(kreditinstitut, kreditinstitut.trim().length >= 2)}
+                >
                   <Input
                     value={kreditinstitut}
                     onChange={(e) => setKreditinstitut(e.target.value)}
@@ -1353,17 +1472,17 @@ function AntragForm() {
         ) : null}
       </div>
 
-      {warning ? (
+      <Reveal open={Boolean(warning)} collapsedClassName="-mt-6">
         <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
           {warning}
         </p>
-      ) : null}
-      {error ? (
-        <p className="flex items-center gap-2 text-sm text-destructive">
+      </Reveal>
+      <Reveal open={Boolean(error)} collapsedClassName="-mt-6">
+        <p role="alert" className="flex items-center gap-2 text-sm text-destructive">
           <AlertTriangle className="size-4 shrink-0" />
           {error}
         </p>
-      ) : null}
+      </Reveal>
 
       <div className="flex justify-between gap-2">
         <Button
@@ -1469,10 +1588,7 @@ function FeeCard({
   loading: boolean;
 }) {
   return (
-    <div
-      key={`${tarif}-${betrag}`}
-      className="motion-fee-pop flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4"
-    >
+    <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
         <CheckCircle2 className="size-5" />
       </span>
@@ -1485,7 +1601,9 @@ function FeeCard({
             {tarif ?? (loading ? "wird ermittelt…" : EMPTY_VALUE)}
           </span>
           {betrag ? (
-            <span className="text-lg font-bold text-primary">{betrag} pro Jahr</span>
+            <span key={betrag} className="motion-pop-in text-lg font-bold text-primary">
+              {betrag} pro Jahr
+            </span>
           ) : null}
         </div>
         {isMinor ? (
@@ -1546,83 +1664,6 @@ function Stepper({ step, onJump }: { step: number; onJump: (i: number) => void }
         );
       })}
     </div>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  valid,
-  error,
-  anchorId,
-  pulseNonce,
-  help,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  valid?: boolean;
-  error?: string;
-  /** DOM id used as the scroll-to-error anchor (e.g. "f-vorname"). */
-  anchorId?: string;
-  pulseNonce?: number;
-  help?: string;
-  children: React.ReactNode;
-}) {
-  // Flag the underlying control as invalid so it picks up the red focus ring.
-  const control =
-    error && isValidElement(children)
-      ? cloneElement(children as ReactElement<{ "aria-invalid"?: boolean }>, {
-          "aria-invalid": true,
-        })
-      : children;
-  return (
-    <div id={anchorId} className="scroll-mt-24">
-      <Label className="flex flex-col gap-1.5">
-        <span className="flex items-center gap-1.5">
-          {label}
-          {valid && !error ? (
-            <CheckCircle2 className="motion-pop-in size-3.5 text-success" aria-label="gültig" />
-          ) : null}
-          {help ? <HelpTip text={help} /> : null}
-        </span>
-        {error ? (
-          <span key={pulseNonce} className="field-pulse block">
-            {control}
-          </span>
-        ) : (
-          control
-        )}
-        {error ? (
-          <span className="text-xs font-normal text-destructive">{error}</span>
-        ) : hint ? (
-          <span className="text-xs font-normal text-muted-foreground">{hint}</span>
-        ) : null}
-      </Label>
-    </div>
-  );
-}
-
-// Small inline help: a question-mark button that toggles a short tooltip.
-function HelpTip({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span className="relative inline-flex">
-      <button
-        type="button"
-        aria-label="Hilfe anzeigen"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className="text-muted-foreground hover:text-foreground"
-      >
-        <HelpCircle className="size-3.5" />
-      </button>
-      {open ? (
-        <span className="motion-pop-in absolute left-5 top-0 z-10 w-56 rounded-lg border border-border bg-popover p-2.5 text-xs font-normal leading-relaxed text-popover-foreground shadow-elevated">
-          {text}
-        </span>
-      ) : null}
-    </span>
   );
 }
 

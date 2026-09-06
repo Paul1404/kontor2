@@ -554,3 +554,52 @@ body::after {
     transition: none;
   }
 }
+
+/*
+ * Public Beitritts-Antrag: stable form feedback.
+ * Validity is shown on the control's border (green once a non-empty value
+ * passes its check, red when flagged) instead of an icon that would shift the
+ * label row. Unlayered so it wins over the Input utility classes.
+ */
+[data-field-state="valid"] :where(input, textarea) {
+  border-color: var(--color-success);
+}
+[data-field-state="valid"] :where(input, textarea):focus-visible {
+  border-color: var(--color-success);
+  --tw-ring-color: color-mix(in oklab, var(--color-success) 28%, transparent);
+}
+[data-field-state="invalid"] :where(input, textarea),
+[data-field-state] :where(input, textarea)[aria-invalid="true"] {
+  border-color: var(--color-destructive);
+}
+[data-field-state="invalid"] :where(input, textarea):focus-visible {
+  border-color: var(--color-destructive);
+  --tw-ring-color: color-mix(in oklab, var(--color-destructive) 28%, transparent);
+}
+
+/* Height transition for blocks that appear or disappear mid-form. */
+.reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 200ms ease-out;
+}
+.reveal-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.reveal-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.reveal-settled .reveal-inner {
+  overflow: visible;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    transition: none;
+  }
+}
