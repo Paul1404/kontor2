@@ -55,6 +55,16 @@ export const RELEASES: Release[] = [
         description:
           "Der abgeleitete SVUMS-Push-Schlüssel wird nicht mehr erzeugt. Alte Datensätze mit Quelle SVUMS bleiben lesbar.",
       },
+      {
+        category: "fix",
+        description:
+          "Der Knopf Status verfolgen nach dem Absenden führte auf eine Seite ohne Zugangsschlüssel. Er öffnet jetzt denselben geschützten Link wie die Bestätigungs-E-Mail.",
+      },
+      {
+        category: "fix",
+        description:
+          "Der Hinweis Entwurf gespeichert liegt außerhalb des Formularflusses und verschiebt die Felder auch auf schmalen Bildschirmen nicht mehr.",
+      },
     ],
   },
   {

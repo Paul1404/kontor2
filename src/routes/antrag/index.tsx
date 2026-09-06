@@ -145,7 +145,7 @@ function AntragForm() {
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState<"forward" | "backward">("forward");
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ antragsnummer: string } | null>(null);
+  const [result, setResult] = useState<{ antragsnummer: string; statusUrl: string } | null>(null);
 
   // Step 0
   const [geschlecht, setGeschlecht] = useState<Anrede | null>(null);
@@ -430,7 +430,7 @@ function AntragForm() {
       } catch {
         // ignore
       }
-      setResult({ antragsnummer: res.antragsnummer });
+      setResult({ antragsnummer: res.antragsnummer, statusUrl: res.statusUrl });
     },
     onError: (e: unknown) =>
       setError(e instanceof Error ? e.message : "Der Antrag konnte nicht gesendet werden."),
@@ -587,6 +587,7 @@ function AntragForm() {
     return (
       <SuccessScreen
         antragsnummer={result.antragsnummer}
+        statusUrl={result.statusUrl}
         signOnline={signOnline}
         email={email}
         name={`${vorname} ${nachname}`.trim()}
@@ -599,12 +600,13 @@ function AntragForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
+      <div className="relative pb-5">
         <Stepper step={step} onJump={(i) => i < step && goTo(i)} />
+        {/* Out of the flow: it never pushes the form, whatever the viewport. */}
         <p
           aria-live="polite"
           className={cn(
-            "flex min-h-4 items-center gap-1.5 self-end text-xs text-muted-foreground transition-opacity duration-300",
+            "absolute top-full right-0 -mt-4 flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground transition-opacity duration-300",
             draftState === "idle" ? "opacity-0" : "opacity-100",
           )}
         >
@@ -1822,6 +1824,7 @@ function SuccessCheck() {
 
 function SuccessScreen({
   antragsnummer,
+  statusUrl,
   signOnline,
   email,
   name,
@@ -1830,6 +1833,8 @@ function SuccessScreen({
   abteilungen,
 }: {
   antragsnummer: string;
+  /** Tokenised status link, the same one the confirmation mail carries. */
+  statusUrl: string;
   signOnline: boolean;
   email: string;
   name: string;
@@ -1946,13 +1951,12 @@ function SuccessScreen({
       </Card>
 
       <div className="flex flex-wrap gap-3">
-        <Link
-          to="/antrag/status"
-          search={{ nr: antragsnummer }}
+        <a
+          href={statusUrl}
           className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 text-sm font-medium text-foreground shadow-soft transition-all hover:bg-accent"
         >
           <ArrowRight className="size-4" /> Status verfolgen
-        </Link>
+        </a>
       </div>
     </div>
   );
