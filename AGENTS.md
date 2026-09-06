@@ -78,6 +78,11 @@ on Railway via Dockerfile.
   `sent`, because posting it stays a human act. A workflow with its own letter
   (the Austrittsbestätigung) keeps it and records that letter as its postal
   channel instead of generating a second one.
+- Manual letters (`letters.create`, `BriefDialog`) accept per-letter sender,
+  function, contact, return-address, date and signature-space overrides through
+  `manualLetterOptionsSchema`. These never update organization settings.
+  `notifyByPost` preserves the resolved details in the postal history. A null
+  closing suppresses the entire signature block, including personal details.
 - `email_log.status = sent` only means the MTA accepted the message. A bounce
   arrives asynchronously in the configured mailbox; `emailLog.scanBounces` reads
   those DSNs (RFC 3464, parsed in `src/server/mail/dsn.ts`), flips the row to
