@@ -54,6 +54,12 @@ export function BriefDialog({
   const [greeting, setGreeting] = useState("");
   const [body, setBody] = useState("");
   const [closing, setClosing] = useState(DEFAULT_CLOSING);
+  const [senderName, setSenderName] = useState("");
+  const [senderTitle, setSenderTitle] = useState("");
+  const [contact, setContact] = useState("");
+  const [returnAddress, setReturnAddress] = useState("");
+  const [letterDate, setLetterDate] = useState("");
+  const [signatureSpace, setSignatureSpace] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enclosures, setEnclosures] = useState<string[]>([]);
   /** Per-enclosure wording for the Anlagenvermerk, keyed like the selection. */
@@ -87,6 +93,12 @@ export function BriefDialog({
       setGreeting(memberName ? `Sehr geehrte(r) ${memberName},` : "");
       return;
     }
+    setSenderName("");
+    setSenderTitle("");
+    setContact("");
+    setReturnAddress("");
+    setLetterDate("");
+    setSignatureSpace(false);
     setSubject("");
     setBody("");
     setClosing(DEFAULT_CLOSING);
@@ -107,6 +119,12 @@ export function BriefDialog({
         memberId,
         subject: subject.trim(),
         body,
+        senderName,
+        senderTitle,
+        contact,
+        returnAddress,
+        letterDate: letterDate || undefined,
+        signatureSpace,
         greeting: greeting.trim() || null,
         closing: closing.trim() || null,
         enclosures: available
@@ -141,7 +159,7 @@ export function BriefDialog({
         if (!create.isPending) onOpenChange(next);
       }}
       title="Brief schreiben"
-      description="Betreff und Text eingeben. Briefkopf, Anschriftfeld und Falzmarken nach DIN 5008 kommen aus den Vereinsdaten."
+      description="Persönlichen Brief schreiben. Vereinsbriefkopf und Anschrift werden übernommen. Ihre Anpassungen gelten nur für diesen Brief."
       confirmLabel="Brief erzeugen"
       cancelLabel="Abbrechen"
       loading={create.isPending}
@@ -163,7 +181,7 @@ export function BriefDialog({
         )}
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="brief-betreff">Betreff *</Label>
+          <Label htmlFor="brief-betreff">Titel / Betreff *</Label>
           <Input
             id="brief-betreff"
             value={subject}
@@ -190,6 +208,7 @@ export function BriefDialog({
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={10}
+            maxLength={20_000}
           />
           <p className="text-xs text-muted-foreground">
             Eine Leerzeile trennt Absätze. {paragraphs.length}{" "}
@@ -207,6 +226,98 @@ export function BriefDialog({
             maxLength={60}
           />
         </div>
+
+        <fieldset
+          className="flex flex-col gap-3 rounded-md border border-border p-3"
+          disabled={!closing.trim()}
+        >
+          <legend className="px-1 font-medium">Absender und Unterschrift</legend>
+          <p className="text-xs text-muted-foreground">
+            Name und Funktion stehen unter der Grußformel. Ohne Namen unterschreibt der Verein. Ohne
+            Grußformel entfällt dieser gesamte Abschluss.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="brief-sender">Absendername</Label>
+              <Input
+                id="brief-sender"
+                value={senderName}
+                onChange={(e) => setSenderName(e.target.value)}
+                maxLength={100}
+                placeholder="z. B. Paul Dresch"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="brief-title">Titel / Funktion</Label>
+              <Input
+                id="brief-title"
+                value={senderTitle}
+                onChange={(e) => setSenderTitle(e.target.value)}
+                maxLength={100}
+                placeholder="z. B. Mitgliederverwaltung"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="brief-contact">Kontakt für Rückfragen</Label>
+            <Input
+              id="brief-contact"
+              value={contact}
+              onChange={(e) => setContact(e.target.value)}
+              maxLength={160}
+              placeholder="E-Mail oder Telefon (optional)"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={signatureSpace}
+              onChange={(e) => setSignatureSpace(e.target.checked)}
+            />
+            Platz für handschriftliche Unterschrift
+          </label>
+          {closing.trim() ? (
+            <section
+              className="whitespace-pre-wrap rounded-md bg-background p-3 text-sm"
+              aria-label="Vorschau des Briefabschlusses"
+            >
+              <p>{closing.trim()}</p>
+              {signatureSpace ? <div className="h-12" /> : null}
+              <p>{senderName.trim() || "Vereinsname aus den Einstellungen"}</p>
+              {senderTitle.trim() ? <p>{senderTitle.trim()}</p> : null}
+              {contact.trim() ? <p>{contact.trim()}</p> : null}
+            </section>
+          ) : null}
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3 rounded-md border border-border p-3">
+          <legend className="px-1 font-medium">Briefdetails</legend>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="brief-date">Briefdatum</Label>
+            <Input
+              id="brief-date"
+              type="date"
+              value={letterDate}
+              onChange={(e) => setLetterDate(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Leer lassen für heute. Das Erstellungsdatum im Protokoll bleibt erhalten.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="brief-return">Abweichende Rücksendeadresse</Label>
+            <Input
+              id="brief-return"
+              value={returnAddress}
+              onChange={(e) => setReturnAddress(e.target.value)}
+              maxLength={180}
+              placeholder="Name · Straße Hausnummer · PLZ Ort"
+            />
+            <p className="text-xs text-muted-foreground">
+              Kleine Zeile über der Empfängeranschrift. Leer lassen für die Vereinsadresse.
+            </p>
+          </div>
+        </fieldset>
 
         {available.length > 0 ? (
           <div className="flex flex-col gap-1.5">

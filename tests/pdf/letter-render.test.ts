@@ -9,6 +9,7 @@ import { BeitrittserklaerungDocument } from "~/server/pdf/templates/beitrittserk
 import { EhrungsurkundeDocument } from "~/server/pdf/templates/ehrungsurkunde";
 import { KulanzSonderkuendigungDocument } from "~/server/pdf/templates/kulanz-sonderkuendigung";
 import { MahnungDocument } from "~/server/pdf/templates/mahnung";
+import { MitteilungDocument } from "~/server/pdf/templates/mitteilung";
 
 /**
  * Smoke test for the DIN 5008 letter templates: they have no other coverage, so
@@ -56,6 +57,39 @@ const SIGNATURE_PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC";
 
 describe("DIN 5008 letter templates", () => {
+  it("keeps a personal letter with handwritten signature space and enclosure on one page", async () => {
+    expect(
+      await pdfPageCount(
+        MitteilungDocument({
+          club: {
+            vereinsname: org.vereinsname,
+            senderLine: "Paul Dresch · Musterweg 3 · 97516 Untereuerheim",
+            logoDataUri: null,
+          },
+          docRef: "MT-2026-0001",
+          model: {
+            recipientLines: ["Erika Beispiel", "Musterstraße 12", "97516 Untereuerheim"],
+            reference: "M-123",
+            referenceLabel: "Mitgliedsnummer",
+            datum: "06.09.2026",
+            subject: "Ihre Mitgliedschaft",
+            greeting: "Guten Tag,",
+            blocks: [
+              {
+                kind: "paragraph",
+                text: "anbei erhalten Sie die besprochenen Unterlagen. Bei Fragen melden Sie sich bitte bei mir.",
+              },
+            ],
+            closing: "Freundliche Grüße",
+            signatureLines: ["Paul Dresch", "Mitgliederverwaltung", "paul@example.org"],
+            signatureSpace: true,
+            enclosures: ["Beitragsübersicht"],
+          },
+        }),
+      ),
+    ).toBe(1);
+  });
+
   it("renders the Mahnung", async () => {
     await expectValidPdf(
       MahnungDocument({

@@ -46,6 +46,8 @@ export type MitteilungModel = {
   greeting: string | null;
   blocks: MailBlock[];
   closing: string | null;
+  signatureLines?: string[];
+  signatureSpace?: boolean;
   /**
    * Anlagenvermerk per DIN 5008. An enclosure travels in the same envelope as
    * a separate document; naming it on the letter is what ties the two together
@@ -114,9 +116,12 @@ export function MitteilungDocument({
           <Block key={String(index)} block={block} />
         ))}
         {model.closing ? (
-          <View style={styles.closing}>
+          <View style={styles.closing} wrap={false}>
             <Text>{pdfText(model.closing)}</Text>
-            <Text>{club.vereinsname}</Text>
+            {model.signatureSpace ? <View style={{ height: 36 }} /> : null}
+            {(model.signatureLines ?? [club.vereinsname]).map((line, index) => (
+              <Text key={String(index)}>{pdfText(line)}</Text>
+            ))}
           </View>
         ) : null}
         {model.enclosures && model.enclosures.length > 0 ? (

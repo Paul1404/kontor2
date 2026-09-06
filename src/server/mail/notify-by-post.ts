@@ -1,4 +1,5 @@
 import { formatDate } from "~/lib/format";
+import type { ManualLetterOptions } from "~/lib/manual-letter";
 import type { DB } from "~/server/db/client";
 import { allocateDocRef } from "~/server/db/doc-ref";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
@@ -50,6 +51,7 @@ export async function notifyByPost(
     greeting: string | null;
     blocks: MailBlock[];
     closing?: string | null;
+    letterOptions?: ManualLetterOptions;
     /** Plain text of the same content, stored so the protocol can show it. */
     bodyText: string;
     /** Documents travelling in the same envelope, named on the letter. */
@@ -68,21 +70,34 @@ export async function notifyByPost(
     .filter(Boolean)
     .join(" · ");
 
+  const options = input.letterOptions;
+  const closing = input.closing === undefined ? "Freundliche Grüße" : input.closing;
+  const signatureLines = [
+    options?.senderName || vereinsname,
+    options?.senderTitle,
+    options?.contact,
+  ].filter((line): line is string => Boolean(line));
   const now = new Date();
   const docRef = await allocateDocRef(db, "MT", now.getUTCFullYear());
   const { base64 } = await renderPdfBase64(
     MitteilungDocument({
-      club: { vereinsname, senderLine, logoDataUri: resolveClubLogo(org?.logo) },
+      club: {
+        vereinsname,
+        senderLine: options?.returnAddress || senderLine,
+        logoDataUri: resolveClubLogo(org?.logo),
+      },
       docRef,
       model: {
         recipientLines: input.recipient.recipientLines,
         reference: input.recipient.reference,
         referenceLabel: input.recipient.referenceLabel ?? "Mitgliedsnummer",
-        datum: formatDate(now),
+        datum: formatDate(options?.letterDate ?? now),
         subject: input.subject,
         greeting: input.greeting,
         blocks: input.blocks,
-        closing: input.closing === undefined ? "Freundliche Grüße" : input.closing,
+        closing,
+        signatureLines,
+        signatureSpace: options?.signatureSpace,
         enclosures: input.enclosures,
       },
     }),
@@ -106,7 +121,17 @@ export async function notifyByPost(
         status: "printed",
         recipient: input.recipient.recipientLines.join(", "),
         subject: input.subject,
-        bodyText: input.bodyText,
+        bodyText: options
+          ? [
+              `Briefdatum: ${formatDate(options.letterDate ?? now)}`,
+              `Rücksendeadresse: ${options.returnAddress || senderLine}`,
+              input.bodyText,
+              closing ? [closing, ...signatureLines].join("\n") : null,
+              input.enclosures?.length ? `Anlagen: ${input.enclosures.join("; ")}` : null,
+            ]
+              .filter(Boolean)
+              .join("\n\n")
+          : input.bodyText,
         attachmentNames: [`${docRef}.pdf`, ...(input.enclosures ?? [])],
         detail: docRef,
         entityType: "member",

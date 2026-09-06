@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, desc, eq } from "drizzle-orm";
 import * as v from "valibot";
 import { formatDate } from "~/lib/format";
+import { manualLetterOptionsSchema } from "~/lib/manual-letter";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { attachmentsTable } from "~/server/db/schema/attachments";
 import { cancellationLettersTable } from "~/server/db/schema/cancellations";
@@ -48,6 +49,7 @@ export const lettersRouter = {
       v.object({
         memberId: v.pipe(v.string(), v.uuid()),
         subject: Subject,
+        ...manualLetterOptionsSchema.entries,
         body: Body,
         /**
          * Documents to enclose. Named on the letter as an Anlagenvermerk; the
@@ -142,6 +144,7 @@ export const lettersRouter = {
         greeting: input.greeting || null,
         blocks,
         closing: input.closing,
+        letterOptions: v.parse(manualLetterOptionsSchema, input),
         // The protocol stores what was written, so the letter stays readable
         // years later without keeping the PDF around.
         bodyText: [input.greeting, "", input.body].filter(Boolean).join("\n"),

@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.18.0",
+    date: "2026-09-06",
+    title: "Persönliche Briefe gestalten",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Einzelbriefe unterstützen einen eigenen Absender mit Titel oder Funktion, Kontaktdaten und Platz für die Unterschrift. Briefdatum und Rücksendeadresse lassen sich je Brief anpassen. Der Briefabschluss wird direkt im Editor angezeigt.",
+      },
+    ],
+  },
+  {
     version: "2.17.1",
     date: "2026-09-03",
     title: "Versandprotokoll zählt alle Zustände",
