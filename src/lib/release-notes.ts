@@ -41,6 +41,33 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.19.0",
+    date: "2026-09-06",
+    title: "Online-Antrag ohne Springen",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Die Adresseingabe im Online-Antrag ist jetzt ein echtes Auswahlfeld: Straßenvorschläge lassen sich mit den Pfeiltasten wählen, der getippte Teil ist hervorgehoben, und nach der Auswahl springt der Cursor zur Hausnummer. Gehören zu einer PLZ mehrere Orte, erscheinen sie als Auswahl unter dem Ortsfeld.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Das Formular bleibt beim Ausfüllen ruhig. Hinweise, Fehler, Tarifkarte, Familienbereich und die Karte für die gesetzliche Vertretung schieben sich sanft ein statt die Seite zu verschieben.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Sinnvoll ausgefüllte Felder bekommen einen grünen Rand statt eines Häkchens neben der Beschriftung. Eine unpassende Eingabe, etwa eine E-Mail ohne Endung, wird beim Verlassen des Feldes markiert.",
+      },
+      {
+        category: "fix",
+        description:
+          "Fehler in Straße, PLZ und Ort werden jetzt am jeweiligen Feld angezeigt und beim Klick auf Weiter angesprungen.",
+      },
+    ],
+  },
+  {
     version: "2.18.1",
     date: "2026-09-06",
     title: "Briefe ohne Fokusverlust bearbeiten",

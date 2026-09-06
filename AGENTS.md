@@ -69,6 +69,14 @@ on Railway via Dockerfile.
   validated against their magic bytes, referenced by an append-only receipt
   row, undeletable as a normal attachment and hidden from readonly users. Add
   a new kind to `EVIDENCE_ATTACHMENT_KINDS` and the rest follows.
+- The public Beitritts-Antrag (`src/routes/antrag/index.tsx`) must not shift
+  while typing. Build its inputs with `Field` from
+  `src/components/antrag/field.tsx` (reserved helper line, validity shown as a
+  green or red border via `data-field-state`, never an icon next to the label)
+  and wrap anything that appears mid-form in `Reveal` (animated height; pass
+  the negative gap margin as `collapsedClassName` inside `gap` containers).
+  Street suggestions are a real combobox (`address-fields.tsx`) whose pure
+  keyboard and highlight helpers live in `src/lib/antrag-combobox.ts`.
 - Direct-debit detection: a blank `lastschrift` counts as direct debit (that is
   how Linear stored it); only `aufRechnung = 'J'` is a true invoice payer.
 - Member notifications have two equal channels, not a channel and a fallback:
