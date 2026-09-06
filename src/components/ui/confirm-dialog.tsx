@@ -32,44 +32,14 @@ export function ConfirmDialog({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const confirmRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !loading) {
-        e.preventDefault();
-        onOpenChange(false);
-        return;
-      }
-      if (e.key !== "Tab") return;
-      const focusable = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-        ) ?? [],
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0]!;
-      const last = focusable.at(-1)!;
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const t = window.setTimeout(() => cancelRef.current?.focus(), 0);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-      window.clearTimeout(t);
-      opener?.focus();
-    };
-  }, [open, onOpenChange, loading]);
+  useModalFocus({
+    open,
+    containerRef: dialogRef,
+    initialFocusRef: cancelRef,
+    onEscape: () => {
+      if (!loading) onOpenChange(false);
+    },
+  });
 
   if (!open) return null;
 
@@ -81,7 +51,7 @@ export function ConfirmDialog({
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onOpenChange(false);
+        if (e.target === e.currentTarget && !loading) onOpenChange(false);
       }}
     >
       <div
@@ -131,7 +101,6 @@ export function ConfirmDialog({
             {cancelLabel}
           </Button>
           <Button
-            ref={confirmRef}
             type="button"
             variant={destructive ? "destructive" : "default"}
             onClick={onConfirm}
