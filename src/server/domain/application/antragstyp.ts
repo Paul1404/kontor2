@@ -31,8 +31,7 @@ export type Altersgrenzen = {
 };
 
 /**
- * The historic boundaries (14 / 18 / 25). Used only where no club settings are
- * available (the deprecated svums import) and as a fixture default; live request
+ * The historic boundaries (14 / 18 / 25). A fixture default only; live request
  * paths pass the club's configured values.
  */
 export const DEFAULT_ALTERSGRENZEN: Altersgrenzen = {

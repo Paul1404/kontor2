@@ -14,6 +14,8 @@ export const auditActionEnum = pgEnum("audit_action", [
 export const auditSourceEnum = pgEnum("audit_source", [
   "ui",
   "import",
+  // Kept for historical rows written by the retired svums push; nothing
+  // produces it anymore.
   "svums_push",
   "system",
   "dsgvo",

@@ -1,4 +1,4 @@
-export type LegacyImportSource = "linear_webverein" | "svums";
+export type LegacyImportSource = "linear_webverein";
 export type CancellationDateMode = "anytime" | "month_end" | "year_end";
 
 export type DunningLevelText = {
@@ -67,7 +67,7 @@ export function normalizeTenantPolicy(value: TenantPolicy | null | undefined): T
     ...DEFAULT_TENANT_POLICY,
     ...value,
     legacyImportSources: [...new Set(value.legacyImportSources ?? [])].filter(
-      (source): source is LegacyImportSource => source === "linear_webverein" || source === "svums",
+      (source): source is LegacyImportSource => source === "linear_webverein",
     ),
     dunningTexts: { ...DEFAULT_TENANT_POLICY.dunningTexts, ...value.dunningTexts },
   };

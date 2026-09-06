@@ -53,7 +53,7 @@ export type OnboardMemberOpts = {
   actorEmail: string;
   requestId: string | null;
   /** Audit source; defaults to "ui". */
-  source?: "ui" | "import" | "svums_push" | "system" | "dsgvo";
+  source?: "ui" | "import" | "system" | "dsgvo";
 };
 
 export type OnboardMemberResult = {

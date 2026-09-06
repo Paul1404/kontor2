@@ -41,6 +41,33 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.0",
+    date: "2026-09-06",
+    title: "Kontor2 übernimmt den Mitgliedseintritt vollständig",
+    changes: [
+      {
+        category: "breaking",
+        description:
+          "Die Anbindung an die alte SVUMS-Anwendung ist entfernt. Der signierte Push-Endpunkt /api/ingest/svums, der SVUMS-Antragsimport unter Datenimport und der zugehörige Schalter in den Vereinsdaten gibt es nicht mehr. Neue Mitglieder kommen ausschließlich über die Online-Beitrittserklärung unter /antrag oder werden direkt in der Verwaltung angelegt.",
+      },
+      {
+        category: "internal",
+        description:
+          "Der abgeleitete SVUMS-Push-Schlüssel wird nicht mehr erzeugt. Alte Datensätze mit Quelle SVUMS bleiben lesbar.",
+      },
+      {
+        category: "fix",
+        description:
+          "Der Knopf Status verfolgen nach dem Absenden führte auf eine Seite ohne Zugangsschlüssel. Er öffnet jetzt denselben geschützten Link wie die Bestätigungs-E-Mail.",
+      },
+      {
+        category: "fix",
+        description:
+          "Der Hinweis Entwurf gespeichert liegt außerhalb des Formularflusses und verschiebt die Felder auch auf schmalen Bildschirmen nicht mehr.",
+      },
+    ],
+  },
+  {
     version: "2.19.0",
     date: "2026-09-06",
     title: "Online-Antrag ohne Springen",

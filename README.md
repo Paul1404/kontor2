@@ -284,9 +284,7 @@ The parts that took real engineering, not just CRUD.
 - Linear Webverein `mysqldump` upload up to 50 MB. Parsed in process, multi-row
   inserts split, MySQL escapes decoded, written in batches with live progress
   (published per tenant through Redis).
-- Legacy push compatibility. `POST /api/ingest/svums` accepts the same record
-  shape so the mapper is shared between SQL upload and JSON push.
-- Both paths write through the same ingest pipeline. Diffs land in the audit log
+- The upload writes through the ingest pipeline. Diffs land in the audit log
   and trigger a pre-import snapshot. Contracts and SEPA mandates upsert in place,
   so app-created Sollstellungen survive a re-import.
 - Historical tables are carried over, not discarded.
@@ -496,7 +494,6 @@ Postgres advisory lock keeps multiple replicas from running it at once. Set
 - `/api/mcp`. Remote MCP server for AI assistants.
 - `/api/health`. Railway healthcheck.
 - `/api/files/$id`. Signed attachment download.
-- `/api/ingest/svums`. HMAC-signed legacy push.
 - `/api/cron/snapshots`. External snapshot trigger.
 - `/api/portal/zugang/$token`, `/api/portal/logout`. Magic-link portal session.
 
@@ -551,7 +548,7 @@ Required Railway services:
 
 Manually set:
 - `APP_SECRET`. 32-byte hex. Every other secret (better-auth signing key,
-  data-at-rest key, legacy push HMAC) is derived from this via HKDF-SHA256.
+  data-at-rest key, snapshot cron HMAC) is derived from this via HKDF-SHA256.
   See `bun scripts/print-derived-secrets.ts`.
 - `APP_SECRET_PREV`. Optional. Previous APP_SECRET(s), comma-separated, kept in
   the keyring during a rotation so existing encrypted rows stay readable.
@@ -568,27 +565,10 @@ The nightly snapshot scheduler runs in-process by default. To move it to an
 external scheduler (Railway Cron, GitHub Actions and the like), set
 `SNAPSHOT_CRON_DISABLED=1` and hit `POST /api/cron/snapshots` with
 `X-Kontor-Timestamp` and `X-Kontor-Signature`, signed with `SNAPSHOT_CRON_SECRET`.
-These are deliberately not the legacy push headers documented below; wiring a
-scheduler with those returns 401.
 
 ## Environment
 
 See [`.env.example`](.env.example).
-
-## Legacy push contract
-
-`POST /api/ingest/svums` with JSON body. Headers:
-
-- `X-SVUMS-Timestamp: <unix-seconds>`
-- `X-SVUMS-Signature: hex(HMAC_SHA256(svumsPushSecret, timestamp + "." + raw_body))`
-
-Body keys: `batch`, `members`, `feeTypes`, `contracts`, `sepaMandates`. Each
-member record uses the raw Linear column names so the same mapper handles both
-SQL upload and JSON push.
-
-Replay protection: signatures are nonce-deduplicated in Redis for 10 minutes.
-Requests with a timestamp skew greater than the allowed window are rejected
-before the body is parsed.
 
 ## License
 

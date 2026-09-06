@@ -40,6 +40,11 @@ on Railway via Dockerfile.
 
 ## Domain notes that save time
 
+- The standalone svums app is retired. Membership entry is native only:
+  `/antrag` (public), `/app/antraege` (review), approval onboards the member.
+  The `svums_push` values in the `audit_source` and `import_source` enums are
+  kept for historical rows; nothing writes them and no code should read them
+  as an active path.
 - A "member" row can be a real member (`mitglnr` set) or a legacy payer/contact
   with only an `adrNr`. Code paths fall back from `mitglnr` to `adrNr`.
 - Money is summed in integer cents (`sumDecimal`) to avoid float drift. Keep it

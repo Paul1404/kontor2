@@ -34,7 +34,7 @@ const DunningLevelTextInput = v.object({
 });
 
 const TenantPolicyInput = v.object({
-  legacyImportSources: v.array(v.picklist(["linear_webverein", "svums"])),
+  legacyImportSources: v.array(v.picklist(["linear_webverein"])),
   legacyArchiveEnabled: v.boolean(),
   cancellationDateMode: v.picklist(["anytime", "month_end", "year_end"]),
   cancellationStatuteReference: v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120))),

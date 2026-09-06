@@ -600,27 +600,6 @@ function VereinsdatenPage() {
                     <option value="ja">An</option>
                   </Select>
                 </Field>
-                <Field label="SVUMS Import">
-                  <Select
-                    value={form.tenantPolicy.legacyImportSources.includes("svums") ? "ja" : "nein"}
-                    onChange={(e) => {
-                      const enabled = e.target.value === "ja";
-                      const sources = form.tenantPolicy.legacyImportSources.filter(
-                        (source) => source !== "svums",
-                      );
-                      setForm({
-                        ...form,
-                        tenantPolicy: {
-                          ...form.tenantPolicy,
-                          legacyImportSources: enabled ? [...sources, "svums"] : sources,
-                        },
-                      });
-                    }}
-                  >
-                    <option value="nein">Aus</option>
-                    <option value="ja">An</option>
-                  </Select>
-                </Field>
                 <Field label="Linear Archiv und Museum">
                   <Select
                     value={form.tenantPolicy.legacyArchiveEnabled ? "ja" : "nein"}
