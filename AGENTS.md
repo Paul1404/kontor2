@@ -104,6 +104,10 @@ on Railway via Dockerfile.
   hand. Integration tests are excluded from the fast suite and self-skip unless
   `DATABASE_URL` points at `svuwv_test`; CI runs them as a separate job with
   service containers.
+- `bun run test:browser` runs isolated shared-UI regressions in Chromium without
+  a database or app server. Install the browser with `bunx playwright install chromium`.
+  Modal focus setup belongs in `useModalFocus`; inline callbacks and loading
+  updates must not restart initial focus or restore focus while the dialog is open.
 - `bun run typecheck`, `bun run check` (biome autofix).
 - `bun run db:generate` -- generate a migration from schema changes. Commit the
   SQL file; never hand-edit generated migrations. `db:migrate` applies them.

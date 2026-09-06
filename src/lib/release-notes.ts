@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "2.18.1",
+    date: "2026-09-06",
+    title: "Briefe ohne Fokusverlust bearbeiten",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Beim Tippen im Briefdialog bleibt der Fokus im Eingabefeld. Leerzeichen und Enter lösen nicht mehr versehentlich Abbrechen aus. Auch bei Statusänderungen bleibt die Eingabe fokussiert.",
+      },
+    ],
+  },
+  {
     version: "2.18.0",
     date: "2026-09-06",
     title: "Persönliche Briefe gestalten",
