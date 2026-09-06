@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { users } from "~/server/db/schema/auth";
 
+// `svums_push` stays in the enum for historical batches; the push endpoint is gone.
 export const importSourceEnum = pgEnum("import_source", ["sql_upload", "svums_push"]);
 
 export const importBatchesTable = pgTable("import_batches", {

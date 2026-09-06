@@ -1,5 +1,5 @@
 import { writeFile } from "node:fs/promises";
-import { env, tenantSvumsPushSecret } from "../src/server/env";
+import { env } from "../src/server/env";
 
 const args = new Map(
   process.argv.slice(2).map((arg) => {
@@ -8,27 +8,20 @@ const args = new Map(
   }),
 );
 
-const purpose = args.get("purpose") ?? "svums-ingest";
+const purpose = args.get("purpose") ?? "snapshot-cron";
 const out = args.get("out");
-const tenant = args.get("tenant");
 
-if (!out || (purpose === "svums-ingest" && !tenant)) {
+if (!out) {
   console.error(
-    "Usage: bun scripts/print-derived-secrets.ts --purpose=svums-ingest --tenant=<key> --out=<new-file>\n" +
-      "   or: bun scripts/print-derived-secrets.ts --purpose=snapshot-cron --out=<new-file>",
+    "Usage: bun scripts/print-derived-secrets.ts --purpose=snapshot-cron --out=<new-file>",
   );
   process.exit(2);
 }
 
-const secret =
-  purpose === "svums-ingest"
-    ? tenantSvumsPushSecret(tenant!)
-    : purpose === "snapshot-cron"
-      ? env().snapshotCronSecret
-      : null;
+const secret = purpose === "snapshot-cron" ? env().snapshotCronSecret : null;
 
 if (!secret) {
-  console.error("Unknown purpose. Use svums-ingest or snapshot-cron.");
+  console.error("Unknown purpose. Use snapshot-cron.");
   process.exit(2);
 }
 

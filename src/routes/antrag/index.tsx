@@ -96,7 +96,7 @@ function useMagnetic() {
 }
 
 // Draft persistence: keep an in-progress application across reloads. Uses
-// sessionStorage (cleared when the tab closes), matching svums and keeping the
+// sessionStorage (cleared when the tab closes), keeping the
 // applicant's data off the device long-term. The signature is intentionally
 // excluded; it is re-drawn on the summary step.
 const DRAFT_KEY = "kontor2-antrag-draft-v1";
@@ -437,7 +437,7 @@ function AntragForm() {
   });
 
   // Final submit: run a soft duplicate check first. A hit does not block; it
-  // warns once and a second click goes through (matching svums).
+  // warns once and a second click goes through.
   async function handleSubmit() {
     setError(null);
     setWarning(null);

@@ -79,7 +79,6 @@ import { Route as AppAdminProtokollRouteImport } from './app/admin/protokoll'
 import { Route as AppAdminErweitertRouteImport } from './app/admin/erweitert'
 import { Route as ApiRpcSplatRouteImport } from './api/rpc.$'
 import { Route as ApiPortalLogoutRouteImport } from './api/portal.logout'
-import { Route as ApiIngestSvumsRouteImport } from './api/ingest.svums'
 import { Route as ApiFilesIdRouteImport } from './api/files.$id'
 import { Route as ApiCronSnapshotsRouteImport } from './api/cron.snapshots'
 import { Route as ApiBrandingManifestRouteImport } from './api/branding.manifest'
@@ -455,11 +454,6 @@ const ApiPortalLogoutRoute = ApiPortalLogoutRouteImport.update({
   path: '/api/portal/logout',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiIngestSvumsRoute = ApiIngestSvumsRouteImport.update({
-  id: '/api/ingest/svums',
-  path: '/api/ingest/svums',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiFilesIdRoute = ApiFilesIdRouteImport.update({
   id: '/api/files/$id',
   path: '/api/files/$id',
@@ -575,7 +569,6 @@ export interface FileRoutesByFullPath {
   '/api/branding/manifest': typeof ApiBrandingManifestRoute
   '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
-  '/api/ingest/svums': typeof ApiIngestSvumsRoute
   '/api/portal/logout': typeof ApiPortalLogoutRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
@@ -657,7 +650,6 @@ export interface FileRoutesByTo {
   '/api/branding/manifest': typeof ApiBrandingManifestRoute
   '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
-  '/api/ingest/svums': typeof ApiIngestSvumsRoute
   '/api/portal/logout': typeof ApiPortalLogoutRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
@@ -744,7 +736,6 @@ export interface FileRoutesById {
   '/api/branding/manifest': typeof ApiBrandingManifestRoute
   '/api/cron/snapshots': typeof ApiCronSnapshotsRoute
   '/api/files/$id': typeof ApiFilesIdRoute
-  '/api/ingest/svums': typeof ApiIngestSvumsRoute
   '/api/portal/logout': typeof ApiPortalLogoutRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/app/admin/erweitert': typeof AppAdminErweitertRoute
@@ -832,7 +823,6 @@ export interface FileRouteTypes {
     | '/api/branding/manifest'
     | '/api/cron/snapshots'
     | '/api/files/$id'
-    | '/api/ingest/svums'
     | '/api/portal/logout'
     | '/api/rpc/$'
     | '/app/admin/erweitert'
@@ -914,7 +904,6 @@ export interface FileRouteTypes {
     | '/api/branding/manifest'
     | '/api/cron/snapshots'
     | '/api/files/$id'
-    | '/api/ingest/svums'
     | '/api/portal/logout'
     | '/api/rpc/$'
     | '/app/admin/erweitert'
@@ -1000,7 +989,6 @@ export interface FileRouteTypes {
     | '/api/branding/manifest'
     | '/api/cron/snapshots'
     | '/api/files/$id'
-    | '/api/ingest/svums'
     | '/api/portal/logout'
     | '/api/rpc/$'
     | '/app/admin/erweitert'
@@ -1066,7 +1054,6 @@ export interface RootRouteChildren {
   ApiBrandingManifestRoute: typeof ApiBrandingManifestRoute
   ApiCronSnapshotsRoute: typeof ApiCronSnapshotsRoute
   ApiFilesIdRoute: typeof ApiFilesIdRoute
-  ApiIngestSvumsRoute: typeof ApiIngestSvumsRoute
   ApiPortalLogoutRoute: typeof ApiPortalLogoutRoute
   ApiRpcSplatRoute: typeof ApiRpcSplatRoute
   ApiPortalZugangTokenRoute: typeof ApiPortalZugangTokenRoute
@@ -1564,13 +1551,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPortalLogoutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/ingest/svums': {
-      id: '/api/ingest/svums'
-      path: '/api/ingest/svums'
-      fullPath: '/api/ingest/svums'
-      preLoaderRoute: typeof ApiIngestSvumsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/files/$id': {
       id: '/api/files/$id'
       path: '/api/files/$id'
@@ -1845,7 +1825,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBrandingManifestRoute: ApiBrandingManifestRoute,
   ApiCronSnapshotsRoute: ApiCronSnapshotsRoute,
   ApiFilesIdRoute: ApiFilesIdRoute,
-  ApiIngestSvumsRoute: ApiIngestSvumsRoute,
   ApiPortalLogoutRoute: ApiPortalLogoutRoute,
   ApiRpcSplatRoute: ApiRpcSplatRoute,
   ApiPortalZugangTokenRoute: ApiPortalZugangTokenRoute,
