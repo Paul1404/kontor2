@@ -147,6 +147,8 @@ function AntragDetailPage() {
   const [linkTo, setLinkTo] = useState<string | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const selectedFeeType =
+    art === "" ? null : (feeTypes.data?.find((feeType) => feeType.art === art) ?? null);
 
   const [notes, setNotes] = useState("");
   const [workStatus, setWorkStatus] = useState<WorkflowStatus>("neu");
@@ -759,18 +761,20 @@ function AntragDetailPage() {
                     className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                   >
                     <option value="">Kein Vertrag</option>
-                    {feeTypes.data?.map((f) => (
-                      <option key={f.art} value={f.art}>
-                        {f.bezeichnung ?? `Art ${f.art}`}
-                      </option>
-                    ))}
+                    {feeTypes.data
+                      ?.filter((f) => f.nichAktiv !== "J")
+                      .map((f) => (
+                        <option key={f.art} value={f.art}>
+                          {f.bezeichnung ?? `Art ${f.art}`}
+                        </option>
+                      ))}
                   </select>
                 </Label>
                 <Label className="flex flex-col gap-1.5">
                   <span>Betrag (EUR)</span>
                   <Input
                     inputMode="decimal"
-                    placeholder={a.jahresbeitrag ?? "z. B. 54,00"}
+                    placeholder={selectedFeeType?.betrag1 ?? a.jahresbeitrag ?? "z. B. 54,00"}
                     value={betrag}
                     onChange={(e) => setBetrag(e.target.value)}
                   />
