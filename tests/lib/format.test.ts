@@ -1,12 +1,38 @@
 import { describe, expect, it } from "vitest";
+import { formatAuditValue } from "~/lib/audit-labels";
 import {
   EMPTY_VALUE,
   formatDateInput,
+  formatDecimalInput,
   formatPhone,
   orEmpty,
   parseDateInput,
   telHref,
 } from "~/lib/format";
+
+describe("formatDecimalInput", () => {
+  it("removes only insignificant fixed-scale zero padding", () => {
+    expect(formatDecimalInput("96.00000000")).toBe("96");
+    expect(formatDecimalInput("54.50000000")).toBe("54.5");
+    expect(formatDecimalInput("0.00010000")).toBe("0.0001");
+    expect(formatDecimalInput("12,3400")).toBe("12,34");
+  });
+
+  it("keeps blank and non-decimal input safe", () => {
+    expect(formatDecimalInput(null)).toBe("");
+    expect(formatDecimalInput(" ")).toBe("");
+    expect(formatDecimalInput("variabel")).toBe("variabel");
+    expect(formatDecimalInput("-0.00000000")).toBe("0");
+  });
+});
+
+describe("decimal presentation", () => {
+  it("formats monetary audit values as currency and other decimals without padding", () => {
+    expect(formatAuditValue("betrag", "96.00000000")).toContain("96,00");
+    expect(formatAuditValue("betrag", "96.00000000")).not.toContain(".000000");
+    expect(formatAuditValue("eProz", "12.50000000")).toBe("12.5");
+  });
+});
 
 describe("orEmpty", () => {
   it("returns the value when present", () => {

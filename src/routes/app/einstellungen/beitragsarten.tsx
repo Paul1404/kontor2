@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { QueryError } from "~/components/ui/query-error";
-import { EMPTY_VALUE, formatCurrency } from "~/lib/format";
+import { EMPTY_VALUE, formatCurrency, formatDecimalInput } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/einstellungen/beitragsarten")({
@@ -135,7 +135,7 @@ function BeitragsartenSettingsPage() {
     setForm({
       bezeichnung: row.bezeichnung ?? "",
       abteilung: row.abteilung ?? "",
-      betrag1: row.betrag1 ?? "",
+      betrag1: formatDecimalInput(row.betrag1),
       sollstellung: row.sollstellung ?? "",
       kontoname: row.kontoname ?? "",
       valuta: row.valuta ?? "",

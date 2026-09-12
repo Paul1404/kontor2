@@ -159,6 +159,24 @@ export function formatCurrency(value: string | number | null | undefined): strin
   return new Intl.NumberFormat(DE, { style: "currency", currency: "EUR" }).format(n);
 }
 
+/**
+ * Prepare a stored decimal for an editable field or a non-currency hint.
+ * PostgreSQL returns fixed-scale numerics as strings such as `96.00000000`.
+ * Keep every significant digit, but remove zero padding without converting
+ * through `number`, which could lose precision.
+ */
+export function formatDecimalInput(value: string | number | null | undefined): string {
+  if (value == null || value === "") return "";
+  const raw = String(value).trim();
+  const match = raw.match(/^([+-]?)(\d+)(?:([.,])(\d+))?$/);
+  if (!match) return raw;
+
+  const whole = match[2] ?? "0";
+  const fraction = (match[4] ?? "").replace(/0+$/, "");
+  const sign = /^0+$/.test(whole) && fraction === "" ? "" : (match[1] ?? "");
+  return `${sign}${whole}${fraction ? `${match[3]}${fraction}` : ""}`;
+}
+
 /** Human-readable byte size: B, kB (1 decimal), MB (2 decimals). */
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;

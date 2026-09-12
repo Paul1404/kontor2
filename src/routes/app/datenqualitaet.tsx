@@ -26,7 +26,7 @@ import { ABTEILUNG_NONE_FILTER } from "~/lib/abteilung-filter";
 import { cn } from "~/lib/cn";
 import { triggerDownload, triggerDownloadBase64 } from "~/lib/download";
 import { fokusFieldFor } from "~/lib/dq-fix-fields";
-import { formatDate } from "~/lib/format";
+import { formatDate, formatDecimalInput } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 // Type-only import (erased at build): keep the cockpit's CategoryId in lockstep
 // with the server registry instead of a hand-maintained union that drifts.
@@ -928,7 +928,7 @@ type FixContract = {
 };
 
 function ContractFixRow({ contract, onFixed }: { contract: FixContract; onFixed: () => void }) {
-  const [betrag, setBetrag] = useState(contract.betrag ?? "");
+  const [betrag, setBetrag] = useState(formatDecimalInput(contract.betrag));
   const quickFix = useMutation({
     mutationFn: (input: { betrag?: string | null; isDirectDebit?: boolean }) =>
       orpc.contracts.quickFix({ id: contract.id, ...input }),
@@ -959,7 +959,7 @@ function ContractFixRow({ contract, onFixed }: { contract: FixContract; onFixed:
       <Button
         size="sm"
         variant="outline"
-        disabled={quickFix.isPending || betrag.trim() === (contract.betrag ?? "")}
+        disabled={quickFix.isPending || betrag.trim() === formatDecimalInput(contract.betrag)}
         onClick={() => quickFix.mutate({ betrag: betrag.trim() || null })}
       >
         Betrag speichern

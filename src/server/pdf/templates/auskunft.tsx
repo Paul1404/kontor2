@@ -1,5 +1,5 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
-import { formatDate, formatDateTime } from "~/lib/format";
+import { formatCurrency, formatDate, formatDateTime } from "~/lib/format";
 import type { AuskunftsPackage } from "~/server/dsgvo/auskunft";
 import { pdfBoldFamily, pdfBoldWeight, pdfFamily } from "~/server/pdf/fonts";
 
@@ -161,7 +161,9 @@ export function AuskunftDocument({
                 <Text style={styles.cell}>{fmt(c.artName ?? c.art)}</Text>
                 <Text style={styles.cell}>{fmt(c.vertragBegin)}</Text>
                 <Text style={styles.cell}>{fmt(c.vertragEnde)}</Text>
-                <Text style={styles.cell}>{fmt(c.betrag)}</Text>
+                <Text style={styles.cell}>
+                  {formatCurrency(c.betrag as string | number) || "—"}
+                </Text>
               </View>
             ))}
           </View>

@@ -9,7 +9,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toast } from "~/components/ui/toaster";
 import { cn } from "~/lib/cn";
-import { formatCurrency, formatDate, toDateInput } from "~/lib/format";
+import { formatCurrency, formatDate, formatDecimalInput, toDateInput } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 type Contract = {
@@ -584,7 +584,7 @@ function EditContractForm({
   // contract's identity. To change it, delete and re-create. Everything else
   // about the running contract is editable in place.
   const [vertragNr, setVertragNr] = useState(contract.vertragNr);
-  const [betrag, setBetrag] = useState(contract.betrag ?? "");
+  const [betrag, setBetrag] = useState(formatDecimalInput(contract.betrag));
   const [vertragBegin, setVertragBegin] = useState(toDateInput(contract.vertragBegin));
   const [vertragEnde, setVertragEnde] = useState(toDateInput(contract.vertragEnde));
   const [gekuendAm, setGekuendAm] = useState(toDateInput(contract.gekuendAm));
