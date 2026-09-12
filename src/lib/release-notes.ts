@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.4",
+    date: "2026-09-12",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Genehmigungen, Ablehnungen, Papier-Anträge, Portalzugänge und SEPA-Vorabankündigungen verwenden jetzt vollständig das gemeinsame E-Mail-Design. Das Versandprotokoll bewahrt HTML-Ansicht, Textansicht und Nachrichten-ID zuverlässig auf. Ältere Antragsmails mit reiner Textablage erhalten beim Öffnen wieder eine gestaltete Vorschau.",
+      },
+    ],
+  },
+  {
     version: "3.0.3",
     date: "2026-09-12",
     changes: [

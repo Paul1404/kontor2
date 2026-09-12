@@ -205,7 +205,11 @@ export const emailLogRouter = {
       if (!row) {
         throw new ORPCError("NOT_FOUND", { message: "E-Mail-Protokolleintrag nicht gefunden." });
       }
-      if (row.bodyText || row.bodyHtml) {
+      // A complete archive snapshot wins immediately. Older callers sometimes
+      // stored only the plain-text fallback even though a branded HTML part was
+      // sent. For those sent rows, continue to reconstruction/IMAP so the
+      // preview can recover the actual message instead of being stuck in text.
+      if (row.bodyHtml || (row.bodyText && row.status !== "sent")) {
         return {
           ...row,
           bodyHtml: row.bodyHtml ? await displayableHtml(context.db, row.bodyHtml) : null,
@@ -223,6 +227,8 @@ export const emailLogRouter = {
           recipient: row.recipient,
           subject: row.subject,
           sentAt: row.createdAt,
+          bodyText: row.bodyText,
+          attachmentNames: row.attachmentNames,
         });
         if (reconstructed) {
           return { ...row, ...reconstructed, contentSource: "reconstructed" as const };
@@ -256,6 +262,9 @@ export const emailLogRouter = {
           emailLogId: row.id,
           error: error instanceof Error ? error.message : String(error),
         });
+      }
+      if (row.bodyText) {
+        return { ...row, contentSource: "archive" as const };
       }
       return {
         ...row,

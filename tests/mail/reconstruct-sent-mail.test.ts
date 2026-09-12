@@ -9,6 +9,11 @@ vi.mock("~/server/mail/send-bank-details-confirmation", async (importOriginal) =
   return { ...original, loadBankDetailsConfirmationOrganization: loadOrganization };
 });
 
+vi.mock("~/server/mail/branding", async (importOriginal) => {
+  const original = await importOriginal<typeof import("~/server/mail/branding")>();
+  return { ...original, loadMailOrganization: loadOrganization };
+});
+
 import { reconstructSentMessage } from "~/server/mail/reconstruct-sent-mail";
 
 const SENT_AT = new Date("2026-08-01T17:15:00.000Z");
@@ -77,6 +82,24 @@ describe("sent-mail reconstruction", () => {
       }),
     ).resolves.toBeNull();
     expect(database.select).not.toHaveBeenCalled();
+  });
+
+  it("restores the branded preview for legacy application logs that kept only text", async () => {
+    const result = await reconstructSentMessage(fakeDb([]), {
+      kind: "antrag_approval",
+      entityType: "membership_application",
+      entityId: "application-1",
+      recipient: "mitglied@example.test",
+      subject: "SV Untereuerheim: Willkommen",
+      sentAt: SENT_AT,
+      bodyText: "Hallo Max Mustermann,\n\nIhr Aufnahmeantrag wurde angenommen.",
+      attachmentNames: ["Beitrittserklaerung-genehmigt.pdf"],
+    });
+
+    expect(result?.bodyHtml).toContain("<!doctype html>");
+    expect(result?.bodyHtml).toContain("Mitgliedschaft");
+    expect(result?.bodyText).toContain("Ihr Aufnahmeantrag wurde angenommen.");
+    expect(result?.attachmentNames).toEqual(["Beitrittserklaerung-genehmigt.pdf"]);
   });
 
   it("rejects a reconstruction when the historical subject does not match", async () => {

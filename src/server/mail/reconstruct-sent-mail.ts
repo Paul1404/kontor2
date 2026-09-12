@@ -2,6 +2,8 @@ import { and, between, desc, eq } from "drizzle-orm";
 import type { DB } from "~/server/db/client";
 import { memberBankDetailChangesTable } from "~/server/db/schema/bank-detail-changes";
 import { memberSnapshotsTable } from "~/server/db/schema/snapshots";
+import { loadMailOrganization } from "~/server/mail/branding";
+import { paragraphsFromText, renderMail } from "~/server/mail/layout";
 import {
   buildBankDetailsConfirmation,
   loadBankDetailsConfirmationOrganization,
@@ -16,6 +18,8 @@ type HistoricalMail = {
   recipient: string;
   subject: string;
   sentAt: Date;
+  bodyText?: string | null;
+  attachmentNames?: string[] | null;
 };
 
 export type ReconstructedMessageSnapshot = {
@@ -43,6 +47,27 @@ export async function reconstructSentMessage(
   db: DB,
   expected: HistoricalMail,
 ): Promise<ReconstructedMessageSnapshot | null> {
+  const legacyApplicationMail = {
+    antrag_confirmation: { subline: "Aufnahmeantrag", closing: undefined },
+    antrag_club_notification: { subline: "Interne Benachrichtigung", closing: null },
+    antrag_approval: { subline: "Mitgliedschaft", closing: undefined },
+  }[expected.kind];
+  if (legacyApplicationMail && expected.bodyText) {
+    const organization = await loadMailOrganization(db);
+    const rendered = renderMail({
+      organization,
+      preheader: expected.subject,
+      subline: legacyApplicationMail.subline,
+      closing: legacyApplicationMail.closing,
+      blocks: paragraphsFromText(expected.bodyText),
+    });
+    return {
+      bodyText: rendered.text,
+      bodyHtml: rendered.html,
+      attachmentNames: expected.attachmentNames ?? [],
+    };
+  }
+
   if (
     expected.kind !== "bank_details_confirmation" ||
     expected.entityType !== "member" ||

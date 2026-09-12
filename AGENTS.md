@@ -91,6 +91,9 @@ on Railway via Dockerfile.
   `sent`, because posting it stays a human act. A workflow with its own letter
   (the Austrittsbestätigung) keeps it and records that letter as its postal
   channel instead of generating a second one.
+- Every outbound email uses the shared `renderMail` / `sendBrandedMail` design.
+  Persist the returned `bodyText`, `bodyHtml`, `messageId` and attachment names
+  in `email_log`; do not rebuild a shorter archive body beside the sent one.
 - Manual letters (`letters.create`, `BriefDialog`) accept per-letter sender,
   function, contact, return-address, date and signature-space overrides through
   `manualLetterOptionsSchema`. These never update organization settings.

@@ -12,6 +12,9 @@ import { organizationSettingsTable } from "~/server/db/schema/organization-setti
 import { type SepaMandate, sepaMandatesTable } from "~/server/db/schema/sepa";
 import { memberDisplayName } from "~/server/domain/member";
 import { OVERRIDABLE_STATUSES, planSollstellungStatus } from "~/server/domain/sollstellung-status";
+import { loadMailOrganization } from "~/server/mail/branding";
+import { EMAIL_KIND, type EmailLogEntry, recordEmail } from "~/server/mail/email-log";
+import { renderMail } from "~/server/mail/layout";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { invalidateDashboardCaches } from "~/server/search/cache";
 import { amountStrToCents, buildFeeRunPreview, centsToAmount } from "~/server/sepa/build-fee-run";
@@ -1716,6 +1719,7 @@ export const feeRunsRouter = {
           message: "SMTP ist nicht konfiguriert. Bitte unter Einstellungen > SMTP einrichten.",
         });
       }
+      const mailOrganization = await loadMailOrganization(context.db);
 
       const items = await context.db
         .select({
@@ -1748,13 +1752,10 @@ export const feeRunsRouter = {
       let failed = 0;
       let skipped = 0;
       let firstError: string | null = null;
+      const emailRecords: EmailLogEntry[] = [];
       for (const it of items) {
         const to = it.email?.trim();
-        if (!to?.includes("@")) {
-          skipped += 1;
-          continue;
-        }
-        const { subject, text } = buildPrenotificationEmail({
+        const { subject, document } = buildPrenotificationEmail({
           recipientName: memberDisplayName(it),
           vereinsname: org?.vereinsname ?? "Ihr Verein",
           glaeubigerId: org?.glaeubigerId ?? null,
@@ -1763,14 +1764,50 @@ export const feeRunsRouter = {
           falligkeitsdatum: run.falligkeitsdatum,
           billingYear: run.billingYear,
         });
+        const rendered = renderMail({ ...document, organization: mailOrganization });
+        const recordBase = {
+          kind: EMAIL_KIND.prenotification,
+          recipient: to ?? null,
+          subject,
+          bodyText: rendered.text,
+          bodyHtml: rendered.html,
+          entityType: "fee_run",
+          entityId: run.id,
+          actorEmail: context.session!.user.email,
+          requestId: context.requestId ?? null,
+        } satisfies Partial<EmailLogEntry>;
+        if (!to?.includes("@")) {
+          skipped += 1;
+          emailRecords.push({ ...recordBase, status: "skipped", detail: "no_recipient" });
+          continue;
+        }
         try {
-          await mailer.send({ to, subject, text });
+          const delivery = await mailer.send({
+            to,
+            subject,
+            text: rendered.text,
+            html: rendered.html,
+            attachments: rendered.attachments,
+          });
           sent += 1;
+          emailRecords.push({
+            ...recordBase,
+            status: "sent",
+            recipient: to,
+            messageId: delivery.messageId,
+          });
         } catch (e) {
           failed += 1;
           if (!firstError) firstError = e instanceof Error ? e.message : String(e);
+          emailRecords.push({
+            ...recordBase,
+            status: "failed",
+            recipient: to,
+            detail: e instanceof Error ? e.message : String(e),
+          });
         }
       }
+      await recordEmail(emailRecords, context.db);
 
       // Only mark the run as pre-notified when at least one mail actually went
       // out. Marking it on a total failure would claim a Vorabankündigung was

@@ -3,6 +3,7 @@ import { and, count, desc, eq, isNull } from "drizzle-orm";
 import * as v from "valibot";
 import { appendAudit, diff } from "~/server/audit/log";
 import { authBaseUrl } from "~/server/auth/auth";
+import type { BrandedMailResult } from "~/server/auth/send-invite";
 import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { portalChangeRequestsTable, portalTokensTable } from "~/server/db/schema/portal";
@@ -207,12 +208,21 @@ export const portalRouter = {
       const portalUrl = buildPortalUrl(baseUrl, rawToken);
 
       let mailResult:
-        | { ok: true; subject: string; bodyText: string }
-        | { ok: false; reason: string; subject: string | null; bodyText: string | null } = {
+        | BrandedMailResult
+        | {
+            ok: false;
+            reason: string;
+            subject: null;
+            bodyText: null;
+            bodyHtml: null;
+            messageId: null;
+          } = {
         ok: false,
         reason: "not_sent",
         subject: null,
         bodyText: null,
+        bodyHtml: null,
+        messageId: null,
       };
       if (input.sendEmail && targetEmail) {
         const [org] = await context.db
@@ -242,6 +252,8 @@ export const portalRouter = {
             recipient: targetEmail,
             subject: mailResult.subject ?? "Zugang zum Mitgliederportal",
             bodyText: mailResult.bodyText,
+            bodyHtml: mailResult.bodyHtml,
+            messageId: mailResult.messageId,
             entityType: "member",
             entityId: member.id,
             actorEmail: context.session!.user.email,
