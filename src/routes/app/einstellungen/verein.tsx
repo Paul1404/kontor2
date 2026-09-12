@@ -10,6 +10,7 @@ import { QueryError } from "~/components/ui/query-error";
 import { Textarea } from "~/components/ui/textarea";
 import { toast } from "~/components/ui/toaster";
 import { useBranding } from "~/lib/branding";
+import { formatDecimalInput } from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 import {
   DEFAULT_DUNNING_TEXTS,
@@ -48,6 +49,18 @@ const DEFAULT_STAFFEL: Staffel = {
   jungerErwachsener: "0.00",
   erwachsener: "0.00",
 };
+
+function formatStaffelForInput(staffel: Staffel): Staffel {
+  return {
+    familie: formatDecimalInput(staffel.familie),
+    kind: formatDecimalInput(staffel.kind),
+    kindElternMitglied: formatDecimalInput(staffel.kindElternMitglied),
+    jugendlich: formatDecimalInput(staffel.jugendlich),
+    jugendlichElternMitglied: formatDecimalInput(staffel.jugendlichElternMitglied),
+    jungerErwachsener: formatDecimalInput(staffel.jungerErwachsener),
+    erwachsener: formatDecimalInput(staffel.erwachsener),
+  };
+}
 
 function VereinsdatenPage() {
   const qc = useQueryClient();
@@ -126,10 +139,10 @@ function VereinsdatenPage() {
         vereinsBankname: cfg.data.vereinsBankname ?? "",
         defaultFalligkeitTag: cfg.data.defaultFalligkeitTag,
         maxMahnstufe: cfg.data.maxMahnstufe ?? 3,
-        mahngebuhr1: cfg.data.mahngebuhr1 ?? "0",
-        mahngebuhr2: cfg.data.mahngebuhr2 ?? "5",
-        mahngebuhr3: cfg.data.mahngebuhr3 ?? "10",
-        sepaReturnFee: cfg.data.sepaReturnFee ?? "3.00",
+        mahngebuhr1: formatDecimalInput(cfg.data.mahngebuhr1 ?? "0"),
+        mahngebuhr2: formatDecimalInput(cfg.data.mahngebuhr2 ?? "5"),
+        mahngebuhr3: formatDecimalInput(cfg.data.mahngebuhr3 ?? "10"),
+        sepaReturnFee: formatDecimalInput(cfg.data.sepaReturnFee ?? "3.00"),
         mahnFristTage: cfg.data.mahnFristTage ?? 14,
         beitragModus: cfg.data.beitragModus === "anteilig" ? "anteilig" : "voll",
         anteilEinheit: cfg.data.anteilEinheit === "tag" ? "tag" : "monat",
@@ -142,7 +155,7 @@ function VereinsdatenPage() {
         datenschutzUrl: cfg.data.datenschutzUrl ?? "",
         satzungUrl: cfg.data.satzungUrl ?? "",
         mandatsreferenzPrefix: cfg.data.mandatsreferenzPrefix ?? "",
-        beitragsstaffel: cfg.data.beitragsstaffel ?? DEFAULT_STAFFEL,
+        beitragsstaffel: formatStaffelForInput(cfg.data.beitragsstaffel ?? DEFAULT_STAFFEL),
         kategorieKindMaxAlter: cfg.data.kategorieKindMaxAlter ?? 14,
         kategorieJugendlichMaxAlter: cfg.data.kategorieJugendlichMaxAlter ?? 18,
         kategorieJungerErwachsenerMaxAlter: cfg.data.kategorieJungerErwachsenerMaxAlter ?? 25,

@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.3",
+    date: "2026-09-12",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Betragsfelder zeigen keine technisch bedingten Nullstellen mehr. Werte wie 96.00000000 erscheinen in Formularen als 96 und in Anzeigen weiterhin als 96,00 €.",
+      },
+    ],
+  },
+  {
     version: "3.0.2",
     date: "2026-09-12",
     changes: [

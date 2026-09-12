@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from "~/lib/format";
+import { formatCurrency, formatDate, formatDateTime, formatDecimalInput } from "~/lib/format";
 
 /**
  * Human-readable labels for the DB column names that show up in audit
@@ -111,6 +111,34 @@ const DATE_FIELDS = new Set([
   "kuendigungBerechneterTermin",
 ]);
 
+const MONEY_FIELDS = new Set([
+  "betrag",
+  "aufnahmegeb",
+  "betrag1",
+  "minBetrag",
+  "maxBetrag",
+  "eMinBetrag",
+  "eMaxBetrag",
+  "tBetrag1",
+  "tBetrag2",
+  "mahngebuhr1",
+  "mahngebuhr2",
+  "mahngebuhr3",
+  "sepaReturnFee",
+  "rueckgebuhr",
+  "totalOpen",
+  "totalFees",
+  "openSum",
+  "mahngebuhr",
+  "totalDue",
+  "amount",
+  "paidAmount",
+  "openAmount",
+  "totalAmount",
+]);
+
+const DECIMAL_FIELDS = new Set(["eProz"]);
+
 export function fieldLabel(name: string): string {
   return FIELD_LABELS[name] ?? name;
 }
@@ -126,6 +154,8 @@ export function isHiddenField(name: string): boolean {
 export function formatAuditValue(field: string, value: unknown): string {
   if (value == null || value === "") return "—";
   if (typeof value === "boolean") return value ? "Ja" : "Nein";
+  if (MONEY_FIELDS.has(field)) return formatCurrency(value as string | number) || String(value);
+  if (DECIMAL_FIELDS.has(field)) return formatDecimalInput(value as string | number);
   if (typeof value === "number") return String(value);
   if (DATE_FIELDS.has(field)) {
     if (field === "deletedAt") return formatDateTime(value as string);

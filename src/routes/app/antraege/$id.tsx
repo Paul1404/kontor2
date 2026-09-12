@@ -30,7 +30,13 @@ import { Label } from "~/components/ui/label";
 import { PdfViewer } from "~/components/ui/pdf-viewer";
 import { QueryError } from "~/components/ui/query-error";
 import { Textarea } from "~/components/ui/textarea";
-import { formatCurrency, formatDate, formatDateTime, orEmpty } from "~/lib/format";
+import {
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+  formatDecimalInput,
+  orEmpty,
+} from "~/lib/format";
 import { orpc } from "~/lib/orpc";
 
 const ANTRAGSTYP_LABEL: Record<string, string> = {
@@ -774,7 +780,10 @@ function AntragDetailPage() {
                   <span>Betrag (EUR)</span>
                   <Input
                     inputMode="decimal"
-                    placeholder={selectedFeeType?.betrag1 ?? a.jahresbeitrag ?? "z. B. 54,00"}
+                    placeholder={
+                      formatDecimalInput(selectedFeeType?.betrag1 ?? a.jahresbeitrag) ||
+                      "z. B. 54,00"
+                    }
                     value={betrag}
                     onChange={(e) => setBetrag(e.target.value)}
                   />

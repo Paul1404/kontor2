@@ -157,6 +157,10 @@ changelog stuck at 0.4.0 while many features shipped.
   `orEmpty()` for plain strings. Form input defaults (`?? ""`) are fine; this
   rule is about rendered output.
 - Use the typographic ellipsis `…`, not three dots `...`, in UI copy.
+- PostgreSQL `numeric` values arrive as fixed-scale strings such as
+  `96.00000000`. Use `formatCurrency` for money displays and
+  `formatDecimalInput` when hydrating editable fields or hints. Do not trim
+  precision in storage, calculations, APIs, or exports.
 - Icons via `lucide-react`, never emojis.
 - Icon-only buttons need an `aria-label` (a `title` tooltip is not an
   accessible name).
