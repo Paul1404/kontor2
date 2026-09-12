@@ -172,52 +172,54 @@ function AntraegeListPage() {
           <Loader2 className="size-5 animate-spin" />
         </div>
       ) : list.data && list.data.rows.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
-            <table className="w-full text-sm">
-              <thead className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3">Antragsnummer</th>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Typ</th>
-                  <th className="px-4 py-3">Beitrag</th>
-                  <th className="px-4 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.data.rows.map((r) => (
-                  <tr key={r.id} className="border-b last:border-0 hover:bg-muted/40">
-                    <td className="px-4 py-3">
-                      <Link
-                        to="/app/antraege/$id"
-                        params={{ id: r.id }}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {r.antragsnummer}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      {r.vorname} {r.nachname}
-                      {r.isTest ? (
-                        <span className="ml-2 text-xs text-muted-foreground">(Test)</span>
-                      ) : null}
-                      {r.archivedAt ? (
-                        <Badge className="ml-2 bg-muted font-normal text-muted-foreground">
-                          Archiviert
-                        </Badge>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3 capitalize">{r.antragstyp}</td>
-                    <td className="px-4 py-3">{formatCurrency(r.jahresbeitrag)}</td>
-                    <td className="px-4 py-3">
-                      <Badge className={cn("font-normal", STATUS_TONE[r.status] ?? "")}>
-                        {STATUS_LABELS[r.status] ?? r.status}
-                      </Badge>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3">Antragsnummer</th>
+                    <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Typ</th>
+                    <th className="px-4 py-3">Beitrag</th>
+                    <th className="px-4 py-3">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {list.data.rows.map((r) => (
+                    <tr key={r.id} className="border-b last:border-0 hover:bg-muted/40">
+                      <td className="px-4 py-3">
+                        <Link
+                          to="/app/antraege/$id"
+                          params={{ id: r.id }}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {r.antragsnummer}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        {r.vorname} {r.nachname}
+                        {r.isTest ? (
+                          <span className="ml-2 text-xs text-muted-foreground">(Test)</span>
+                        ) : null}
+                        {r.archivedAt ? (
+                          <Badge className="ml-2 bg-muted font-normal text-muted-foreground">
+                            Archiviert
+                          </Badge>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 capitalize">{r.antragstyp}</td>
+                      <td className="px-4 py-3">{formatCurrency(r.jahresbeitrag)}</td>
+                      <td className="px-4 py-3">
+                        <Badge className={cn("font-normal", STATUS_TONE[r.status] ?? "")}>
+                          {STATUS_LABELS[r.status] ?? r.status}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       ) : (

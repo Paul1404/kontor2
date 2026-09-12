@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.1",
+    date: "2026-09-12",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Auf dem Handy schob eine breite Tabelle die ganze Seite zur Seite. Kopfzeile, Filter und Suche rutschten dabei aus dem Bild. Betroffen waren unter anderem Anträge, Rundschreiben, Protokoll, Snapshots, Bestandserhebung und die Vertrags- und Einwilligungslisten im Mitglied. Tabellen scrollen jetzt für sich, die Seite bleibt stehen.",
+      },
+    ],
+  },
+  {
     version: "3.0.0",
     date: "2026-09-06",
     title: "Kontor2 übernimmt den Mitgliedseintritt vollständig",

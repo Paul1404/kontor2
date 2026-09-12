@@ -288,45 +288,47 @@ function BestandserhebungPage() {
           ) : !archived.data || archived.data.length === 0 ? (
             <div className="text-sm text-muted-foreground">Noch keine Erhebungen archiviert.</div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="py-2 font-medium">Stichtag</th>
-                  <th className="py-2 font-medium">Erstellt</th>
-                  <th className="py-2 font-medium">Signoff</th>
-                  <th className="py-2 font-medium">SHA-256</th>
-                  <th className="py-2" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {archived.data.map((row) => (
-                  <tr key={row.id}>
-                    <td className="py-2 font-medium">{String(row.stichtag)}</td>
-                    <td className="py-2 text-muted-foreground">
-                      {formatDateTime(row.createdAt)} · {orEmpty(row.createdByEmail)}
-                    </td>
-                    <td className="py-2">
-                      {row.signedOff ? (
-                        <span className="inline-flex items-center gap-1 text-success">
-                          <ShieldCheck className="size-3" />{" "}
-                          {row.signedOffAt ? formatDate(row.signedOffAt) : ""}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">offen</span>
-                      )}
-                    </td>
-                    <td className="py-2 font-mono text-xs text-muted-foreground">
-                      {row.deliverableSha256?.slice(0, 16) ?? "—"}…
-                    </td>
-                    <td className="py-2 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setDetailId(row.id)}>
-                        Details
-                      </Button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="py-2 font-medium">Stichtag</th>
+                    <th className="py-2 font-medium">Erstellt</th>
+                    <th className="py-2 font-medium">Signoff</th>
+                    <th className="py-2 font-medium">SHA-256</th>
+                    <th className="py-2" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {archived.data.map((row) => (
+                    <tr key={row.id}>
+                      <td className="py-2 font-medium">{String(row.stichtag)}</td>
+                      <td className="py-2 text-muted-foreground">
+                        {formatDateTime(row.createdAt)} · {orEmpty(row.createdByEmail)}
+                      </td>
+                      <td className="py-2">
+                        {row.signedOff ? (
+                          <span className="inline-flex items-center gap-1 text-success">
+                            <ShieldCheck className="size-3" />{" "}
+                            {row.signedOffAt ? formatDate(row.signedOffAt) : ""}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">offen</span>
+                        )}
+                      </td>
+                      <td className="py-2 font-mono text-xs text-muted-foreground">
+                        {row.deliverableSha256?.slice(0, 16) ?? "—"}…
+                      </td>
+                      <td className="py-2 text-right">
+                        <Button variant="ghost" size="sm" onClick={() => setDetailId(row.id)}>
+                          Details
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>

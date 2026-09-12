@@ -85,47 +85,49 @@ function AdminSnapshotsPage() {
               Noch keine Snapshot-Läufe vorhanden.
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Trigger</th>
-                  <th className="px-4 py-2 font-medium">Gestartet</th>
-                  <th className="px-4 py-2 font-medium">Abgeschlossen</th>
-                  <th className="px-4 py-2 text-right font-medium">Mitglieder</th>
-                  <th className="px-4 py-2 text-right font-medium">Größe</th>
-                  <th className="px-4 py-2 font-medium">Notiz</th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {(runs.data?.rows ?? []).map((r) => (
-                  <tr key={r.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-2">
-                      <Badge variant="outline">{TRIGGER_LABEL[r.trigger as Trigger]}</Badge>
-                    </td>
-                    <td className="px-4 py-2 tabular-nums">{formatDateTime(r.startedAt)}</td>
-                    <td className="px-4 py-2 tabular-nums text-muted-foreground">
-                      {r.finishedAt ? formatDateTime(r.finishedAt) : "—"}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums">{r.memberCount}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
-                      {formatBytes(r.bytesTotal)}
-                    </td>
-                    <td className="px-4 py-2 text-xs text-muted-foreground">{r.notes ?? "—"}</td>
-                    <td className="px-4 py-2 text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedRunId(r.id)}
-                      >
-                        Inhalt <ChevronRight className="size-3.5" />
-                      </Button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Trigger</th>
+                    <th className="px-4 py-2 font-medium">Gestartet</th>
+                    <th className="px-4 py-2 font-medium">Abgeschlossen</th>
+                    <th className="px-4 py-2 text-right font-medium">Mitglieder</th>
+                    <th className="px-4 py-2 text-right font-medium">Größe</th>
+                    <th className="px-4 py-2 font-medium">Notiz</th>
+                    <th className="px-4 py-2" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {(runs.data?.rows ?? []).map((r) => (
+                    <tr key={r.id} className="hover:bg-muted/30">
+                      <td className="px-4 py-2">
+                        <Badge variant="outline">{TRIGGER_LABEL[r.trigger as Trigger]}</Badge>
+                      </td>
+                      <td className="px-4 py-2 tabular-nums">{formatDateTime(r.startedAt)}</td>
+                      <td className="px-4 py-2 tabular-nums text-muted-foreground">
+                        {r.finishedAt ? formatDateTime(r.finishedAt) : "—"}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">{r.memberCount}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+                        {formatBytes(r.bytesTotal)}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-muted-foreground">{r.notes ?? "—"}</td>
+                      <td className="px-4 py-2 text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedRunId(r.id)}
+                        >
+                          Inhalt <ChevronRight className="size-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -310,62 +312,64 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
             />
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="w-8 px-4 py-2" />
-                <th className="px-4 py-2 font-medium">Nr.</th>
-                <th className="px-4 py-2 font-medium">Name</th>
-                <th className="px-4 py-2 font-medium">Erfasst</th>
-                <th className="px-4 py-2 text-right font-medium">Größe</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {snapshots.map((s) => {
-                const isSel = selected.has(s.memberId);
-                return (
-                  <tr key={s.id} className={`hover:bg-muted/30 ${isSel ? "bg-primary/5" : ""}`}>
-                    <td className="px-4 py-2">
-                      <input
-                        type="checkbox"
-                        checked={isSel}
-                        onChange={() => {
-                          setSelected((prev) => {
-                            const next = new Set(prev);
-                            if (isSel) next.delete(s.memberId);
-                            else next.add(s.memberId);
-                            return next;
-                          });
-                        }}
-                      />
-                    </td>
-                    <td className="px-4 py-2 tabular-nums text-muted-foreground">
-                      {memberRef(s) || <span className="text-muted-foreground/60">—</span>}
-                    </td>
-                    <td className="px-4 py-2">
-                      {[s.vorname, s.nachname].filter(Boolean).join(" ") || "—"}
-                    </td>
-                    <td className="px-4 py-2 tabular-nums text-muted-foreground">
-                      {formatDateTime(s.createdAt)}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
-                      {formatBytes(s.byteSize)}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <Link
-                        to="/app/mitglieder/$mitgliedsnummer"
-                        params={{ mitgliedsnummer: memberRef(s) }}
-                        className="text-xs text-primary hover:underline"
-                      >
-                        Mitglied →
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="w-8 px-4 py-2" />
+                  <th className="px-4 py-2 font-medium">Nr.</th>
+                  <th className="px-4 py-2 font-medium">Name</th>
+                  <th className="px-4 py-2 font-medium">Erfasst</th>
+                  <th className="px-4 py-2 text-right font-medium">Größe</th>
+                  <th className="px-4 py-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {snapshots.map((s) => {
+                  const isSel = selected.has(s.memberId);
+                  return (
+                    <tr key={s.id} className={`hover:bg-muted/30 ${isSel ? "bg-primary/5" : ""}`}>
+                      <td className="px-4 py-2">
+                        <input
+                          type="checkbox"
+                          checked={isSel}
+                          onChange={() => {
+                            setSelected((prev) => {
+                              const next = new Set(prev);
+                              if (isSel) next.delete(s.memberId);
+                              else next.add(s.memberId);
+                              return next;
+                            });
+                          }}
+                        />
+                      </td>
+                      <td className="px-4 py-2 tabular-nums text-muted-foreground">
+                        {memberRef(s) || <span className="text-muted-foreground/60">—</span>}
+                      </td>
+                      <td className="px-4 py-2">
+                        {[s.vorname, s.nachname].filter(Boolean).join(" ") || "—"}
+                      </td>
+                      <td className="px-4 py-2 tabular-nums text-muted-foreground">
+                        {formatDateTime(s.createdAt)}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+                        {formatBytes(s.byteSize)}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <Link
+                          to="/app/mitglieder/$mitgliedsnummer"
+                          params={{ mitgliedsnummer: memberRef(s) }}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Mitglied →
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </CardContent>
 

@@ -327,39 +327,41 @@ function SnapshotDetailView({
         </p>
       ) : (
         <div className="overflow-hidden rounded border border-border bg-card">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/60 text-left text-muted-foreground">
-              <tr>
-                <th className="px-3 py-1.5 font-medium">Feld</th>
-                <th className="px-3 py-1.5 font-medium">Snapshot</th>
-                <th className="px-3 py-1.5 font-medium">Aktuell</th>
-                {canRestore ? <th className="px-3 py-1.5 font-medium" /> : null}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {visibleChanges.map(([field, change]) => (
-                <tr key={field}>
-                  <td className="px-3 py-1.5 font-medium">{fieldLabel(field)}</td>
-                  <td className="px-3 py-1.5 text-muted-foreground">
-                    {formatAuditValue(field, change.before)}
-                  </td>
-                  <td className="px-3 py-1.5">{formatAuditValue(field, change.after)}</td>
-                  {canRestore ? (
-                    <td className="px-3 py-1.5">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setConfirmField(field)}
-                      >
-                        <RotateCcw className="size-3" /> Zurücksetzen
-                      </Button>
-                    </td>
-                  ) : null}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/60 text-left text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-1.5 font-medium">Feld</th>
+                  <th className="px-3 py-1.5 font-medium">Snapshot</th>
+                  <th className="px-3 py-1.5 font-medium">Aktuell</th>
+                  {canRestore ? <th className="px-3 py-1.5 font-medium" /> : null}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {visibleChanges.map(([field, change]) => (
+                  <tr key={field}>
+                    <td className="px-3 py-1.5 font-medium">{fieldLabel(field)}</td>
+                    <td className="px-3 py-1.5 text-muted-foreground">
+                      {formatAuditValue(field, change.before)}
+                    </td>
+                    <td className="px-3 py-1.5">{formatAuditValue(field, change.after)}</td>
+                    {canRestore ? (
+                      <td className="px-3 py-1.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setConfirmField(field)}
+                        >
+                          <RotateCcw className="size-3" /> Zurücksetzen
+                        </Button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
