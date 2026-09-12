@@ -568,7 +568,7 @@ function ExcludedList(props: { excluded: PreviewData["excluded"] }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="max-h-64 overflow-y-auto">
+        <div className="max-h-64 overflow-auto">
           <table className="w-full text-sm">
             <tbody>
               {props.excluded.map((e) => (

@@ -358,48 +358,50 @@ function RundschreibenPage() {
           ) : !history.data || history.data.length === 0 ? (
             <p className="text-sm text-muted-foreground">Noch keine Rundschreiben versendet.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="text-left text-muted-foreground">
-                <tr>
-                  <th className="py-1 pr-3">Betreff</th>
-                  <th className="py-1 pr-3 text-right">Empfänger</th>
-                  <th className="py-1 pr-3 text-right">Zugestellt</th>
-                  <th className="py-1 pr-3 text-right">Fehler</th>
-                  <th className="py-1 pr-3">Gesendet</th>
-                  <th className="py-1 pr-3">Von</th>
-                  <th className="py-1" />
-                </tr>
-              </thead>
-              <tbody>
-                {history.data.map((h) => (
-                  <tr key={h.id} className="border-t">
-                    <td className="py-1.5 pr-3 font-medium">{h.subject}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums">{h.recipientCount}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums text-success">
-                      {h.sentCount}
-                    </td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums">
-                      {h.failedCount > 0 ? (
-                        <span className="text-destructive">{h.failedCount}</span>
-                      ) : (
-                        "0"
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-3 text-muted-foreground tabular-nums">
-                      {formatDateTime(h.createdAt)}
-                    </td>
-                    <td className="py-1.5 pr-3 text-muted-foreground">
-                      {h.createdByEmail || EMPTY_VALUE}
-                    </td>
-                    <td className="py-1.5 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setDetailId(h.id)}>
-                        Details
-                      </Button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-left text-muted-foreground">
+                  <tr>
+                    <th className="py-1 pr-3">Betreff</th>
+                    <th className="py-1 pr-3 text-right">Empfänger</th>
+                    <th className="py-1 pr-3 text-right">Zugestellt</th>
+                    <th className="py-1 pr-3 text-right">Fehler</th>
+                    <th className="py-1 pr-3">Gesendet</th>
+                    <th className="py-1 pr-3">Von</th>
+                    <th className="py-1" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {history.data.map((h) => (
+                    <tr key={h.id} className="border-t">
+                      <td className="py-1.5 pr-3 font-medium">{h.subject}</td>
+                      <td className="py-1.5 pr-3 text-right tabular-nums">{h.recipientCount}</td>
+                      <td className="py-1.5 pr-3 text-right tabular-nums text-success">
+                        {h.sentCount}
+                      </td>
+                      <td className="py-1.5 pr-3 text-right tabular-nums">
+                        {h.failedCount > 0 ? (
+                          <span className="text-destructive">{h.failedCount}</span>
+                        ) : (
+                          "0"
+                        )}
+                      </td>
+                      <td className="py-1.5 pr-3 text-muted-foreground tabular-nums">
+                        {formatDateTime(h.createdAt)}
+                      </td>
+                      <td className="py-1.5 pr-3 text-muted-foreground">
+                        {h.createdByEmail || EMPTY_VALUE}
+                      </td>
+                      <td className="py-1.5 text-right">
+                        <Button variant="ghost" size="sm" onClick={() => setDetailId(h.id)}>
+                          Details
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -432,34 +434,36 @@ function RundschreibenPage() {
             <Loader2 className="size-4 animate-spin" /> Lade…
           </span>
         ) : detail.data && detail.data.recipients.length > 0 ? (
-          <table className="w-full text-sm">
-            <thead className="text-left text-muted-foreground">
-              <tr>
-                <th className="py-1 pr-3">Name</th>
-                <th className="py-1 pr-3">E-Mail</th>
-                <th className="py-1">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {detail.data.recipients.map((r) => (
-                <tr key={`${r.email}-${r.name}`} className="border-t">
-                  <td className="py-1.5 pr-3">{r.name || EMPTY_VALUE}</td>
-                  <td className="py-1.5 pr-3 text-muted-foreground">{r.email || EMPTY_VALUE}</td>
-                  <td className="py-1.5">
-                    {r.status === "sent" ? (
-                      <span className="text-success">Zugestellt</span>
-                    ) : r.status === "failed" ? (
-                      <span className="text-destructive" title={r.error ?? undefined}>
-                        Fehler{r.error ? `: ${r.error}` : ""}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">{r.status}</span>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-3">Name</th>
+                  <th className="py-1 pr-3">E-Mail</th>
+                  <th className="py-1">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {detail.data.recipients.map((r) => (
+                  <tr key={`${r.email}-${r.name}`} className="border-t">
+                    <td className="py-1.5 pr-3">{r.name || EMPTY_VALUE}</td>
+                    <td className="py-1.5 pr-3 text-muted-foreground">{r.email || EMPTY_VALUE}</td>
+                    <td className="py-1.5">
+                      {r.status === "sent" ? (
+                        <span className="text-success">Zugestellt</span>
+                      ) : r.status === "failed" ? (
+                        <span className="text-destructive" title={r.error ?? undefined}>
+                          Fehler{r.error ? `: ${r.error}` : ""}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">{r.status}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">Keine Empfänger erfasst.</p>
         )}

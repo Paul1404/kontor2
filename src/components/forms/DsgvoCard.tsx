@@ -160,36 +160,38 @@ function ConsentSection({
   return (
     <div className="flex flex-col gap-3">
       <div className="text-sm font-semibold">Aktueller Stand</div>
-      <table className="w-full text-sm">
-        <tbody className="divide-y divide-border">
-          {CONSENT_OPTIONS.map((opt) => {
-            const cur = current.find((c) => c.consentType === opt.value);
-            return (
-              <tr key={opt.value}>
-                <td className="py-2">{opt.label}</td>
-                <td className="py-2 text-right">
-                  {cur ? (
-                    cur.granted ? (
-                      <span className="inline-flex items-center gap-1 text-success">
-                        <CheckCircle2 className="size-4" /> Erteilt
-                      </span>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <tbody className="divide-y divide-border">
+            {CONSENT_OPTIONS.map((opt) => {
+              const cur = current.find((c) => c.consentType === opt.value);
+              return (
+                <tr key={opt.value}>
+                  <td className="py-2">{opt.label}</td>
+                  <td className="py-2 text-right">
+                    {cur ? (
+                      cur.granted ? (
+                        <span className="inline-flex items-center gap-1 text-success">
+                          <CheckCircle2 className="size-4" /> Erteilt
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                          <XCircle className="size-4" /> Widerrufen
+                        </span>
+                      )
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-muted-foreground">
-                        <XCircle className="size-4" /> Widerrufen
-                      </span>
-                    )
-                  ) : (
-                    <span className="text-muted-foreground">{EMPTY_VALUE}</span>
-                  )}
-                </td>
-                <td className="py-2 pl-3 text-xs text-muted-foreground">
-                  {cur ? formatDate(cur.recordedAt) : ""}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                      <span className="text-muted-foreground">{EMPTY_VALUE}</span>
+                    )}
+                  </td>
+                  <td className="py-2 pl-3 text-xs text-muted-foreground">
+                    {cur ? formatDate(cur.recordedAt) : ""}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {canManage ? (
         <div className="flex flex-col gap-2 border-t border-border pt-3">

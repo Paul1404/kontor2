@@ -114,87 +114,89 @@ export function ContractsCard({
         {vertraege.length === 0 ? (
           <p className="text-sm text-muted-foreground">Keine Verträge.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="text-left text-muted-foreground">
-              <tr>
-                <th className="py-1 pr-3">Vertrag</th>
-                <th className="py-1 pr-3">Art</th>
-                <th className="py-1 pr-3 text-right">Betrag</th>
-                <th className="py-1 px-3">Beginn</th>
-                <th className="py-1 px-3">Ende</th>
-                {canEdit ? <th className="py-1 w-28" /> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {vertraege.map((v) => {
-                const isDeleting = pendingDeleteId === v.id;
-                return (
-                  <tr key={v.id} className="border-t">
-                    <td className="py-1 pr-3 tabular-nums align-top">{v.vertragNr}</td>
-                    <td className="py-1 pr-3 align-top">
-                      <div>{v.artName ?? v.art}</div>
-                      {v.zahlerName ? (
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          Zahler: {v.zahlerName}
-                          {v.zahlerRef ? ` (${v.zahlerRef})` : ""}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-3">Vertrag</th>
+                  <th className="py-1 pr-3">Art</th>
+                  <th className="py-1 pr-3 text-right">Betrag</th>
+                  <th className="py-1 px-3">Beginn</th>
+                  <th className="py-1 px-3">Ende</th>
+                  {canEdit ? <th className="py-1 w-28" /> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {vertraege.map((v) => {
+                  const isDeleting = pendingDeleteId === v.id;
+                  return (
+                    <tr key={v.id} className="border-t">
+                      <td className="py-1 pr-3 tabular-nums align-top">{v.vertragNr}</td>
+                      <td className="py-1 pr-3 align-top">
+                        <div>{v.artName ?? v.art}</div>
+                        {v.zahlerName ? (
+                          <div className="mt-0.5 text-xs text-muted-foreground">
+                            Zahler: {v.zahlerName}
+                            {v.zahlerRef ? ` (${v.zahlerRef})` : ""}
+                          </div>
+                        ) : null}
+                        <div className="mt-1">
+                          <ZahlartControl contract={v} canEdit={canEdit} onChanged={refresh} />
                         </div>
-                      ) : null}
-                      <div className="mt-1">
-                        <ZahlartControl contract={v} canEdit={canEdit} onChanged={refresh} />
-                      </div>
-                    </td>
-                    <td className="py-1 pr-3 text-right tabular-nums">
-                      {formatCurrency(v.betrag)}
-                    </td>
-                    <td className="py-1 px-3 text-muted-foreground tabular-nums">
-                      {formatDate(v.vertragBegin)}
-                    </td>
-                    <td className="py-1 px-3 text-muted-foreground tabular-nums">
-                      {formatDate(v.vertragEnde) || (v.gekuendAm ? formatDate(v.gekuendAm) : "")}
-                    </td>
-                    {canEdit ? (
-                      <td className="py-1 text-right whitespace-nowrap align-top">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setZahlerTarget(v)}
-                          disabled={isDeleting}
-                          aria-label="Zahler festlegen"
-                          title="Zahler festlegen"
-                        >
-                          <Wallet className="size-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setEditTarget(v)}
-                          disabled={isDeleting}
-                          aria-label="Vertrag bearbeiten"
-                          title="Vertrag bearbeiten"
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setConfirmTarget(v)}
-                          disabled={isDeleting}
-                          aria-label="Vertrag löschen"
-                          title="Vertrag löschen"
-                        >
-                          {isDeleting ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="size-4 text-destructive" />
-                          )}
-                        </Button>
                       </td>
-                    ) : null}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <td className="py-1 pr-3 text-right tabular-nums">
+                        {formatCurrency(v.betrag)}
+                      </td>
+                      <td className="py-1 px-3 text-muted-foreground tabular-nums">
+                        {formatDate(v.vertragBegin)}
+                      </td>
+                      <td className="py-1 px-3 text-muted-foreground tabular-nums">
+                        {formatDate(v.vertragEnde) || (v.gekuendAm ? formatDate(v.gekuendAm) : "")}
+                      </td>
+                      {canEdit ? (
+                        <td className="py-1 text-right whitespace-nowrap align-top">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setZahlerTarget(v)}
+                            disabled={isDeleting}
+                            aria-label="Zahler festlegen"
+                            title="Zahler festlegen"
+                          >
+                            <Wallet className="size-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEditTarget(v)}
+                            disabled={isDeleting}
+                            aria-label="Vertrag bearbeiten"
+                            title="Vertrag bearbeiten"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setConfirmTarget(v)}
+                            disabled={isDeleting}
+                            aria-label="Vertrag löschen"
+                            title="Vertrag löschen"
+                          >
+                            {isDeleting ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="size-4 text-destructive" />
+                            )}
+                          </Button>
+                        </td>
+                      ) : null}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </CardContent>
       <ConfirmDialog

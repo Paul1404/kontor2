@@ -1206,26 +1206,28 @@ function AuditEntry({ entry }: { entry: AuditEntryRow }) {
       </button>
       {open && visibleChanges.length > 0 ? (
         <div className="mt-2 overflow-hidden rounded border border-border bg-muted/30">
-          <table className="w-full text-xs">
-            <thead className="text-left text-muted-foreground">
-              <tr>
-                <th className="px-3 py-1.5 font-medium">Feld</th>
-                <th className="px-3 py-1.5 font-medium">Vorher</th>
-                <th className="px-3 py-1.5 font-medium">Nachher</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleChanges.map(([k, change]) => (
-                <tr key={k} className="border-t border-border/60">
-                  <td className="px-3 py-1.5 font-medium">{fieldLabel(k)}</td>
-                  <td className="px-3 py-1.5 text-muted-foreground">
-                    {formatAuditValue(k, change.before)}
-                  </td>
-                  <td className="px-3 py-1.5">{formatAuditValue(k, change.after)}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-left text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-1.5 font-medium">Feld</th>
+                  <th className="px-3 py-1.5 font-medium">Vorher</th>
+                  <th className="px-3 py-1.5 font-medium">Nachher</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {visibleChanges.map(([k, change]) => (
+                  <tr key={k} className="border-t border-border/60">
+                    <td className="px-3 py-1.5 font-medium">{fieldLabel(k)}</td>
+                    <td className="px-3 py-1.5 text-muted-foreground">
+                      {formatAuditValue(k, change.before)}
+                    </td>
+                    <td className="px-3 py-1.5">{formatAuditValue(k, change.after)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : null}
     </li>

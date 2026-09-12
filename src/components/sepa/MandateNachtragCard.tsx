@@ -97,66 +97,72 @@ export function MandateNachtragCard({ canEdit }: { canEdit: boolean }) {
           nachgetragen, inaktiv gesetzte Import-Mandate reaktiviert. Minderjährige ohne Vertreter
           oder Familie brauchen erst Datenpflege.
         </p>
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th className="py-1.5 pr-3 font-medium">Zahler</th>
-              <th className="py-1.5 pr-3 font-medium">Zahlt für</th>
-              <th className="py-1.5 pr-3 font-medium">Unterschrift</th>
-              <th className="py-1.5 pr-3 font-medium">IBAN</th>
-              <th className="py-1.5 font-medium">Plan</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {rows.map((r) => (
-              <tr key={r.zahlerMemberId}>
-                <td className="py-1.5 pr-3">
-                  <Link
-                    to="/app/mitglieder/$mitgliedsnummer"
-                    params={{ mitgliedsnummer: r.reference }}
-                    className="text-primary hover:underline"
-                  >
-                    {r.name}
-                  </Link>
-                </td>
-                <td className="py-1.5 pr-3 text-muted-foreground">
-                  {r.zahltFuer.length > 0 ? r.zahltFuer.join(", ") : "sich selbst"}
-                </td>
-                <td className="py-1.5 pr-3 tabular-nums text-muted-foreground">
-                  {r.unterschriftDatum ? formatDate(r.unterschriftDatum) : EMPTY_VALUE}
-                </td>
-                <td className="py-1.5 pr-3">
-                  {r.hasIban ? "vorhanden" : <span className="text-warning">fehlt</span>}
-                </td>
-                <td className="py-1.5">
-                  {r.plan.kind === "create" ? (
-                    <Badge variant="success">Nachtragen</Badge>
-                  ) : r.plan.kind === "reactivate" ? (
-                    <Badge variant="success">
-                      Reaktivieren{r.mandatsNr ? ` (${r.mandatsNr})` : ""}
-                    </Badge>
-                  ) : r.vertreterCandidate ? (
-                    <AssignVertreterButton
-                      minorMemberId={r.zahlerMemberId}
-                      candidate={r.vertreterCandidate}
-                      canEdit={canEdit}
-                      onDone={() => qc.invalidateQueries({ queryKey: ["sepa.nachtragKandidaten"] })}
-                    />
-                  ) : r.payerContactSuggestion ? (
-                    <ResolveViaKontoinhaberButton
-                      minorMemberId={r.zahlerMemberId}
-                      suggestion={r.payerContactSuggestion}
-                      canEdit={canEdit}
-                      onDone={() => qc.invalidateQueries({ queryKey: ["sepa.nachtragKandidaten"] })}
-                    />
-                  ) : (
-                    <Badge variant="warning">{r.plan.reason}</Badge>
-                  )}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="py-1.5 pr-3 font-medium">Zahler</th>
+                <th className="py-1.5 pr-3 font-medium">Zahlt für</th>
+                <th className="py-1.5 pr-3 font-medium">Unterschrift</th>
+                <th className="py-1.5 pr-3 font-medium">IBAN</th>
+                <th className="py-1.5 font-medium">Plan</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {rows.map((r) => (
+                <tr key={r.zahlerMemberId}>
+                  <td className="py-1.5 pr-3">
+                    <Link
+                      to="/app/mitglieder/$mitgliedsnummer"
+                      params={{ mitgliedsnummer: r.reference }}
+                      className="text-primary hover:underline"
+                    >
+                      {r.name}
+                    </Link>
+                  </td>
+                  <td className="py-1.5 pr-3 text-muted-foreground">
+                    {r.zahltFuer.length > 0 ? r.zahltFuer.join(", ") : "sich selbst"}
+                  </td>
+                  <td className="py-1.5 pr-3 tabular-nums text-muted-foreground">
+                    {r.unterschriftDatum ? formatDate(r.unterschriftDatum) : EMPTY_VALUE}
+                  </td>
+                  <td className="py-1.5 pr-3">
+                    {r.hasIban ? "vorhanden" : <span className="text-warning">fehlt</span>}
+                  </td>
+                  <td className="py-1.5">
+                    {r.plan.kind === "create" ? (
+                      <Badge variant="success">Nachtragen</Badge>
+                    ) : r.plan.kind === "reactivate" ? (
+                      <Badge variant="success">
+                        Reaktivieren{r.mandatsNr ? ` (${r.mandatsNr})` : ""}
+                      </Badge>
+                    ) : r.vertreterCandidate ? (
+                      <AssignVertreterButton
+                        minorMemberId={r.zahlerMemberId}
+                        candidate={r.vertreterCandidate}
+                        canEdit={canEdit}
+                        onDone={() =>
+                          qc.invalidateQueries({ queryKey: ["sepa.nachtragKandidaten"] })
+                        }
+                      />
+                    ) : r.payerContactSuggestion ? (
+                      <ResolveViaKontoinhaberButton
+                        minorMemberId={r.zahlerMemberId}
+                        suggestion={r.payerContactSuggestion}
+                        canEdit={canEdit}
+                        onDone={() =>
+                          qc.invalidateQueries({ queryKey: ["sepa.nachtragKandidaten"] })
+                        }
+                      />
+                    ) : (
+                      <Badge variant="warning">{r.plan.reason}</Badge>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </CardContent>
 
       <ConfirmDialog
