@@ -46,6 +46,7 @@ import { attachmentsTable } from "~/server/db/schema/attachments";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { emailLogTable } from "~/server/db/schema/email-log";
 import { familienMitgliederTable, familienTable } from "~/server/db/schema/familien";
+import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { membersTable } from "~/server/db/schema/members";
 import {
   type AntragKind,
@@ -71,7 +72,7 @@ import {
 import { divergentKontoinhaber } from "~/server/domain/application/payer";
 import { resolveApplicationFee } from "~/server/domain/application/resolve-fee";
 import { findDuplicateCandidates } from "~/server/domain/member/duplicate-detection";
-import { onboardMember } from "~/server/domain/member/onboard";
+import { type OnboardContractValues, onboardMember } from "~/server/domain/member/onboard";
 import { lookupBankByIban } from "~/server/lib/blz";
 import { toCsv } from "~/server/lib/csv";
 import { logger } from "~/server/lib/logger";
@@ -394,6 +395,69 @@ function applicationGuardianName(app: MembershipApplication, ibanPlain: string |
   return { vorname: "", nachname: "" };
 }
 
+/** Validate the Vorstand's contract choice against the current Beitragsarten
+ * and turn the optional German decimal input into a database-safe value. */
+async function resolveApprovalContract(
+  db: DB,
+  opts: {
+    art: number | null;
+    betrag: string | null;
+    quotedArt: number | null;
+    quotedBetrag: string | null;
+    abwKontoInh: string | null;
+    isDirectDebit: boolean;
+  },
+): Promise<OnboardContractValues | null> {
+  if (opts.art == null) {
+    if (opts.betrag?.trim()) {
+      throw new ORPCError("VALIDATION_FAILED", {
+        message: "Ein Betrag kann nur zusammen mit einer Beitragsart gespeichert werden.",
+      });
+    }
+    return null;
+  }
+
+  const [feeType] = await db
+    .select({
+      art: feeTypesTable.art,
+      bezeichnung: feeTypesTable.bezeichnung,
+      betrag1: feeTypesTable.betrag1,
+      nichAktiv: feeTypesTable.nichAktiv,
+    })
+    .from(feeTypesTable)
+    .where(eq(feeTypesTable.art, opts.art))
+    .limit(1);
+  if (!feeType) {
+    throw new ORPCError("NOT_FOUND", { message: "Beitragsart nicht gefunden." });
+  }
+  if (feeType.nichAktiv === "J") {
+    throw new ORPCError("PRECONDITION_FAILED", {
+      message: "Diese Beitragsart ist inaktiv. Bitte eine aktive Beitragsart wählen.",
+    });
+  }
+
+  const rawBetrag =
+    opts.betrag ?? (opts.art === opts.quotedArt ? opts.quotedBetrag : feeType.betrag1);
+  const trimmed = rawBetrag?.trim() ?? "";
+  const betrag = trimmed ? trimmed.replace(",", ".") : null;
+  if (betrag != null && !/^\d+(?:\.\d{1,8})?$/.test(betrag)) {
+    throw new ORPCError("VALIDATION_FAILED", {
+      message: `Ungültiger Betrag: "${rawBetrag}".`,
+    });
+  }
+
+  return {
+    art: feeType.art,
+    artName: feeType.bezeichnung?.trim() || `Art ${feeType.art}`,
+    vertragNr: null,
+    betrag,
+    sollstellung: null,
+    vertragBegin: new Date(),
+    abwKontoInh: opts.abwKontoInh,
+    isDirectDebit: opts.isDirectDebit,
+  };
+}
+
 /**
  * Create the secondary members of an application around an already-existing
  * primary: the guardian (kontakt + payer + Vertreter, mandate on the guardian)
@@ -563,8 +627,7 @@ async function approveByLinking(
   opts: {
     app: MembershipApplication;
     memberId: string;
-    art: number | null;
-    betrag: string | null;
+    contract: OnboardContractValues | null;
     actorId: string;
     actorEmail: string;
     requestId: string | null;
@@ -654,7 +717,7 @@ async function approveByLinking(
         ),
       )
       .limit(1);
-    if (existingContract.length === 0 && opts.art != null) {
+    if (existingContract.length === 0 && opts.contract) {
       const existingNumbers = await tx
         .select({ vertragNr: contractsTable.vertragNr })
         .from(contractsTable)
@@ -671,10 +734,13 @@ async function approveByLinking(
         adrNr: member.adrNr,
         mitglNr: ref,
         vertragNr: String(nextVertragNr),
-        art: opts.art,
-        betrag: opts.betrag ?? app.jahresbeitrag ?? null,
-        vertragBegin: new Date(),
-        isDirectDebit: ibanPlain != null,
+        art: opts.contract.art,
+        artName: opts.contract.artName,
+        betrag: opts.contract.betrag,
+        sollstellung: opts.contract.sollstellung,
+        vertragBegin: opts.contract.vertragBegin,
+        abwKontoInh: opts.contract.abwKontoInh ?? null,
+        isDirectDebit: opts.contract.isDirectDebit ?? false,
       } as never);
       changes.vertragAngelegt = { before: null, after: 1 };
     }
@@ -2336,22 +2402,17 @@ export const applicationsRouter = {
         if (selfPayerAbwKontoInh) primaryPatch.abwKontoInh = selfPayerAbwKontoInh;
       }
 
-      const contract =
-        input.art != null
-          ? {
-              art: input.art,
-              artName: null,
-              vertragNr: null,
-              betrag: input.betrag ?? app.jahresbeitrag ?? null,
-              sollstellung: null,
-              vertragBegin: new Date(),
-              abwKontoInh: selfPayerAbwKontoInh,
-              // Direct debit whenever a bank account was given. True for a
-              // minor's contract too: the debit runs against the guardian's
-              // mandate (resolved via the Vertreter link in the fee run).
-              isDirectDebit: ibanPlain != null,
-            }
-          : null;
+      const contract = await resolveApprovalContract(context.db, {
+        art: input.art,
+        betrag: input.betrag,
+        quotedArt: app.vorgeschlageneArt,
+        quotedBetrag: app.jahresbeitrag,
+        abwKontoInh: selfPayerAbwKontoInh,
+        // Direct debit whenever a bank account was given. True for a minor's
+        // contract too: the debit runs against the guardian's mandate
+        // (resolved via the Vertreter link in the fee run).
+        isDirectDebit: ibanPlain != null,
+      });
       const sepa = ibanPlain
         ? {
             mandatsNr: app.mandatsreferenz,
@@ -2364,8 +2425,7 @@ export const applicationsRouter = {
         ? await approveByLinking(context.db, {
             app,
             memberId: input.linkToMemberId,
-            art: input.art,
-            betrag: input.betrag,
+            contract,
             actorId,
             actorEmail,
             requestId: context.requestId ?? null,

@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.2",
+    date: "2026-09-12",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Beim Genehmigen eines Aufnahmeantrags übernimmt der neue Vertrag die gewählte Beitragsart jetzt vollständig. Ungültige oder inaktive Beitragsarten und fehlerhafte Beträge werden vor der Anlage abgewiesen.",
+      },
+    ],
+  },
+  {
     version: "3.0.1",
     date: "2026-09-12",
     changes: [
