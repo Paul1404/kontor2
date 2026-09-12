@@ -35,7 +35,6 @@ import {
 } from "~/server/application/upload-token";
 import { appendAudit } from "~/server/audit/log";
 import { authBaseUrl } from "~/server/auth/auth";
-import { getMailer } from "~/server/auth/send-invite";
 import { lastFour } from "~/server/crypto/encrypt";
 import type { DB, DBOrTx } from "~/server/db/client";
 import { allocateDocRef } from "~/server/db/doc-ref";
@@ -1734,7 +1733,9 @@ export const applicationsRouter = {
             status: res.status,
             recipient: input.email,
             subject,
-            bodyText,
+            bodyText: res.bodyText,
+            bodyHtml: res.bodyHtml,
+            messageId: res.messageId,
             detail: res.detail,
           });
         }
@@ -1760,7 +1761,9 @@ export const applicationsRouter = {
             status: res.status,
             recipient: clubEmail,
             subject,
-            bodyText,
+            bodyText: res.bodyText,
+            bodyHtml: res.bodyHtml,
+            messageId: res.messageId,
             detail: res.detail,
           });
         }
@@ -2283,31 +2286,21 @@ export const applicationsRouter = {
       } satisfies Partial<EmailLogEntry>;
       let record: EmailLogEntry;
       if (app.email) {
-        const mailer = await getMailer(context.db);
-        if (!mailer) {
-          record = {
-            ...base,
-            status: "skipped",
-            recipient: app.email,
-            detail: "smtp_not_configured",
-          };
-        } else {
-          try {
-            await mailer.send({
-              to: app.email,
-              subject,
-              text: declineBody,
-            });
-            record = { ...base, status: "sent", recipient: app.email };
-          } catch (err) {
-            record = {
-              ...base,
-              status: "failed",
-              recipient: app.email,
-              detail: err instanceof Error ? err.message : String(err),
-            };
-          }
-        }
+        const sent = await sendApplicationDocumentMail(context.db, {
+          to: app.email,
+          subject,
+          text: declineBody,
+          subline: "Aufnahmeantrag",
+        });
+        record = {
+          ...base,
+          status: sent.status,
+          recipient: app.email,
+          bodyText: sent.bodyText,
+          bodyHtml: sent.bodyHtml,
+          messageId: sent.messageId,
+          detail: sent.detail,
+        };
       } else {
         record = { ...base, status: "skipped", detail: "no_recipient" };
       }
@@ -2554,7 +2547,9 @@ export const applicationsRouter = {
             status: sent.status,
             recipient: app.email,
             subject: approvalSubject,
-            bodyText: approvalBody,
+            bodyText: sent.bodyText,
+            bodyHtml: sent.bodyHtml,
+            messageId: sent.messageId,
             attachmentNames: approvedPdf
               ? [`Beitrittserklaerung-${app.antragsnummer}-genehmigt.pdf`]
               : null,

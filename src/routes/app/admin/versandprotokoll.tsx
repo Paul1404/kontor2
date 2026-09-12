@@ -91,6 +91,7 @@ const KIND_LABEL: Record<(typeof EMAIL_KIND)[keyof typeof EMAIL_KIND], string> =
   dunning: "Mahnung",
   invite: "Benutzereinladung",
   portal_invite: "Portalzugang",
+  prenotification: "SEPA-Vorabankündigung",
   password_reset: "Passwort zurücksetzen",
   test_mail: "Test-E-Mail",
   letter: "Brief",
@@ -689,7 +690,7 @@ function MailDetailDialog({
                       {mail.contentSource === "imap"
                         ? `Gesendet-Ordner (${mail.imapMailbox ?? "automatisch erkannt"})`
                         : mail.contentSource === "reconstructed"
-                          ? "Rekonstruktion aus Änderungsnachweis und Mitgliedssnapshot"
+                          ? "Rekonstruktion aus erhaltenen Vorgangsdaten"
                           : "Kontor²-Versandarchiv"}
                     </dd>
                   </>
@@ -746,8 +747,8 @@ function MailDetailDialog({
                 </div>
                 {mail.contentSource === "reconstructed" ? (
                   <p className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-xs text-muted-foreground">
-                    Der Mailserver enthält keine Originalkopie. Inhalt und Empfänger wurden aus dem
-                    damaligen Mitgliedssnapshot und dem Bankänderungseintrag rekonstruiert. Logo und
+                    Der Mailserver enthält keine Originalkopie. Die Vorschau wurde aus den im
+                    Versandprotokoll und im Fachvorgang erhaltenen Daten rekonstruiert. Logo und
                     Vereinsangaben entsprechen dem aktuellen Stand.
                   </p>
                 ) : null}

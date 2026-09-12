@@ -25,6 +25,7 @@ export const EMAIL_KIND = {
   dunning: "dunning",
   invite: "invite",
   portalInvite: "portal_invite",
+  prenotification: "prenotification",
   passwordReset: "password_reset",
   testMail: "test_mail",
   /** Free-text letter written by the Vorstand to a single member. */

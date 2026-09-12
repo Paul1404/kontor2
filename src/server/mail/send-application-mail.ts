@@ -33,7 +33,13 @@ export async function sendApplicationDocumentMail(
     /** Inbox preview line. Defaults to the subject when there is nothing better. */
     preheader?: string;
   },
-): Promise<{ status: "sent" | "failed" | "skipped"; detail: string | null; bodyHtml?: string }> {
+): Promise<{
+  status: "sent" | "failed" | "skipped";
+  detail: string | null;
+  bodyText: string;
+  bodyHtml: string;
+  messageId: string | null;
+}> {
   const res = await sendBrandedMail(db, {
     to: opts.to,
     subject: opts.subject,
@@ -46,11 +52,21 @@ export async function sendApplicationDocumentMail(
       blocks: paragraphBlocks(opts.text),
     },
   });
-  if (res.ok) return { status: "sent", detail: null, bodyHtml: res.bodyHtml };
+  if (res.ok) {
+    return {
+      status: "sent",
+      detail: null,
+      bodyText: res.bodyText,
+      bodyHtml: res.bodyHtml,
+      messageId: res.messageId,
+    };
+  }
   return {
     status: res.reason === "smtp_not_configured" ? "skipped" : "failed",
     detail: res.reason,
+    bodyText: res.bodyText,
     bodyHtml: res.bodyHtml,
+    messageId: res.messageId,
   };
 }
 

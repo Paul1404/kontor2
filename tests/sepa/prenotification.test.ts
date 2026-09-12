@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { renderMail } from "~/server/mail/layout";
 import { buildPrenotificationEmail } from "~/server/sepa/prenotification";
 
 describe("buildPrenotificationEmail", () => {
@@ -24,7 +25,31 @@ describe("buildPrenotificationEmail", () => {
   });
 
   it("omits the Gläubiger-ID line when it is missing", () => {
-    const { text } = buildPrenotificationEmail({ ...base, glaeubigerId: null });
+    const { document, text } = buildPrenotificationEmail({ ...base, glaeubigerId: null });
     expect(text).not.toContain("Gläubiger-Identifikationsnummer");
+    expect(document.blocks).not.toContainEqual(
+      expect.objectContaining({ label: "Gläubiger-Identifikationsnummer" }),
+    );
+  });
+
+  it("renders the shared branded HTML and matching text alternative", () => {
+    const { document } = buildPrenotificationEmail(base);
+    const rendered = renderMail({
+      ...document,
+      organization: {
+        displayName: "SV Untereuerheim",
+        legalName: "Sportverein 1945 Untereuerheim e.V.",
+        addressLines: ["Musterweg 1", "97508 Untereuerheim"],
+        contactEmail: "verein@example.test",
+        contactPhone: null,
+        brandColor: "#a6864e",
+        logoDataUri: null,
+      },
+    });
+    expect(rendered.html).toContain("<!doctype html>");
+    expect(rendered.html).toContain("SEPA-Lastschrift");
+    expect(rendered.html).toContain("42,50 €");
+    expect(rendered.text).toContain("Mandatsreferenz: MND-0001");
+    expect(rendered.text).toContain("Technisch versendet über Kontor²");
   });
 });
