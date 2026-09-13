@@ -104,6 +104,8 @@ function VereinsdatenPage() {
     kategorieJungerErwachsenerMaxAlter: 25,
     antragBenachrichtigungAktiv: true,
     antragVorstandEmail: "",
+    neumitgliedBenachrichtigungAktiv: true,
+    neumitgliedVorstandEmail: "",
     antragGegenzeichnungBild: "",
     antragGegenzeichnerName: "",
   });
@@ -161,6 +163,8 @@ function VereinsdatenPage() {
         kategorieJungerErwachsenerMaxAlter: cfg.data.kategorieJungerErwachsenerMaxAlter ?? 25,
         antragBenachrichtigungAktiv: cfg.data.antragBenachrichtigungAktiv ?? true,
         antragVorstandEmail: cfg.data.antragVorstandEmail ?? "",
+        neumitgliedBenachrichtigungAktiv: cfg.data.neumitgliedBenachrichtigungAktiv ?? true,
+        neumitgliedVorstandEmail: cfg.data.neumitgliedVorstandEmail ?? "",
         antragGegenzeichnungBild: cfg.data.antragGegenzeichnungBild ?? "",
         antragGegenzeichnerName: cfg.data.antragGegenzeichnerName ?? "",
       });
@@ -212,6 +216,8 @@ function VereinsdatenPage() {
         kategorieJungerErwachsenerMaxAlter: form.kategorieJungerErwachsenerMaxAlter,
         antragBenachrichtigungAktiv: form.antragBenachrichtigungAktiv,
         antragVorstandEmail: form.antragVorstandEmail || null,
+        neumitgliedBenachrichtigungAktiv: form.neumitgliedBenachrichtigungAktiv,
+        neumitgliedVorstandEmail: form.neumitgliedVorstandEmail || null,
         antragGegenzeichnungBild: form.antragGegenzeichnungBild || null,
         antragGegenzeichnerName: form.antragGegenzeichnerName || null,
       }),
@@ -1030,6 +1036,46 @@ function VereinsdatenPage() {
                       }}
                     />
                   </div>
+                </Field>
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Neue Mitglieder
+              </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Meldung an den Vorstand, sobald ein Mitglied aufgenommen wurde. Gilt für die
+                Genehmigung eines Antrags und für die manuelle Neuanlage.
+              </p>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <Field
+                  label="Benachrichtigung an den Vorstand"
+                  hint="Bei jeder Aufnahme eine E-Mail mit Name, Mitgliedsnummer und Eintritt senden."
+                >
+                  <Select
+                    value={form.neumitgliedBenachrichtigungAktiv ? "ja" : "nein"}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        neumitgliedBenachrichtigungAktiv: e.target.value === "ja",
+                      })
+                    }
+                  >
+                    <option value="ja">An</option>
+                    <option value="nein">Aus</option>
+                  </Select>
+                </Field>
+                <Field
+                  label="Vorstands-E-Mail für Neuaufnahmen"
+                  hint="Empfänger der Meldung. Leer: es wird die Antrags-E-Mail, dann die Mitgliedschaft-E-Mail verwendet."
+                >
+                  <Input
+                    type="email"
+                    value={form.neumitgliedVorstandEmail}
+                    onChange={(e) => setForm({ ...form, neumitgliedVorstandEmail: e.target.value })}
+                    placeholder="vorstand@verein.de"
+                  />
                 </Field>
               </div>
             </div>

@@ -97,6 +97,8 @@ const UpdateInput = v.object({
   ),
   antragBenachrichtigungAktiv: v.optional(v.boolean(), true),
   antragVorstandEmail: v.optional(v.nullable(v.string()), null),
+  neumitgliedBenachrichtigungAktiv: v.optional(v.boolean(), true),
+  neumitgliedVorstandEmail: v.optional(v.nullable(v.string()), null),
   /** PNG data URI, max ~512 KB encoded, or null to clear. */
   antragGegenzeichnungBild: v.optional(
     v.nullable(
@@ -195,6 +197,8 @@ export const organizationSettingsRouter = {
       kategorieJungerErwachsenerMaxAlter: input.kategorieJungerErwachsenerMaxAlter,
       antragBenachrichtigungAktiv: input.antragBenachrichtigungAktiv,
       antragVorstandEmail: input.antragVorstandEmail,
+      neumitgliedBenachrichtigungAktiv: input.neumitgliedBenachrichtigungAktiv,
+      neumitgliedVorstandEmail: input.neumitgliedVorstandEmail,
       antragGegenzeichnungBild: input.antragGegenzeichnungBild,
       antragGegenzeichnerName: input.antragGegenzeichnerName,
       updatedAt: new Date(),

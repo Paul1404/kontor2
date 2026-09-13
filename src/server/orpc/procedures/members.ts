@@ -37,6 +37,7 @@ import { onboardMember } from "~/server/domain/member/onboard";
 import { generateMemberNumber } from "~/server/domain/member-number";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
 import { planReactivateCascade, toIsoDay } from "~/server/lib/member-lifecycle";
+import { notifyVorstandNewMember } from "~/server/mail/send-new-member-notification";
 import { adminProc, authedProc, vorstandProc } from "~/server/orpc/base";
 import {
   CACHE_NS,
@@ -2036,6 +2037,32 @@ export const membersRouter = {
       );
 
       await invalidateMemberCaches(context.tenant.key);
+
+      // Vorstands-Meldung nur für echte Mitglieder. Ein Kontakt oder Zahler
+      // tritt dem Verein nicht bei, und ein sofort auf ausgetreten oder
+      // verstorben gesetzter Datensatz ist eine Nacherfassung, keine Aufnahme.
+      if (!isKontakt && status === "aktiv") {
+        // `patch` ist bewusst untypisiert (Record<string, unknown>), deshalb
+        // werden die Anzeigefelder hier auf Strings eingegrenzt.
+        const text = (value: unknown) => (typeof value === "string" ? value : null);
+        await notifyVorstandNewMember(context.db, {
+          memberId: result.id,
+          members: [
+            {
+              name: [text(patch.vorname), text(patch.nachname)].filter(Boolean).join(" "),
+              reference: result.ref,
+            },
+          ],
+          origin: "manuell",
+          eintritt: eintrittIso ?? fallbackEintritt,
+          ort: text(patch.ort),
+          email: text(patch.email),
+          beitrag: contract?.betrag ?? null,
+          actorEmail,
+          requestId: context.requestId ?? null,
+        });
+      }
+
       return result;
     }),
 };

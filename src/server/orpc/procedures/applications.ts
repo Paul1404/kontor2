@@ -80,6 +80,7 @@ import {
   sendApplicationDocumentMail,
   sendApplicationMails,
 } from "~/server/mail/send-application-mail";
+import { notifyVorstandNewMember } from "~/server/mail/send-new-member-notification";
 import { errorLogFields, publicProc, vorstandProc } from "~/server/orpc/base";
 import { parsePayerName } from "~/server/orpc/procedures/sepa";
 import { buildBeitrittModel } from "~/server/pdf/beitrittserklaerung-model";
@@ -610,6 +611,32 @@ async function createApplicationSecondaries(
   }
 
   return refs;
+}
+
+/**
+ * Namen der Datensätze, die eine Genehmigung anlegt, in genau der Reihenfolge,
+ * in der `createApplicationSecondaries` die Referenzen anhängt: Hauptperson,
+ * danach der Erziehungsberechtigte (Kind) oder Partner und Kinder (Familie).
+ * Steht bewusst neben jener Funktion, damit beide zusammen gepflegt werden.
+ * Die Vorstands-Benachrichtigung legt diese Liste über die zurückgegebenen Refs.
+ */
+function applicationMemberNames(app: MembershipApplication, ibanPlain: string | null): string[] {
+  const join = (vorname: string | null, nachname: string | null) =>
+    [vorname?.trim(), nachname?.trim()].filter(Boolean).join(" ");
+  const names = [join(app.vorname, app.nachname)];
+  if (app.antragstyp === "kind") {
+    const guardian = applicationGuardianName(app, ibanPlain);
+    if (guardian.nachname || guardian.vorname) {
+      names.push(join(guardian.vorname, guardian.nachname));
+    }
+  }
+  if (app.antragstyp === "familie") {
+    if (app.partnerVorname && app.partnerNachname) {
+      names.push(join(app.partnerVorname, app.partnerNachname));
+    }
+    for (const kind of app.kinder ?? []) names.push(join(kind.vorname, kind.nachname));
+  }
+  return names;
 }
 
 /**
@@ -2517,6 +2544,25 @@ export const applicationsRouter = {
       // so the documents are findable on the member (new or linked), not only on
       // the application. Best-effort, never undoes the approval.
       await attachApplicationFilesToMember(context.db, app.id, result.primaryId, actorId);
+
+      // Vorstands-Meldung über die Neuaufnahme. Best-effort und nach dem Commit,
+      // damit sie die Genehmigung nicht rückgängig machen kann.
+      const names = applicationMemberNames(app, ibanPlain);
+      await notifyVorstandNewMember(context.db, {
+        memberId: result.primaryId,
+        members: result.refs.map((reference, i) => ({
+          name: names[i] ?? `${app.vorname} ${app.nachname}`.trim(),
+          reference,
+        })),
+        origin: "antrag",
+        eintritt: approvedAt,
+        ort: app.ort,
+        email: app.email,
+        beitrag: contract?.betrag ?? app.jahresbeitrag,
+        antragsnummer: app.antragsnummer,
+        actorEmail,
+        requestId: context.requestId ?? null,
+      });
 
       if (app.email) {
         const approvalSubject = `${org?.vereinsname ?? "Verein"}: Willkommen`;
