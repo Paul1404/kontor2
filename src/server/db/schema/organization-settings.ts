@@ -141,6 +141,19 @@ export const organizationSettingsTable = pgTable("organization_settings", {
    */
   antragVorstandEmail: text("antrag_vorstand_email"),
   /**
+   * Bei jedem neu aufgenommenen Mitglied eine Benachrichtigung an den Vorstand
+   * senden? Greift für die Antragsgenehmigung und die manuelle Neuanlage.
+   */
+  neumitgliedBenachrichtigungAktiv: boolean("neumitglied_benachrichtigung_aktiv")
+    .notNull()
+    .default(true),
+  /**
+   * Empfänger der Neumitglied-Benachrichtigung. Leer: es wird auf
+   * `antragVorstandEmail`, dann `mitgliedschaftEmail`, dann `kontaktEmail`
+   * zurückgegriffen.
+   */
+  neumitgliedVorstandEmail: text("neumitglied_vorstand_email"),
+  /**
    * Gegenzeichnung des Vorstands für die Beitrittserklärung: ein PNG als
    * data-URI. Wird beim Genehmigen in das amtliche Antrags-PDF eingebettet.
    * Leer: das genehmigte PDF zeigt nur die Unterschrift des Antragstellers.

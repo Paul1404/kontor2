@@ -1,0 +1,2 @@
+ALTER TABLE "organization_settings" ADD COLUMN "neumitglied_benachrichtigung_aktiv" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization_settings" ADD COLUMN "neumitglied_vorstand_email" text;

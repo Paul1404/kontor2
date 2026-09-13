@@ -86,6 +86,7 @@ const KIND_LABEL: Record<(typeof EMAIL_KIND)[keyof typeof EMAIL_KIND], string> =
   antrag_club_notification: "Antrag: Vereinsbenachrichtigung",
   antrag_approval: "Antrag: Genehmigung",
   antrag_decline: "Antrag: Ablehnung",
+  new_member_notification: "Neues Mitglied: Vorstandshinweis",
   bank_details_confirmation: "Bankänderung: Bestätigung",
   cancellation_confirmation: "Austritt: Bestätigung",
   dunning: "Mahnung",

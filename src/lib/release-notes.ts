@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.1.0",
+    date: "2026-09-13",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Der Vorstand wird jetzt per E-Mail informiert, sobald ein Mitglied aufgenommen wurde. Das gilt für die Genehmigung eines Antrags und für die manuelle Neuanlage. Die Meldung nennt Name, Mitgliedsnummer, Eintritt und Beitrag und steht im Versandprotokoll. Empfänger und Ein- oder Ausschalten stellen Sie unter Einstellungen > Verein im Abschnitt Neue Mitglieder ein.",
+      },
+    ],
+  },
+  {
     version: "3.0.4",
     date: "2026-09-12",
     changes: [

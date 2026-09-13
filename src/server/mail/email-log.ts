@@ -20,6 +20,8 @@ export const EMAIL_KIND = {
   antragClubNotification: "antrag_club_notification",
   antragApproval: "antrag_approval",
   antragDecline: "antrag_decline",
+  /** Vorstands-Hinweis auf ein neu aufgenommenes Mitglied. */
+  newMemberNotification: "new_member_notification",
   bankDetailsConfirmation: "bank_details_confirmation",
   cancellationConfirmation: "cancellation_confirmation",
   dunning: "dunning",

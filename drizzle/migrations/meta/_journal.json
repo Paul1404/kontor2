@@ -575,6 +575,13 @@
       "when": 1788465321419,
       "tag": "0081_charming_caretaker",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1789314066209,
+      "tag": "0082_odd_siren",
+      "breakpoints": true
     }
   ]
 }

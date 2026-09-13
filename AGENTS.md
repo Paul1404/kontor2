@@ -91,6 +91,14 @@ on Railway via Dockerfile.
   `sent`, because posting it stays a human act. A workflow with its own letter
   (the Austrittsbestätigung) keeps it and records that letter as its postal
   channel instead of generating a second one.
+- A new member triggers a Vorstand notice through the single
+  `notifyVorstandNewMember` (`src/server/mail/send-new-member-notification.ts`),
+  called post-commit by `applications.approve` and by `members.onboard` (real
+  members only, never a Kontakt). It is best-effort and never throws: an
+  onboarding must not fail on SMTP. `neumitgliedBenachrichtigungAktiv` switches
+  it off entirely (nothing is logged then); the recipient falls back
+  `neumitgliedVorstandEmail` -> `antragVorstandEmail` -> `mitgliedschaftEmail`
+  -> `kontaktEmail`, and a missing one is logged as `skipped`.
 - Every outbound email uses the shared `renderMail` / `sendBrandedMail` design.
   Persist the returned `bodyText`, `bodyHtml`, `messageId` and attachment names
   in `email_log`; do not rebuild a shorter archive body beside the sent one.
