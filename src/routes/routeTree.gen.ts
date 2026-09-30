@@ -9,143 +9,93 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './__root'
-import { Route as SitemapDotxmlRouteImport } from './sitemap[.]xml'
-import { Route as SetupRouteImport } from './setup'
-import { Route as RobotsDottxtRouteImport } from './robots[.]txt'
-import { Route as PasswortZuruecksetzenRouteImport } from './passwort-zuruecksetzen'
-import { Route as PasswortVergessenRouteImport } from './passwort-vergessen'
-import { Route as LoginRouteImport } from './login'
-import { Route as ImpressumRouteImport } from './impressum'
-import { Route as DatenschutzRouteImport } from './datenschutz'
-import { Route as PortalRouteRouteImport } from './portal/route'
-import { Route as ConsoleRouteRouteImport } from './console/route'
-import { Route as AppRouteRouteImport } from './app/route'
-import { Route as AntragRouteRouteImport } from './antrag/route'
 import { Route as IndexRouteImport } from './index'
-import { Route as PortalIndexRouteImport } from './portal/index'
-import { Route as ConsoleIndexRouteImport } from './console/index'
-import { Route as AppIndexRouteImport } from './app/index'
+import { Route as AntragRouteRouteImport } from './antrag/route'
+import { Route as AppRouteRouteImport } from './app/route'
+import { Route as ConsoleRouteRouteImport } from './console/route'
+import { Route as DatenschutzRouteImport } from './datenschutz'
+import { Route as ImpressumRouteImport } from './impressum'
+import { Route as LoginRouteImport } from './login'
+import { Route as PasswortVergessenRouteImport } from './passwort-vergessen'
+import { Route as PasswortZuruecksetzenRouteImport } from './passwort-zuruecksetzen'
+import { Route as PortalRouteRouteImport } from './portal/route'
+import { Route as RobotsDottxtRouteImport } from './robots[.]txt'
+import { Route as SetupRouteImport } from './setup'
+import { Route as SitemapDotxmlRouteImport } from './sitemap[.]xml'
 import { Route as AntragIndexRouteImport } from './antrag/index'
-import { Route as PortalProfilRouteImport } from './portal/profil'
-import { Route as PortalAbgemeldetRouteImport } from './portal/abgemeldet'
-import { Route as PortalAbgelaufenRouteImport } from './portal/abgelaufen'
-import { Route as InviteTokenRouteImport } from './invite.$token'
-import { Route as AppZahlungsabgleichRouteImport } from './app/zahlungsabgleich'
-import { Route as AppWiedervorlagenRouteImport } from './app/wiedervorlagen'
-import { Route as AppRundschreibenRouteImport } from './app/rundschreiben'
-import { Route as AppPortalAnfragenRouteImport } from './app/portal-anfragen'
-import { Route as AppMuseumRouteImport } from './app/museum'
-import { Route as AppImportRouteImport } from './app/import'
-import { Route as AppFamilienRouteImport } from './app/familien'
-import { Route as AppDokumentationRouteImport } from './app/dokumentation'
-import { Route as AppDatenqualitaetRouteImport } from './app/datenqualitaet'
-import { Route as AppAuditRouteImport } from './app/audit'
-import { Route as AppArchiveRouteImport } from './app/archive'
-import { Route as ApiMcpRouteImport } from './api/mcp'
-import { Route as ApiHealthRouteImport } from './api/health'
-import { Route as AntragStatusRouteImport } from './antrag/status'
 import { Route as AntragPapierformularRouteImport } from './antrag/papierformular'
-import { Route as AppMitgliederIndexRouteImport } from './app/mitglieder/index'
-import { Route as AppForderungenIndexRouteImport } from './app/forderungen/index'
-import { Route as AppDsgvoIndexRouteImport } from './app/dsgvo/index'
-import { Route as AppBerichteIndexRouteImport } from './app/berichte/index'
-import { Route as AppBeitragIndexRouteImport } from './app/beitrag/index'
-import { Route as AppAntraegeIndexRouteImport } from './app/antraege/index'
-import { Route as AppMitgliederNeuRouteImport } from './app/mitglieder/neu'
-import { Route as AppMitgliederMitgliedsnummerRouteImport } from './app/mitglieder/$mitgliedsnummer'
-import { Route as AppForderungenRuecklaeuferRouteImport } from './app/forderungen/ruecklaeufer'
-import { Route as AppEinstellungenVerschluesselungRouteImport } from './app/einstellungen/verschluesselung'
-import { Route as AppEinstellungenVereinRouteImport } from './app/einstellungen/verein'
-import { Route as AppEinstellungenSmtpRouteImport } from './app/einstellungen/smtp'
-import { Route as AppEinstellungenKiZugriffRouteImport } from './app/einstellungen/ki-zugriff'
-import { Route as AppEinstellungenBenutzerRouteImport } from './app/einstellungen/benutzer'
-import { Route as AppEinstellungenBeitragsartenRouteImport } from './app/einstellungen/beitragsarten'
-import { Route as AppEinstellungenAbteilungenRouteImport } from './app/einstellungen/abteilungen'
-import { Route as AppDsgvoIdRouteImport } from './app/dsgvo/$id'
-import { Route as AppBerichteGeburtstageRouteImport } from './app/berichte/geburtstage'
-import { Route as AppBerichteFinanzenRouteImport } from './app/berichte/finanzen'
-import { Route as AppBerichteExportRouteImport } from './app/berichte/export'
-import { Route as AppBerichteEhrungenRouteImport } from './app/berichte/ehrungen'
-import { Route as AppBerichteBestandserhebungRouteImport } from './app/berichte/bestandserhebung'
-import { Route as AppBerichteAbteilungsStatistikRouteImport } from './app/berichte/abteilungs-statistik'
-import { Route as AppBeitragNeuRouteImport } from './app/beitrag/neu'
-import { Route as AppBeitragErneutEinziehenRouteImport } from './app/beitrag/erneut-einziehen'
-import { Route as AppBeitragIdRouteImport } from './app/beitrag/$id'
-import { Route as AppAntraegeIdRouteImport } from './app/antraege/$id'
-import { Route as AppAdminVersandprotokollRouteImport } from './app/admin/versandprotokoll'
-import { Route as AppAdminSnapshotsRouteImport } from './app/admin/snapshots'
-import { Route as AppAdminSepaPruefungRouteImport } from './app/admin/sepa-pruefung'
-import { Route as AppAdminProtokollRouteImport } from './app/admin/protokoll'
-import { Route as AppAdminErweitertRouteImport } from './app/admin/erweitert'
-import { Route as ApiRpcSplatRouteImport } from './api/rpc.$'
-import { Route as ApiPortalLogoutRouteImport } from './api/portal.logout'
-import { Route as ApiFilesIdRouteImport } from './api/files.$id'
-import { Route as ApiCronSnapshotsRouteImport } from './api/cron.snapshots'
-import { Route as ApiBrandingManifestRouteImport } from './api/branding.manifest'
-import { Route as ApiBrandingIconRouteImport } from './api/branding.icon'
-import { Route as ApiAuthSplatRouteImport } from './api/auth.$'
-import { Route as ApiAttachmentsUploadIdRouteImport } from './api/attachments-upload.$id'
+import { Route as AntragStatusRouteImport } from './antrag/status'
+import { Route as ApiHealthRouteImport } from './api/health'
+import { Route as ApiMcpRouteImport } from './api/mcp'
+import { Route as AppIndexRouteImport } from './app/index'
+import { Route as AppArchiveRouteImport } from './app/archive'
+import { Route as AppAuditRouteImport } from './app/audit'
+import { Route as AppDatenqualitaetRouteImport } from './app/datenqualitaet'
+import { Route as AppDokumentationRouteImport } from './app/dokumentation'
+import { Route as AppFamilienRouteImport } from './app/familien'
+import { Route as AppImportRouteImport } from './app/import'
+import { Route as AppMuseumRouteImport } from './app/museum'
+import { Route as AppPortalAnfragenRouteImport } from './app/portal-anfragen'
+import { Route as AppRundschreibenRouteImport } from './app/rundschreiben'
+import { Route as AppWiedervorlagenRouteImport } from './app/wiedervorlagen'
+import { Route as AppZahlungsabgleichRouteImport } from './app/zahlungsabgleich'
+import { Route as ConsoleIndexRouteImport } from './console/index'
+import { Route as InviteTokenRouteImport } from './invite.$token'
+import { Route as PortalIndexRouteImport } from './portal/index'
+import { Route as PortalAbgelaufenRouteImport } from './portal/abgelaufen'
+import { Route as PortalAbgemeldetRouteImport } from './portal/abgemeldet'
+import { Route as PortalProfilRouteImport } from './portal/profil'
 import { Route as AntragUploadTokenRouteImport } from './antrag/upload.$token'
-import { Route as AppForderungenMahnungenIndexRouteImport } from './app/forderungen/mahnungen/index'
-import { Route as AppForderungenKulanzIndexRouteImport } from './app/forderungen/kulanz/index'
-import { Route as AppMitgliederMitgliedsnummerBearbeitenRouteImport } from './app/mitglieder/$mitgliedsnummer_.bearbeiten'
-import { Route as AppForderungenMahnungenNeuRouteImport } from './app/forderungen/mahnungen/neu'
-import { Route as AppForderungenMahnungenIdRouteImport } from './app/forderungen/mahnungen/$id'
+import { Route as ApiAttachmentsUploadIdRouteImport } from './api/attachments-upload.$id'
+import { Route as ApiAuthSplatRouteImport } from './api/auth.$'
+import { Route as ApiBrandingIconRouteImport } from './api/branding.icon'
+import { Route as ApiBrandingManifestRouteImport } from './api/branding.manifest'
+import { Route as ApiCronSnapshotsRouteImport } from './api/cron.snapshots'
+import { Route as ApiFilesIdRouteImport } from './api/files.$id'
+import { Route as ApiPortalLogoutRouteImport } from './api/portal.logout'
+import { Route as ApiRpcSplatRouteImport } from './api/rpc.$'
+import { Route as AppAdminErweitertRouteImport } from './app/admin/erweitert'
+import { Route as AppAdminProtokollRouteImport } from './app/admin/protokoll'
+import { Route as AppAdminSepaPruefungRouteImport } from './app/admin/sepa-pruefung'
+import { Route as AppAdminSnapshotsRouteImport } from './app/admin/snapshots'
+import { Route as AppAdminVersandprotokollRouteImport } from './app/admin/versandprotokoll'
+import { Route as AppAntraegeIndexRouteImport } from './app/antraege/index'
+import { Route as AppAntraegeIdRouteImport } from './app/antraege/$id'
+import { Route as AppBeitragIndexRouteImport } from './app/beitrag/index'
+import { Route as AppBeitragIdRouteImport } from './app/beitrag/$id'
+import { Route as AppBeitragErneutEinziehenRouteImport } from './app/beitrag/erneut-einziehen'
+import { Route as AppBeitragNeuRouteImport } from './app/beitrag/neu'
+import { Route as AppBerichteIndexRouteImport } from './app/berichte/index'
+import { Route as AppBerichteAbteilungsStatistikRouteImport } from './app/berichte/abteilungs-statistik'
+import { Route as AppBerichteBestandserhebungRouteImport } from './app/berichte/bestandserhebung'
+import { Route as AppBerichteEhrungenRouteImport } from './app/berichte/ehrungen'
+import { Route as AppBerichteExportRouteImport } from './app/berichte/export'
+import { Route as AppBerichteFinanzenRouteImport } from './app/berichte/finanzen'
+import { Route as AppBerichteGeburtstageRouteImport } from './app/berichte/geburtstage'
+import { Route as AppDsgvoIndexRouteImport } from './app/dsgvo/index'
+import { Route as AppDsgvoIdRouteImport } from './app/dsgvo/$id'
+import { Route as AppEinstellungenAbteilungenRouteImport } from './app/einstellungen/abteilungen'
+import { Route as AppEinstellungenBeitragsartenRouteImport } from './app/einstellungen/beitragsarten'
+import { Route as AppEinstellungenBenutzerRouteImport } from './app/einstellungen/benutzer'
+import { Route as AppEinstellungenKiZugriffRouteImport } from './app/einstellungen/ki-zugriff'
+import { Route as AppEinstellungenSmtpRouteImport } from './app/einstellungen/smtp'
+import { Route as AppEinstellungenVereinRouteImport } from './app/einstellungen/verein'
+import { Route as AppEinstellungenVerschluesselungRouteImport } from './app/einstellungen/verschluesselung'
+import { Route as AppForderungenIndexRouteImport } from './app/forderungen/index'
+import { Route as AppForderungenRuecklaeuferRouteImport } from './app/forderungen/ruecklaeufer'
+import { Route as AppMitgliederIndexRouteImport } from './app/mitglieder/index'
+import { Route as AppMitgliederMitgliedsnummerRouteImport } from './app/mitglieder/$mitgliedsnummer'
+import { Route as AppMitgliederNeuRouteImport } from './app/mitglieder/neu'
 import { Route as ApiPortalZugangTokenRouteImport } from './api/portal.zugang.$token'
+import { Route as AppForderungenKulanzIndexRouteImport } from './app/forderungen/kulanz/index'
+import { Route as AppForderungenMahnungenIndexRouteImport } from './app/forderungen/mahnungen/index'
+import { Route as AppForderungenMahnungenIdRouteImport } from './app/forderungen/mahnungen/$id'
+import { Route as AppForderungenMahnungenNeuRouteImport } from './app/forderungen/mahnungen/neu'
+import { Route as AppMitgliederMitgliedsnummerBearbeitenRouteImport } from './app/mitglieder/$mitgliedsnummer_.bearbeiten'
 
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SetupRoute = SetupRouteImport.update({
-  id: '/setup',
-  path: '/setup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
-  id: '/robots.txt',
-  path: '/robots.txt',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PasswortZuruecksetzenRoute = PasswortZuruecksetzenRouteImport.update({
-  id: '/passwort-zuruecksetzen',
-  path: '/passwort-zuruecksetzen',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PasswortVergessenRoute = PasswortVergessenRouteImport.update({
-  id: '/passwort-vergessen',
-  path: '/passwort-vergessen',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ImpressumRoute = ImpressumRouteImport.update({
-  id: '/impressum',
-  path: '/impressum',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DatenschutzRoute = DatenschutzRouteImport.update({
-  id: '/datenschutz',
-  path: '/datenschutz',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PortalRouteRoute = PortalRouteRouteImport.update({
-  id: '/portal',
-  path: '/portal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ConsoleRouteRoute = ConsoleRouteRouteImport.update({
-  id: '/console',
-  path: '/console',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AppRouteRoute = AppRouteRouteImport.update({
-  id: '/app',
-  path: '/app',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AntragRouteRoute = AntragRouteRouteImport.update({
@@ -153,119 +103,64 @@ const AntragRouteRoute = AntragRouteRouteImport.update({
   path: '/antrag',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AppRouteRoute = AppRouteRouteImport.update({
+  id: '/app',
+  path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PortalIndexRoute = PortalIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => PortalRouteRoute,
+const ConsoleRouteRoute = ConsoleRouteRouteImport.update({
+  id: '/console',
+  path: '/console',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const ConsoleIndexRoute = ConsoleIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => ConsoleRouteRoute,
+const DatenschutzRoute = DatenschutzRouteImport.update({
+  id: '/datenschutz',
+  path: '/datenschutz',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AppIndexRoute = AppIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppRouteRoute,
+const ImpressumRoute = ImpressumRouteImport.update({
+  id: '/impressum',
+  path: '/impressum',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PasswortVergessenRoute = PasswortVergessenRouteImport.update({
+  id: '/passwort-vergessen',
+  path: '/passwort-vergessen',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PasswortZuruecksetzenRoute = PasswortZuruecksetzenRouteImport.update({
+  id: '/passwort-zuruecksetzen',
+  path: '/passwort-zuruecksetzen',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalRouteRoute = PortalRouteRouteImport.update({
+  id: '/portal',
+  path: '/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AntragIndexRoute = AntragIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AntragRouteRoute,
-} as any)
-const PortalProfilRoute = PortalProfilRouteImport.update({
-  id: '/profil',
-  path: '/profil',
-  getParentRoute: () => PortalRouteRoute,
-} as any)
-const PortalAbgemeldetRoute = PortalAbgemeldetRouteImport.update({
-  id: '/abgemeldet',
-  path: '/abgemeldet',
-  getParentRoute: () => PortalRouteRoute,
-} as any)
-const PortalAbgelaufenRoute = PortalAbgelaufenRouteImport.update({
-  id: '/abgelaufen',
-  path: '/abgelaufen',
-  getParentRoute: () => PortalRouteRoute,
-} as any)
-const InviteTokenRoute = InviteTokenRouteImport.update({
-  id: '/invite/$token',
-  path: '/invite/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AppZahlungsabgleichRoute = AppZahlungsabgleichRouteImport.update({
-  id: '/zahlungsabgleich',
-  path: '/zahlungsabgleich',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppWiedervorlagenRoute = AppWiedervorlagenRouteImport.update({
-  id: '/wiedervorlagen',
-  path: '/wiedervorlagen',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppRundschreibenRoute = AppRundschreibenRouteImport.update({
-  id: '/rundschreiben',
-  path: '/rundschreiben',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppPortalAnfragenRoute = AppPortalAnfragenRouteImport.update({
-  id: '/portal-anfragen',
-  path: '/portal-anfragen',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppMuseumRoute = AppMuseumRouteImport.update({
-  id: '/museum',
-  path: '/museum',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppImportRoute = AppImportRouteImport.update({
-  id: '/import',
-  path: '/import',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppFamilienRoute = AppFamilienRouteImport.update({
-  id: '/familien',
-  path: '/familien',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppDokumentationRoute = AppDokumentationRouteImport.update({
-  id: '/dokumentation',
-  path: '/dokumentation',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppDatenqualitaetRoute = AppDatenqualitaetRouteImport.update({
-  id: '/datenqualitaet',
-  path: '/datenqualitaet',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppAuditRoute = AppAuditRouteImport.update({
-  id: '/audit',
-  path: '/audit',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppArchiveRoute = AppArchiveRouteImport.update({
-  id: '/archive',
-  path: '/archive',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const ApiMcpRoute = ApiMcpRouteImport.update({
-  id: '/api/mcp',
-  path: '/api/mcp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiHealthRoute = ApiHealthRouteImport.update({
-  id: '/api/health',
-  path: '/api/health',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AntragStatusRoute = AntragStatusRouteImport.update({
-  id: '/status',
-  path: '/status',
   getParentRoute: () => AntragRouteRoute,
 } as any)
 const AntragPapierformularRoute = AntragPapierformularRouteImport.update({
@@ -273,149 +168,174 @@ const AntragPapierformularRoute = AntragPapierformularRouteImport.update({
   path: '/papierformular',
   getParentRoute: () => AntragRouteRoute,
 } as any)
-const AppMitgliederIndexRoute = AppMitgliederIndexRouteImport.update({
-  id: '/mitglieder/',
-  path: '/mitglieder/',
+const AntragStatusRoute = AntragStatusRouteImport.update({
+  id: '/status',
+  path: '/status',
+  getParentRoute: () => AntragRouteRoute,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMcpRoute = ApiMcpRouteImport.update({
+  id: '/api/mcp',
+  path: '/api/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppForderungenIndexRoute = AppForderungenIndexRouteImport.update({
-  id: '/forderungen/',
-  path: '/forderungen/',
+const AppArchiveRoute = AppArchiveRouteImport.update({
+  id: '/archive',
+  path: '/archive',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppDsgvoIndexRoute = AppDsgvoIndexRouteImport.update({
-  id: '/dsgvo/',
-  path: '/dsgvo/',
+const AppAuditRoute = AppAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppBerichteIndexRoute = AppBerichteIndexRouteImport.update({
-  id: '/berichte/',
-  path: '/berichte/',
+const AppDatenqualitaetRoute = AppDatenqualitaetRouteImport.update({
+  id: '/datenqualitaet',
+  path: '/datenqualitaet',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppBeitragIndexRoute = AppBeitragIndexRouteImport.update({
-  id: '/beitrag/',
-  path: '/beitrag/',
+const AppDokumentationRoute = AppDokumentationRouteImport.update({
+  id: '/dokumentation',
+  path: '/dokumentation',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppAntraegeIndexRoute = AppAntraegeIndexRouteImport.update({
-  id: '/antraege/',
-  path: '/antraege/',
+const AppFamilienRoute = AppFamilienRouteImport.update({
+  id: '/familien',
+  path: '/familien',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppMitgliederNeuRoute = AppMitgliederNeuRouteImport.update({
-  id: '/mitglieder/neu',
-  path: '/mitglieder/neu',
+const AppImportRoute = AppImportRouteImport.update({
+  id: '/import',
+  path: '/import',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppMitgliederMitgliedsnummerRoute =
-  AppMitgliederMitgliedsnummerRouteImport.update({
-    id: '/mitglieder/$mitgliedsnummer',
-    path: '/mitglieder/$mitgliedsnummer',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppForderungenRuecklaeuferRoute =
-  AppForderungenRuecklaeuferRouteImport.update({
-    id: '/forderungen/ruecklaeufer',
-    path: '/forderungen/ruecklaeufer',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppEinstellungenVerschluesselungRoute =
-  AppEinstellungenVerschluesselungRouteImport.update({
-    id: '/einstellungen/verschluesselung',
-    path: '/einstellungen/verschluesselung',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppEinstellungenVereinRoute = AppEinstellungenVereinRouteImport.update({
-  id: '/einstellungen/verein',
-  path: '/einstellungen/verein',
+const AppMuseumRoute = AppMuseumRouteImport.update({
+  id: '/museum',
+  path: '/museum',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppEinstellungenSmtpRoute = AppEinstellungenSmtpRouteImport.update({
-  id: '/einstellungen/smtp',
-  path: '/einstellungen/smtp',
+const AppPortalAnfragenRoute = AppPortalAnfragenRouteImport.update({
+  id: '/portal-anfragen',
+  path: '/portal-anfragen',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppEinstellungenKiZugriffRoute =
-  AppEinstellungenKiZugriffRouteImport.update({
-    id: '/einstellungen/ki-zugriff',
-    path: '/einstellungen/ki-zugriff',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppEinstellungenBenutzerRoute =
-  AppEinstellungenBenutzerRouteImport.update({
-    id: '/einstellungen/benutzer',
-    path: '/einstellungen/benutzer',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppEinstellungenBeitragsartenRoute =
-  AppEinstellungenBeitragsartenRouteImport.update({
-    id: '/einstellungen/beitragsarten',
-    path: '/einstellungen/beitragsarten',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppEinstellungenAbteilungenRoute =
-  AppEinstellungenAbteilungenRouteImport.update({
-    id: '/einstellungen/abteilungen',
-    path: '/einstellungen/abteilungen',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppDsgvoIdRoute = AppDsgvoIdRouteImport.update({
-  id: '/dsgvo/$id',
-  path: '/dsgvo/$id',
+const AppRundschreibenRoute = AppRundschreibenRouteImport.update({
+  id: '/rundschreiben',
+  path: '/rundschreiben',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppBerichteGeburtstageRoute = AppBerichteGeburtstageRouteImport.update({
-  id: '/berichte/geburtstage',
-  path: '/berichte/geburtstage',
+const AppWiedervorlagenRoute = AppWiedervorlagenRouteImport.update({
+  id: '/wiedervorlagen',
+  path: '/wiedervorlagen',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppBerichteFinanzenRoute = AppBerichteFinanzenRouteImport.update({
-  id: '/berichte/finanzen',
-  path: '/berichte/finanzen',
+const AppZahlungsabgleichRoute = AppZahlungsabgleichRouteImport.update({
+  id: '/zahlungsabgleich',
+  path: '/zahlungsabgleich',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppBerichteExportRoute = AppBerichteExportRouteImport.update({
-  id: '/berichte/export',
-  path: '/berichte/export',
+const ConsoleIndexRoute = ConsoleIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalIndexRoute = PortalIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PortalRouteRoute,
+} as any)
+const PortalAbgelaufenRoute = PortalAbgelaufenRouteImport.update({
+  id: '/abgelaufen',
+  path: '/abgelaufen',
+  getParentRoute: () => PortalRouteRoute,
+} as any)
+const PortalAbgemeldetRoute = PortalAbgemeldetRouteImport.update({
+  id: '/abgemeldet',
+  path: '/abgemeldet',
+  getParentRoute: () => PortalRouteRoute,
+} as any)
+const PortalProfilRoute = PortalProfilRouteImport.update({
+  id: '/profil',
+  path: '/profil',
+  getParentRoute: () => PortalRouteRoute,
+} as any)
+const AntragUploadTokenRoute = AntragUploadTokenRouteImport.update({
+  id: '/upload/$token',
+  path: '/upload/$token',
+  getParentRoute: () => AntragRouteRoute,
+} as any)
+const ApiAttachmentsUploadIdRoute = ApiAttachmentsUploadIdRouteImport.update({
+  id: '/api/attachments-upload/$id',
+  path: '/api/attachments-upload/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBrandingIconRoute = ApiBrandingIconRouteImport.update({
+  id: '/api/branding/icon',
+  path: '/api/branding/icon',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBrandingManifestRoute = ApiBrandingManifestRouteImport.update({
+  id: '/api/branding/manifest',
+  path: '/api/branding/manifest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCronSnapshotsRoute = ApiCronSnapshotsRouteImport.update({
+  id: '/api/cron/snapshots',
+  path: '/api/cron/snapshots',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFilesIdRoute = ApiFilesIdRouteImport.update({
+  id: '/api/files/$id',
+  path: '/api/files/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPortalLogoutRoute = ApiPortalLogoutRouteImport.update({
+  id: '/api/portal/logout',
+  path: '/api/portal/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
+  id: '/api/rpc/$',
+  path: '/api/rpc/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppAdminErweitertRoute = AppAdminErweitertRouteImport.update({
+  id: '/admin/erweitert',
+  path: '/admin/erweitert',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppBerichteEhrungenRoute = AppBerichteEhrungenRouteImport.update({
-  id: '/berichte/ehrungen',
-  path: '/berichte/ehrungen',
+const AppAdminProtokollRoute = AppAdminProtokollRouteImport.update({
+  id: '/admin/protokoll',
+  path: '/admin/protokoll',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppBerichteBestandserhebungRoute =
-  AppBerichteBestandserhebungRouteImport.update({
-    id: '/berichte/bestandserhebung',
-    path: '/berichte/bestandserhebung',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppBerichteAbteilungsStatistikRoute =
-  AppBerichteAbteilungsStatistikRouteImport.update({
-    id: '/berichte/abteilungs-statistik',
-    path: '/berichte/abteilungs-statistik',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppBeitragNeuRoute = AppBeitragNeuRouteImport.update({
-  id: '/beitrag/neu',
-  path: '/beitrag/neu',
+const AppAdminSepaPruefungRoute = AppAdminSepaPruefungRouteImport.update({
+  id: '/admin/sepa-pruefung',
+  path: '/admin/sepa-pruefung',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppBeitragErneutEinziehenRoute =
-  AppBeitragErneutEinziehenRouteImport.update({
-    id: '/beitrag/erneut-einziehen',
-    path: '/beitrag/erneut-einziehen',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppBeitragIdRoute = AppBeitragIdRouteImport.update({
-  id: '/beitrag/$id',
-  path: '/beitrag/$id',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppAntraegeIdRoute = AppAntraegeIdRouteImport.update({
-  id: '/antraege/$id',
-  path: '/antraege/$id',
+const AppAdminSnapshotsRoute = AppAdminSnapshotsRouteImport.update({
+  id: '/admin/snapshots',
+  path: '/admin/snapshots',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppAdminVersandprotokollRoute =
@@ -424,93 +344,166 @@ const AppAdminVersandprotokollRoute =
     path: '/admin/versandprotokoll',
     getParentRoute: () => AppRouteRoute,
   } as any)
-const AppAdminSnapshotsRoute = AppAdminSnapshotsRouteImport.update({
-  id: '/admin/snapshots',
-  path: '/admin/snapshots',
+const AppAntraegeIndexRoute = AppAntraegeIndexRouteImport.update({
+  id: '/antraege/',
+  path: '/antraege/',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppAdminSepaPruefungRoute = AppAdminSepaPruefungRouteImport.update({
-  id: '/admin/sepa-pruefung',
-  path: '/admin/sepa-pruefung',
+const AppAntraegeIdRoute = AppAntraegeIdRouteImport.update({
+  id: '/antraege/$id',
+  path: '/antraege/$id',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppAdminProtokollRoute = AppAdminProtokollRouteImport.update({
-  id: '/admin/protokoll',
-  path: '/admin/protokoll',
+const AppBeitragIndexRoute = AppBeitragIndexRouteImport.update({
+  id: '/beitrag/',
+  path: '/beitrag/',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppAdminErweitertRoute = AppAdminErweitertRouteImport.update({
-  id: '/admin/erweitert',
-  path: '/admin/erweitert',
+const AppBeitragIdRoute = AppBeitragIdRouteImport.update({
+  id: '/beitrag/$id',
+  path: '/beitrag/$id',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
-  id: '/api/rpc/$',
-  path: '/api/rpc/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPortalLogoutRoute = ApiPortalLogoutRouteImport.update({
-  id: '/api/portal/logout',
-  path: '/api/portal/logout',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiFilesIdRoute = ApiFilesIdRouteImport.update({
-  id: '/api/files/$id',
-  path: '/api/files/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCronSnapshotsRoute = ApiCronSnapshotsRouteImport.update({
-  id: '/api/cron/snapshots',
-  path: '/api/cron/snapshots',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBrandingManifestRoute = ApiBrandingManifestRouteImport.update({
-  id: '/api/branding/manifest',
-  path: '/api/branding/manifest',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBrandingIconRoute = ApiBrandingIconRouteImport.update({
-  id: '/api/branding/icon',
-  path: '/api/branding/icon',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAttachmentsUploadIdRoute = ApiAttachmentsUploadIdRouteImport.update({
-  id: '/api/attachments-upload/$id',
-  path: '/api/attachments-upload/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AntragUploadTokenRoute = AntragUploadTokenRouteImport.update({
-  id: '/upload/$token',
-  path: '/upload/$token',
-  getParentRoute: () => AntragRouteRoute,
-} as any)
-const AppForderungenMahnungenIndexRoute =
-  AppForderungenMahnungenIndexRouteImport.update({
-    id: '/forderungen/mahnungen/',
-    path: '/forderungen/mahnungen/',
+const AppBeitragErneutEinziehenRoute =
+  AppBeitragErneutEinziehenRouteImport.update({
+    id: '/beitrag/erneut-einziehen',
+    path: '/beitrag/erneut-einziehen',
     getParentRoute: () => AppRouteRoute,
   } as any)
+const AppBeitragNeuRoute = AppBeitragNeuRouteImport.update({
+  id: '/beitrag/neu',
+  path: '/beitrag/neu',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBerichteIndexRoute = AppBerichteIndexRouteImport.update({
+  id: '/berichte/',
+  path: '/berichte/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBerichteAbteilungsStatistikRoute =
+  AppBerichteAbteilungsStatistikRouteImport.update({
+    id: '/berichte/abteilungs-statistik',
+    path: '/berichte/abteilungs-statistik',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppBerichteBestandserhebungRoute =
+  AppBerichteBestandserhebungRouteImport.update({
+    id: '/berichte/bestandserhebung',
+    path: '/berichte/bestandserhebung',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppBerichteEhrungenRoute = AppBerichteEhrungenRouteImport.update({
+  id: '/berichte/ehrungen',
+  path: '/berichte/ehrungen',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBerichteExportRoute = AppBerichteExportRouteImport.update({
+  id: '/berichte/export',
+  path: '/berichte/export',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBerichteFinanzenRoute = AppBerichteFinanzenRouteImport.update({
+  id: '/berichte/finanzen',
+  path: '/berichte/finanzen',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBerichteGeburtstageRoute = AppBerichteGeburtstageRouteImport.update({
+  id: '/berichte/geburtstage',
+  path: '/berichte/geburtstage',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppDsgvoIndexRoute = AppDsgvoIndexRouteImport.update({
+  id: '/dsgvo/',
+  path: '/dsgvo/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppDsgvoIdRoute = AppDsgvoIdRouteImport.update({
+  id: '/dsgvo/$id',
+  path: '/dsgvo/$id',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppEinstellungenAbteilungenRoute =
+  AppEinstellungenAbteilungenRouteImport.update({
+    id: '/einstellungen/abteilungen',
+    path: '/einstellungen/abteilungen',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppEinstellungenBeitragsartenRoute =
+  AppEinstellungenBeitragsartenRouteImport.update({
+    id: '/einstellungen/beitragsarten',
+    path: '/einstellungen/beitragsarten',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppEinstellungenBenutzerRoute =
+  AppEinstellungenBenutzerRouteImport.update({
+    id: '/einstellungen/benutzer',
+    path: '/einstellungen/benutzer',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppEinstellungenKiZugriffRoute =
+  AppEinstellungenKiZugriffRouteImport.update({
+    id: '/einstellungen/ki-zugriff',
+    path: '/einstellungen/ki-zugriff',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppEinstellungenSmtpRoute = AppEinstellungenSmtpRouteImport.update({
+  id: '/einstellungen/smtp',
+  path: '/einstellungen/smtp',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppEinstellungenVereinRoute = AppEinstellungenVereinRouteImport.update({
+  id: '/einstellungen/verein',
+  path: '/einstellungen/verein',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppEinstellungenVerschluesselungRoute =
+  AppEinstellungenVerschluesselungRouteImport.update({
+    id: '/einstellungen/verschluesselung',
+    path: '/einstellungen/verschluesselung',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppForderungenIndexRoute = AppForderungenIndexRouteImport.update({
+  id: '/forderungen/',
+  path: '/forderungen/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppForderungenRuecklaeuferRoute =
+  AppForderungenRuecklaeuferRouteImport.update({
+    id: '/forderungen/ruecklaeufer',
+    path: '/forderungen/ruecklaeufer',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppMitgliederIndexRoute = AppMitgliederIndexRouteImport.update({
+  id: '/mitglieder/',
+  path: '/mitglieder/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppMitgliederMitgliedsnummerRoute =
+  AppMitgliederMitgliedsnummerRouteImport.update({
+    id: '/mitglieder/$mitgliedsnummer',
+    path: '/mitglieder/$mitgliedsnummer',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppMitgliederNeuRoute = AppMitgliederNeuRouteImport.update({
+  id: '/mitglieder/neu',
+  path: '/mitglieder/neu',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const ApiPortalZugangTokenRoute = ApiPortalZugangTokenRouteImport.update({
+  id: '/api/portal/zugang/$token',
+  path: '/api/portal/zugang/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppForderungenKulanzIndexRoute =
   AppForderungenKulanzIndexRouteImport.update({
     id: '/forderungen/kulanz/',
     path: '/forderungen/kulanz/',
     getParentRoute: () => AppRouteRoute,
   } as any)
-const AppMitgliederMitgliedsnummerBearbeitenRoute =
-  AppMitgliederMitgliedsnummerBearbeitenRouteImport.update({
-    id: '/mitglieder/$mitgliedsnummer_/bearbeiten',
-    path: '/mitglieder/$mitgliedsnummer/bearbeiten',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppForderungenMahnungenNeuRoute =
-  AppForderungenMahnungenNeuRouteImport.update({
-    id: '/forderungen/mahnungen/neu',
-    path: '/forderungen/mahnungen/neu',
+const AppForderungenMahnungenIndexRoute =
+  AppForderungenMahnungenIndexRouteImport.update({
+    id: '/forderungen/mahnungen/',
+    path: '/forderungen/mahnungen/',
     getParentRoute: () => AppRouteRoute,
   } as any)
 const AppForderungenMahnungenIdRoute =
@@ -519,11 +512,18 @@ const AppForderungenMahnungenIdRoute =
     path: '/forderungen/mahnungen/$id',
     getParentRoute: () => AppRouteRoute,
   } as any)
-const ApiPortalZugangTokenRoute = ApiPortalZugangTokenRouteImport.update({
-  id: '/api/portal/zugang/$token',
-  path: '/api/portal/zugang/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
+const AppForderungenMahnungenNeuRoute =
+  AppForderungenMahnungenNeuRouteImport.update({
+    id: '/forderungen/mahnungen/neu',
+    path: '/forderungen/mahnungen/neu',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppMitgliederMitgliedsnummerBearbeitenRoute =
+  AppMitgliederMitgliedsnummerBearbeitenRouteImport.update({
+    id: '/mitglieder/$mitgliedsnummer_/bearbeiten',
+    path: '/mitglieder/$mitgliedsnummer/bearbeiten',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1061,81 +1061,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/setup': {
-      id: '/setup'
-      path: '/setup'
-      fullPath: '/setup'
-      preLoaderRoute: typeof SetupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/robots.txt': {
-      id: '/robots.txt'
-      path: '/robots.txt'
-      fullPath: '/robots.txt'
-      preLoaderRoute: typeof RobotsDottxtRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/passwort-zuruecksetzen': {
-      id: '/passwort-zuruecksetzen'
-      path: '/passwort-zuruecksetzen'
-      fullPath: '/passwort-zuruecksetzen'
-      preLoaderRoute: typeof PasswortZuruecksetzenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/passwort-vergessen': {
-      id: '/passwort-vergessen'
-      path: '/passwort-vergessen'
-      fullPath: '/passwort-vergessen'
-      preLoaderRoute: typeof PasswortVergessenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/impressum': {
-      id: '/impressum'
-      path: '/impressum'
-      fullPath: '/impressum'
-      preLoaderRoute: typeof ImpressumRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/datenschutz': {
-      id: '/datenschutz'
-      path: '/datenschutz'
-      fullPath: '/datenschutz'
-      preLoaderRoute: typeof DatenschutzRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portal': {
-      id: '/portal'
-      path: '/portal'
-      fullPath: '/portal'
-      preLoaderRoute: typeof PortalRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/console': {
-      id: '/console'
-      path: '/console'
-      fullPath: '/console'
-      preLoaderRoute: typeof ConsoleRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/app': {
-      id: '/app'
-      path: '/app'
-      fullPath: '/app'
-      preLoaderRoute: typeof AppRouteRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/antrag': {
@@ -1145,165 +1075,88 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AntragRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/portal/': {
-      id: '/portal/'
-      path: '/'
-      fullPath: '/portal/'
-      preLoaderRoute: typeof PortalIndexRouteImport
-      parentRoute: typeof PortalRouteRoute
+    '/console': {
+      id: '/console'
+      path: '/console'
+      fullPath: '/console'
+      preLoaderRoute: typeof ConsoleRouteRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/console/': {
-      id: '/console/'
-      path: '/'
-      fullPath: '/console/'
-      preLoaderRoute: typeof ConsoleIndexRouteImport
-      parentRoute: typeof ConsoleRouteRoute
+    '/datenschutz': {
+      id: '/datenschutz'
+      path: '/datenschutz'
+      fullPath: '/datenschutz'
+      preLoaderRoute: typeof DatenschutzRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/app/': {
-      id: '/app/'
-      path: '/'
-      fullPath: '/app/'
-      preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRouteRoute
+    '/impressum': {
+      id: '/impressum'
+      path: '/impressum'
+      fullPath: '/impressum'
+      preLoaderRoute: typeof ImpressumRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/passwort-vergessen': {
+      id: '/passwort-vergessen'
+      path: '/passwort-vergessen'
+      fullPath: '/passwort-vergessen'
+      preLoaderRoute: typeof PasswortVergessenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/passwort-zuruecksetzen': {
+      id: '/passwort-zuruecksetzen'
+      path: '/passwort-zuruecksetzen'
+      fullPath: '/passwort-zuruecksetzen'
+      preLoaderRoute: typeof PasswortZuruecksetzenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal': {
+      id: '/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof PortalRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/antrag/': {
       id: '/antrag/'
       path: '/'
       fullPath: '/antrag/'
       preLoaderRoute: typeof AntragIndexRouteImport
-      parentRoute: typeof AntragRouteRoute
-    }
-    '/portal/profil': {
-      id: '/portal/profil'
-      path: '/profil'
-      fullPath: '/portal/profil'
-      preLoaderRoute: typeof PortalProfilRouteImport
-      parentRoute: typeof PortalRouteRoute
-    }
-    '/portal/abgemeldet': {
-      id: '/portal/abgemeldet'
-      path: '/abgemeldet'
-      fullPath: '/portal/abgemeldet'
-      preLoaderRoute: typeof PortalAbgemeldetRouteImport
-      parentRoute: typeof PortalRouteRoute
-    }
-    '/portal/abgelaufen': {
-      id: '/portal/abgelaufen'
-      path: '/abgelaufen'
-      fullPath: '/portal/abgelaufen'
-      preLoaderRoute: typeof PortalAbgelaufenRouteImport
-      parentRoute: typeof PortalRouteRoute
-    }
-    '/invite/$token': {
-      id: '/invite/$token'
-      path: '/invite/$token'
-      fullPath: '/invite/$token'
-      preLoaderRoute: typeof InviteTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/app/zahlungsabgleich': {
-      id: '/app/zahlungsabgleich'
-      path: '/zahlungsabgleich'
-      fullPath: '/app/zahlungsabgleich'
-      preLoaderRoute: typeof AppZahlungsabgleichRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/wiedervorlagen': {
-      id: '/app/wiedervorlagen'
-      path: '/wiedervorlagen'
-      fullPath: '/app/wiedervorlagen'
-      preLoaderRoute: typeof AppWiedervorlagenRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/rundschreiben': {
-      id: '/app/rundschreiben'
-      path: '/rundschreiben'
-      fullPath: '/app/rundschreiben'
-      preLoaderRoute: typeof AppRundschreibenRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/portal-anfragen': {
-      id: '/app/portal-anfragen'
-      path: '/portal-anfragen'
-      fullPath: '/app/portal-anfragen'
-      preLoaderRoute: typeof AppPortalAnfragenRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/museum': {
-      id: '/app/museum'
-      path: '/museum'
-      fullPath: '/app/museum'
-      preLoaderRoute: typeof AppMuseumRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/import': {
-      id: '/app/import'
-      path: '/import'
-      fullPath: '/app/import'
-      preLoaderRoute: typeof AppImportRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/familien': {
-      id: '/app/familien'
-      path: '/familien'
-      fullPath: '/app/familien'
-      preLoaderRoute: typeof AppFamilienRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/dokumentation': {
-      id: '/app/dokumentation'
-      path: '/dokumentation'
-      fullPath: '/app/dokumentation'
-      preLoaderRoute: typeof AppDokumentationRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/datenqualitaet': {
-      id: '/app/datenqualitaet'
-      path: '/datenqualitaet'
-      fullPath: '/app/datenqualitaet'
-      preLoaderRoute: typeof AppDatenqualitaetRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/audit': {
-      id: '/app/audit'
-      path: '/audit'
-      fullPath: '/app/audit'
-      preLoaderRoute: typeof AppAuditRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/archive': {
-      id: '/app/archive'
-      path: '/archive'
-      fullPath: '/app/archive'
-      preLoaderRoute: typeof AppArchiveRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/api/mcp': {
-      id: '/api/mcp'
-      path: '/api/mcp'
-      fullPath: '/api/mcp'
-      preLoaderRoute: typeof ApiMcpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/health': {
-      id: '/api/health'
-      path: '/api/health'
-      fullPath: '/api/health'
-      preLoaderRoute: typeof ApiHealthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/antrag/status': {
-      id: '/antrag/status'
-      path: '/status'
-      fullPath: '/antrag/status'
-      preLoaderRoute: typeof AntragStatusRouteImport
       parentRoute: typeof AntragRouteRoute
     }
     '/antrag/papierformular': {
@@ -1313,270 +1166,165 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AntragPapierformularRouteImport
       parentRoute: typeof AntragRouteRoute
     }
-    '/app/mitglieder/': {
-      id: '/app/mitglieder/'
-      path: '/mitglieder'
-      fullPath: '/app/mitglieder/'
-      preLoaderRoute: typeof AppMitgliederIndexRouteImport
-      parentRoute: typeof AppRouteRoute
+    '/antrag/status': {
+      id: '/antrag/status'
+      path: '/status'
+      fullPath: '/antrag/status'
+      preLoaderRoute: typeof AntragStatusRouteImport
+      parentRoute: typeof AntragRouteRoute
     }
-    '/app/forderungen/': {
-      id: '/app/forderungen/'
-      path: '/forderungen'
-      fullPath: '/app/forderungen/'
-      preLoaderRoute: typeof AppForderungenIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/dsgvo/': {
-      id: '/app/dsgvo/'
-      path: '/dsgvo'
-      fullPath: '/app/dsgvo/'
-      preLoaderRoute: typeof AppDsgvoIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/berichte/': {
-      id: '/app/berichte/'
-      path: '/berichte'
-      fullPath: '/app/berichte/'
-      preLoaderRoute: typeof AppBerichteIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/beitrag/': {
-      id: '/app/beitrag/'
-      path: '/beitrag'
-      fullPath: '/app/beitrag/'
-      preLoaderRoute: typeof AppBeitragIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/antraege/': {
-      id: '/app/antraege/'
-      path: '/antraege'
-      fullPath: '/app/antraege/'
-      preLoaderRoute: typeof AppAntraegeIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/mitglieder/neu': {
-      id: '/app/mitglieder/neu'
-      path: '/mitglieder/neu'
-      fullPath: '/app/mitglieder/neu'
-      preLoaderRoute: typeof AppMitgliederNeuRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/mitglieder/$mitgliedsnummer': {
-      id: '/app/mitglieder/$mitgliedsnummer'
-      path: '/mitglieder/$mitgliedsnummer'
-      fullPath: '/app/mitglieder/$mitgliedsnummer'
-      preLoaderRoute: typeof AppMitgliederMitgliedsnummerRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/forderungen/ruecklaeufer': {
-      id: '/app/forderungen/ruecklaeufer'
-      path: '/forderungen/ruecklaeufer'
-      fullPath: '/app/forderungen/ruecklaeufer'
-      preLoaderRoute: typeof AppForderungenRuecklaeuferRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/einstellungen/verschluesselung': {
-      id: '/app/einstellungen/verschluesselung'
-      path: '/einstellungen/verschluesselung'
-      fullPath: '/app/einstellungen/verschluesselung'
-      preLoaderRoute: typeof AppEinstellungenVerschluesselungRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/einstellungen/verein': {
-      id: '/app/einstellungen/verein'
-      path: '/einstellungen/verein'
-      fullPath: '/app/einstellungen/verein'
-      preLoaderRoute: typeof AppEinstellungenVereinRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/einstellungen/smtp': {
-      id: '/app/einstellungen/smtp'
-      path: '/einstellungen/smtp'
-      fullPath: '/app/einstellungen/smtp'
-      preLoaderRoute: typeof AppEinstellungenSmtpRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/einstellungen/ki-zugriff': {
-      id: '/app/einstellungen/ki-zugriff'
-      path: '/einstellungen/ki-zugriff'
-      fullPath: '/app/einstellungen/ki-zugriff'
-      preLoaderRoute: typeof AppEinstellungenKiZugriffRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/einstellungen/benutzer': {
-      id: '/app/einstellungen/benutzer'
-      path: '/einstellungen/benutzer'
-      fullPath: '/app/einstellungen/benutzer'
-      preLoaderRoute: typeof AppEinstellungenBenutzerRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/einstellungen/beitragsarten': {
-      id: '/app/einstellungen/beitragsarten'
-      path: '/einstellungen/beitragsarten'
-      fullPath: '/app/einstellungen/beitragsarten'
-      preLoaderRoute: typeof AppEinstellungenBeitragsartenRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/einstellungen/abteilungen': {
-      id: '/app/einstellungen/abteilungen'
-      path: '/einstellungen/abteilungen'
-      fullPath: '/app/einstellungen/abteilungen'
-      preLoaderRoute: typeof AppEinstellungenAbteilungenRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/dsgvo/$id': {
-      id: '/app/dsgvo/$id'
-      path: '/dsgvo/$id'
-      fullPath: '/app/dsgvo/$id'
-      preLoaderRoute: typeof AppDsgvoIdRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/berichte/geburtstage': {
-      id: '/app/berichte/geburtstage'
-      path: '/berichte/geburtstage'
-      fullPath: '/app/berichte/geburtstage'
-      preLoaderRoute: typeof AppBerichteGeburtstageRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/berichte/finanzen': {
-      id: '/app/berichte/finanzen'
-      path: '/berichte/finanzen'
-      fullPath: '/app/berichte/finanzen'
-      preLoaderRoute: typeof AppBerichteFinanzenRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/berichte/export': {
-      id: '/app/berichte/export'
-      path: '/berichte/export'
-      fullPath: '/app/berichte/export'
-      preLoaderRoute: typeof AppBerichteExportRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/berichte/ehrungen': {
-      id: '/app/berichte/ehrungen'
-      path: '/berichte/ehrungen'
-      fullPath: '/app/berichte/ehrungen'
-      preLoaderRoute: typeof AppBerichteEhrungenRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/berichte/bestandserhebung': {
-      id: '/app/berichte/bestandserhebung'
-      path: '/berichte/bestandserhebung'
-      fullPath: '/app/berichte/bestandserhebung'
-      preLoaderRoute: typeof AppBerichteBestandserhebungRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/berichte/abteilungs-statistik': {
-      id: '/app/berichte/abteilungs-statistik'
-      path: '/berichte/abteilungs-statistik'
-      fullPath: '/app/berichte/abteilungs-statistik'
-      preLoaderRoute: typeof AppBerichteAbteilungsStatistikRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/beitrag/neu': {
-      id: '/app/beitrag/neu'
-      path: '/beitrag/neu'
-      fullPath: '/app/beitrag/neu'
-      preLoaderRoute: typeof AppBeitragNeuRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/beitrag/erneut-einziehen': {
-      id: '/app/beitrag/erneut-einziehen'
-      path: '/beitrag/erneut-einziehen'
-      fullPath: '/app/beitrag/erneut-einziehen'
-      preLoaderRoute: typeof AppBeitragErneutEinziehenRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/beitrag/$id': {
-      id: '/app/beitrag/$id'
-      path: '/beitrag/$id'
-      fullPath: '/app/beitrag/$id'
-      preLoaderRoute: typeof AppBeitragIdRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/antraege/$id': {
-      id: '/app/antraege/$id'
-      path: '/antraege/$id'
-      fullPath: '/app/antraege/$id'
-      preLoaderRoute: typeof AppAntraegeIdRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/admin/versandprotokoll': {
-      id: '/app/admin/versandprotokoll'
-      path: '/admin/versandprotokoll'
-      fullPath: '/app/admin/versandprotokoll'
-      preLoaderRoute: typeof AppAdminVersandprotokollRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/admin/snapshots': {
-      id: '/app/admin/snapshots'
-      path: '/admin/snapshots'
-      fullPath: '/app/admin/snapshots'
-      preLoaderRoute: typeof AppAdminSnapshotsRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/admin/sepa-pruefung': {
-      id: '/app/admin/sepa-pruefung'
-      path: '/admin/sepa-pruefung'
-      fullPath: '/app/admin/sepa-pruefung'
-      preLoaderRoute: typeof AppAdminSepaPruefungRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/admin/protokoll': {
-      id: '/app/admin/protokoll'
-      path: '/admin/protokoll'
-      fullPath: '/app/admin/protokoll'
-      preLoaderRoute: typeof AppAdminProtokollRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/admin/erweitert': {
-      id: '/app/admin/erweitert'
-      path: '/admin/erweitert'
-      fullPath: '/app/admin/erweitert'
-      preLoaderRoute: typeof AppAdminErweitertRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/api/rpc/$': {
-      id: '/api/rpc/$'
-      path: '/api/rpc/$'
-      fullPath: '/api/rpc/$'
-      preLoaderRoute: typeof ApiRpcSplatRouteImport
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/portal/logout': {
-      id: '/api/portal/logout'
-      path: '/api/portal/logout'
-      fullPath: '/api/portal/logout'
-      preLoaderRoute: typeof ApiPortalLogoutRouteImport
+    '/api/mcp': {
+      id: '/api/mcp'
+      path: '/api/mcp'
+      fullPath: '/api/mcp'
+      preLoaderRoute: typeof ApiMcpRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/files/$id': {
-      id: '/api/files/$id'
-      path: '/api/files/$id'
-      fullPath: '/api/files/$id'
-      preLoaderRoute: typeof ApiFilesIdRouteImport
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/archive': {
+      id: '/app/archive'
+      path: '/archive'
+      fullPath: '/app/archive'
+      preLoaderRoute: typeof AppArchiveRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/audit': {
+      id: '/app/audit'
+      path: '/audit'
+      fullPath: '/app/audit'
+      preLoaderRoute: typeof AppAuditRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/datenqualitaet': {
+      id: '/app/datenqualitaet'
+      path: '/datenqualitaet'
+      fullPath: '/app/datenqualitaet'
+      preLoaderRoute: typeof AppDatenqualitaetRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/dokumentation': {
+      id: '/app/dokumentation'
+      path: '/dokumentation'
+      fullPath: '/app/dokumentation'
+      preLoaderRoute: typeof AppDokumentationRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/familien': {
+      id: '/app/familien'
+      path: '/familien'
+      fullPath: '/app/familien'
+      preLoaderRoute: typeof AppFamilienRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/import': {
+      id: '/app/import'
+      path: '/import'
+      fullPath: '/app/import'
+      preLoaderRoute: typeof AppImportRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/museum': {
+      id: '/app/museum'
+      path: '/museum'
+      fullPath: '/app/museum'
+      preLoaderRoute: typeof AppMuseumRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/portal-anfragen': {
+      id: '/app/portal-anfragen'
+      path: '/portal-anfragen'
+      fullPath: '/app/portal-anfragen'
+      preLoaderRoute: typeof AppPortalAnfragenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/rundschreiben': {
+      id: '/app/rundschreiben'
+      path: '/rundschreiben'
+      fullPath: '/app/rundschreiben'
+      preLoaderRoute: typeof AppRundschreibenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/wiedervorlagen': {
+      id: '/app/wiedervorlagen'
+      path: '/wiedervorlagen'
+      fullPath: '/app/wiedervorlagen'
+      preLoaderRoute: typeof AppWiedervorlagenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/zahlungsabgleich': {
+      id: '/app/zahlungsabgleich'
+      path: '/zahlungsabgleich'
+      fullPath: '/app/zahlungsabgleich'
+      preLoaderRoute: typeof AppZahlungsabgleichRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/console/': {
+      id: '/console/'
+      path: '/'
+      fullPath: '/console/'
+      preLoaderRoute: typeof ConsoleIndexRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/cron/snapshots': {
-      id: '/api/cron/snapshots'
-      path: '/api/cron/snapshots'
-      fullPath: '/api/cron/snapshots'
-      preLoaderRoute: typeof ApiCronSnapshotsRouteImport
-      parentRoute: typeof rootRouteImport
+    '/portal/': {
+      id: '/portal/'
+      path: '/'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof PortalIndexRouteImport
+      parentRoute: typeof PortalRouteRoute
     }
-    '/api/branding/manifest': {
-      id: '/api/branding/manifest'
-      path: '/api/branding/manifest'
-      fullPath: '/api/branding/manifest'
-      preLoaderRoute: typeof ApiBrandingManifestRouteImport
-      parentRoute: typeof rootRouteImport
+    '/portal/abgelaufen': {
+      id: '/portal/abgelaufen'
+      path: '/abgelaufen'
+      fullPath: '/portal/abgelaufen'
+      preLoaderRoute: typeof PortalAbgelaufenRouteImport
+      parentRoute: typeof PortalRouteRoute
     }
-    '/api/branding/icon': {
-      id: '/api/branding/icon'
-      path: '/api/branding/icon'
-      fullPath: '/api/branding/icon'
-      preLoaderRoute: typeof ApiBrandingIconRouteImport
+    '/portal/abgemeldet': {
+      id: '/portal/abgemeldet'
+      path: '/abgemeldet'
+      fullPath: '/portal/abgemeldet'
+      preLoaderRoute: typeof PortalAbgemeldetRouteImport
+      parentRoute: typeof PortalRouteRoute
+    }
+    '/portal/profil': {
+      id: '/portal/profil'
+      path: '/profil'
+      fullPath: '/portal/profil'
+      preLoaderRoute: typeof PortalProfilRouteImport
+      parentRoute: typeof PortalRouteRoute
+    }
+    '/antrag/upload/$token': {
+      id: '/antrag/upload/$token'
+      path: '/upload/$token'
+      fullPath: '/antrag/upload/$token'
+      preLoaderRoute: typeof AntragUploadTokenRouteImport
+      parentRoute: typeof AntragRouteRoute
+    }
+    '/api/attachments-upload/$id': {
+      id: '/api/attachments-upload/$id'
+      path: '/api/attachments-upload/$id'
+      fullPath: '/api/attachments-upload/$id'
+      preLoaderRoute: typeof ApiAttachmentsUploadIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -1586,26 +1334,278 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/attachments-upload/$id': {
-      id: '/api/attachments-upload/$id'
-      path: '/api/attachments-upload/$id'
-      fullPath: '/api/attachments-upload/$id'
-      preLoaderRoute: typeof ApiAttachmentsUploadIdRouteImport
+    '/api/branding/icon': {
+      id: '/api/branding/icon'
+      path: '/api/branding/icon'
+      fullPath: '/api/branding/icon'
+      preLoaderRoute: typeof ApiBrandingIconRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/antrag/upload/$token': {
-      id: '/antrag/upload/$token'
-      path: '/upload/$token'
-      fullPath: '/antrag/upload/$token'
-      preLoaderRoute: typeof AntragUploadTokenRouteImport
-      parentRoute: typeof AntragRouteRoute
+    '/api/branding/manifest': {
+      id: '/api/branding/manifest'
+      path: '/api/branding/manifest'
+      fullPath: '/api/branding/manifest'
+      preLoaderRoute: typeof ApiBrandingManifestRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/app/forderungen/mahnungen/': {
-      id: '/app/forderungen/mahnungen/'
-      path: '/forderungen/mahnungen'
-      fullPath: '/app/forderungen/mahnungen/'
-      preLoaderRoute: typeof AppForderungenMahnungenIndexRouteImport
+    '/api/cron/snapshots': {
+      id: '/api/cron/snapshots'
+      path: '/api/cron/snapshots'
+      fullPath: '/api/cron/snapshots'
+      preLoaderRoute: typeof ApiCronSnapshotsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/files/$id': {
+      id: '/api/files/$id'
+      path: '/api/files/$id'
+      fullPath: '/api/files/$id'
+      preLoaderRoute: typeof ApiFilesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/portal/logout': {
+      id: '/api/portal/logout'
+      path: '/api/portal/logout'
+      fullPath: '/api/portal/logout'
+      preLoaderRoute: typeof ApiPortalLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rpc/$': {
+      id: '/api/rpc/$'
+      path: '/api/rpc/$'
+      fullPath: '/api/rpc/$'
+      preLoaderRoute: typeof ApiRpcSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/admin/erweitert': {
+      id: '/app/admin/erweitert'
+      path: '/admin/erweitert'
+      fullPath: '/app/admin/erweitert'
+      preLoaderRoute: typeof AppAdminErweitertRouteImport
       parentRoute: typeof AppRouteRoute
+    }
+    '/app/admin/protokoll': {
+      id: '/app/admin/protokoll'
+      path: '/admin/protokoll'
+      fullPath: '/app/admin/protokoll'
+      preLoaderRoute: typeof AppAdminProtokollRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/admin/sepa-pruefung': {
+      id: '/app/admin/sepa-pruefung'
+      path: '/admin/sepa-pruefung'
+      fullPath: '/app/admin/sepa-pruefung'
+      preLoaderRoute: typeof AppAdminSepaPruefungRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/admin/snapshots': {
+      id: '/app/admin/snapshots'
+      path: '/admin/snapshots'
+      fullPath: '/app/admin/snapshots'
+      preLoaderRoute: typeof AppAdminSnapshotsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/admin/versandprotokoll': {
+      id: '/app/admin/versandprotokoll'
+      path: '/admin/versandprotokoll'
+      fullPath: '/app/admin/versandprotokoll'
+      preLoaderRoute: typeof AppAdminVersandprotokollRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/antraege/': {
+      id: '/app/antraege/'
+      path: '/antraege'
+      fullPath: '/app/antraege/'
+      preLoaderRoute: typeof AppAntraegeIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/antraege/$id': {
+      id: '/app/antraege/$id'
+      path: '/antraege/$id'
+      fullPath: '/app/antraege/$id'
+      preLoaderRoute: typeof AppAntraegeIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/beitrag/': {
+      id: '/app/beitrag/'
+      path: '/beitrag'
+      fullPath: '/app/beitrag/'
+      preLoaderRoute: typeof AppBeitragIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/beitrag/$id': {
+      id: '/app/beitrag/$id'
+      path: '/beitrag/$id'
+      fullPath: '/app/beitrag/$id'
+      preLoaderRoute: typeof AppBeitragIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/beitrag/erneut-einziehen': {
+      id: '/app/beitrag/erneut-einziehen'
+      path: '/beitrag/erneut-einziehen'
+      fullPath: '/app/beitrag/erneut-einziehen'
+      preLoaderRoute: typeof AppBeitragErneutEinziehenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/beitrag/neu': {
+      id: '/app/beitrag/neu'
+      path: '/beitrag/neu'
+      fullPath: '/app/beitrag/neu'
+      preLoaderRoute: typeof AppBeitragNeuRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/': {
+      id: '/app/berichte/'
+      path: '/berichte'
+      fullPath: '/app/berichte/'
+      preLoaderRoute: typeof AppBerichteIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/abteilungs-statistik': {
+      id: '/app/berichte/abteilungs-statistik'
+      path: '/berichte/abteilungs-statistik'
+      fullPath: '/app/berichte/abteilungs-statistik'
+      preLoaderRoute: typeof AppBerichteAbteilungsStatistikRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/bestandserhebung': {
+      id: '/app/berichte/bestandserhebung'
+      path: '/berichte/bestandserhebung'
+      fullPath: '/app/berichte/bestandserhebung'
+      preLoaderRoute: typeof AppBerichteBestandserhebungRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/ehrungen': {
+      id: '/app/berichte/ehrungen'
+      path: '/berichte/ehrungen'
+      fullPath: '/app/berichte/ehrungen'
+      preLoaderRoute: typeof AppBerichteEhrungenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/export': {
+      id: '/app/berichte/export'
+      path: '/berichte/export'
+      fullPath: '/app/berichte/export'
+      preLoaderRoute: typeof AppBerichteExportRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/finanzen': {
+      id: '/app/berichte/finanzen'
+      path: '/berichte/finanzen'
+      fullPath: '/app/berichte/finanzen'
+      preLoaderRoute: typeof AppBerichteFinanzenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/berichte/geburtstage': {
+      id: '/app/berichte/geburtstage'
+      path: '/berichte/geburtstage'
+      fullPath: '/app/berichte/geburtstage'
+      preLoaderRoute: typeof AppBerichteGeburtstageRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/dsgvo/': {
+      id: '/app/dsgvo/'
+      path: '/dsgvo'
+      fullPath: '/app/dsgvo/'
+      preLoaderRoute: typeof AppDsgvoIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/dsgvo/$id': {
+      id: '/app/dsgvo/$id'
+      path: '/dsgvo/$id'
+      fullPath: '/app/dsgvo/$id'
+      preLoaderRoute: typeof AppDsgvoIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/abteilungen': {
+      id: '/app/einstellungen/abteilungen'
+      path: '/einstellungen/abteilungen'
+      fullPath: '/app/einstellungen/abteilungen'
+      preLoaderRoute: typeof AppEinstellungenAbteilungenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/beitragsarten': {
+      id: '/app/einstellungen/beitragsarten'
+      path: '/einstellungen/beitragsarten'
+      fullPath: '/app/einstellungen/beitragsarten'
+      preLoaderRoute: typeof AppEinstellungenBeitragsartenRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/benutzer': {
+      id: '/app/einstellungen/benutzer'
+      path: '/einstellungen/benutzer'
+      fullPath: '/app/einstellungen/benutzer'
+      preLoaderRoute: typeof AppEinstellungenBenutzerRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/ki-zugriff': {
+      id: '/app/einstellungen/ki-zugriff'
+      path: '/einstellungen/ki-zugriff'
+      fullPath: '/app/einstellungen/ki-zugriff'
+      preLoaderRoute: typeof AppEinstellungenKiZugriffRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/smtp': {
+      id: '/app/einstellungen/smtp'
+      path: '/einstellungen/smtp'
+      fullPath: '/app/einstellungen/smtp'
+      preLoaderRoute: typeof AppEinstellungenSmtpRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/verein': {
+      id: '/app/einstellungen/verein'
+      path: '/einstellungen/verein'
+      fullPath: '/app/einstellungen/verein'
+      preLoaderRoute: typeof AppEinstellungenVereinRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/einstellungen/verschluesselung': {
+      id: '/app/einstellungen/verschluesselung'
+      path: '/einstellungen/verschluesselung'
+      fullPath: '/app/einstellungen/verschluesselung'
+      preLoaderRoute: typeof AppEinstellungenVerschluesselungRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/forderungen/': {
+      id: '/app/forderungen/'
+      path: '/forderungen'
+      fullPath: '/app/forderungen/'
+      preLoaderRoute: typeof AppForderungenIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/forderungen/ruecklaeufer': {
+      id: '/app/forderungen/ruecklaeufer'
+      path: '/forderungen/ruecklaeufer'
+      fullPath: '/app/forderungen/ruecklaeufer'
+      preLoaderRoute: typeof AppForderungenRuecklaeuferRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/mitglieder/': {
+      id: '/app/mitglieder/'
+      path: '/mitglieder'
+      fullPath: '/app/mitglieder/'
+      preLoaderRoute: typeof AppMitgliederIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/mitglieder/$mitgliedsnummer': {
+      id: '/app/mitglieder/$mitgliedsnummer'
+      path: '/mitglieder/$mitgliedsnummer'
+      fullPath: '/app/mitglieder/$mitgliedsnummer'
+      preLoaderRoute: typeof AppMitgliederMitgliedsnummerRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/mitglieder/neu': {
+      id: '/app/mitglieder/neu'
+      path: '/mitglieder/neu'
+      fullPath: '/app/mitglieder/neu'
+      preLoaderRoute: typeof AppMitgliederNeuRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/api/portal/zugang/$token': {
+      id: '/api/portal/zugang/$token'
+      path: '/api/portal/zugang/$token'
+      fullPath: '/api/portal/zugang/$token'
+      preLoaderRoute: typeof ApiPortalZugangTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/app/forderungen/kulanz/': {
       id: '/app/forderungen/kulanz/'
@@ -1614,18 +1614,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppForderungenKulanzIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/app/mitglieder/$mitgliedsnummer_/bearbeiten': {
-      id: '/app/mitglieder/$mitgliedsnummer_/bearbeiten'
-      path: '/mitglieder/$mitgliedsnummer/bearbeiten'
-      fullPath: '/app/mitglieder/$mitgliedsnummer/bearbeiten'
-      preLoaderRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/forderungen/mahnungen/neu': {
-      id: '/app/forderungen/mahnungen/neu'
-      path: '/forderungen/mahnungen/neu'
-      fullPath: '/app/forderungen/mahnungen/neu'
-      preLoaderRoute: typeof AppForderungenMahnungenNeuRouteImport
+    '/app/forderungen/mahnungen/': {
+      id: '/app/forderungen/mahnungen/'
+      path: '/forderungen/mahnungen'
+      fullPath: '/app/forderungen/mahnungen/'
+      preLoaderRoute: typeof AppForderungenMahnungenIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/forderungen/mahnungen/$id': {
@@ -1635,12 +1628,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppForderungenMahnungenIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/api/portal/zugang/$token': {
-      id: '/api/portal/zugang/$token'
-      path: '/api/portal/zugang/$token'
-      fullPath: '/api/portal/zugang/$token'
-      preLoaderRoute: typeof ApiPortalZugangTokenRouteImport
-      parentRoute: typeof rootRouteImport
+    '/app/forderungen/mahnungen/neu': {
+      id: '/app/forderungen/mahnungen/neu'
+      path: '/forderungen/mahnungen/neu'
+      fullPath: '/app/forderungen/mahnungen/neu'
+      preLoaderRoute: typeof AppForderungenMahnungenNeuRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/mitglieder/$mitgliedsnummer_/bearbeiten': {
+      id: '/app/mitglieder/$mitgliedsnummer_/bearbeiten'
+      path: '/mitglieder/$mitgliedsnummer/bearbeiten'
+      fullPath: '/app/mitglieder/$mitgliedsnummer/bearbeiten'
+      preLoaderRoute: typeof AppMitgliederMitgliedsnummerBearbeitenRouteImport
+      parentRoute: typeof AppRouteRoute
     }
   }
 }

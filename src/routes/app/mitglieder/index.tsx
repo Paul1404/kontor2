@@ -3,12 +3,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   type Column,
   type ColumnDef,
+  columnVisibilityFeature,
   flexRender,
-  getCoreRowModel,
   type PaginationState,
   type RowSelectionState,
+  rowPaginationFeature,
+  rowSelectionFeature,
+  rowSortingFeature,
   type SortingState,
-  useReactTable,
+  tableFeatures,
+  useTable,
 } from "@tanstack/react-table";
 import {
   AlertTriangle,
@@ -78,6 +82,13 @@ type MemberRow = {
   deletedAt: string | Date | null;
   hatAktiveAbteilung: boolean;
 };
+
+const memberTableFeatures = tableFeatures({
+  columnVisibilityFeature,
+  rowPaginationFeature,
+  rowSelectionFeature,
+  rowSortingFeature,
+});
 
 type MembersSearch = {
   q: string;
@@ -439,7 +450,7 @@ function MembersListPage() {
     () => ({ pageIndex: search.page - 1, pageSize }),
     [search.page, pageSize],
   );
-  const columns = useMemo<ColumnDef<MemberRow>[]>(
+  const columns = useMemo<ColumnDef<typeof memberTableFeatures, MemberRow>[]>(
     () => [
       ...(canEdit
         ? [
@@ -450,7 +461,9 @@ function MembersListPage() {
                 <TableSelectionCheckbox
                   ariaLabel="Alle auf dieser Seite auswählen"
                   checked={table.getIsAllPageRowsSelected()}
-                  indeterminate={table.getIsSomePageRowsSelected()}
+                  indeterminate={
+                    table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()
+                  }
                   onChange={() => {
                     table.toggleAllPageRowsSelected();
                     anchorRef.current = null;
@@ -467,7 +480,7 @@ function MembersListPage() {
                   />
                 );
               },
-            } satisfies ColumnDef<MemberRow>,
+            } satisfies ColumnDef<typeof memberTableFeatures, MemberRow>,
           ]
         : []),
       {
@@ -552,11 +565,11 @@ function MembersListPage() {
     ],
     [canEdit, toggleRow],
   );
-  const table = useReactTable({
+  const table = useTable({
+    features: memberTableFeatures,
     data: rows,
     columns,
     state: { sorting, pagination, rowSelection },
-    getCoreRowModel: getCoreRowModel(),
     getRowId: (row) => row.id,
     enableRowSelection: canEdit,
     manualSorting: true,
@@ -1101,7 +1114,7 @@ function MembersListPage() {
           <span className="text-muted-foreground">{list.data?.total ?? 0} Einträge</span>
           <div className="flex items-center gap-4">
             <PageSizeSelect
-              value={table.getState().pagination.pageSize}
+              value={table.state.pagination.pageSize}
               onChange={(size) => table.setPageSize(size)}
             />
             <div className="flex items-center gap-2">
@@ -1115,7 +1128,7 @@ function MembersListPage() {
                 <ChevronLeft className="size-3.5" /> Zurück
               </Button>
               <span className="text-muted-foreground">
-                Seite {table.getState().pagination.pageIndex + 1}
+                Seite {table.state.pagination.pageIndex + 1}
               </span>
               <Button
                 type="button"
@@ -1232,7 +1245,13 @@ function MemberStatsStrip({
   );
 }
 
-function SortableHeader({ column, label }: { column: Column<MemberRow>; label: string }) {
+function SortableHeader({
+  column,
+  label,
+}: {
+  column: Column<typeof memberTableFeatures, MemberRow, unknown>;
+  label: string;
+}) {
   const sorted = column.getIsSorted();
   const Icon = !sorted ? ArrowUpDown : sorted === "asc" ? ArrowUp : ArrowDown;
   return (

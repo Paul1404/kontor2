@@ -35,13 +35,11 @@ describe("isPublicProductPath", () => {
     "/sitemap.xml",
     "/api/health",
   ])("allows %s on the product host", (pathname) =>
-    expect(isPublicProductPath(pathname)).toBe(true));
+    expect(isPublicProductPath(pathname)).toBe(true),
+  );
 
-  it.each([
-    "/app",
-    "/login",
-    "/console",
-    "/antrag",
-  ])("keeps %s away from the product host", (pathname) =>
-    expect(isPublicProductPath(pathname)).toBe(false));
+  it.each(["/app", "/login", "/console", "/antrag"])(
+    "keeps %s away from the product host",
+    (pathname) => expect(isPublicProductPath(pathname)).toBe(false),
+  );
 });

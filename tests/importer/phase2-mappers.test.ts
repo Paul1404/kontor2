@@ -128,7 +128,8 @@ describe("mapMgartDatRow", () => {
       betrag: "54",
       prozent: "0",
     });
-    expect((row?.datum as Date).toISOString().slice(0, 10)).toBe("2018-01-01");
+    if (!row) throw new Error("Expected the historical row to be mapped");
+    expect((row.datum as Date).toISOString().slice(0, 10)).toBe("2018-01-01");
   });
 });
 

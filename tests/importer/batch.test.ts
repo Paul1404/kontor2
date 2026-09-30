@@ -36,8 +36,13 @@ describe("chunkedWrite", () => {
     // 1, 2, 4 succeed individually; only 3 is reported.
     expect(written).toBe(3);
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError.mock.calls[0]?.[0]).toBe(3);
-    expect((onError.mock.calls[0]?.[1] as Error).message).toBe("bad row 3");
+    const errorCall = onError.mock.calls[0];
+    expect(errorCall).toBeDefined();
+    if (!errorCall) throw new Error("Expected the failed row to be reported");
+    const [rowIndex, error] = errorCall;
+    expect(rowIndex).toBe(3);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toBe("bad row 3");
   });
 
   it("only retries the failing chunk row-by-row, not the healthy ones", async () => {
