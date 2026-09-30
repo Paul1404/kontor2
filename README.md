@@ -1,17 +1,30 @@
 # Kontor2
 
-Self-hosted, multi-tenant Vereinsverwaltung. It began as a replacement for one
-club's commercial Linear "Online Vereinsverwaltung", a per-seat cloud
-subscription advertised at 292,80 € a year, and grew into a single web app that
-many clubs can run and own outright. The original Linear database was migrated
-losslessly, not re-keyed by hand.
+A self-hosted, multi-tenant back office for German clubs. Kontor2 brings
+members, families, contributions, SEPA direct debits, invoices, correspondence,
+privacy workflows, and audit history into one application with a German UI.
 
-One app runs the entire back office: members and families, contributions and
-SEPA direct debit, open items and a dunning workflow, SEPA returns, invoices,
-honours, mass mailings, a member self-service portal, DSGVO tooling, a data
-quality cockpit, reports, snapshots and a full audit trail. There is even a
-built-in MCP endpoint so an AI assistant can read the books. Internal admin
-tool, German UI, React 19 on Bun.
+It began with the migration of a club's existing Linear database. Historical
+records remain part of the application, alongside member self-service,
+data-quality checks, snapshots, and a role-limited MCP endpoint.
+
+**Source availability:** public repository, proprietary software. Deployment
+and use require the owner's written permission. See [LICENSE](LICENSE).
+
+![Kontor2 member management with fictional club members](docs/screenshots/members.png)
+
+Screenshots show the real application running locally with synthetic demo data.
+They contain no production member records or bank details.
+
+<details>
+<summary>Membership overview</summary>
+
+![Kontor2 membership overview with synthetic demographics](docs/screenshots/overview.png)
+
+</details>
+
+[Features](#at-a-glance) · [Engineering](#technical-feats) ·
+[Local setup](#run-locally) · [License](#license)
 
 ## Why this exists
 

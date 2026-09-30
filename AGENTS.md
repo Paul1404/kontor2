@@ -189,6 +189,10 @@ changelog stuck at 0.4.0 while many features shipped.
 
 ## Maintaining this file
 
+Public screenshots belong in `docs/screenshots/` and must use an isolated
+demo instance with synthetic members and financial data. Label them as demo
+data in the README; never publish production records or credentials.
+
 Update this file when verified repository behavior changes. Keep it concise and
 move detailed explanations to `docs/`. Keep `CLAUDE.md` as the compatibility
 import unless Claude-specific guidance is genuinely required.
