@@ -13,8 +13,9 @@ and use require the owner's written permission. See [LICENSE](LICENSE).
 
 ![Kontor2 member management with fictional club members](docs/screenshots/members.png)
 
-Screenshots show the real application running locally with synthetic demo data.
-They contain no production member records or bank details.
+Screenshots show the real application running locally with 550 fictional club
+members. The demo illustrates a club-sized register and contains no production
+member records or bank details.
 
 <details>
 <summary>Membership overview</summary>
