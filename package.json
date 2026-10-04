@@ -70,7 +70,7 @@
     "exceljs": "^4.4.0",
     "imapflow": "^1.6.5",
     "ioredis": "^5.11.1",
-    "lucide-react": "^1.21.0",
+    "lucide-react": "^1.49.0",
     "mailparser": "^3.9.14",
     "nodemailer": "^9.0.1",
     "postgres": "^3.4.9",
