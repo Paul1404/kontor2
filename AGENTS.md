@@ -45,6 +45,13 @@ on Railway via Dockerfile.
   The `svums_push` values in the `audit_source` and `import_source` enums are
   kept for historical rows; nothing writes them and no code should read them
   as an active path.
+- Application approval supports per-person `personLinks` (`primary`, `partner`,
+  `child:N`, `guardian`). Duplicate candidates are grouped by that same inventory.
+  Keep linked records and new records in application order for references and
+  notifications. Reuse a compatible active family; conflicting families, roles
+  or representatives must abort the whole transaction instead of moving people.
+  Linked contacts who join become members on the same record; a contact used only
+  as guardian/payer stays a contact. A conflicting payer IBAN blocks approval.
 - A "member" row can be a real member (`mitglnr` set) or a legacy payer/contact
   with only an `adrNr`. Code paths fall back from `mitglnr` to `adrNr`.
 - Money is summed in integer cents (`sumDecimal`) to avoid float drift. Keep it

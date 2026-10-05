@@ -21,7 +21,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Badge } from "~/components/ui/badge";
+import { ApplicationPersonLinks } from "~/components/antrag/person-links";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
@@ -149,8 +149,13 @@ function AntragDetailPage() {
 
   const [art, setArt] = useState<number | "">("");
   const [betrag, setBetrag] = useState("");
-  // Dedup gate: member id to link to instead of creating new (einzel only).
-  const [linkTo, setLinkTo] = useState<string | null>(null);
+  const [personLinks, setPersonLinks] = useState<Record<string, string>>({});
+  const linkTo = personLinks.primary ?? null;
+  // Route changes must discard selections from the previous application.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset is keyed by the application route
+  useEffect(() => {
+    setPersonLinks({});
+  }, [id]);
   const [declineReason, setDeclineReason] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const selectedFeeType =
@@ -204,7 +209,10 @@ function AntragDetailPage() {
         id,
         art: art === "" ? null : Number(art),
         betrag: betrag.trim() || null,
-        linkToMemberId: linkTo,
+        personLinks: Object.entries(personLinks).map(([personKey, memberId]) => ({
+          personKey,
+          memberId,
+        })),
       }),
     onSuccess: (res) => {
       setMsg(
@@ -688,75 +696,37 @@ function AntragDetailPage() {
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <p className="text-sm text-muted-foreground">
-                Legt ein Mitglied an (bei Familie inklusive Partner und Kindern) und übernimmt die
-                Bankverbindung als SEPA-Mandat. Optional wird ein Beitragsvertrag erstellt.
+                Übernimmt die Personen aus dem Antrag. Bestehende Datensätze können einzeln
+                verknüpft werden. Bankverbindung und Beitragsvertrag werden bei Bedarf ergänzt.
               </p>
 
               {dupes.isLoading ? (
                 <p className="text-sm text-muted-foreground">Prüfe auf mögliche Dubletten…</p>
-              ) : dupes.data && dupes.data.candidates.length > 0 ? (
-                <div className="flex flex-col gap-2 rounded-lg border border-amber-300/60 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
-                  <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300">
-                    <AlertTriangle className="size-4" />
-                    Mögliche Dubletten gefunden ({dupes.data.candidates.length})
-                  </div>
-                  <p className="text-xs text-amber-800/80 dark:text-amber-300/80">
-                    Bitte prüfen: neues Mitglied anlegen oder mit einem bestehenden verknüpfen. Bei
-                    Familien- und Kinderanträgen wird der Hauptantragsteller verknüpft, die übrigen
-                    Personen werden neu angelegt.
-                  </p>
-                  <div className="flex flex-col gap-1">
-                    {dupes.data.candidates.map((c) => {
-                      const selected = linkTo === c.id && c.kind === "member";
-                      const linkable = c.kind === "member";
-                      return (
-                        <div
-                          key={`${c.kind}-${c.id}`}
-                          className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-card px-2 py-1.5 text-sm"
-                        >
-                          <Badge variant={c.kind === "member" ? "secondary" : "outline"}>
-                            {c.kind === "member"
-                              ? (c.memberNo ?? c.kontaktNo ?? "Mitglied")
-                              : "Antrag"}
-                          </Badge>
-                          <span className="font-medium">{c.name || "—"}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {[c.geburtsdatum, c.ort].filter(Boolean).join(" · ")}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {c.reasons.join(", ")}
-                          </span>
-                          {linkable ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={selected ? "default" : "outline"}
-                              className="ml-auto"
-                              onClick={() => setLinkTo(selected ? null : c.id)}
-                            >
-                              {selected ? "Verknüpft" : "Verknüpfen"}
-                            </Button>
-                          ) : c.kind === "application" ? (
-                            <Link
-                              to="/app/antraege/$id"
-                              params={{ id: c.id }}
-                              className="ml-auto text-xs text-primary hover:underline"
-                            >
-                              Antrag öffnen
-                            </Link>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {linkTo ? (
-                    <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
-                      Beim Genehmigen wird kein neues Mitglied angelegt, sondern das gewählte
-                      bestehende aktualisiert (fehlende Daten, Vertrag und Mandat falls nötig,
-                      Antrag verknüpft).
-                    </p>
-                  ) : null}
-                </div>
+              ) : dupes.isError ? (
+                <QueryError error={dupes.error} onRetry={() => dupes.refetch()} />
+              ) : dupes.data ? (
+                <ApplicationPersonLinks
+                  people={dupes.data.people}
+                  personLinks={personLinks}
+                  disabled={approve.isPending}
+                  onChange={(key, memberId) =>
+                    setPersonLinks((current) => {
+                      const next = { ...current };
+                      if (memberId) next[key] = memberId;
+                      else delete next[key];
+                      return next;
+                    })
+                  }
+                  renderApplicationLink={(applicationId) => (
+                    <Link
+                      to="/app/antraege/$id"
+                      params={{ id: applicationId }}
+                      className="ml-auto text-xs text-primary hover:underline"
+                    >
+                      Antrag öffnen
+                    </Link>
+                  )}
+                />
               ) : null}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Label className="flex flex-col gap-1.5">
@@ -801,7 +771,7 @@ function AntragDetailPage() {
               <Button
                 type="button"
                 className="self-start"
-                disabled={approve.isPending}
+                disabled={approve.isPending || dupes.isPending || dupes.isError}
                 onClick={() => {
                   setMsg(null);
                   approve.mutate();
@@ -812,7 +782,9 @@ function AntragDetailPage() {
                 ) : (
                   <CheckCircle2 className="size-4" />
                 )}
-                {linkTo ? "Genehmigen und verknüpfen" : "Genehmigen und Mitglied anlegen"}
+                {Object.keys(personLinks).length
+                  ? "Genehmigen und verknüpfen"
+                  : "Genehmigen und Mitglieder anlegen"}
               </Button>
             </CardContent>
           </Card>

@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.1.1",
+    date: "2026-10-05",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Bei der Antragsgenehmigung können Antragsteller, Partner, Kinder und Erziehungsberechtigte einzeln mit bestehenden Datensätzen verknüpft werden. Bestehende Familien werden weiterverwendet.",
+      },
+    ],
+  },
+  {
     version: "3.1.0",
     date: "2026-09-13",
     changes: [

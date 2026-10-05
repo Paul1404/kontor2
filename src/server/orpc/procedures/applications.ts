@@ -70,8 +70,12 @@ import {
 } from "~/server/domain/application/antragstyp";
 import { divergentKontoinhaber } from "~/server/domain/application/payer";
 import { resolveApplicationFee } from "~/server/domain/application/resolve-fee";
-import { findDuplicateCandidates } from "~/server/domain/member/duplicate-detection";
+import {
+  type DuplicateSignalInput,
+  findDuplicateCandidates,
+} from "~/server/domain/member/duplicate-detection";
 import { type OnboardContractValues, onboardMember } from "~/server/domain/member/onboard";
+import { generateMemberNumber } from "~/server/domain/member-number";
 import { lookupBankByIban } from "~/server/lib/blz";
 import { toCsv } from "~/server/lib/csv";
 import { logger } from "~/server/lib/logger";
@@ -395,6 +399,76 @@ function applicationGuardianName(app: MembershipApplication, ibanPlain: string |
   return { vorname: "", nachname: "" };
 }
 
+type ApplicationPersonLink = { personKey: string; memberId: string };
+
+function applicationPeople(app: MembershipApplication) {
+  const people: (DuplicateSignalInput & { key: string; label: string })[] = [
+    {
+      key: "primary",
+      label: app.antragstyp === "familie" ? "Antragsteller und Zahler" : "Antragsteller",
+      vorname: app.vorname,
+      nachname: app.nachname,
+      geburtsdatum: app.geburtsdatum,
+      iban: app.antragstyp === "kind" ? null : app.iban,
+      email: app.email,
+      plz: app.plz,
+    },
+  ];
+  if (app.antragstyp === "kind") {
+    const guardian = applicationGuardianName(app, app.iban);
+    if (guardian.vorname || guardian.nachname)
+      people.push({
+        key: "guardian",
+        label: "Erziehungsberechtigter und Zahler",
+        ...guardian,
+        geburtsdatum: null,
+        iban: app.iban,
+        email: null,
+        plz: app.plz,
+      });
+  }
+  if (app.antragstyp === "familie") {
+    if (app.partnerVorname && app.partnerNachname)
+      people.push({
+        key: "partner",
+        label: "Partner",
+        vorname: app.partnerVorname,
+        nachname: app.partnerNachname,
+        geburtsdatum: app.partnerGeburtsdatum,
+        iban: null,
+        email: null,
+        plz: app.plz,
+      });
+    for (const [index, child] of (app.kinder ?? []).entries())
+      people.push({
+        key: `child:${index}`,
+        label: `Kind ${index + 1}`,
+        vorname: child.vorname,
+        nachname: child.nachname,
+        geburtsdatum: child.geburtsdatum ? parseISODate(child.geburtsdatum) : null,
+        iban: null,
+        email: null,
+        plz: app.plz,
+      });
+  }
+  return people;
+}
+
+function validatePersonLinks(app: MembershipApplication, links: ApplicationPersonLink[]) {
+  const keys = new Set(applicationPeople(app).map((person) => person.key));
+  const usedKeys = new Set<string>();
+  const usedIds = new Set<string>();
+  for (const link of links) {
+    if (!keys.has(link.personKey) || usedKeys.has(link.personKey) || usedIds.has(link.memberId)) {
+      throw new ORPCError("VALIDATION_FAILED", {
+        message: "Jede Person darf nur einmal mit einem bestehenden Datensatz verknüpft werden.",
+      });
+    }
+    usedKeys.add(link.personKey);
+    usedIds.add(link.memberId);
+  }
+}
+
 /** Validate the Vorstand's contract choice against the current Beitragsarten
  * and turn the optional German decimal input into a database-safe value. */
 async function resolveApprovalContract(
@@ -458,18 +532,220 @@ async function resolveApprovalContract(
   };
 }
 
+/** Reuse a record without replacing established data, contracts or mandates. */
+async function linkApplicationPerson(
+  tx: DBOrTx,
+  opts: {
+    app: Omit<MembershipApplication, "geburtsdatum"> & { geburtsdatum: Date | null };
+    memberId: string;
+    isKontakt?: boolean;
+    contract: OnboardContractValues | null;
+    actorId: string;
+    actorEmail: string;
+    requestId: string | null;
+  },
+) {
+  const { app } = opts;
+  const ibanPlain = app.iban?.trim() || null;
+  const isMinor = app.antragstyp === "kind";
+  const today = new Date().toISOString().slice(0, 10);
+  const isPlaceholderDob = (d: Date | string | null) =>
+    !d || (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10).endsWith("-01-01");
+  const [member] = await tx
+    .select()
+    .from(membersTable)
+    .where(and(eq(membersTable.id, opts.memberId), isNull(membersTable.deletedAt)))
+    .limit(1)
+    .for("update");
+  if (!member) {
+    throw new ORPCError("NOT_FOUND", { message: "Verknüpftes Mitglied nicht gefunden." });
+  }
+
+  // Enrich only missing / placeholder fields; never overwrite good data.
+  const patch: Record<string, unknown> = {};
+  const changes: Record<string, { before: unknown; after: unknown }> = {};
+  const fill = (key: keyof typeof member, value: unknown, missing: boolean) => {
+    if (missing && value != null && String(value).trim() !== "") {
+      patch[key as string] = value;
+      changes[key as string] = { before: member[key] ?? null, after: value };
+    }
+  };
+  fill("email", app.email, !member.email);
+  fill("telefon1", app.telefon, !member.telefon1);
+  fill("geburtsdatum", app.geburtsdatum, isPlaceholderDob(member.geburtsdatum));
+  fill("strasse", app.strasse, !member.strasse);
+  fill("hausnummer", app.hausnummer, !member.hausnummer);
+  fill("plz", app.plz, !member.plz);
+  fill("ort", app.ort, !member.ort);
+  // A contact who now joins keeps the same record and relationships, but gains
+  // a member reference. A guardian/payer remains a contact unless already a member.
+  const memberNo =
+    !opts.isKontakt && !member.memberNo && !member.mitgliedsnummer
+      ? generateMemberNumber("member")
+      : member.memberNo;
+  if (memberNo !== member.memberNo) {
+    patch.memberNo = memberNo;
+    patch.kontaktNo = null;
+    fill("eintritt", new Date(), !member.eintritt);
+    changes.memberNo = { before: member.memberNo, after: memberNo };
+    changes.kontaktNo = { before: member.kontaktNo, after: null };
+  }
+  if (
+    !isMinor &&
+    ibanPlain &&
+    member.iban1 &&
+    normalizeIban(member.iban1) !== normalizeIban(ibanPlain)
+  ) {
+    throw new ORPCError("CONFLICT", {
+      message:
+        "Die Bankverbindung des verknüpften Zahlers weicht vom Antrag ab. Bitte zuerst die Bankverbindung prüfen.",
+    });
+  }
+
+  if (!isMinor && ibanPlain) {
+    fill(
+      "abwKontoInh",
+      divergentKontoinhaber(app.kontoinhaber, app.vorname, app.nachname),
+      !member.abwKontoInh,
+    );
+  }
+  if (!isMinor && ibanPlain && !member.iban1) {
+    patch.iban1 = ibanPlain;
+    patch.iban1Last4 = app.ibanLast4 ?? lastFour(ibanPlain);
+    patch.bic1 = app.bic;
+    changes.iban1 = { before: null, after: app.ibanLast4 ?? lastFour(ibanPlain) };
+  }
+  if (Object.keys(patch).length > 0) {
+    patch.updatedAt = new Date();
+    await tx
+      .update(membersTable)
+      .set(patch as never)
+      .where(eq(membersTable.id, member.id));
+  }
+
+  const ref = (memberNo ??
+    member.kontaktNo ??
+    member.mitgliedsnummer ??
+    `A${member.adrNr}`) as string;
+
+  // Contract only when the member has no currently billable contract and the
+  // reviewer picked a Beitragsart. Historical contracts may keep vertrag_ende
+  // null while gekuend_zum closes them for billing.
+  const now = new Date();
+  const existingContract = await tx
+    .select({ id: contractsTable.id })
+    .from(contractsTable)
+    .where(
+      and(
+        eq(contractsTable.memberId, member.id),
+        or(isNull(contractsTable.vertragEnde), gt(contractsTable.vertragEnde, now)),
+        or(isNull(contractsTable.gekuendZum), gt(contractsTable.gekuendZum, now)),
+      ),
+    )
+    .limit(1);
+  if (existingContract.length === 0 && opts.contract) {
+    const existingNumbers = await tx
+      .select({ vertragNr: contractsTable.vertragNr })
+      .from(contractsTable)
+      .where(eq(contractsTable.adrNr, member.adrNr));
+    const nextVertragNr =
+      Math.max(
+        0,
+        ...existingNumbers
+          .map((r) => Number.parseInt(r.vertragNr, 10))
+          .filter((n) => Number.isFinite(n)),
+      ) + 1;
+    await tx.insert(contractsTable).values({
+      memberId: member.id,
+      adrNr: member.adrNr,
+      mitglNr: ref,
+      vertragNr: String(nextVertragNr),
+      art: opts.contract.art,
+      artName: opts.contract.artName,
+      betrag: opts.contract.betrag,
+      sollstellung: opts.contract.sollstellung,
+      vertragBegin: opts.contract.vertragBegin,
+      abwKontoInh: opts.contract.abwKontoInh ?? null,
+      isDirectDebit: opts.contract.isDirectDebit ?? false,
+    } as never);
+    changes.vertragAngelegt = { before: null, after: 1 };
+  }
+
+  // SEPA mandate only when none exists and an IBAN is on file.
+  const existingMandate = await tx
+    .select({ id: sepaMandatesTable.id })
+    .from(sepaMandatesTable)
+    .where(and(eq(sepaMandatesTable.memberId, member.id), eq(sepaMandatesTable.isDeleted, false)))
+    .limit(1);
+  if (!isMinor && existingMandate.length === 0 && ibanPlain) {
+    await tx.insert(sepaMandatesTable).values({
+      memberId: member.id,
+      adrNr: member.adrNr,
+      mandatsNr: app.mandatsreferenz ?? "M1",
+      angelegtAm: new Date(),
+      unterschriftDatum: app.consentAt,
+      gueltigAb: new Date(),
+    } as never);
+    changes.mandatAngelegt = { before: null, after: 1 };
+  }
+
+  // Abteilungen: additive.
+  let abtAdded = 0;
+  for (const abteilungId of app.abteilungen ?? []) {
+    const active = await tx
+      .select({ memberId: memberAbteilungenTable.memberId })
+      .from(memberAbteilungenTable)
+      .where(
+        and(
+          eq(memberAbteilungenTable.memberId, member.id),
+          eq(memberAbteilungenTable.abteilungId, abteilungId),
+          isNull(memberAbteilungenTable.austrittsdatum),
+        ),
+      )
+      .limit(1);
+    if (active.length > 0) continue;
+    const r = await tx
+      .insert(memberAbteilungenTable)
+      .values({ memberId: member.id, abteilungId, eintrittsdatum: today })
+      .onConflictDoNothing()
+      .returning({ memberId: memberAbteilungenTable.memberId });
+    if (r.length) abtAdded++;
+  }
+  if (abtAdded > 0) changes.abteilungenAdded = { before: null, after: abtAdded };
+
+  changes.verknuepfterAntrag = { before: null, after: app.antragsnummer };
+  const auditId = await appendAudit(tx, {
+    entityType: "member",
+    entityId: member.id,
+    action: "update",
+    source: "ui",
+    actorId: opts.actorId,
+    actorEmail: opts.actorEmail,
+    changes,
+    requestId: opts.requestId,
+  });
+  await takeMemberSnapshot(tx, member.id, {
+    trigger: "mutation",
+    actorId: opts.actorId,
+    actorEmail: opts.actorEmail,
+    auditId,
+  });
+  return { id: member.id, adrNr: member.adrNr, ref };
+}
+
 /**
  * Create the secondary members of an application around an already-existing
  * primary: the guardian (kontakt + payer + Vertreter, mandate on the guardian)
  * for a minor, or the partner, children and the Familie record (primary = payer)
  * for a family. Shared by both the create-new and the link-to-existing approval
  * paths so family/minor linking reuses the exact same modelling. Returns the
- * refs of the members it created.
+ * refs of all resolved persons, including linked records.
  */
 async function createApplicationSecondaries(
   tx: DBOrTx,
   opts: {
     app: MembershipApplication;
+    personLinks: ApplicationPersonLink[];
     primary: { id: string; adrNr: number };
     ibanPlain: string | null;
     fallbackEintritt: string;
@@ -487,11 +763,35 @@ async function createApplicationSecondaries(
     requestId: opts.requestId,
   };
   const refs: string[] = [];
+  const resolvePerson = async (key: string, values: Parameters<typeof onboardMember>[1]) => {
+    const link = opts.personLinks.find((item) => item.personKey === key);
+    if (!link) return onboardMember(tx, values);
+    const patch = values.patch;
+    return linkApplicationPerson(tx, {
+      app: {
+        ...app,
+        antragstyp: "einzel",
+        vorname: patch.vorname as string,
+        nachname: patch.nachname as string,
+        geburtsdatum: (patch.geburtsdatum as Date | null) ?? null,
+        email: null,
+        telefon: null,
+        iban: (patch.iban1 as string | null) ?? null,
+        abteilungen: values.abteilungen.map((item) => item.abteilungId),
+      },
+      memberId: link.memberId,
+      isKontakt: values.isKontakt,
+      contract: null,
+      actorId: opts.actorId,
+      actorEmail: opts.actorEmail,
+      requestId: opts.requestId,
+    });
+  };
 
   if (app.antragstyp === "kind") {
     const guardianName = applicationGuardianName(app, ibanPlain);
     if (guardianName.nachname || guardianName.vorname) {
-      const guardian = await onboardMember(tx, {
+      const guardian = await resolvePerson("guardian", {
         patch: {
           vorname: guardianName.vorname || null,
           nachname: guardianName.nachname || null,
@@ -516,14 +816,47 @@ async function createApplicationSecondaries(
         ...base,
       });
       refs.push(guardian.ref);
-      await tx.insert(relationshipsTable).values({
-        fromMemberId: primary.id,
-        toMemberId: guardian.id,
-        fromAdrNr: primary.adrNr,
-        toAdrNr: guardian.adrNr,
-        beziehung: "Erziehungsberechtigt",
-        istVertreter: true,
-      });
+      const representatives = await tx
+        .select()
+        .from(relationshipsTable)
+        .where(
+          and(
+            eq(relationshipsTable.fromMemberId, primary.id),
+            eq(relationshipsTable.istVertreter, true),
+          ),
+        );
+      if (representatives.some((row) => row.toMemberId !== guardian.id)) {
+        throw new ORPCError("CONFLICT", {
+          message:
+            "Das Kind hat bereits einen anderen Vertreter. Bitte zuerst die Beziehung prüfen.",
+        });
+      }
+      if (!representatives.some((row) => row.toMemberId === guardian.id)) {
+        const [existing] = await tx
+          .select()
+          .from(relationshipsTable)
+          .where(
+            and(
+              eq(relationshipsTable.fromAdrNr, primary.adrNr),
+              eq(relationshipsTable.toAdrNr, guardian.adrNr),
+            ),
+          )
+          .limit(1);
+        if (existing)
+          await tx
+            .update(relationshipsTable)
+            .set({ toMemberId: guardian.id, istVertreter: true, updatedAt: new Date() })
+            .where(eq(relationshipsTable.id, existing.id));
+        else
+          await tx.insert(relationshipsTable).values({
+            fromMemberId: primary.id,
+            toMemberId: guardian.id,
+            fromAdrNr: primary.adrNr,
+            toAdrNr: guardian.adrNr,
+            beziehung: "Erziehungsberechtigt",
+            istVertreter: true,
+          });
+      }
       for (const memberId of [primary.id, guardian.id]) {
         await takeMemberSnapshot(tx, memberId, {
           trigger: "mutation",
@@ -537,7 +870,7 @@ async function createApplicationSecondaries(
   if (app.antragstyp === "familie") {
     let partnerId: string | null = null;
     if (app.partnerVorname && app.partnerNachname) {
-      const p = await onboardMember(tx, {
+      const p = await resolvePerson("partner", {
         patch: {
           vorname: app.partnerVorname,
           nachname: app.partnerNachname,
@@ -559,8 +892,8 @@ async function createApplicationSecondaries(
       refs.push(p.ref);
     }
     const childIds: string[] = [];
-    for (const k of app.kinder ?? []) {
-      const c = await onboardMember(tx, {
+    for (const [index, k] of (app.kinder ?? []).entries()) {
+      const c = await resolvePerson(`child:${index}`, {
         patch: {
           vorname: k.vorname,
           nachname: k.nachname,
@@ -583,23 +916,62 @@ async function createApplicationSecondaries(
     }
 
     const today = new Date().toISOString().slice(0, 10);
-    const [fam] = await tx
-      .insert(familienTable)
-      .values({ name: `Familie ${app.nachname}`, zahlerMemberId: primary.id })
-      .returning({ id: familienTable.id });
+    const memberships = [
+      { memberId: primary.id, rolle: "zahler" as const },
+      ...(partnerId ? [{ memberId: partnerId, rolle: "partner" as const }] : []),
+      ...childIds.map((memberId) => ({ memberId, rolle: "kind" as const })),
+    ];
+    const active = await tx
+      .select()
+      .from(familienMitgliederTable)
+      .where(
+        and(
+          inArray(
+            familienMitgliederTable.memberId,
+            memberships.map((item) => item.memberId),
+          ),
+          isNull(familienMitgliederTable.bis),
+        ),
+      );
+    const familyIds = new Set(active.map((item) => item.familieId));
+    if (
+      familyIds.size > 1 ||
+      active.some(
+        (item) =>
+          memberships.find((wanted) => wanted.memberId === item.memberId)?.rolle !== item.rolle,
+      )
+    ) {
+      throw new ORPCError("CONFLICT", {
+        message:
+          "Die Personen gehören bereits zu unterschiedlichen Familien oder haben andere Rollen. Bitte zuerst die Familienzuordnung prüfen.",
+      });
+    }
+    const existingId = active[0]?.familieId;
+    const [fam] = existingId
+      ? await tx.select().from(familienTable).where(eq(familienTable.id, existingId)).for("update")
+      : await tx
+          .insert(familienTable)
+          .values({ name: `Familie ${app.nachname}`, zahlerMemberId: primary.id })
+          .returning();
     if (fam) {
-      await tx.insert(familienMitgliederTable).values([
-        { familieId: fam.id, memberId: primary.id, rolle: "zahler", von: today },
-        ...(partnerId
-          ? [{ familieId: fam.id, memberId: partnerId, rolle: "partner" as const, von: today }]
-          : []),
-        ...childIds.map((id) => ({
-          familieId: fam.id,
-          memberId: id,
-          rolle: "kind" as const,
-          von: today,
-        })),
-      ]);
+      if (fam.zahlerMemberId && fam.zahlerMemberId !== primary.id) {
+        throw new ORPCError("CONFLICT", {
+          message:
+            "Die bestehende Familie hat einen anderen Zahler. Bitte zuerst die Familienzuordnung prüfen.",
+        });
+      }
+      if (!fam.zahlerMemberId)
+        await tx
+          .update(familienTable)
+          .set({ zahlerMemberId: primary.id, updatedAt: new Date() })
+          .where(eq(familienTable.id, fam.id));
+      const missing = memberships.filter(
+        (item) => !active.some((row) => row.memberId === item.memberId),
+      );
+      if (missing.length)
+        await tx
+          .insert(familienMitgliederTable)
+          .values(missing.map((item) => ({ ...item, familieId: fam.id, von: today })));
       for (const memberId of [primary.id, ...(partnerId ? [partnerId] : []), ...childIds]) {
         await takeMemberSnapshot(tx, memberId, {
           trigger: "mutation",
@@ -652,6 +1024,7 @@ async function approveByLinking(
   db: DB,
   opts: {
     app: MembershipApplication;
+    personLinks: ApplicationPersonLink[];
     memberId: string;
     contract: OnboardContractValues | null;
     actorId: string;
@@ -661,14 +1034,7 @@ async function approveByLinking(
 ): Promise<{ primaryId: string; refs: string[] }> {
   const { app } = opts;
   const ibanPlain = app.iban?.trim() ? app.iban.trim() : null;
-  // A minor's bank details belong on the guardian (created as a secondary), not
-  // on the linked child, so the child primary is not enriched with IBAN/mandate.
-  const isMinor = app.antragstyp === "kind";
   const today = new Date().toISOString().slice(0, 10);
-  const isPlaceholderDob = (d: Date | string | null) => {
-    if (!d) return true;
-    return (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10).endsWith("-01-01");
-  };
 
   return db.transaction(async (tx) => {
     const [locked] = await tx
@@ -684,139 +1050,13 @@ async function approveByLinking(
       throw new ORPCError("CONFLICT", { message: "Antrag ist bereits genehmigt." });
     }
 
-    const [member] = await tx
-      .select()
-      .from(membersTable)
-      .where(and(eq(membersTable.id, opts.memberId), isNull(membersTable.deletedAt)))
-      .limit(1);
-    if (!member) {
-      throw new ORPCError("NOT_FOUND", { message: "Verknüpftes Mitglied nicht gefunden." });
-    }
-
-    // Enrich only missing / placeholder fields; never overwrite good data.
-    const patch: Record<string, unknown> = {};
-    const changes: Record<string, { before: unknown; after: unknown }> = {};
-    const fill = (key: keyof typeof member, value: unknown, missing: boolean) => {
-      if (missing && value != null && String(value).trim() !== "") {
-        patch[key as string] = value;
-        changes[key as string] = { before: member[key] ?? null, after: value };
-      }
-    };
-    fill("email", app.email, !member.email);
-    fill("telefon1", app.telefon, !member.telefon1);
-    fill("geburtsdatum", app.geburtsdatum, isPlaceholderDob(member.geburtsdatum));
-    fill("strasse", app.strasse, !member.strasse);
-    fill("hausnummer", app.hausnummer, !member.hausnummer);
-    fill("plz", app.plz, !member.plz);
-    fill("ort", app.ort, !member.ort);
-    if (!isMinor && ibanPlain && !member.iban1) {
-      patch.iban1 = ibanPlain;
-      patch.iban1Last4 = app.ibanLast4 ?? lastFour(ibanPlain);
-      patch.bic1 = app.bic;
-      changes.iban1 = { before: null, after: app.ibanLast4 ?? lastFour(ibanPlain) };
-    }
-    if (Object.keys(patch).length > 0) {
-      patch.updatedAt = new Date();
-      await tx
-        .update(membersTable)
-        .set(patch as never)
-        .where(eq(membersTable.id, member.id));
-    }
-
-    const ref = (member.memberNo ??
-      member.kontaktNo ??
-      member.mitgliedsnummer ??
-      `A${member.adrNr}`) as string;
-
-    // Contract only when the member has no currently billable contract and the
-    // reviewer picked a Beitragsart. Historical contracts may keep vertrag_ende
-    // null while gekuend_zum closes them for billing.
-    const now = new Date();
-    const existingContract = await tx
-      .select({ id: contractsTable.id })
-      .from(contractsTable)
-      .where(
-        and(
-          eq(contractsTable.memberId, member.id),
-          or(isNull(contractsTable.vertragEnde), gt(contractsTable.vertragEnde, now)),
-          or(isNull(contractsTable.gekuendZum), gt(contractsTable.gekuendZum, now)),
-        ),
-      )
-      .limit(1);
-    if (existingContract.length === 0 && opts.contract) {
-      const existingNumbers = await tx
-        .select({ vertragNr: contractsTable.vertragNr })
-        .from(contractsTable)
-        .where(eq(contractsTable.adrNr, member.adrNr));
-      const nextVertragNr =
-        Math.max(
-          0,
-          ...existingNumbers
-            .map((r) => Number.parseInt(r.vertragNr, 10))
-            .filter((n) => Number.isFinite(n)),
-        ) + 1;
-      await tx.insert(contractsTable).values({
-        memberId: member.id,
-        adrNr: member.adrNr,
-        mitglNr: ref,
-        vertragNr: String(nextVertragNr),
-        art: opts.contract.art,
-        artName: opts.contract.artName,
-        betrag: opts.contract.betrag,
-        sollstellung: opts.contract.sollstellung,
-        vertragBegin: opts.contract.vertragBegin,
-        abwKontoInh: opts.contract.abwKontoInh ?? null,
-        isDirectDebit: opts.contract.isDirectDebit ?? false,
-      } as never);
-      changes.vertragAngelegt = { before: null, after: 1 };
-    }
-
-    // SEPA mandate only when none exists and an IBAN is on file.
-    const existingMandate = await tx
-      .select({ id: sepaMandatesTable.id })
-      .from(sepaMandatesTable)
-      .where(and(eq(sepaMandatesTable.memberId, member.id), eq(sepaMandatesTable.isDeleted, false)))
-      .limit(1);
-    if (!isMinor && existingMandate.length === 0 && ibanPlain) {
-      await tx.insert(sepaMandatesTable).values({
-        memberId: member.id,
-        adrNr: member.adrNr,
-        mandatsNr: app.mandatsreferenz ?? "M1",
-        angelegtAm: new Date(),
-        unterschriftDatum: app.consentAt,
-        gueltigAb: new Date(),
-      } as never);
-      changes.mandatAngelegt = { before: null, after: 1 };
-    }
-
-    // Abteilungen: additive.
-    let abtAdded = 0;
-    for (const abteilungId of app.abteilungen ?? []) {
-      const active = await tx
-        .select({ memberId: memberAbteilungenTable.memberId })
-        .from(memberAbteilungenTable)
-        .where(
-          and(
-            eq(memberAbteilungenTable.memberId, member.id),
-            eq(memberAbteilungenTable.abteilungId, abteilungId),
-            isNull(memberAbteilungenTable.austrittsdatum),
-          ),
-        )
-        .limit(1);
-      if (active.length > 0) continue;
-      const r = await tx
-        .insert(memberAbteilungenTable)
-        .values({ memberId: member.id, abteilungId, eintrittsdatum: today })
-        .onConflictDoNothing()
-        .returning({ memberId: memberAbteilungenTable.memberId });
-      if (r.length) abtAdded++;
-    }
-    if (abtAdded > 0) changes.abteilungenAdded = { before: null, after: abtAdded };
-
+    const member = await linkApplicationPerson(tx, opts);
+    const ref = member.ref;
     // Build the secondary members (guardian / partner / children / Familie)
     // around the linked primary, exactly as the create path does.
     const secondaryRefs = await createApplicationSecondaries(tx, {
       app,
+      personLinks: opts.personLinks,
       primary: { id: member.id, adrNr: member.adrNr },
       ibanPlain,
       fallbackEintritt: today,
@@ -825,9 +1065,6 @@ async function approveByLinking(
       requestId: opts.requestId,
     });
     const allRefs = [ref, ...secondaryRefs];
-    if (secondaryRefs.length > 0) {
-      changes.weitereMitglieder = { before: null, after: secondaryRefs.join(", ") };
-    }
 
     await tx
       .update(membershipApplicationsTable)
@@ -839,23 +1076,6 @@ async function approveByLinking(
       })
       .where(eq(membershipApplicationsTable.id, app.id));
 
-    changes.verknuepfterAntrag = { before: null, after: app.antragsnummer };
-    const memberAuditId = await appendAudit(tx, {
-      entityType: "member",
-      entityId: member.id,
-      action: "update",
-      source: "ui",
-      actorId: opts.actorId,
-      actorEmail: opts.actorEmail,
-      changes,
-      requestId: opts.requestId,
-    });
-    await takeMemberSnapshot(tx, member.id, {
-      trigger: "mutation",
-      actorId: opts.actorId,
-      actorEmail: opts.actorEmail,
-      auditId: memberAuditId,
-    });
     await appendAudit(tx, {
       entityType: "membership_application",
       entityId: app.id,
@@ -1073,34 +1293,20 @@ export const applicationsRouter = {
     .input(v.object({ applicationId: v.pipe(v.string(), v.uuid()) }))
     .handler(async ({ context, input }) => {
       const [app] = await context.db
-        .select({
-          id: membershipApplicationsTable.id,
-          vorname: membershipApplicationsTable.vorname,
-          nachname: membershipApplicationsTable.nachname,
-          geburtsdatum: membershipApplicationsTable.geburtsdatum,
-          iban: membershipApplicationsTable.iban,
-          ibanLast4: membershipApplicationsTable.ibanLast4,
-          email: membershipApplicationsTable.email,
-          plz: membershipApplicationsTable.plz,
-        })
+        .select()
         .from(membershipApplicationsTable)
         .where(eq(membershipApplicationsTable.id, input.applicationId))
         .limit(1);
       if (!app) throw new ORPCError("NOT_FOUND", { message: "Antrag nicht gefunden." });
-      const candidates = await findDuplicateCandidates(
-        context.db,
-        {
-          vorname: app.vorname,
-          nachname: app.nachname,
-          geburtsdatum: app.geburtsdatum,
-          iban: app.iban,
-          ibanLast4: app.ibanLast4,
-          email: app.email,
-          plz: app.plz,
-        },
-        { applicationId: app.id },
+      const people = await Promise.all(
+        applicationPeople(app).map(async (person) => ({
+          key: person.key,
+          label: person.label,
+          name: `${person.vorname} ${person.nachname}`.trim(),
+          candidates: await findDuplicateCandidates(context.db, person, { applicationId: app.id }),
+        })),
       );
-      return { candidates };
+      return { candidates: people[0]?.candidates ?? [], people };
     }),
 
   /** Public status lookup by an application-scoped bearer token. */
@@ -2349,6 +2555,18 @@ export const applicationsRouter = {
         betrag: v.optional(v.nullable(v.string()), null),
         /** Dedup gate: link to this existing member instead of creating a new one. */
         linkToMemberId: v.optional(v.nullable(v.pipe(v.string(), v.uuid())), null),
+        personLinks: v.optional(
+          v.pipe(
+            v.array(
+              v.object({
+                personKey: v.pipe(v.string(), v.maxLength(32)),
+                memberId: v.pipe(v.string(), v.uuid()),
+              }),
+            ),
+            v.maxLength(32),
+          ),
+          [],
+        ),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -2374,6 +2592,18 @@ export const applicationsRouter = {
             "Der Antrag kann erst genehmigt werden, wenn das unterschriebene Dokument vorliegt.",
         });
       }
+
+      const personLinks = [...input.personLinks];
+      const primaryLink = personLinks.find((item) => item.personKey === "primary");
+      if (input.linkToMemberId && primaryLink && primaryLink.memberId !== input.linkToMemberId) {
+        throw new ORPCError("VALIDATION_FAILED", {
+          message: "Widersprüchliche Verknüpfung des Antragstellers.",
+        });
+      }
+      if (input.linkToMemberId && !primaryLink)
+        personLinks.push({ personKey: "primary", memberId: input.linkToMemberId });
+      validatePersonLinks(app, personLinks);
+      const primaryMemberId = personLinks.find((item) => item.personKey === "primary")?.memberId;
 
       const actorId = context.session!.user.id;
       const actorEmail = context.session!.user.email;
@@ -2441,15 +2671,18 @@ export const applicationsRouter = {
           }
         : null;
 
-      const result = input.linkToMemberId
-        ? await approveByLinking(context.db, {
-            app,
-            memberId: input.linkToMemberId,
-            contract,
-            actorId,
-            actorEmail,
-            requestId: context.requestId ?? null,
-          })
+      const result = primaryMemberId
+        ? await withUniqueRetry(() =>
+            approveByLinking(context.db, {
+              app,
+              memberId: primaryMemberId,
+              personLinks,
+              contract,
+              actorId,
+              actorEmail,
+              requestId: context.requestId ?? null,
+            }),
+          )
         : await withUniqueRetry(() =>
             context.db.transaction(async (tx) => {
               // Lock the application row and re-check inside the transaction. The
@@ -2483,6 +2716,7 @@ export const applicationsRouter = {
                 primary.ref,
                 ...(await createApplicationSecondaries(tx, {
                   app,
+                  personLinks,
                   primary: { id: primary.id, adrNr: primary.adrNr },
                   ibanPlain,
                   fallbackEintritt,
