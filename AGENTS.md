@@ -125,6 +125,15 @@ on Railway via Dockerfile.
   the stored `messageId`; the recipient plus time window is a bounded fallback.
   A changed address clears the flag.
 
+## MCP setup
+
+- Codex setup text lives in `src/lib/mcp-setup.ts`. Use native Streamable HTTP
+  with `http_headers["x-api-key"]` in user-level Codex config, respecting
+  `CODEX_HOME`. Server names include the host to keep tenant connections apart.
+- Complete API keys for setup stay in component state only. Never persist them
+  in browser storage or query caches. A saved key cannot be retrieved again.
+- Official Codex config reference: https://learn.chatgpt.com/docs/extend/mcp?surface=cli
+
 ## Commands
 
 - `bun run verify` -- typecheck + biome ci + tests + build. Run before pushing.

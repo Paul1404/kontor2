@@ -10,7 +10,9 @@ import { InfoBox } from "~/components/ui/info-box";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { QueryErrorRow } from "~/components/ui/query-error";
+import { toast } from "~/components/ui/toaster";
 import { formatDate, formatDateTime, orEmpty } from "~/lib/format";
+import { buildCodexSetup } from "~/lib/mcp-setup";
 import { orpc } from "~/lib/orpc";
 
 export const Route = createFileRoute("/app/einstellungen/ki-zugriff")({
@@ -42,7 +44,8 @@ function ApiKeysPage() {
 
   // The connection snippets need the deployed origin; window only exists in
   // the browser, so resolve it after mount.
-  const [origin, setOrigin] = useState("https://<host>");
+  const [origin, setOrigin] = useState("");
+  const [existingKey, setExistingKey] = useState("");
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
@@ -58,6 +61,7 @@ function ApiKeysPage() {
     onSuccess: (data) => {
       setError(null);
       setCreatedKey({ name: data.name ?? name, key: data.key });
+      setExistingKey("");
       setName("");
       setExpiresInDays("");
       qc.invalidateQueries({ queryKey: ["apiKeys"] });
@@ -83,7 +87,9 @@ function ApiKeysPage() {
     onError: (err) => setError((err as Error).message),
   });
 
-  const mcpUrl = `${origin}/api/mcp`;
+  const mcpUrl = `${origin || "https://<host>"}/api/mcp`;
+  const setupKey = createdKey?.key ?? existingKey.trim();
+  const codexSetup = origin && setupKey ? buildCodexSetup(mcpUrl, setupKey) : null;
   const claudeCodeCommand = `claude mcp add --transport http kontor2 ${mcpUrl} --header "x-api-key: <SCHLÜSSEL>"`;
   const desktopConfig = `{
   "mcpServers": {
@@ -104,8 +110,8 @@ function ApiKeysPage() {
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">KI-Zugriff (MCP)</h1>
         <p className="text-sm text-muted-foreground">
-          Zugriffsschlüssel für KI-Assistenten wie Claude. Ein Schlüssel handelt mit den Rechten des
-          verknüpften Benutzers.
+          Zugriffsschlüssel für KI-Assistenten wie Codex und Claude. Ein Schlüssel handelt mit den
+          Rechten des verknüpften Benutzers.
         </p>
       </div>
 
@@ -157,7 +163,7 @@ function ApiKeysPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-56"
-                placeholder="z. B. Claude Vorstand"
+                placeholder="z. B. Codex Vorstand"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -357,34 +363,97 @@ function ApiKeysPage() {
         <CardHeader>
           <CardTitle>Verbindung einrichten</CardTitle>
           <CardDescription>
-            Den Platzhalter durch den erstellten Schlüssel ersetzen.
+            Schlüssel erstellen, Einrichtungsauftrag kopieren und einmal in Codex einfügen.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
-          <div>
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">Claude Code</p>
-              <CopyButton value={claudeCodeCommand} label="Befehl" />
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-medium">Codex dauerhaft verbinden</p>
+              <Button
+                type="button"
+                disabled={!codexSetup}
+                onClick={() => {
+                  if (!codexSetup) return;
+                  if (!navigator.clipboard) {
+                    toast.error("Zwischenablage nicht verfügbar");
+                    return;
+                  }
+                  navigator.clipboard
+                    .writeText(codexSetup.prompt)
+                    .then(() => toast.success("Einrichtungsauftrag für Codex kopiert"))
+                    .catch(() => toast.error("Kopieren fehlgeschlagen"));
+                }}
+              >
+                Einrichtungsauftrag kopieren
+              </Button>
             </div>
-            <pre className="mt-1.5 overflow-x-auto rounded-lg bg-muted/60 p-3 text-xs">
-              {claudeCodeCommand}
-            </pre>
-          </div>
-          <div>
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">Claude Desktop</p>
-              <CopyButton value={desktopConfig} label="Konfiguration" />
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Claude Desktop kann in den Connector-Einstellungen keine eigenen Header senden.
-              Stattdessen diesen Block in die Datei{" "}
-              <code className="text-xs">claude_desktop_config.json</code> eintragen (benötigt
-              Node.js):
+            <p className="mt-2 text-sm text-muted-foreground">
+              Codex speichert die Verbindung für künftige Chats und prüft den Zugriff. Der Auftrag
+              enthält die Serveradresse und deinen Schlüssel. Nach der Einrichtung kann ein Neustart
+              von Codex nötig sein.
             </p>
-            <pre className="mt-1.5 overflow-x-auto rounded-lg bg-muted/60 p-3 text-xs">
-              {desktopConfig}
-            </pre>
+            {!createdKey ? (
+              <div className="mt-3 flex flex-col gap-1.5">
+                <Label htmlFor="setup-key">Vorhandener Schlüssel</Label>
+                <Input
+                  id="setup-key"
+                  type="password"
+                  autoComplete="off"
+                  value={existingKey}
+                  onChange={(e) => setExistingKey(e.target.value)}
+                  placeholder="Schlüssel einfügen oder oben einen erstellen"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Der vollständige Schlüssel kann später nicht erneut abgerufen werden.
+                </p>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-success">
+                Der gerade erstellte Schlüssel ist im Einrichtungsauftrag enthalten.
+              </p>
+            )}
+            {codexSetup ? (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Einrichtungsauftrag kopieren und in einen lokalen Codex-Chat einfügen. Der Auftrag
+                enthält einen vertraulichen Schlüssel. Nur mit deinem Codex teilen.
+              </p>
+            ) : null}
           </div>
+          <details>
+            <summary className="cursor-pointer text-sm font-medium">
+              Claude und manuelle Einrichtung
+            </summary>
+            <div className="mt-4 flex flex-col gap-5">
+              <p className="text-xs text-muted-foreground">
+                Den Platzhalter durch den erstellten Schlüssel ersetzen.
+              </p>
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Claude Code</p>
+                  <CopyButton value={claudeCodeCommand} label="Befehl" />
+                </div>
+                <pre className="mt-1.5 overflow-x-auto rounded-lg bg-muted/60 p-3 text-xs">
+                  {claudeCodeCommand}
+                </pre>
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Claude Desktop</p>
+                  <CopyButton value={desktopConfig} label="Konfiguration" />
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Claude Desktop kann in den Connector-Einstellungen keine eigenen Header senden.
+                  Stattdessen diesen Block in die Datei{" "}
+                  <code className="text-xs">claude_desktop_config.json</code> eintragen (benötigt
+                  Node.js):
+                </p>
+                <pre className="mt-1.5 overflow-x-auto rounded-lg bg-muted/60 p-3 text-xs">
+                  {desktopConfig}
+                </pre>
+              </div>
+            </div>
+          </details>
         </CardContent>
       </Card>
 
