@@ -4,6 +4,7 @@ import { and, eq, inArray, isNull, like, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Session } from "~/server/auth/auth";
 import { db } from "~/server/db/client";
+import { auditLogTable } from "~/server/db/schema/audit";
 import { users } from "~/server/db/schema/auth";
 import { contractsTable } from "~/server/db/schema/contracts";
 import { familienMitgliederTable, familienTable } from "~/server/db/schema/familien";
@@ -16,6 +17,7 @@ import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import type { AppContext } from "~/server/orpc/context";
 import { appRouter } from "~/server/orpc/router";
+import { selectMandate } from "~/server/sepa/select-mandate";
 
 // Only external file storage is mocked. Approval, audit, snapshots, contracts,
 // mandates and all person/family relationships use the disposable real database.
@@ -344,19 +346,118 @@ describe.skipIf(!onTestDb)("application links each person (integration)", () => 
     ).toHaveLength(3);
   });
 
-  it("rolls back rather than silently using a different existing payer bank account", async () => {
-    const payer = await member("Paula", "bank-conflict");
+  it.each(["familie", "kind"] as const)(
+    "adopts a signed new bank account for a linked %s payer",
+    async (kind) => {
+      const payer = await member("Paula", `bank-change-${kind}`, kind === "kind");
+      const oldIban = "DE12500105170648489890";
+      await db()
+        .update(membersTable)
+        .set({ iban1: oldIban, iban1Last4: "9890", bic1: "OLDTEST", abwKontoInh: "Old holder" })
+        .where(eq(membersTable.id, payer.id));
+      await db()
+        .insert(sepaMandatesTable)
+        .values({
+          memberId: payer.id,
+          adrNr: payer.adrNr,
+          mandatsNr: "previous",
+          status: "Aktiv",
+          ersteVerwendung: new Date("2025-01-01"),
+        });
+      if (kind === "familie")
+        await db().insert(contractsTable).values({
+          memberId: payer.id,
+          adrNr: payer.adrNr,
+          vertragNr: "1",
+          art: 999,
+          betrag: "96",
+          isDirectDebit: true,
+          abwKontoInh: "Old holder",
+        });
+      const app = await application(`bank-change-${kind}`, kind);
+      await db()
+        .update(membershipApplicationsTable)
+        .set({ bic: "COBADEFFXXX", kontoinhaber: `Paula ${payer.nachname}` })
+        .where(eq(membershipApplicationsTable.id, app.id));
+      await approve(app.id, [
+        { personKey: kind === "kind" ? "guardian" : "primary", memberId: payer.id },
+      ]);
+      const [updated] = await db().select().from(membersTable).where(eq(membersTable.id, payer.id));
+      expect(updated).toMatchObject({
+        iban1: iban,
+        iban1Last4: "3000",
+        bic1: "COBADEFFXXX",
+        abwKontoInh: null,
+        strasse: "Bestehende Straße",
+      });
+      const mandates = await db()
+        .select()
+        .from(sepaMandatesTable)
+        .where(eq(sepaMandatesTable.memberId, payer.id));
+      expect(mandates).toHaveLength(2);
+      expect(mandates.find((mandate) => mandate.mandatsNr === "previous")).toMatchObject({
+        status: "Ersetzt",
+        ersteVerwendung: new Date("2025-01-01"),
+        isDeleted: false,
+      });
+      expect(selectMandate(mandates)).toMatchObject({
+        conflict: false,
+        chosen: { mandatsNr: app.mandatsreferenz, unterschriftDatum: app.consentAt },
+      });
+      const audit = await db()
+        .select()
+        .from(auditLogTable)
+        .where(eq(auditLogTable.entityId, payer.id));
+      expect(JSON.stringify(audit)).not.toContain(oldIban);
+      expect(JSON.stringify(audit)).not.toContain(iban);
+      expect(audit.map((entry) => entry.changes)).toContainEqual(
+        expect.objectContaining({ iban1: { before: "9890", after: "3000" } }),
+      );
+      if (kind === "familie") {
+        const contracts = await db()
+          .select()
+          .from(contractsTable)
+          .where(eq(contractsTable.memberId, payer.id));
+        expect(contracts).toHaveLength(1);
+        expect(contracts[0]).toMatchObject({ abwKontoInh: null, isDirectDebit: true });
+        expect(Number(contracts[0]?.betrag)).toBe(96);
+      } else {
+        const [child] = await db()
+          .select()
+          .from(membersTable)
+          .where(and(eq(membersTable.nachname, app.nachname), eq(membersTable.vorname, "Klara")));
+        expect(child?.iban1).toBeNull();
+      }
+      await expect(approve(app.id, [])).rejects.toThrow("bereits genehmigt");
+      expect(
+        await db().select().from(sepaMandatesTable).where(eq(sepaMandatesTable.memberId, payer.id)),
+      ).toHaveLength(2);
+    },
+  );
+
+  it("updates submitted BIC and holder on the same account without duplicating its mandate", async () => {
+    const payer = await member("Paula", "same-bank");
     await db()
       .update(membersTable)
-      .set({ iban1: "DE12500105170648489890", iban1Last4: "9890" })
+      .set({ iban1: iban, iban1Last4: "3000", bic1: "OLDTEST", abwKontoInh: "Old holder" })
       .where(eq(membersTable.id, payer.id));
-    const app = await application("bank-conflict");
-    await expect(approve(app.id, [{ personKey: "primary", memberId: payer.id }])).rejects.toThrow(
-      "Bankverbindung",
-    );
-    expect(
-      await db().select().from(membersTable).where(eq(membersTable.nachname, app.nachname)),
-    ).toHaveLength(1);
+    await db()
+      .insert(sepaMandatesTable)
+      .values({ memberId: payer.id, adrNr: payer.adrNr, mandatsNr: "existing", status: "Aktiv" });
+    const app = await application("same-bank");
+    await db()
+      .update(membershipApplicationsTable)
+      .set({ bic: "COBADEFFXXX", kontoinhaber: "New holder" })
+      .where(eq(membershipApplicationsTable.id, app.id));
+    await approve(app.id, [{ personKey: "primary", memberId: payer.id }]);
+    const [updated] = await db().select().from(membersTable).where(eq(membersTable.id, payer.id));
+    expect(updated).toMatchObject({ bic1: "COBADEFFXXX", abwKontoInh: "New holder" });
+    const mandates = await db()
+      .select()
+      .from(sepaMandatesTable)
+      .where(eq(sepaMandatesTable.memberId, payer.id));
+    expect(mandates).toHaveLength(1);
+    expect(selectMandate(mandates).chosen?.mandatsNr).toBe("existing");
   });
 
   it("rejects assigning one member twice, nonexistent person keys and deleted records", async () => {
