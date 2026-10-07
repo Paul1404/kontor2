@@ -47,7 +47,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1144.0",
     "@aws-sdk/s3-request-presigner": "^3.1144.0",
-    "@better-auth/api-key": "1.6.20",
+    "@better-auth/api-key": "1.7.7",
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@fontsource/spectral": "^5.3.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
