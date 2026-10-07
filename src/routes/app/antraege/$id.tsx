@@ -697,7 +697,8 @@ function AntragDetailPage() {
             <CardContent className="flex flex-col gap-4">
               <p className="text-sm text-muted-foreground">
                 Übernimmt die Personen aus dem Antrag. Bestehende Datensätze können einzeln
-                verknüpft werden. Bankverbindung und Beitragsvertrag werden bei Bedarf ergänzt.
+                verknüpft werden. Die eingereichte Bankverbindung wird beim Zahler übernommen. Ein
+                Beitragsvertrag wird bei Bedarf ergänzt.
               </p>
 
               {dupes.isLoading ? (

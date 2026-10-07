@@ -33,7 +33,7 @@ import {
   peekStatusToken,
   peekUploadToken,
 } from "~/server/application/upload-token";
-import { appendAudit } from "~/server/audit/log";
+import { appendAudit, diff } from "~/server/audit/log";
 import { authBaseUrl } from "~/server/auth/auth";
 import { lastFour } from "~/server/crypto/encrypt";
 import type { DB, DBOrTx } from "~/server/db/client";
@@ -95,6 +95,7 @@ import { rateLimit } from "~/server/redis/client";
 import { deleteObject, getObject, presignDownload, putObject } from "~/server/s3/client";
 import { invalidateMemberCaches } from "~/server/search/cache";
 import { formatIbanGrouped, normalizeIban, validateIban } from "~/server/sepa/iban";
+import { selectMandate } from "~/server/sepa/select-mandate";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 import type { Tenant } from "~/server/tenants/registry";
 
@@ -532,7 +533,7 @@ async function resolveApprovalContract(
   };
 }
 
-/** Reuse a record without replacing established data, contracts or mandates. */
+/** Reuse a person; adopt signed payer bank details and preserve mandate history. */
 async function linkApplicationPerson(
   tx: DBOrTx,
   opts: {
@@ -590,30 +591,28 @@ async function linkApplicationPerson(
     changes.memberNo = { before: member.memberNo, after: memberNo };
     changes.kontaktNo = { before: member.kontaktNo, after: null };
   }
-  if (
+  const bankChanged =
     !isMinor &&
-    ibanPlain &&
-    member.iban1 &&
-    normalizeIban(member.iban1) !== normalizeIban(ibanPlain)
-  ) {
-    throw new ORPCError("CONFLICT", {
-      message:
-        "Die Bankverbindung des verknüpften Zahlers weicht vom Antrag ab. Bitte zuerst die Bankverbindung prüfen.",
-    });
-  }
-
+    !!ibanPlain &&
+    !!member.iban1 &&
+    normalizeIban(member.iban1) !== normalizeIban(ibanPlain);
+  // Approval of the signed application adopts the submitted payer account.
+  // Other established personal fields continue to use missing-only enrichment.
   if (!isMinor && ibanPlain) {
-    fill(
-      "abwKontoInh",
-      divergentKontoinhaber(app.kontoinhaber, app.vorname, app.nachname),
-      !member.abwKontoInh,
+    const bankPatch = {
+      iban1: normalizeIban(ibanPlain),
+      iban1Last4: lastFour(ibanPlain),
+      bic1: app.bic?.trim() || null,
+      abwKontoInh: divergentKontoinhaber(app.kontoinhaber, app.vorname, app.nachname),
+    };
+    Object.assign(patch, bankPatch);
+    Object.assign(
+      changes,
+      diff(member as unknown as Record<string, unknown>, {
+        ...member,
+        ...bankPatch,
+      }),
     );
-  }
-  if (!isMinor && ibanPlain && !member.iban1) {
-    patch.iban1 = ibanPlain;
-    patch.iban1Last4 = app.ibanLast4 ?? lastFour(ibanPlain);
-    patch.bic1 = app.bic;
-    changes.iban1 = { before: null, after: app.ibanLast4 ?? lastFour(ibanPlain) };
   }
   if (Object.keys(patch).length > 0) {
     patch.updatedAt = new Date();
@@ -671,22 +670,68 @@ async function linkApplicationPerson(
     changes.vertragAngelegt = { before: null, after: 1 };
   }
 
-  // SEPA mandate only when none exists and an IBAN is on file.
-  const existingMandate = await tx
-    .select({ id: sepaMandatesTable.id })
-    .from(sepaMandatesTable)
-    .where(and(eq(sepaMandatesTable.memberId, member.id), eq(sepaMandatesTable.isDeleted, false)))
-    .limit(1);
-  if (!isMinor && existingMandate.length === 0 && ibanPlain) {
-    await tx.insert(sepaMandatesTable).values({
-      memberId: member.id,
-      adrNr: member.adrNr,
-      mandatsNr: app.mandatsreferenz ?? "M1",
-      angelegtAm: new Date(),
-      unterschriftDatum: app.consentAt,
-      gueltigAb: new Date(),
-    } as never);
-    changes.mandatAngelegt = { before: null, after: 1 };
+  // Keep mandate history. A signed application with a new bank account
+  // supersedes previous active authorizations, without deleting or rewriting them.
+  if (!isMinor && ibanPlain) {
+    const mandates = await tx
+      .select()
+      .from(sepaMandatesTable)
+      .where(eq(sepaMandatesTable.memberId, member.id));
+    const active = selectMandate(mandates).options;
+    if (bankChanged && active.length) {
+      await tx
+        .update(sepaMandatesTable)
+        .set({ status: "Ersetzt", updatedAt: new Date() })
+        .where(
+          inArray(
+            sepaMandatesTable.id,
+            active.map((mandate) => mandate.id),
+          ),
+        );
+      changes.ersetzteMandate = {
+        before: active.map((mandate) => mandate.mandatsNr),
+        after: app.mandatsreferenz ?? app.antragsnummer,
+      };
+    }
+    if (bankChanged || active.length === 0) {
+      await tx.insert(sepaMandatesTable).values({
+        memberId: member.id,
+        adrNr: member.adrNr,
+        mandatsNr: app.mandatsreferenz ?? app.antragsnummer,
+        status: "Aktiv",
+        angelegtAm: new Date(),
+        unterschriftDatum: app.consentAt,
+        gueltigAb: new Date(),
+      });
+      changes.mandatAngelegt = { before: null, after: 1 };
+    }
+    // Contract overrides precede the member's account-holder name in fee runs.
+    // Keep contribution amounts and billing mode; adopt the submitted debtor name.
+    const activeContracts = await tx
+      .select({ id: contractsTable.id, holder: contractsTable.abwKontoInh })
+      .from(contractsTable)
+      .where(
+        and(
+          eq(contractsTable.memberId, member.id),
+          eq(contractsTable.isDirectDebit, true),
+          or(isNull(contractsTable.vertragEnde), gt(contractsTable.vertragEnde, now)),
+          or(isNull(contractsTable.gekuendZum), gt(contractsTable.gekuendZum, now)),
+        ),
+      );
+    const holder = divergentKontoinhaber(app.kontoinhaber, app.vorname, app.nachname);
+    const changedContracts = activeContracts.filter((contract) => contract.holder !== holder);
+    if (changedContracts.length) {
+      await tx
+        .update(contractsTable)
+        .set({ abwKontoInh: holder })
+        .where(
+          inArray(
+            contractsTable.id,
+            changedContracts.map((contract) => contract.id),
+          ),
+        );
+      changes.vertragsKontoinhaber = { before: changedContracts, after: holder };
+    }
   }
 
   // Abteilungen: additive.

@@ -51,7 +51,10 @@ on Railway via Dockerfile.
   notifications. Reuse a compatible active family; conflicting families, roles
   or representatives must abort the whole transaction instead of moving people.
   Linked contacts who join become members on the same record; a contact used only
-  as guardian/payer stays a contact. A conflicting payer IBAN blocks approval.
+  as guardian/payer stays a contact. Approval adopts the signed application's bank
+  details on the payer. A changed IBAN supersedes active mandates with status
+  `Ersetzt` and creates the application's signed mandate; retain previous rows.
+  Audit bank changes through `diff` so only masked IBANs enter the log.
 - A "member" row can be a real member (`mitglnr` set) or a legacy payer/contact
   with only an `adrNr`. Code paths fall back from `mitglnr` to `adrNr`.
 - Money is summed in integer cents (`sumDecimal`) to avoid float drift. Keep it

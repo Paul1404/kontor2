@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.1.2",
+    date: "2026-10-07",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Anträge können auch mit einer neuen Bankverbindung genehmigt werden. Die eingereichten Bankdaten werden beim verknüpften Zahler übernommen. Bei geänderter IBAN wird das neue Mandat verwendet; bisherige Mandate bleiben im Verlauf.",
+      },
+    ],
+  },
+  {
     version: "3.1.1",
     date: "2026-10-05",
     changes: [
