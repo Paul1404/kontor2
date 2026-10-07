@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.2.0",
+    date: "2026-10-07",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "KI-Zugriff lässt sich mit einem kopierten Einrichtungsauftrag dauerhaft in Codex verbinden. Neu erstellte Schlüssel sind bereits enthalten; vorhandene Schlüssel können eingefügt werden.",
+      },
+    ],
+  },
+  {
     version: "3.1.2",
     date: "2026-10-07",
     changes: [
