@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "4.0.0",
+    date: "2026-10-23",
+    changes: [
+      {
+        category: "breaking",
+        description:
+          "Entwicklung und Tests verwenden PostgreSQL 18.6 und Redis 8.10.2. Bestehende lokale PostgreSQL-Daten müssen per Sicherung und Wiederherstellung in das neue Volume übertragen werden. Die Anleitung steht in docs/local-dev.md.",
+      },
+    ],
+  },
+  {
     version: "3.2.1",
     date: "2026-10-23",
     changes: [

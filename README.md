@@ -517,8 +517,8 @@ Postgres advisory lock keeps multiple replicas from running it at once. Set
 bun install
 cp .env.example .env
 openssl rand -hex 32   # paste into APP_SECRET
-docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=kontor2 postgres:16
-docker run -d --name redis -p 6379:6379 redis:7
+docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=kontor2 postgres:18.6-alpine
+docker run -d --name redis -p 6379:6379 redis:8.10.2-alpine
 bun run db:generate
 bun run db:migrate
 bun run dev

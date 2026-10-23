@@ -66,6 +66,39 @@ their data. The persistent development stack on port 3000 is not touched.
 Set `SANDBOX_PORT` to use another app port. If a previous sandbox process was
 interrupted before cleanup, `bun run sandbox:down` removes its test containers.
 
+## PostgreSQL 18 upgrade
+
+Development and all test jobs use PostgreSQL 18.6 and Redis 8.10.2. The official
+PostgreSQL 18 image stores its cluster under `/var/lib/postgresql/18/docker`.
+Mount the parent `/var/lib/postgresql`, also for tmpfs-backed tests.
+
+Version 4.0.0 changes the development volume from `pgdata` to `pgdata18`.
+The old `kontor2-dev_pgdata` volume is retained. PostgreSQL 16 data files cannot
+be opened directly by PostgreSQL 18. To preserve an existing development DB,
+export it **before switching from the old Compose file**:
+
+```sh
+umask 077
+docker compose -f docker-compose.dev.yml up -d --wait postgres
+docker compose -f docker-compose.dev.yml exec -T postgres pg_dump -U kontor2 -d kontor2_dev -Fc > kontor2-dev-pg16.dump
+docker compose -f docker-compose.dev.yml stop postgres
+```
+
+Move the dump to a private location outside the repository. After switching to
+the new Compose file, start the empty PostgreSQL 18 cluster and restore it:
+
+```sh
+docker compose -f docker-compose.dev.yml up -d --wait postgres
+docker compose -f docker-compose.dev.yml exec -T postgres pg_restore -U kontor2 -d kontor2_dev --exit-on-error --no-owner < /private/path/kontor2-dev-pg16.dump
+bun run dev:up
+```
+
+Verify the restored application before deleting any backup or old volume. For
+disposable data, starting the new stack without a restore creates an empty DB;
+the old volume still remains available. Redis reuses `redisdata`; back up that
+volume before its first Redis 8 start if its local state needs to be retained.
+These changes do not upgrade any hosted production database.
+
 ## Notes
 
 - **No HMR yet.** The app is served from the production build (`dev:serve`
