@@ -147,6 +147,15 @@ on Railway via Dockerfile.
   in browser storage or query caches. A saved key cannot be retrieved again.
 - Official Codex config reference: https://learn.chatgpt.com/docs/extend/mcp?surface=cli
 
+## Local service versions
+
+- Development, integration CI and production-image smoke tests use PostgreSQL 18
+  and Redis 8. PostgreSQL 18 mounts `/var/lib/postgresql`, with its default
+  versioned PGDATA underneath, including tmpfs mounts in CI and tests.
+- Development uses `pgdata18`; the old `pgdata` volume is deliberately preserved.
+  Existing development data needs dump/restore, never an in-place image swap.
+  See `docs/local-dev.md`. Production database services are managed separately.
+
 ## Commands
 
 - `bun run verify` -- typecheck + biome ci + tests + build. Run before pushing.
