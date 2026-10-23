@@ -61,7 +61,6 @@ const DEFAULT_CSP = [
 ].join("; ");
 
 const CSP = process.env.CONTENT_SECURITY_POLICY ?? DEFAULT_CSP;
-let activeRequests = 0;
 
 // Legacy-domain redirects belong to the persisted Control-Plane settings. The
 // map refreshes without a restart, Railway variable, or tenant-database scan.
@@ -137,46 +136,31 @@ function tryStaticFile(pathname: string): { path: string; mime: string } | null 
 }
 
 async function handle(request: Request): Promise<Response> {
-  const started = performance.now();
-  activeRequests += 1;
-  let status = 500;
-  try {
-    const url = new URL(request.url);
-    const host = (request.headers.get("host") ?? "").split(":")[0];
-    const canonicalHost = legacyRedirects.get(host.toLowerCase());
-    if (canonicalHost && url.pathname !== "/api/health") {
-      const response = new Response(null, {
-        status: 301,
-        headers: { location: `https://${canonicalHost}${url.pathname}${url.search}` },
-      });
-      status = response.status;
-      return response;
-    }
-    const hit = tryStaticFile(url.pathname);
-    if (hit) {
-      const file = Bun.file(hit.path);
-      const response = withSecurityHeaders(
-        new Response(file.stream(), {
-          headers: {
-            "content-type": hit.mime,
-            "cache-control": "public, max-age=86400, immutable",
-          },
-        }),
-      );
-      status = response.status;
-      return response;
-    }
-    const response = withSecurityHeaders(await handler.fetch(request));
-    status = response.status;
-    return response;
-  } finally {
-    activeRequests = Math.max(0, activeRequests - 1);
-    globalThis.__kontor2RecordHttpRequest?.({
-      status,
-      latencyMs: Math.round(performance.now() - started),
-      activeRequests,
+  const url = new URL(request.url);
+  const host = (request.headers.get("host") ?? "").split(":")[0];
+  const canonicalHost = legacyRedirects.get(host.toLowerCase());
+  if (canonicalHost && url.pathname !== "/api/health") {
+    const response = new Response(null, {
+      status: 301,
+      headers: { location: `https://${canonicalHost}${url.pathname}${url.search}` },
     });
+    return response;
   }
+  const hit = tryStaticFile(url.pathname);
+  if (hit) {
+    const file = Bun.file(hit.path);
+    const response = withSecurityHeaders(
+      new Response(file.stream(), {
+        headers: {
+          "content-type": hit.mime,
+          "cache-control": "public, max-age=86400, immutable",
+        },
+      }),
+    );
+    return response;
+  }
+  const response = withSecurityHeaders(await handler.fetch(request));
+  return response;
 }
 
 try {

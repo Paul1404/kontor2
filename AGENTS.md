@@ -138,6 +138,10 @@ on Railway via Dockerfile.
   Counter expiry is set only at creation. Keep all Better Auth packages aligned.
   ioredis uses explicit RESP2 in runtime and startup probes.
 
+LFIO is retired. Do not restore its telemetry reporter or per-request sample
+buffer. Readiness, startup S3 checks, snapshots, and application logs operate
+independently of the former external telemetry service.
+
 ## MCP setup
 
 - Codex setup text lives in `src/lib/mcp-setup.ts`. Use native Streamable HTTP

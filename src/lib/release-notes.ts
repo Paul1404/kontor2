@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "4.0.2",
+    date: "2026-10-24",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Nicht mehr benötigte Hintergrundmeldungen an das abgeschaltete Monitoring entfallen. Dadurch werden wiederholte Verbindungen und Fehlermeldungen vermieden.",
+      },
+    ],
+  },
+  {
     version: "4.0.1",
     date: "2026-10-23",
     changes: [
