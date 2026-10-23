@@ -125,6 +125,19 @@ on Railway via Dockerfile.
   the stored `messageId`; the recipient plus time window is a bounded fallback.
   A changed address clears the flag.
 
+## Readiness
+
+- `/api/health` returns 200 only when the primary and control databases, Redis
+  and PDF renderer pass; otherwise 503. Dependency checks repeat on every run,
+  concurrent requests share one run, and probes have a five-second deadline.
+  Only a successful PDF runtime probe is cached. Responses contain booleans,
+  never connection details, and use `Cache-Control: no-store`.
+- S3 reachability remains a startup preflight check. Readiness does not validate
+  every tenant database, schema compatibility, authenticated workflows or mail delivery.
+- Better Auth secondary storage requires atomic `getAndDelete` and `increment`.
+  Counter expiry is set only at creation. Keep all Better Auth packages aligned.
+  ioredis uses explicit RESP2 in runtime and startup probes.
+
 ## MCP setup
 
 - Codex setup text lives in `src/lib/mcp-setup.ts`. Use native Streamable HTTP

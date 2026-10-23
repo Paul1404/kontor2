@@ -42,6 +42,7 @@ async function checkRedis(): Promise<void> {
   const url = process.env.REDIS_URL;
   if (!url) throw new Error("REDIS_URL not set");
   const r = new Redis(url, {
+    protocol: 2,
     lazyConnect: true,
     maxRetriesPerRequest: 1,
     connectTimeout: 5_000,
