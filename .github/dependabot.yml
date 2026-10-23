@@ -9,6 +9,10 @@ updates:
       timezone: Europe/Berlin
     open-pull-requests-limit: 5
     groups:
+      better-auth:
+        patterns:
+          - "better-auth"
+          - "@better-auth/*"
       tanstack:
         patterns:
           - "@tanstack/*"

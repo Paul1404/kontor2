@@ -40,7 +40,7 @@ export function getRouter() {
     defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
     scrollRestoration: true,
-    Wrap: ({ children }: { children: ReactNode }) => <Providers>{children}</Providers>,
+    Wrap: Providers,
   });
 }
 

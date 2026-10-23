@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.2.1",
+    date: "2026-10-23",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Abhängigkeiten und Bun aktualisiert. Der Healthcheck prüft Datenbanken, Redis und die PDF-Erzeugung. Die Anmeldung verwendet atomare Redis-Operationen für Einmalwerte und Zugriffslimits.",
+      },
+    ],
+  },
+  {
     version: "3.2.0",
     date: "2026-10-07",
     changes: [

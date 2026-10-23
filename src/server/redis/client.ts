@@ -7,6 +7,7 @@ let client: Redis | undefined;
 export function redis(): Redis {
   if (!client) {
     client = new Redis(env().REDIS_URL, {
+      protocol: 2,
       lazyConnect: false,
       maxRetriesPerRequest: 3,
       enableReadyCheck: true,

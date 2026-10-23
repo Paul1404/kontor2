@@ -21,11 +21,20 @@ function embeddedCharacters(base64: string): Set<string> {
       // Not every stream is deflate-compressed; skip what will not inflate.
     }
   }
-  return new Set(
+  const characters = new Set(
     [...text.matchAll(/beginbfchar[\s\S]*?endbfchar/g)]
       .flatMap((block) => [...block[0].matchAll(/<[0-9A-Fa-f]{4}>\s*<([0-9A-Fa-f]{4,})>/g)])
       .map((pair) => String.fromCharCode(Number.parseInt((pair[1] ?? "").slice(0, 4), 16))),
   );
+  // Newer PDFKit uses bfrange arrays for ToUnicode mappings instead of bfchar.
+  for (const block of text.matchAll(/beginbfrange[\s\S]*?endbfrange/g)) {
+    for (const array of block[0].matchAll(/\[([^\]]*)\]/g)) {
+      for (const value of (array[1] ?? "").matchAll(/<([0-9A-Fa-f]{4,})>/g)) {
+        characters.add(String.fromCharCode(Number.parseInt((value[1] ?? "").slice(0, 4), 16)));
+      }
+    }
+  }
+  return characters;
 }
 
 async function renderSample(text: string): Promise<Set<string>> {

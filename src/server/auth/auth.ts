@@ -146,6 +146,27 @@ function buildAuth(tenant: Tenant) {
     },
     secondaryStorage: {
       get: async (key) => (await redis().get(`${keyPrefix}${key}`)) ?? null,
+      getAndDelete: async (key) => redis().getdel(`${keyPrefix}${key}`),
+      increment: async (key, ttl) =>
+        Number(
+          await redis().eval(
+            // 1.6 stored rate-limit snapshots as JSON at these same keys.
+            // Preserve their count and remaining TTL during the upgrade.
+            `local value = redis.call('GET', KEYS[1])
+             if value and not tonumber(value) then
+               local old = cjson.decode(value)
+               if type(old.count) == 'number' then
+                 redis.call('SET', KEYS[1], old.count, 'KEEPTTL')
+               end
+             end
+             local n = redis.call('INCR', KEYS[1])
+             if n == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+             return n`,
+            1,
+            `${keyPrefix}${key}`,
+            ttl,
+          ),
+        ),
       set: async (key, value, ttl) => {
         if (ttl) await redis().set(`${keyPrefix}${key}`, value, "EX", ttl);
         else await redis().set(`${keyPrefix}${key}`, value);
