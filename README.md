@@ -517,14 +517,13 @@ Postgres advisory lock keeps multiple replicas from running it at once. Set
 bun install
 cp .env.example .env
 openssl rand -hex 32   # paste into APP_SECRET
-docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=kontor2 postgres:18.6-alpine
-docker run -d --name redis -p 6379:6379 redis:8.10.2-alpine
-bun run db:generate
-bun run db:migrate
-bun run dev
+bun run dev:up
+bun run dev:serve
 ```
 
-Open <http://localhost:3000>.
+Open <http://localhost:3000>. PostgreSQL uses `127.0.0.1:5434`, so an existing
+host database on 5432 stays available. See [local development](docs/local-dev.md)
+for the service configuration and data-upgrade instructions.
 
 The first user is created interactively at `/setup`, which is reachable
 without auth only while the user table is empty.

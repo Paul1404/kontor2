@@ -156,6 +156,12 @@ on Railway via Dockerfile.
   Existing development data needs dump/restore, never an in-place image swap.
   See `docs/local-dev.md`. Production database services are managed separately.
 
+- Host development PostgreSQL uses `127.0.0.1:5434`, tests use 5433, and the
+  machine's PostgreSQL on 5432 is independent. `scripts/dev.ts` waits for services
+  and bucket setup, then migrates with the local environment from `dev-env.ts`.
+  `dev:serve` uses the same local connections; `PORT` also determines its auth
+  origin. These helpers preserve APP_SECRET and do not rewrite `.env`.
+
 ## Commands
 
 - `bun run verify` -- typecheck + biome ci + tests + build. Run before pushing.

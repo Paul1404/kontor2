@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "4.0.1",
+    date: "2026-10-23",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Die lokale Entwicklungsumgebung verwendet einen eigenen PostgreSQL-Port. Start, Migration und Vorschau greifen gezielt auf die Entwicklungsdienste zu, ohne einen vorhandenen PostgreSQL-Dienst zu ändern.",
+      },
+    ],
+  },
+  {
     version: "4.0.0",
     date: "2026-10-23",
     changes: [

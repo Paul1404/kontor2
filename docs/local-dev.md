@@ -19,7 +19,7 @@ Create `.env` in the repo root (gitignored). The values below match the
 
 ```sh
 NODE_ENV=development
-DATABASE_URL=postgres://kontor2:kontor2@localhost:5432/kontor2_dev
+DATABASE_URL=postgres://kontor2:kontor2@127.0.0.1:5434/kontor2_dev
 REDIS_URL=redis://localhost:6379
 BETTER_AUTH_URL=http://localhost:3000
 APP_SECRET=$(openssl rand -hex 32)
@@ -30,12 +30,27 @@ AWS_ACCESS_KEY_ID=minioadmin
 AWS_SECRET_ACCESS_KEY=minioadmin
 ```
 
+The `dev:up`, `dev:reset` and `dev:serve` helpers explicitly select these local
+services, including the control database and MinIO. They preserve `APP_SECRET`
+and unrelated settings from `.env`, but ignore inherited database, tenant-list,
+Redis, object-storage and public-origin settings. Raw `bun run dev`, `start`
+and `db:migrate` still use your own environment.
+
+PostgreSQL is published only on `127.0.0.1:5434`. An existing host PostgreSQL on
+5432 and the disposable integration database on 5433 can run alongside it.
+The internal Docker port remains 5432. Redis stays on its existing port 6379.
+
 ## Run
 
 ```sh
 bun run dev:up      # start Postgres + Redis + MinIO (+ create the bucket) and apply migrations
 bun run dev:serve   # build the app and serve it on http://localhost:3000
 ```
+
+The helper waits for healthy PostgreSQL and Redis, creates the MinIO bucket,
+and then runs migrations against the development database. If app port 3000
+is already occupied, use `PORT=3301 bun run dev:serve`; the local auth origin
+follows that port automatically. Snapshot scheduling is disabled for this stack.
 
 Other helpers:
 
