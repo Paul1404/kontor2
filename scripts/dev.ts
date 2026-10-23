@@ -28,11 +28,21 @@ switch (process.argv[2]) {
     compose(["down", "-v"]);
     up();
     break;
+  case "vite":
+    run("bun", [
+      "x",
+      "vite",
+      "dev",
+      "--port",
+      environment.PORT ?? "3000",
+      ...process.argv.slice(3),
+    ]);
+    break;
   case "serve":
     run("bun", ["run", "build"]);
     run("bun", ["run", "start"]);
     break;
   default:
-    console.error("Usage: bun scripts/dev.ts <up|reset|serve>");
+    console.error("Usage: bun scripts/dev.ts <up|reset|serve|vite>");
     process.exit(1);
 }

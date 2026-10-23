@@ -6,7 +6,7 @@
   "author": "Paul Dresch <paul.dresch@untereuerheim.com>",
   "type": "module",
   "scripts": {
-    "dev": "vite dev --port 3000",
+    "dev": "bun scripts/dev.ts vite",
     "build": "vite build",
     "start": "bun scripts/serve.ts",
     "typecheck": "tsc --noEmit",

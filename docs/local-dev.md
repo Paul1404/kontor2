@@ -30,11 +30,10 @@ AWS_ACCESS_KEY_ID=minioadmin
 AWS_SECRET_ACCESS_KEY=minioadmin
 ```
 
-The `dev:up`, `dev:reset` and `dev:serve` helpers explicitly select these local
+The `dev`, `dev:up`, `dev:reset` and `dev:serve` helpers explicitly select these local
 services, including the control database and MinIO. They preserve `APP_SECRET`
 and unrelated settings from `.env`, but ignore inherited database, tenant-list,
-Redis, object-storage and public-origin settings. Raw `bun run dev`, `start`
-and `db:migrate` still use your own environment.
+Redis, object-storage and public-origin settings. Raw `start` and `db:migrate` still use your own environment.
 
 PostgreSQL is published only on `127.0.0.1:5434`. An existing host PostgreSQL on
 5432 and the disposable integration database on 5433 can run alongside it.
