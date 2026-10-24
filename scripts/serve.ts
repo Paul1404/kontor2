@@ -93,13 +93,24 @@ async function refreshLegacyRedirects(): Promise<void> {
   }
 }
 
-function withSecurityHeaders(res: Response): Response {
+function withSecurityHeaders(res: Response, request?: Request): Response {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
     if (!res.headers.has(key)) res.headers.set(key, value);
   }
   const type = res.headers.get("content-type") ?? "";
   if (CSP && type.includes("text/html") && !res.headers.has("content-security-policy")) {
-    res.headers.set("content-security-policy", CSP);
+    const url = request ? new URL(request.url) : null;
+    const applicationPage =
+      url?.hostname === "svu.kontor2.com" && /^\/antrag\/?$/.test(url.pathname);
+    // Allow only our consent-gated tracker on the public SVU application page.
+    const policy =
+      applicationPage && CSP === DEFAULT_CSP
+        ? CSP.replace(
+            "script-src 'self' 'unsafe-inline'",
+            "script-src 'self' 'unsafe-inline' https://umami.pdcd.net",
+          ).replace("connect-src 'self'", "connect-src 'self' https://umami.pdcd.net")
+        : CSP;
+    res.headers.set("content-security-policy", policy);
   }
   return res;
 }
@@ -159,7 +170,7 @@ async function handle(request: Request): Promise<Response> {
     );
     return response;
   }
-  const response = withSecurityHeaders(await handler.fetch(request));
+  const response = withSecurityHeaders(await handler.fetch(request), request);
   return response;
 }
 
