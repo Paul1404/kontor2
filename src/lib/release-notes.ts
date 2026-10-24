@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "4.0.4",
+    date: "2026-10-24",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Der öffentliche Antrag und andere Seiten starten wieder zuverlässig im Browser. Die technische Bereitschaftsprüfung lädt ihre Datenbanktreiber ausschließlich auf dem Server.",
+      },
+    ],
+  },
+  {
     version: "4.0.3",
     date: "2026-10-24",
     changes: [
