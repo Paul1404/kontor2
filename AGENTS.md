@@ -257,3 +257,9 @@ honors DNT/GPC, excludes query-bearing and authenticated routes, and strips
 individual event data and titles. Server-side strict masking and replay limits
 are owned by web-host-gitops analytics/websites.json. Never rely on recorder
 data-mask-level attributes. Keep the site's privacy notice and providers aligned.
+
+API route modules enter the client route tree. Wrap exported handlers with
+createServerOnlyFn and load server dependencies inside that boundary. A static
+readiness import previously pulled postgres into the browser and prevented
+hydration. The analytics browser suite imports the actual built client graph
+to catch this class of regression, so build before running that suite.

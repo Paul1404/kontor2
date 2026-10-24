@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
 const code = readFileSync("public/analytics-consent.js", "utf8");
@@ -70,3 +71,25 @@ for (const mode of [
     }
   });
 }
+
+// Exercise the built browser graph. A server-only readiness import previously
+// evaluated the PostgreSQL driver before React could hydrate any public form.
+test("production browser entry does not evaluate server dependencies", async ({ page }) => {
+  const entry = readdirSync("dist/client/assets").find((name) => /^index-.*\.js$/.test(name));
+  expect(entry).toBeTruthy();
+  await page.route("https://bundle.test/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    return route.fulfill(
+      path.startsWith("/assets/")
+        ? { contentType: "application/javascript", body: readFileSync(join("dist/client", path)) }
+        : { contentType: "text/html", body: "<!doctype html><html><body></body></html>" },
+    );
+  });
+  await page.goto("https://bundle.test/");
+  await expect(
+    page.evaluate(async (path) => {
+      await import(path);
+      return true;
+    }, `/assets/${entry}`),
+  ).resolves.toBe(true);
+});

@@ -41,14 +41,14 @@ jobs:
       - name: Test
         run: bun run test
 
+      - name: Build
+        run: bun run build
+
       - name: Install Chromium for consent regressions
         run: bunx playwright install --with-deps chromium
 
       - name: Verify analytics consent in a real browser
         run: bun run test:browser -- tests/browser/analytics-consent.spec.ts
-
-      - name: Build
-        run: bun run build
 
   integration:
     name: integration tests
