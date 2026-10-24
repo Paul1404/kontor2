@@ -247,3 +247,13 @@ data in the README; never publish production records or credentials.
 Update this file when verified repository behavior changes. Keep it concise and
 move detailed explanations to `docs/`. Keep `CLAUDE.md` as the compatibility
 import unless Claude-specific guidance is genuinely required.
+
+## Analytics privacy
+
+public/analytics-consent.js gates both Umami scripts behind an explicit choice.
+Keep it consistent with the same asset in the other managed websites. Reject
+and withdraw must stop requests, including beacon/keepalive sends. The loader
+honors DNT/GPC, excludes query-bearing and authenticated routes, and strips
+individual event data and titles. Server-side strict masking and replay limits
+are owned by web-host-gitops analytics/websites.json. Never rely on recorder
+data-mask-level attributes. Keep the site's privacy notice and providers aligned.

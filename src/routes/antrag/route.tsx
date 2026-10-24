@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { Mail, Phone, ShieldCheck } from "lucide-react";
+import { useEffect } from "react";
 import { useBranding } from "~/lib/branding";
 import { orpc } from "~/lib/orpc";
 
@@ -9,6 +10,24 @@ export const Route = createFileRoute("/antrag")({
 });
 
 function AntragLayout() {
+  useEffect(() => {
+    // Keep all other clubs, authenticated pages and follow-up routes untracked.
+    if (location.hostname !== "svu.kontor2.com" || !/^\/antrag\/?$/.test(location.pathname)) return;
+    const script = document.createElement("script");
+    script.src = "/analytics-consent.js";
+    script.dataset.websiteId = "35888d1d-623f-40d4-86b2-d4fd181074f3";
+    script.dataset.hosts = "svu.kontor2.com";
+    script.dataset.onlyPath = "/antrag";
+    script.dataset.privacy = "https://sv-untereuerheim.de/datenschutz/#analyse";
+    document.body.append(script);
+    return () => {
+      script.remove();
+      // The recorder has no stop API. Discard its observers on SPA departure.
+      const consent = (window as unknown as { siteAnalyticsConsent?: { destroy: () => void } })
+        .siteAnalyticsConsent;
+      consent?.destroy();
+    };
+  }, []);
   const branding = useBranding();
   const settings = useQuery({
     queryKey: ["applications.publicSettings"],
@@ -45,7 +64,7 @@ function AntragLayout() {
           </span>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-4 py-6">
+      <main className="rr-block mx-auto max-w-3xl px-4 py-6" data-private="true">
         <Outlet />
       </main>
       <footer className="mt-12 border-t py-8">

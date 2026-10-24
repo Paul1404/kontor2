@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "4.0.3",
+    date: "2026-10-24",
+    changes: [
+      {
+        category: "improvement",
+        description:
+          "Beim öffentlichen SVU-Mitgliedsantrag ist eine freiwillige, maskierte Nutzungsanalyse möglich. Die gesamte Antragsfläche bleibt von Aufzeichnungen ausgeschlossen. Ablehnen und Widerrufen sind jederzeit möglich.",
+      },
+    ],
+  },
+  {
     version: "4.0.2",
     date: "2026-10-24",
     changes: [
