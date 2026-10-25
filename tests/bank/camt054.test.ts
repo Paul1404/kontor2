@@ -47,6 +47,10 @@ const CAMT = `<?xml version="1.0" encoding="UTF-8"?>
 </Document>`;
 
 describe("parseCamt054", () => {
+  it("preserves identifiers split by valid XML comments", () => {
+    const split = CAMT.replace("E2E-AAA-001", "E2E-<!---->AAA-001");
+    expect(parseCamt054(split).returns[0]?.endToEndId).toBe("E2E-AAA-001");
+  });
   it("extracts returned debits with reason, amount, date and debtor", () => {
     const { returns, warnings } = parseCamt054(CAMT);
     expect(warnings).toHaveLength(0);

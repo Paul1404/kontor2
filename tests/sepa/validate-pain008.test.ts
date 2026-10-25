@@ -40,6 +40,10 @@ const VALID = `<?xml version="1.0" encoding="UTF-8"?>
 const codes = (xml: string) => validatePain008(xml, TODAY).findings.map((f) => f.code);
 
 describe("validatePain008", () => {
+  it("preserves identifiers split by valid XML comments", () => {
+    const split = VALID.replace("<MsgId>TEST-1</MsgId>", "<MsgId>TEST-<!---->1</MsgId>");
+    expect(validatePain008(split, TODAY).summary.messageId).toBe("TEST-1");
+  });
   it("accepts a well-formed file", () => {
     const r = validatePain008(VALID, TODAY);
     expect(r.ok).toBe(true);

@@ -97,9 +97,9 @@ function useMagnetic() {
 
 // Draft persistence: keep an in-progress application across reloads. Uses
 // sessionStorage (cleared when the tab closes), keeping the
-// applicant's data off the device long-term. The signature is intentionally
-// excluded; it is re-drawn on the summary step.
-const DRAFT_KEY = "kontor2-antrag-draft-v1";
+// applicant's data off the device long-term. Bank details and the signature
+// stay in memory only and must be entered again after a reload.
+const DRAFT_KEY = "kontor2-antrag-draft-v2";
 
 type Draft = {
   step: number;
@@ -124,16 +124,12 @@ type Draft = {
   partnerGeburtsdatum: string;
   partnerAbt: string[];
   kinder: KindRow[];
-  kontoinhaber: string;
-  iban: string;
-  bic: string;
-  kreditinstitut: string;
   signOnline: boolean;
   datenschutz: boolean;
   satzung: boolean;
 };
 
-function AntragForm() {
+export function AntragForm() {
   const settings = useQuery({
     queryKey: ["applications.publicSettings"],
     queryFn: () => orpc.applications.publicSettings(),
@@ -224,10 +220,12 @@ function AntragForm() {
   // Restore a saved draft once on mount.
   useEffect(() => {
     try {
+      // Remove legacy drafts that could contain bank details.
+      sessionStorage.removeItem("kontor2-antrag-draft-v1");
       const raw = sessionStorage.getItem(DRAFT_KEY);
       if (raw) {
         const d = JSON.parse(raw) as Partial<Draft>;
-        if (typeof d.step === "number") setStep(Math.min(Math.max(d.step, 0), STEPS.length - 1));
+        if (typeof d.step === "number") setStep(Math.min(Math.max(d.step, 0), 1));
         if (d.geschlecht !== undefined) setGeschlecht(d.geschlecht);
         if (typeof d.vorname === "string") setVorname(d.vorname);
         if (typeof d.nachname === "string") setNachname(d.nachname);
@@ -250,10 +248,6 @@ function AntragForm() {
           setPartnerGeburtsdatum(d.partnerGeburtsdatum);
         if (Array.isArray(d.partnerAbt)) setPartnerAbt(d.partnerAbt);
         if (Array.isArray(d.kinder)) setKinder(d.kinder);
-        if (typeof d.kontoinhaber === "string") setKontoinhaber(d.kontoinhaber);
-        if (typeof d.iban === "string") setIban(d.iban);
-        if (typeof d.bic === "string") setBic(d.bic);
-        if (typeof d.kreditinstitut === "string") setKreditinstitut(d.kreditinstitut);
         if (typeof d.signOnline === "boolean") setSignOnline(d.signOnline);
         if (typeof d.datenschutz === "boolean") setDatenschutz(d.datenschutz);
         if (typeof d.satzung === "boolean") setSatzung(d.satzung);
@@ -289,10 +283,6 @@ function AntragForm() {
     partnerGeburtsdatum,
     partnerAbt,
     kinder,
-    kontoinhaber,
-    iban,
-    bic,
-    kreditinstitut,
     signOnline,
     datenschutz,
     satzung,
@@ -611,7 +601,9 @@ function AntragForm() {
           )}
         >
           <Check className="size-3.5 text-success" />
-          {draftState === "restored" ? "Entwurf wiederhergestellt" : "Entwurf gespeichert"}
+          {draftState === "restored"
+            ? "Entwurf wiederhergestellt"
+            : "Entwurf ohne Bankdaten gespeichert"}
         </p>
       </div>
 

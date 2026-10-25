@@ -1,3 +1,4 @@
+import { stripXmlComments } from "~/server/lib/xml-comments";
 /**
  * camt.054 (Bank-to-Customer Debit/Credit Notification) parser, focused on
  * SEPA-Rücklastschriften (R-Transactions). The bank delivers a camt.054 file
@@ -73,10 +74,9 @@ function parseAttrs(raw: string): Record<string, string> {
 
 /** Tolerant, namespace-agnostic XML parser producing a node tree. */
 function parseXml(xml: string): XmlNode {
-  const cleaned = xml
+  const cleaned = stripXmlComments(xml)
     .replace(/^﻿/, "")
     .replace(/<\?[\s\S]*?\?>/g, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_, inner) => inner);
 
   const root: XmlNode = { name: "#root", attrs: {}, children: [], text: "" };
