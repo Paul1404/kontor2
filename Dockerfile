@@ -64,4 +64,4 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 # the process is ever compromised.
 USER bun
 EXPOSE 3000
-CMD ["bun", "scripts/serve.ts"]
+CMD ["bun", "--smol", "scripts/serve.ts"]

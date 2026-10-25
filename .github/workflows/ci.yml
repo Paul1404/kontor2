@@ -161,4 +161,4 @@ jobs:
             -e APP_SECRET=0000000000000000000000000000000000000000000000000000000000000000 \
             -e AWS_ENDPOINT_URL=http://localhost:9000 -e AWS_S3_BUCKET_NAME=svuwv-test \
             -e AWS_DEFAULT_REGION=us-east-1 -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test \
-            -e SNAPSHOT_CRON_DISABLED=1 kontor2:ci bun scripts/smoke-image.ts
+            -e SNAPSHOT_CRON_DISABLED=1 kontor2:ci bun --smol scripts/smoke-image.ts
