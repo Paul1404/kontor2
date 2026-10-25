@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "4.0.6",
+    date: "2026-10-25",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Hilfsbibliotheken für Excel-Exporte und Datenbankwerkzeuge wurden aktualisiert. Dateierzeugung, erneutes Öffnen und die Verarbeitung der Datenbankschemata sind durch gezielte Prüfungen abgesichert.",
+      },
+    ],
+  },
+  {
     version: "4.0.5",
     date: "2026-10-25",
     changes: [
