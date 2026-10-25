@@ -270,3 +270,16 @@ Production server commands pass `bun --smol` explicitly. Keep this scoped to
 the long-lived server process; do not set global `BUN_OPTIONS` for builds,
 installs or migrations. Preserve readiness and background work when measuring
 memory savings. Removing the runtime flag is the rollback.
+
+## Scoped dependency compatibility
+
+The `@esbuild-kit/core-utils>esbuild` override is parent-scoped. Its regression
+test checks both synchronous CommonJS and asynchronous ESM transforms used by
+Drizzle Kit. Keep the override scoped and validate schema loading and migrations
+when changing it. Nested overrides require a Bun version that supports lockfile
+version 3; CI and production must use a compatible runtime.
+`exceljs>uuid` preserves the CommonJS UUID v4 call used by ExcelJS. Its test
+generates UUID-backed conditional formatting and reopens the actual XLSX file.
+`bunx drizzle-kit export --sql` validates loading the actual TypeScript schema
+without connecting to a database; run it alongside the transform regression
+tests after changing this loader override.
