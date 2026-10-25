@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "4.0.9",
+    date: "2026-10-25",
+    title: "Schlankeres Server-Abbild",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Unbenötigte Systemwerkzeuge werden aus dem laufenden Server entfernt. Die Freigabe prüft weiterhin Datenbankzugriff, PDF-Erzeugung und Bereitschaft im fertigen Abbild.",
+      },
+    ],
+  },
+  {
     version: "4.0.8",
     date: "2026-10-25",
     changes: [
