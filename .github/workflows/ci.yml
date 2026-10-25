@@ -12,7 +12,7 @@ permissions:
 # Cancel superseded runs on the same ref so a force-push doesn't pile up jobs.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:

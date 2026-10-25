@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "4.0.8",
+    date: "2026-10-25",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Unbenötigte Entwicklungswerkzeuge entfallen im laufenden Server. Sicherheitsprüfungen kontrollieren das erzeugte Server-Abbild vor jeder Freigabe.",
+      },
+    ],
+  },
+  {
     version: "4.0.7",
     date: "2026-10-25",
     changes: [
