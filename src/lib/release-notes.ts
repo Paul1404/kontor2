@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "4.0.5",
+    date: "2026-10-25",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Der Server startet mit einer speichersparenden Laufzeiteinstellung. Bereitschaftsprüfungen und Hintergrundaufgaben bleiben aktiv.",
+      },
+    ],
+  },
+  {
     version: "4.0.4",
     date: "2026-10-24",
     changes: [

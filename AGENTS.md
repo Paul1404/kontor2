@@ -263,3 +263,10 @@ createServerOnlyFn and load server dependencies inside that boundary. A static
 readiness import previously pulled postgres into the browser and prevented
 hydration. The analytics browser suite imports the actual built client graph
 to catch this class of regression, so build before running that suite.
+
+## Runtime memory mode
+
+Production server commands pass `bun --smol` explicitly. Keep this scoped to
+the long-lived server process; do not set global `BUN_OPTIONS` for builds,
+installs or migrations. Preserve readiness and background work when measuring
+memory savings. Removing the runtime flag is the rollback.
