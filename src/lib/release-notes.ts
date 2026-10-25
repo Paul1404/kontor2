@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "4.0.7",
+    date: "2026-10-25",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Antragsentwürfe speichern keine Bankdaten mehr im Browser. Nach dem Neuladen werden Bankverbindung und Unterschrift erneut eingegeben. Ältere Entwürfe mit Bankdaten werden entfernt.",
+      },
+    ],
+  },
+  {
     version: "4.0.6",
     date: "2026-10-25",
     changes: [

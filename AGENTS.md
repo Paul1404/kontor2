@@ -283,3 +283,10 @@ generates UUID-backed conditional formatting and reopens the actual XLSX file.
 `bunx drizzle-kit export --sql` validates loading the actual TypeScript schema
 without connecting to a database; run it alongside the transform regression
 tests after changing this loader override.
+
+## Membership draft privacy
+
+Browser drafts exclude account holder, IBAN, BIC, bank name and signature.
+Remove the old v1 draft on mount. Restored drafts stop at the SEPA step so bank
+details and signature are entered again before submission. Keep bank data in
+component state only until the explicit application submission.

@@ -1,3 +1,4 @@
+import { stripXmlComments } from "~/server/lib/xml-comments";
 import { isTargetBusinessDay, nextCollectionDate } from "~/server/sepa/business-days";
 import { normalizeIban, validateIban } from "~/server/sepa/iban";
 
@@ -77,7 +78,7 @@ function localName(n: string): string {
 export function parseXml(input: string): XmlNode {
   let s = input.replace(/^﻿/, "");
   s = s.replace(/<\?xml[\s\S]*?\?>/g, "");
-  s = s.replace(/<!--[\s\S]*?-->/g, "");
+  s = stripXmlComments(s);
   const stack: XmlNode[] = [];
   let root: XmlNode | null = null;
   const tagRe = /<(\/?)([A-Za-z_][\w:.-]*)((?:\s+[\w:.-]+\s*=\s*"[^"]*")*)\s*(\/?)>|([^<]+)/g;
