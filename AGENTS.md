@@ -147,6 +147,14 @@ on Railway via Dockerfile.
   auch über mehrere Instanzen. Keine automatische Wiederholung nach unklarem
   SMTP-Ausgang; Details und Grenzen stehen in `docs/membership-workflows.md`.
 
+## Ehrungsstufen
+
+`STANDARD_JUBILAEEN` in `src/lib/ehrungen.ts` ist die gemeinsame Quelle für
+Oberfläche und Standardbericht: ab 25 Jahren alle fünf Jahre bis zur
+bestehenden API-Grenze von 150 Jahren. Keine zweite Standardliste pflegen.
+Eine leere Filterauswahl in der Oberfläche zeigt keine Ergebnisse und sperrt
+den CSV-Export; die API behält ihre Standardwerte bei weggelassenen Filtern.
+
 ## Readiness
 
 - `/api/health` returns 200 only when the primary and control databases, Redis

@@ -4,8 +4,8 @@
  * the boundary in either direction. Free of em/en dashes per the house style.
  */
 
-/** Standard Vereinsjubiläen offered by the report, in years of membership. */
-export const STANDARD_JUBILAEEN = [25, 40, 50, 60, 70, 75] as const;
+/** Five-year anniversaries from 25 up to the API's supported 150 years. */
+export const STANDARD_JUBILAEEN = Array.from({ length: 26 }, (_, index) => 25 + index * 5);
 
 /**
  * Common Sonderehrungen suggested in the member form. Free text is still

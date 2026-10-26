@@ -36,11 +36,13 @@ function EhrungenPage() {
   const data = useQuery({
     queryKey: ["reports.ehrungen", { year, selected }],
     queryFn: () => orpc.reports.ehrungen({ year, jubilaeen: selected }),
+    enabled: selected.length > 0,
   });
 
   const status = useQuery({
     queryKey: ["ehrungen.statusForYear", { year, selected }],
     queryFn: () => orpc.ehrungen.statusForYear({ year, jubilaeen: selected }),
+    enabled: selected.length > 0,
   });
 
   // Lookup of recorded honors by member + jubilee, so each due row shows open
@@ -121,15 +123,15 @@ function EhrungenPage() {
             <Trophy className="size-6 text-brand" /> Ehrungen
           </h1>
           <p className="text-sm text-muted-foreground">
-            Mitglieder mit anstehendem Vereinsjubiläum (25, 40, 50 Jahre und mehr) im gewählten
-            Jahr. Erfasste Ehrungen lassen sich als Urkunde drucken.
+            Mitglieder mit anstehendem Vereinsjubiläum ab 25 Jahren in Fünfjahresschritten im
+            gewählten Jahr. Erfasste Ehrungen lassen sich als Urkunde drucken.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => window.print()}>
             <Printer className="size-4" /> Drucken
           </Button>
-          <Button onClick={exportCsv}>
+          <Button onClick={exportCsv} disabled={selected.length === 0}>
             <Download className="size-4" /> Als CSV exportieren
           </Button>
         </div>
@@ -157,6 +159,7 @@ function EhrungenPage() {
         <CardContent className="flex flex-wrap items-center gap-4 p-4">
           <input
             type="number"
+            aria-label="Jahr der Ehrungen"
             min={1900}
             max={2200}
             value={year}
@@ -171,6 +174,7 @@ function EhrungenPage() {
                   key={j}
                   type="button"
                   onClick={() => toggle(j)}
+                  aria-pressed={on}
                   className={
                     "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors " +
                     (on

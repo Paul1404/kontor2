@@ -300,7 +300,7 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "report_honors",
     description:
-      "Upcoming membership jubilees (Ehrungen) for a year. Optionally pass the jubilee years to check (default 25, 40, 50, 60, 70, 75).",
+      "Upcoming membership jubilees (Ehrungen) for a year. Optionally pass the jubilee years to check (default: every five years from 25 through 150).",
     minRole: "readonly",
     input: v.object({
       year: YearInput,
