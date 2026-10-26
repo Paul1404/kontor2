@@ -28,7 +28,6 @@ import { AttachmentsCard } from "~/components/forms/AttachmentsCard";
 import { AustrittDialog } from "~/components/forms/AustrittDialog";
 import { AustrittsbestaetigungCard } from "~/components/forms/AustrittsbestaetigungCard";
 import { BankDetailsChangeDialog } from "~/components/forms/BankDetailsChangeDialog";
-import { BeziehungenCard } from "~/components/forms/BeziehungenCard";
 import { BriefDialog } from "~/components/forms/BriefDialog";
 import { BriefeCard } from "~/components/forms/BriefeCard";
 import { ContractsCard } from "~/components/forms/ContractsCard";
@@ -36,6 +35,7 @@ import { DsgvoCard } from "~/components/forms/DsgvoCard";
 import { EhrungenCard } from "~/components/forms/EhrungenCard";
 import { FamilieCard } from "~/components/forms/FamilieCard";
 import { KuendigungsCard } from "~/components/forms/KuendigungsCard";
+import { MemberConversionDialog } from "~/components/forms/MemberConversionDialog";
 import { SepaCard } from "~/components/forms/SepaCard";
 import { WiedervorlagenCard } from "~/components/forms/WiedervorlagenCard";
 import { SnapshotsTab } from "~/components/snapshots/SnapshotsTab";
@@ -75,6 +75,7 @@ function MemberDetailPage() {
   const { mitgliedsnummer } = Route.useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [conversionOpen, setConversionOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmAustritt, setConfirmAustritt] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
@@ -198,6 +199,7 @@ function MemberDetailPage() {
     audit,
     beziehungen,
     incomingBeziehungenCount,
+    familyRecipients,
     sollstellungen,
   } = detail.data;
   // Kontakt = a payer/contact (kontaktNo, no memberNo). The data-model rule is
@@ -205,8 +207,7 @@ function MemberDetailPage() {
   // relationships in either direction means this row is leftover from the Linear
   // import and should either get linked up or deleted. Keying on memberNo (not
   // the legacy Mitgliedsnummer) so app-created members are never flagged orphan.
-  const isOrphanKontakt =
-    !member.memberNo && beziehungen.length === 0 && incomingBeziehungenCount === 0;
+  const isOrphanKontakt = !member.memberNo && familyRecipients.length === 0;
   const isDeleted = (member as { deletedAt?: string | Date | null }).deletedAt != null;
 
   // aktiv vs passiv is derived: a live member counts as aktiv only while they
@@ -323,8 +324,13 @@ function MemberDetailPage() {
               toast.success("vCard heruntergeladen");
             }}
           >
-            <Contact className="size-4" /> Als Kontakt
+            <Contact className="size-4" /> Kontakt herunterladen
           </Button>
+          {canEdit && member.memberNo ? (
+            <Button variant="outline" size="sm" onClick={() => setConversionOpen(true)}>
+              In Kontakt umwandeln
+            </Button>
+          ) : null}
           {canEdit ? (
             <Link
               to="/app/mitglieder/$mitgliedsnummer/bearbeiten"
@@ -400,6 +406,19 @@ function MemberDetailPage() {
         anhaenge={anhaenge}
       />
 
+      <MemberConversionDialog
+        memberId={member.id}
+        open={conversionOpen}
+        onOpenChange={setConversionOpen}
+        onDone={async (reference) => {
+          setConversionOpen(false);
+          await qc.invalidateQueries();
+          navigate({
+            to: "/app/mitglieder/$mitgliedsnummer",
+            params: { mitgliedsnummer: reference },
+          });
+        }}
+      />
       <AustrittDialog
         open={confirmAustritt}
         onOpenChange={setConfirmAustritt}
@@ -463,9 +482,9 @@ function MemberDetailPage() {
           <div className="flex flex-col gap-1">
             <p className="font-medium text-foreground">Verwaister Kontakt</p>
             <p className="text-muted-foreground">
-              Dieser Eintrag hat keine Mitgliedsnummer und keine verknüpften Beziehungen. Kontakte
-              sollten immer einem Mitglied über eine Beziehung zugeordnet sein. Sonst sind sie
-              vermutlich Altlasten aus dem Linear-Import.
+              Dieser Eintrag hat keine Mitgliedsnummer und keine Familienzuordnung. Kontakte sollten
+              immer einem Mitglied über eine Beziehung zugeordnet sein. Sonst sind sie vermutlich
+              Altlasten aus dem Linear-Import.
             </p>
             {canEdit && me.data?.role === "admin" ? (
               <Link
@@ -608,12 +627,10 @@ function MemberDetailPage() {
             canEdit={canEdit}
           />
 
-          <FamilieCard memberId={member.id} memberNachname={member.nachname} canEdit={canEdit} />
-
-          <BeziehungenCard
+          <FamilieCard
             memberId={member.id}
-            mitgliedsnummer={mitgliedsnummer}
-            beziehungen={beziehungen as never}
+            memberNachname={member.nachname}
+            memberGeburtsdatum={member.geburtsdatum}
             canEdit={canEdit}
           />
 

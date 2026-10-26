@@ -1,3 +1,4 @@
+import { stopBirthdayScheduler } from "~/server/mail/birthday-scheduler";
 /**
  * Process-wide resource teardown for graceful shutdown.
  *
@@ -31,6 +32,7 @@ export function closeResources(): Promise<void> {
   if (inFlight) return inFlight;
   inFlight = (async () => {
     stopSnapshotScheduler();
+    await stopBirthdayScheduler();
 
     try {
       await flushSinks();

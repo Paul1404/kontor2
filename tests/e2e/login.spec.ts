@@ -17,11 +17,12 @@ test.describe("login", () => {
 
   test("rejects wrong credentials and stays on /login", async ({ page }) => {
     await page.goto("/login");
+    await page.waitForLoadState("networkidle");
     await page.fill("#email", E2E_ADMIN.email);
     await page.fill("#password", "definitely-not-the-password");
     await page.getByRole("button", { name: "Anmelden" }).click();
 
-    await expect(page.getByText(/fehlgeschlagen|ungültig|invalid/i)).toBeVisible();
+    await expect(page.getByText(/fehlgeschlagen|ungültig|invalid|falsch/i)).toBeVisible();
     await expect(page).toHaveURL(/\/login/);
   });
 

@@ -125,6 +125,28 @@ on Railway via Dockerfile.
   the stored `messageId`; the recipient plus time window is a bounded fallback.
   A changed address clears the flag.
 
+## Mitglieder- und Familienabläufe ab Version 5
+
+- `memberIsCurrent` und `memberHasNumber` sind die gemeinsame Quelle für echte
+  aktuelle Mitglieder. Kontakte gehören nicht in Mitgliederkennzahlen. Die
+  Listenansicht startet mit `aktuell`; `alle` bedeutet alle Datensätze.
+- Familien führen Zahler und Sorgeberechtigte. `isGuardian` ist unabhängig von
+  der Hauptrolle; `guardianMemberId` bestimmt den Hauptempfänger für Kinder.
+  Altbeziehungen bleiben Herkunftsnachweise, ihre normalen Schreibwege sind
+  deaktiviert. Die bestätigte Bestandsübernahme unter Familien prüft einen
+  Hash und überspringt widersprüchliche Fälle. Siehe `docs/membership-workflows.md`.
+- Tarifwechsel laufen über `contractSwitch.preview` und `.commit`. Ein
+  `seriesId` verbindet Vorgänger und Nachfolger. Das Vertragsende beim Wechsel
+  ist exklusiv, der Nachfolger beginnt am selben Tag. Ein bereits gestellter
+  Jahresbeitrag eines Vorgängers blockiert eine zweite Sollstellung im Verlauf.
+- `memberConversion` korrigiert nur unbelastete Fehlanlagen. Austritts-,
+  Vertrags-, Abteilungs- und Finanzhistorie blockieren die Konvertierung.
+  `previousMemberNo` hält die alte Referenz suchbar; Portalzugänge werden beendet.
+- Geburtstagserinnerungen starten deaktiviert und laufen montags nach
+  Europe/Berlin. Reservierung je Woche und Empfänger verhindert Mehrfachversand
+  auch über mehrere Instanzen. Keine automatische Wiederholung nach unklarem
+  SMTP-Ausgang; Details und Grenzen stehen in `docs/membership-workflows.md`.
+
 ## Readiness
 
 - `/api/health` returns 200 only when the primary and control databases, Redis

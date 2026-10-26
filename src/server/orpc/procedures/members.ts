@@ -8,8 +8,10 @@ import { escapeLike } from "~/server/db/like";
 import {
   memberHasDied,
   memberHasExited,
+  memberHasNumber,
   memberHasPendingExit,
   memberHasRealAbteilung,
+  memberIsCurrent,
   memberIsPassiv,
   memberNotDeceased,
   memberNotDeleted,
@@ -20,6 +22,7 @@ import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abt
 import { attachmentsTable } from "~/server/db/schema/attachments";
 import { auditLogTable } from "~/server/db/schema/audit";
 import { contractsTable } from "~/server/db/schema/contracts";
+import { familienMitgliederTable } from "~/server/db/schema/familien";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { memberCancellationsTable } from "~/server/db/schema/member-cancellations";
 import { membersTable } from "~/server/db/schema/members";
@@ -59,6 +62,9 @@ import {
 } from "~/server/validation/member-fields";
 
 const StatusSchema = v.picklist([
+  "aktuell",
+  "mitglieder",
+  "kontakte",
   "aktiv",
   "passiv",
   "gekuendigt",
@@ -74,7 +80,7 @@ const DateStringInput = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
 
 const ListInput = v.object({
   q: v.optional(v.string(), ""),
-  status: v.optional(StatusSchema, "aktiv"),
+  status: v.optional(StatusSchema, "aktuell"),
   abteilungId: v.optional(v.nullable(v.string()), null),
   includeAusgetretene: v.optional(v.boolean(), false),
   orphanOnly: v.optional(v.boolean(), false),
@@ -345,6 +351,12 @@ export const membersRouter = {
       conditions.push(memberNotDeleted() as never);
     }
 
+    if (!input.deletedOnly && !input.orphanOnly) {
+      if (input.status === "kontakte") conditions.push(isNull(membersTable.memberNo) as never);
+      else if (input.status !== "alle") conditions.push(memberHasNumber() as never);
+      if (input.status === "aktuell") conditions.push(memberIsCurrent() as never);
+    }
+
     // "Exited" means the Austritt date has actually arrived. A member who has
     // only given notice for a future date is still active and must stay in the
     // default and "aktiv"/"passiv" views (see `memberNotExited`).
@@ -358,7 +370,9 @@ export const membersRouter = {
       !input.deletedOnly &&
       !input.includeAusgetretene &&
       input.status !== "ausgetreten" &&
-      input.status !== "alle"
+      input.status !== "alle" &&
+      input.status !== "mitglieder" &&
+      input.status !== "kontakte"
     ) {
       conditions.push(memberNotExited() as never);
     }
@@ -395,6 +409,9 @@ export const membersRouter = {
     if (input.orphanOnly) {
       conditions.push(isNull(membersTable.memberNo) as never);
       conditions.push(
+        sql`not exists(select 1 from familien_mitglieder fm where fm.member_id=members.id and fm.bis is null)` as never,
+      );
+      conditions.push(
         sql`not exists (
           select 1 from ${relationshipsTable}
           where ${relationshipsTable.fromMemberId} = ${membersTable.id}
@@ -410,6 +427,7 @@ export const membersRouter = {
           ilike(membersTable.nachname, like),
           ilike(membersTable.vorname, like),
           ilike(membersTable.memberNo, like),
+          ilike(membersTable.previousMemberNo, like),
           ilike(membersTable.kontaktNo, like),
           ilike(membersTable.mitgliedsnummer, like),
           ilike(membersTable.email, like),
@@ -509,6 +527,7 @@ export const membersRouter = {
       const ref = input.mitgliedsnummer;
       const matchers = [
         eq(membersTable.memberNo, ref),
+        eq(membersTable.previousMemberNo, ref),
         eq(membersTable.kontaktNo, ref),
         eq(membersTable.mitgliedsnummer, ref),
       ];
@@ -712,7 +731,36 @@ export const membersRouter = {
         .from(relationshipsTable)
         .where(eq(relationshipsTable.toMemberId, m.id));
 
+      const familyRecipients = await context.db
+        .select({
+          id: familienMitgliederTable.id,
+          beziehung: familienMitgliederTable.rolle,
+          istVertreter: familienMitgliederTable.isGuardian,
+          toMemberId: membersTable.id,
+          toAdrNr: membersTable.adrNr,
+          fallbackName: sql<string | null>`null`,
+          toMitglnr: membersTable.memberNo,
+          toVorname: membersTable.vorname,
+          toNachname: membersTable.nachname,
+          toAnrede: membersTable.anrede,
+          toStrasse: membersTable.strasse,
+          toHausnummer: membersTable.hausnummer,
+          toPlz: membersTable.plz,
+          toOrt: membersTable.ort,
+          toGeburtsdatum: membersTable.geburtsdatum,
+        })
+        .from(familienMitgliederTable)
+        .innerJoin(membersTable, eq(membersTable.id, familienMitgliederTable.memberId))
+        .where(
+          and(
+            isNull(familienMitgliederTable.bis),
+            memberNotDeleted(),
+            sql`${membersTable.id}<>${m.id}`,
+            sql`${familienMitgliederTable.familieId} in (select familie_id from familien_mitglieder where member_id=${m.id} and bis is null)`,
+          ),
+        );
       return {
+        familyRecipients,
         // Keep the legacy output keys (sourced from the clean columns) so the
         // detail UI need not change here; the cosmetic API rename is a separate
         // pass.
@@ -827,10 +875,10 @@ export const membersRouter = {
     cached(context.tenant.key, CACHE_NS.dashboard, "members-stats", 120, async () => {
       const notDeleted = memberNotDeleted();
       // "Lebt": still a member today (a future-dated Austritt still counts).
-      const lebt = and(notDeleted, memberNotExited(), memberNotDeceased());
+      const lebt = memberIsCurrent();
       const [[total], [aktiv], [passiv], [gekuendigt], [ausgetreten], [verstorben], [kontakte]] =
         await Promise.all([
-          context.db.select({ c: count() }).from(membersTable).where(notDeleted),
+          context.db.select({ c: count() }).from(membersTable).where(lebt),
           context.db
             .select({ c: count() })
             .from(membersTable)
@@ -842,15 +890,15 @@ export const membersRouter = {
           context.db
             .select({ c: count() })
             .from(membersTable)
-            .where(and(notDeleted, memberHasPendingExit())),
+            .where(and(notDeleted, memberHasNumber(), memberHasPendingExit())),
           context.db
             .select({ c: count() })
             .from(membersTable)
-            .where(and(notDeleted, memberHasExited())),
+            .where(and(notDeleted, memberHasNumber(), memberHasExited())),
           context.db
             .select({ c: count() })
             .from(membersTable)
-            .where(and(notDeleted, memberHasDied())),
+            .where(and(notDeleted, memberHasNumber(), memberHasDied())),
           context.db
             .select({ c: count() })
             // Kontakte = rows without an app member number (kontaktNo set),
@@ -1750,6 +1798,7 @@ export const membersRouter = {
               ilike(membersTable.nachname, like),
               ilike(membersTable.vorname, like),
               ilike(membersTable.memberNo, like),
+              ilike(membersTable.previousMemberNo, like),
               ilike(membersTable.kontaktNo, like),
               ilike(membersTable.mitgliedsnummer, like),
               ilike(membersTable.email, like),

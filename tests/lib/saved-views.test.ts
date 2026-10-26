@@ -43,7 +43,7 @@ describe("parseStoredViews", () => {
       { id: "a", name: "Weird", search: { status: "hacked", sortBy: "drop table", sortDir: "x" } },
     ]);
     const [view] = parseStoredViews(raw);
-    expect(view?.search.status).toBe("aktiv");
+    expect(view?.search.status).toBe("aktuell");
     expect(view?.search.sortBy).toBe("nachname");
     expect(view?.search.sortDir).toBe("asc");
   });

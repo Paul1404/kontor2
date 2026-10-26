@@ -1,4 +1,4 @@
-import { and, getTableName, isNull, or, type SQL, sql } from "drizzle-orm";
+import { and, getTableName, isNotNull, isNull, or, type SQL, sql } from "drizzle-orm";
 import { KEINE_ABTEILUNG_NAME } from "~/lib/abteilung-filter";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
@@ -14,6 +14,10 @@ import { membersTable } from "~/server/db/schema/members";
  */
 export function memberNotDeleted() {
   return isNull(membersTable.deletedAt);
+}
+
+export function memberHasNumber(): SQL {
+  return isNotNull(membersTable.memberNo);
 }
 
 /**
@@ -59,7 +63,7 @@ export function memberHasDied(): SQL {
  * member list, the overview stats strip, and the dashboard.
  */
 export function memberIsCurrent(): SQL {
-  return and(memberNotDeleted(), memberNotExited(), memberNotDeceased()) as SQL;
+  return and(memberHasNumber(), memberNotDeleted(), memberNotExited(), memberNotDeceased()) as SQL;
 }
 
 /**

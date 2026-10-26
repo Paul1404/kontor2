@@ -181,12 +181,22 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "search_members",
     description:
-      "Search and list club members (Mitglieder). Filter by free-text query, status (aktiv, passiv, gekuendigt, ausgetreten, verstorben, alle) and Abteilung id; paginated. Returns member rows with Mitgliedsnummer, name, status and Abteilungen.",
+      "Search and list club members (Mitglieder). Filter by free-text query, status (aktuell, mitglieder, kontakte, aktiv, passiv, gekuendigt, ausgetreten, verstorben, alle) and Abteilung id; paginated. Returns member rows with Mitgliedsnummer, name, status and Abteilungen.",
     minRole: "readonly",
     input: v.object({
       q: v.optional(v.string()),
       status: v.optional(
-        v.picklist(["aktiv", "passiv", "gekuendigt", "ausgetreten", "verstorben", "alle"]),
+        v.picklist([
+          "aktuell",
+          "mitglieder",
+          "kontakte",
+          "aktiv",
+          "passiv",
+          "gekuendigt",
+          "ausgetreten",
+          "verstorben",
+          "alle",
+        ]),
       ),
       abteilungId: v.optional(v.nullable(v.string())),
       page: PageInput,
@@ -550,7 +560,7 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "set_contract_zahler",
     description:
-      "Set or clear the explicit payer (Zahler) of a contract. Pass the contract id (from get_member) and zahlerMemberId = the internal member id whose account is debited, or null to clear the override (then the automatic resolution Familie -> Vertreter -> self applies again). Use to route a member's beitrag onto a partner/parent account, e.g. a spouse without an own mandate. The debit follows the Zahler. The change is audited.",
+      "Retired in version 5: per-contract payer overrides are blocked; manage the family payer in the app instead. Former operation: Set or clear the explicit payer (Zahler) of a contract. Pass the contract id (from get_member) and zahlerMemberId = the internal member id whose account is debited, or null to clear the override (then the automatic resolution Familie -> Vertreter -> self applies again). Use to route a member's beitrag onto a partner/parent account, e.g. a spouse without an own mandate. The debit follows the Zahler. The change is audited.",
     minRole: "vorstand",
     input: v.object({ contractId: v.string(), zahlerMemberId: v.nullable(v.string()) }),
     execute: (context, input) => call(appRouter.contracts.setZahler, input, { context }),
@@ -558,7 +568,7 @@ const TOOLS: McpTool[] = [
   defineTool({
     name: "create_relationship",
     description:
-      "Create a relationship (Beziehung) between two members by internal member id (fromMemberId -> toMemberId). Optional beziehung label (e.g. 'Ehepartner', 'Zahler'), notiz and datVon/datBis (YYYY-MM-DD). Set reciprocal: true to also create the mirror link. Use to connect a household (e.g. spouses) so the structure is correct. The change is audited.",
+      "Retired in version 5: relationship writes are blocked; manage family membership in the app instead. Former operation: Create a relationship (Beziehung) between two members by internal member id (fromMemberId -> toMemberId). Optional beziehung label (e.g. 'Ehepartner', 'Zahler'), notiz and datVon/datBis (YYYY-MM-DD). Set reciprocal: true to also create the mirror link. Use to connect a household (e.g. spouses) so the structure is correct. The change is audited.",
     minRole: "vorstand",
     input: v.object({
       fromMemberId: v.string(),

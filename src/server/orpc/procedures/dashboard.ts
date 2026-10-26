@@ -1,6 +1,13 @@
-import { and, count, eq, gte, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, count, eq, gte, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import * as v from "valibot";
-import { memberNotDeceased, memberNotDeleted, memberNotExited } from "~/server/db/member-filters";
+import {
+  memberHasNumber,
+  memberHasRealAbteilung,
+  memberIsCurrent,
+  memberNotDeceased,
+  memberNotDeleted,
+  memberNotExited,
+} from "~/server/db/member-filters";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { membersTable } from "~/server/db/schema/members";
 import { authedProc } from "~/server/orpc/base";
@@ -44,7 +51,7 @@ export const dashboardRouter = {
       // All counts must exclude soft-deleted members or the dashboard drifts
       // from the member list / fee runs. The legacy Linear `geloscht` flag is
       // folded into the app's single `deletedAt`, so one check is authoritative.
-      const notDeleted = memberNotDeleted();
+      const notDeleted = and(memberNotDeleted(), memberHasNumber());
       const [
         [total],
         [aktiv],
@@ -55,7 +62,6 @@ export const dashboardRouter = {
         birthdaysSoon,
         tenureBuckets,
       ] = await Promise.all([
-        context.db.select({ c: count() }).from(membersTable).where(notDeleted),
         context.db
           .select({ c: count() })
           .from(membersTable)
@@ -63,14 +69,28 @@ export const dashboardRouter = {
         context.db
           .select({ c: count() })
           .from(membersTable)
+          .where(and(notDeleted, memberNotExited(), memberNotDeceased(), memberHasRealAbteilung())),
+        context.db
+          .select({ c: count() })
+          .from(membersTable)
           .where(
-            and(notDeleted, isNotNull(membersTable.eintritt), gte(membersTable.eintritt, since)),
+            and(
+              notDeleted,
+              isNotNull(membersTable.eintritt),
+              gte(membersTable.eintritt, since),
+              lte(membersTable.eintritt, new Date()),
+            ),
           ),
         context.db
           .select({ c: count() })
           .from(membersTable)
           .where(
-            and(notDeleted, isNotNull(membersTable.austritt), gte(membersTable.austritt, since)),
+            and(
+              notDeleted,
+              isNotNull(membersTable.austritt),
+              gte(membersTable.austritt, since),
+              lte(membersTable.austritt, new Date()),
+            ),
           ),
         // Age buckets, computed over current active members. Anyone without a
         // birthday gets bucketed into "unbekannt" so we can show the data
@@ -87,7 +107,7 @@ export const dashboardRouter = {
             else '75+'
           end as bucket
           from ${membersTable}
-          where ${memberNotDeleted()}
+          where ${memberNotDeleted()} and ${memberHasNumber()}
             and ${memberNotExited()}
             and ${memberNotDeceased()}
         ) t
@@ -108,7 +128,7 @@ export const dashboardRouter = {
           from (
             select ${effectiveGender} as g
             from ${membersTable}
-            where ${memberNotDeleted()}
+            where ${memberNotDeleted()} and ${memberHasNumber()}
               and ${memberNotExited()}
               and ${memberNotDeceased()}
           ) s
@@ -153,7 +173,7 @@ export const dashboardRouter = {
                              extract(day from ${membersTable.geburtsdatum})::int)
             end as next_birthday
           from ${membersTable}
-          where ${memberNotDeleted()}
+          where ${memberNotDeleted()} and ${memberHasNumber()}
             and ${memberNotExited()}
             and ${memberNotDeceased()}
             and ${membersTable.geburtsdatum} is not null
@@ -175,7 +195,7 @@ export const dashboardRouter = {
             else '25+ Jahre'
           end as bucket
           from ${membersTable}
-          where ${memberNotDeleted()}
+          where ${memberNotDeleted()} and ${memberHasNumber()}
             and ${memberNotExited()}
             and ${memberNotDeceased()}
         ) t
@@ -192,10 +212,19 @@ export const dashboardRouter = {
         .from(memberAbteilungenTable)
         .innerJoin(abteilungenTable, eq(memberAbteilungenTable.abteilungId, abteilungenTable.id))
         .innerJoin(membersTable, eq(membersTable.id, memberAbteilungenTable.memberId))
-        .where(and(isNull(memberAbteilungenTable.austrittsdatum), memberNotDeleted()))
+        .where(
+          and(
+            memberIsCurrent(),
+            sql`(${memberAbteilungenTable.austrittsdatum} is null or ${memberAbteilungenTable.austrittsdatum}>current_date)`,
+          ),
+        )
         .groupBy(abteilungenTable.name)
         .orderBy(sql`count(*) desc`);
 
+      const [contacts] = await context.db
+        .select({ c: count() })
+        .from(membersTable)
+        .where(and(memberNotDeleted(), isNull(membersTable.memberNo)));
       // postgres-js returns the result array directly from db.execute.
       const ageBucketsArr = ageBuckets as unknown as Array<{ bucket: string; c: number }>;
       const genderArr = genderRows as unknown as Array<{ gender: string; c: number }>;
@@ -204,6 +233,7 @@ export const dashboardRouter = {
 
       return {
         total: total?.c ?? 0,
+        kontakte: contacts?.c ?? 0,
         aktiv: aktiv?.c ?? 0,
         newThisMonth: newThisMonth?.c ?? 0,
         austritteThisMonth: austritteThisMonth?.c ?? 0,
@@ -245,14 +275,14 @@ export const dashboardRouter = {
           }>(sql`
         select y::int as year,
           (select count(*) from ${membersTable}
-             where deleted_at is null and eintritt is not null
+             where deleted_at is null and member_no is not null and eintritt is not null
                and extract(year from eintritt) <= y
                and (austritt is null or extract(year from austritt) > y)
                and (verstorben_am is null or extract(year from verstorben_am) > y))::int as aktiv,
           (select count(*) from ${membersTable}
-             where deleted_at is null and extract(year from eintritt) = y)::int as eintritte,
+             where deleted_at is null and member_no is not null and extract(year from eintritt) = y)::int as eintritte,
           (select count(*) from ${membersTable}
-             where deleted_at is null and extract(year from austritt) = y)::int as austritte
+             where deleted_at is null and member_no is not null and extract(year from austritt) = y)::int as austritte
         from generate_series(extract(year from current_date)::int - 9,
                              extract(year from current_date)::int) as y
         order by y
@@ -278,11 +308,11 @@ export const dashboardRouter = {
           context.db.execute<{ lastschrift: number; rechnung: number }>(sql`
         select
           (select count(*) from ${membersTable} m
-             where m.deleted_at is null and (m.austritt is null or m.austritt::date > current_date) and m.verstorben_am is null
+             where m.deleted_at is null and m.member_no is not null and (m.austritt is null or m.austritt::date > current_date) and m.verstorben_am is null
                and exists (select 1 from contracts c where c.member_id = m.id and c.is_direct_debit = true
                             and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date)))::int as lastschrift,
           (select count(*) from ${membersTable} m
-             where m.deleted_at is null and (m.austritt is null or m.austritt::date > current_date) and m.verstorben_am is null
+             where m.deleted_at is null and m.member_no is not null and (m.austritt is null or m.austritt::date > current_date) and m.verstorben_am is null
                and exists (select 1 from contracts c where c.member_id = m.id
                             and c.gekuend_zum is null and (c.vertrag_ende is null or c.vertrag_ende >= current_date))
                and not exists (select 1 from contracts c where c.member_id = m.id and c.is_direct_debit = true
@@ -305,7 +335,7 @@ export const dashboardRouter = {
           end as bucket,
           ${effectiveGender} as g
           from ${membersTable}
-          where ${memberNotDeleted()}
+          where ${memberNotDeleted()} and ${memberHasNumber()}
             and ${memberNotExited()}
             and ${memberNotDeceased()}
         ) t

@@ -41,6 +41,43 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "5.0.0",
+    date: "2026-10-26",
+    title: "Mitglieder, Familien und Beitragswechsel",
+    changes: [
+      {
+        category: "fix",
+        description:
+          "Mitgliederzahlen und Berichte schließen Kontakte aus. Die Mitgliederliste startet mit allen aktuellen Mitgliedern; Kontakte und historische Mitglieder haben eigene Ansichten.",
+      },
+      {
+        category: "breaking",
+        description:
+          "Familien führen Zahler und Sorgeberechtigte gemeinsam. Nach der Datenbankmigration müssen Altzuordnungen unter Familien geprüft und übernommen werden. Unklare Fälle werden nicht automatisch verändert.",
+      },
+      {
+        category: "feature",
+        description:
+          "Tarifwechsel zeigen eine Vorschau und ein Wirksamkeitsdatum. Bereits gestellte Jahresbeiträge bleiben erhalten und werden im selben Vertragsverlauf nicht doppelt berechnet.",
+      },
+      {
+        category: "feature",
+        description:
+          "Versehentlich angelegte Mitglieder können nach einer Vorschau in Kontakte umgewandelt werden. Finanzhistorie und frühere Mitgliedschaften verhindern die automatische Korrektur.",
+      },
+      {
+        category: "feature",
+        description:
+          "Eine konfigurierbare Geburtstagserinnerung informiert montags über die laufende Woche. Jeder Empfänger erhält eine eigene Nachricht; der Versand wird protokolliert.",
+      },
+      {
+        category: "improvement",
+        description:
+          "Navigation und Befehlspalette verwenden dieselben Ziele und Berechtigungen. Mitglieder, Finanzen, Kommunikation, Auswertungen und Verwaltung sind getrennt erreichbar.",
+      },
+    ],
+  },
+  {
     version: "4.0.9",
     date: "2026-10-25",
     title: "Schlankeres Server-Abbild",

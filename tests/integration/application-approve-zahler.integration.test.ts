@@ -1,5 +1,5 @@
 import { call } from "@orpc/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Session } from "~/server/auth/auth";
 import { db } from "~/server/db/client";
@@ -199,6 +199,14 @@ describe.skipIf(!onTestDb)("Antrag-Genehmigung legt Zahler an (integration)", ()
   });
 
   afterAll(async () => {
+    if (createdMemberIds.length) {
+      const childFamilies = await db()
+        .select({ id: familienMitgliederTable.familieId })
+        .from(familienMitgliederTable)
+        .where(inArray(familienMitgliederTable.memberId, createdMemberIds));
+      for (const f of childFamilies)
+        await db().delete(familienTable).where(eq(familienTable.id, f.id));
+    }
     if (familyId) await db().delete(familienTable).where(eq(familienTable.id, familyId));
     for (const id of createdMemberIds) {
       await db().delete(relationshipsTable).where(eq(relationshipsTable.fromMemberId, id));
@@ -283,17 +291,16 @@ describe.skipIf(!onTestDb)("Antrag-Genehmigung legt Zahler an (integration)", ()
       .where(eq(sepaMandatesTable.memberId, guardian?.id as string));
     expect(guardianMandates.length).toBe(1);
 
-    // Vertreter-Beziehung Kind -> Erziehungsberechtigter.
-    const [rel] = await db()
-      .select({ istVertreter: relationshipsTable.istVertreter })
-      .from(relationshipsTable)
-      .where(
-        and(
-          eq(relationshipsTable.fromMemberId, child?.id as string),
-          eq(relationshipsTable.toMemberId, guardian?.id as string),
-        ),
-      );
-    expect(rel?.istVertreter).toBe(true);
+    const [membership] = await db()
+      .select()
+      .from(familienMitgliederTable)
+      .where(eq(familienMitgliederTable.memberId, child!.id));
+    const [family] = await db()
+      .select()
+      .from(familienTable)
+      .where(eq(familienTable.id, membership!.familieId));
+    expect(family!.guardianMemberId).toBe(guardian!.id);
+    expect(family!.zahlerMemberId).toBe(guardian!.id);
   });
 
   it("Familie = Zahler mit Vertrag und Mandat, Partner und Kind beitragsfrei gruppiert", async () => {

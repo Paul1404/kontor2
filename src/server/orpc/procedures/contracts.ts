@@ -7,7 +7,7 @@ import { membersTable } from "~/server/db/schema/members";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { memberRef } from "~/server/domain/member";
 import { assertCancellationAllowed } from "~/server/lib/cancellation-frist";
-import { vorstandProc } from "~/server/orpc/base";
+import { base, vorstandProc } from "~/server/orpc/base";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 function toDateOrNull(value: string | null | undefined, field: string): Date | null {
@@ -111,6 +111,11 @@ export const contractsRouter = {
         if (!member) {
           throw new ORPCError("NOT_FOUND", { message: "Mitglied nicht gefunden." });
         }
+        if (!member.memberNo)
+          throw new ORPCError("CONFLICT", {
+            message:
+              "Kontakte haben keine eigenen Mitgliedsverträge. Bitte die Familienzuordnung verwenden.",
+          });
         const patch = buildPatch(input.patch);
         // A contract created from the member form is a direct-debit contract by
         // default. Updates still preserve an omitted value, but creates must not
@@ -165,6 +170,11 @@ export const contractsRouter = {
         if (!existing) {
           throw new ORPCError("NOT_FOUND", { message: "Vertrag nicht gefunden." });
         }
+        if (input.patch.art !== existing.art)
+          throw new ORPCError("CONFLICT", {
+            message:
+              "Für einen anderen Tarif bitte Tarif wechseln verwenden. Bestehende Verträge werden nicht überschrieben.",
+          });
         const patch = buildPatch(input.patch);
         if (
           patch.gekuendZum instanceof Date &&
@@ -242,6 +252,13 @@ export const contractsRouter = {
    * der das Mitglied selbst ist, wird als "kein Override" gespeichert.
    */
   setZahler: vorstandProc
+    .use(
+      base.middleware(async () => {
+        throw new ORPCError("CONFLICT", {
+          message: "Der Zahler wird ausschließlich in der Familie festgelegt.",
+        });
+      }),
+    )
     .input(
       v.object({
         contractId: v.string(),

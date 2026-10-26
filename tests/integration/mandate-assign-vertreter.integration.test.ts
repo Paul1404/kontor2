@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Session } from "~/server/auth/auth";
 import { db } from "~/server/db/client";
 import { users } from "~/server/db/schema/auth";
+import { familienMitgliederTable, familienTable } from "~/server/db/schema/familien";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import type { AppContext } from "~/server/orpc/context";
@@ -109,6 +110,13 @@ describe.skipIf(!onTestDb)("Mandate-Nachtrag als Vertreter übernehmen (integrat
   });
 
   afterAll(async () => {
+    for (const id of ids) {
+      const rows = await db()
+        .select({ id: familienMitgliederTable.familieId })
+        .from(familienMitgliederTable)
+        .where(eq(familienMitgliederTable.memberId, id));
+      for (const row of rows) await db().delete(familienTable).where(eq(familienTable.id, row.id));
+    }
     for (const id of ids) {
       await db().delete(relationshipsTable).where(eq(relationshipsTable.fromMemberId, id));
     }

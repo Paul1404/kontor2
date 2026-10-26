@@ -5,6 +5,7 @@ import type { Session } from "~/server/auth/auth";
 import { db } from "~/server/db/client";
 import { users } from "~/server/db/schema/auth";
 import { contractsTable } from "~/server/db/schema/contracts";
+import { familienMitgliederTable, familienTable } from "~/server/db/schema/familien";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import type { AppContext } from "~/server/orpc/context";
@@ -89,6 +90,12 @@ describe.skipIf(!onTestDb)("Mandate-Nachtrag Kontoinhaber-Kontakt (integration)"
   });
 
   afterAll(async () => {
+    const familyRows = await db()
+      .select({ id: familienMitgliederTable.familieId })
+      .from(familienMitgliederTable)
+      .where(eq(familienMitgliederTable.memberId, minorId));
+    for (const family of familyRows)
+      await db().delete(familienTable).where(eq(familienTable.id, family.id));
     // Remove the relationship and any created contact, then the minor + user.
     const rels = await db()
       .select({ toMemberId: relationshipsTable.toMemberId })

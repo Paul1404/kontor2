@@ -58,7 +58,6 @@ import {
   type OrganizationSettings,
   organizationSettingsTable,
 } from "~/server/db/schema/organization-settings";
-import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
 import {
   type Altersgrenzen,
@@ -70,6 +69,7 @@ import {
 } from "~/server/domain/application/antragstyp";
 import { divergentKontoinhaber } from "~/server/domain/application/payer";
 import { resolveApplicationFee } from "~/server/domain/application/resolve-fee";
+import { assignChildGuardian } from "~/server/domain/family-guardian";
 import {
   type DuplicateSignalInput,
   findDuplicateCandidates,
@@ -861,47 +861,10 @@ async function createApplicationSecondaries(
         ...base,
       });
       refs.push(guardian.ref);
-      const representatives = await tx
-        .select()
-        .from(relationshipsTable)
-        .where(
-          and(
-            eq(relationshipsTable.fromMemberId, primary.id),
-            eq(relationshipsTable.istVertreter, true),
-          ),
-        );
-      if (representatives.some((row) => row.toMemberId !== guardian.id)) {
-        throw new ORPCError("CONFLICT", {
-          message:
-            "Das Kind hat bereits einen anderen Vertreter. Bitte zuerst die Beziehung prüfen.",
-        });
-      }
-      if (!representatives.some((row) => row.toMemberId === guardian.id)) {
-        const [existing] = await tx
-          .select()
-          .from(relationshipsTable)
-          .where(
-            and(
-              eq(relationshipsTable.fromAdrNr, primary.adrNr),
-              eq(relationshipsTable.toAdrNr, guardian.adrNr),
-            ),
-          )
-          .limit(1);
-        if (existing)
-          await tx
-            .update(relationshipsTable)
-            .set({ toMemberId: guardian.id, istVertreter: true, updatedAt: new Date() })
-            .where(eq(relationshipsTable.id, existing.id));
-        else
-          await tx.insert(relationshipsTable).values({
-            fromMemberId: primary.id,
-            toMemberId: guardian.id,
-            fromAdrNr: primary.adrNr,
-            toAdrNr: guardian.adrNr,
-            beziehung: "Erziehungsberechtigt",
-            istVertreter: true,
-          });
-      }
+      await assignChildGuardian(tx, primary.id, guardian.id, `Familie ${app.nachname}`, {
+        id: opts.actorId,
+        email: opts.actorEmail,
+      });
       for (const memberId of [primary.id, guardian.id]) {
         await takeMemberSnapshot(tx, memberId, {
           trigger: "mutation",
@@ -1017,6 +980,26 @@ async function createApplicationSecondaries(
         await tx
           .insert(familienMitgliederTable)
           .values(missing.map((item) => ({ ...item, familieId: fam.id, von: today })));
+      if (childIds.length) {
+        if (fam.guardianMemberId && fam.guardianMemberId !== primary.id)
+          throw new ORPCError("CONFLICT", {
+            message: "Abweichender Hauptempfänger in der bestehenden Familie.",
+          });
+        await tx
+          .update(familienTable)
+          .set({ guardianMemberId: primary.id, updatedAt: new Date() })
+          .where(eq(familienTable.id, fam.id));
+        await tx
+          .update(familienMitgliederTable)
+          .set({ isGuardian: true })
+          .where(
+            and(
+              eq(familienMitgliederTable.familieId, fam.id),
+              eq(familienMitgliederTable.memberId, primary.id),
+              isNull(familienMitgliederTable.bis),
+            ),
+          );
+      }
       for (const memberId of [primary.id, ...(partnerId ? [partnerId] : []), ...childIds]) {
         await takeMemberSnapshot(tx, memberId, {
           trigger: "mutation",

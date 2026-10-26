@@ -58,6 +58,8 @@ export const CATEGORY_IDS = [
   "beziehung_gleiches_geburtsdatum",
   // --- inflated single-person beitrag covering a partner without a contract
   "beitrag_deckt_partner",
+  "vertragsverlauf_ueberlappt",
+  "familienzuordnung_ungeklaert",
 ] as const;
 
 export type CategoryId = (typeof CATEGORY_IDS)[number];
@@ -77,6 +79,20 @@ export type CategoryMeta = {
 };
 
 export const CATEGORIES: CategoryMeta[] = [
+  {
+    id: "vertragsverlauf_ueberlappt",
+    label: "Überlappender Vertragsverlauf",
+    description:
+      "Mehrere Verträge desselben Verlaufs gelten gleichzeitig. Bitte den Tarifwechsel klären.",
+    severity: "error",
+  },
+  {
+    id: "familienzuordnung_ungeklaert",
+    label: "Familienzuordnung ungeklärt",
+    description:
+      "Altbeziehungen ohne Familie oder Kind ohne festgelegten Sorgeberechtigten als Empfänger.",
+    severity: "warn",
+  },
   {
     id: "lastschrift_ohne_mandat",
     label: "Lastschrift ohne SEPA-Mandat",
@@ -292,12 +308,9 @@ const ACTIVE_DD_POS =
  */
 const FAMILIE_ZAHLER =
   "(select fam.zahler_member_id from familien_mitglieder fm join familien fam on fam.id = fm.familie_id " +
-  "where fm.member_id = members.id and fm.bis is null and fm.rolle = 'kind' limit 1)";
-const VERTRETER =
-  "(select r.to_member_id from relationships r where r.from_member_id = members.id and r.ist_vertreter = true " +
-  "and members.geburtsdatum is not null and members.geburtsdatum > current_date - interval '18 years' limit 1)";
+  "where fm.member_id = members.id and fm.bis is null limit 1)";
 /** Payer of contract `c` (correlated to outer `members`). */
-const PAYER_FOR_C = `coalesce(c.zahler_member_id, ${FAMILIE_ZAHLER}, ${VERTRETER}, members.id)`;
+const PAYER_FOR_C = `coalesce(${FAMILIE_ZAHLER}, members.id)`;
 /** Active direct-debit contract `c` with an amount to collect. */
 const DD_CONTRACT_C =
   "c.member_id = members.id and c.is_direct_debit = true and c.gekuend_zum is null " +
@@ -350,12 +363,14 @@ const ANREDE_HAS_GENDER =
  * clauses for counts and for the error-rule drill-down.
  */
 export const WHERE: Record<CategoryId, string> = {
+  vertragsverlauf_ueberlappt: `deleted_at is null and exists (select 1 from contracts a join contracts b on a.series_id=b.series_id and a.id<>b.id where a.member_id=members.id and a.series_id is not null and coalesce(a.vertrag_begin,'-infinity'::timestamp)<coalesce(b.vertrag_ende,'infinity'::timestamp) and coalesce(b.vertrag_begin,'-infinity'::timestamp)<coalesce(a.vertrag_ende,'infinity'::timestamp))`,
+  familienzuordnung_ungeklaert: `deleted_at is null and (exists(select 1 from relationships r where r.from_member_id=members.id and r.dat_bis is null and not exists(select 1 from familien_mitglieder fm where fm.member_id=members.id and fm.bis is null)) or exists(select 1 from familien_mitglieder fm join familien f on f.id=fm.familie_id where fm.member_id=members.id and fm.bis is null and fm.rolle='kind' and f.guardian_member_id is null))`,
   lastschrift_ohne_mandat: `${ACTIVE} and exists (select 1 from contracts c where ${DD_CONTRACT_C} and not exists (select 1 from sepa_mandates s where s.member_id = (${PAYER_FOR_C}) and coalesce(s.is_deleted, false) = false and s.widerrufen_am is null))`,
   fehlende_iban: `${ACTIVE} and exists (select 1 from contracts c where ${DD_CONTRACT_C} and not exists (select 1 from members p where p.id = (${PAYER_FOR_C}) and p.iban1_last4 is not null and btrim(p.iban1_last4) <> ''))`,
   fehlende_adresse: `${ACTIVE} and (strasse is null or btrim(strasse) = '' or plz is null or btrim(plz) = '' or ort is null or btrim(ort) = '')`,
   name_fehlt: `${ACTIVE} and coalesce(btrim(nachname), '') = '' and coalesce(btrim(firma1), '') = '' and coalesce(btrim(kurzname), '') = ''`,
   aktiv_ohne_vertrag: `${ACTIVE} and member_no is not null and not ${ACTIVE_CONTRACT}`,
-  minderjaehrig_ohne_vertretung: `${ACTIVE} and geburtsdatum is not null and geburtsdatum > (current_date - interval '18 years') and (vertreter_name is null or btrim(vertreter_name) = '') and not exists (select 1 from relationships r where r.from_member_id = members.id and r.ist_vertreter = true)`,
+  minderjaehrig_ohne_vertretung: `${ACTIVE} and geburtsdatum is not null and geburtsdatum > (current_date - interval '18 years') and not exists(select 1 from familien_mitglieder fm join familien f on f.id=fm.familie_id where fm.member_id=members.id and fm.bis is null and f.guardian_member_id is not null)`,
   geburtsdatum_unplausibel: `deleted_at is null and geburtsdatum is not null and (geburtsdatum > current_date or geburtsdatum < current_date - interval '110 years')`,
   eintritt_nach_austritt:
     "deleted_at is null and eintritt is not null and austritt is not null and austritt < eintritt",

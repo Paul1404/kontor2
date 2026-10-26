@@ -589,11 +589,31 @@ export async function runIngest(
     // CASCADE. Upserting keeps the existing contract id, so postings survive a
     // routine re-import. Dedupe on the conflict key so one multi-row upsert
     // never touches the same row twice (Postgres rejects that); last wins.
+    // App-managed histories must not be reopened by an older Linear dump.
+    const managedContracts = await db
+      .select({
+        adrNr: contractsTable.adrNr,
+        vertragNr: contractsTable.vertragNr,
+        art: contractsTable.art,
+      })
+      .from(contractsTable)
+      .where(
+        and(inArray(contractsTable.adrNr, allReferencedAdrNrs), isNotNull(contractsTable.seriesId)),
+      );
+    const managedKeys = new Set(
+      managedContracts.map((c) => zahlerKey(c.adrNr, c.vertragNr, c.art)),
+    );
     const contractByKey = new Map<string, Record<string, unknown>>();
     for (const raw of input.contracts ?? []) {
       try {
         const row = mapContractRow(raw);
         if (!row) continue;
+        if (
+          managedKeys.has(
+            zahlerKey(row.adrNr as number, row.vertragNr as string, row.art as number),
+          )
+        )
+          continue;
         const memberId = adrNrToMemberId.get(row.adrNr as number);
         if (!memberId) continue;
         // The dump carries no Zahler override, so re-apply the one stored before

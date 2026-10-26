@@ -56,14 +56,14 @@ function DashboardPage() {
 
   const cards = [
     {
-      label: "Mitglieder gesamt",
+      label: "Aktuelle Mitglieder",
       value: data.total,
       icon: <Users className="size-5" />,
       tone: "primary",
     },
     {
-      label: "Aktive Mitglieder",
-      value: data.aktiv,
+      label: "Kontakte",
+      value: data.kontakte,
       icon: <UserCheck className="size-5" />,
       tone: "success",
     },
@@ -97,7 +97,7 @@ function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Altersstruktur</CardTitle>
-            <CardDescription>Aktive Mitglieder nach Altersgruppe und Geschlecht.</CardDescription>
+            <CardDescription>Aktuelle Mitglieder nach Altersgruppe und Geschlecht.</CardDescription>
           </CardHeader>
           <CardContent>
             {insights.data ? (
@@ -119,7 +119,7 @@ function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Geschlecht</CardTitle>
-            <CardDescription>Aktive Mitglieder nach hinterlegtem Geschlecht.</CardDescription>
+            <CardDescription>Aktuelle Mitglieder nach hinterlegtem Geschlecht.</CardDescription>
           </CardHeader>
           <CardContent>
             <DonutChart
@@ -138,7 +138,7 @@ function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Mitglieder je Abteilung</CardTitle>
-            <CardDescription>Verteilung der aktiven Mitglieder über Sparten.</CardDescription>
+            <CardDescription>Verteilung der aktuellen Mitglieder über Sparten.</CardDescription>
           </CardHeader>
           <CardContent>
             {data.perAbteilung.length === 0 ? (
@@ -169,7 +169,7 @@ function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Mitgliedsdauer</CardTitle>
-            <CardDescription>Wie lange sind die aktiven Mitglieder schon dabei.</CardDescription>
+            <CardDescription>Wie lange sind die aktuellen Mitglieder schon dabei.</CardDescription>
           </CardHeader>
           <CardContent>
             <BarList rows={data.tenure.map((t) => ({ label: t.bucket, value: t.c }))} />
@@ -287,7 +287,7 @@ function DashboardPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Zahlart</CardTitle>
-                <CardDescription>Aktive Mitglieder nach Zahlungsweg.</CardDescription>
+                <CardDescription>Aktuelle Mitglieder nach Zahlungsweg.</CardDescription>
               </CardHeader>
               <CardContent>
                 <DonutChart

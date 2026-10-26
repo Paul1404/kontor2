@@ -101,6 +101,7 @@ export const membersTable = pgTable(
     // `kontakt_no`. `coalesce(member_no, kontakt_no)` is the user-facing
     // reference and the route key. See `~/server/domain/member#memberRef`.
     /** Opaque app-owned member number (M-...). Null for contacts. */
+    previousMemberNo: text("previous_member_no"),
     memberNo: text("member_no"),
     /** Opaque app-owned contact number (K-...). Null for members. */
     kontaktNo: text("kontakt_no"),

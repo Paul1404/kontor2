@@ -8,6 +8,7 @@ import { withUniqueRetry } from "~/server/db/retry";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { assignChildGuardian } from "~/server/domain/family-guardian";
 import { planMandatNachtrag } from "~/server/domain/mandat-nachtrag";
 import { isMinorAt } from "~/server/domain/member";
 import { onboardMember } from "~/server/domain/member/onboard";
@@ -767,6 +768,14 @@ export const sepaRouter = {
           }
         }
 
+        await assignChildGuardian(tx, input.minorMemberId, rel.toMemberId, "Familie", {
+          id: actorId,
+          email: actorEmail,
+        });
+        await tx
+          .update(relationshipsTable)
+          .set({ datBis: new Date() })
+          .where(eq(relationshipsTable.id, input.relationshipId));
         return { ok: true, ibanMoved };
       });
     }),
@@ -964,6 +973,14 @@ export const sepaRouter = {
             auditId,
           });
 
+          await assignChildGuardian(tx, minor.id, zahlerId, `Familie ${minor.nachname ?? ""}`, {
+            id: actorId,
+            email: actorEmail,
+          });
+          await tx
+            .update(relationshipsTable)
+            .set({ datBis: new Date() })
+            .where(eq(relationshipsTable.id, relId));
           return { action, reference, zahlerMemberId: zahlerId };
         }),
       );

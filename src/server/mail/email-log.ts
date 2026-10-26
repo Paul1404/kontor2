@@ -16,6 +16,7 @@ import { logger } from "~/server/lib/logger";
 
 /** Canonical mail kinds. Free-form text in the column; use these constants. */
 export const EMAIL_KIND = {
+  birthdayReminder: "birthday_reminder",
   antragConfirmation: "antrag_confirmation",
   antragClubNotification: "antrag_club_notification",
   antragApproval: "antrag_approval",

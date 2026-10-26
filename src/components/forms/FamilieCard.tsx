@@ -14,6 +14,8 @@ const ROLLE_LABEL: Record<string, string> = {
   zahler: "Zahler",
   partner: "Partner",
   kind: "Kind",
+  sorgeberechtigt: "Sorgeberechtigt",
+  angehoerig: "Familienangehörig",
 };
 
 function RolleBadge({ rolle }: { rolle: string }) {
@@ -30,12 +32,18 @@ function RolleBadge({ rolle }: { rolle: string }) {
 export function FamilieCard({
   memberId,
   memberNachname,
+  memberGeburtsdatum,
   canEdit,
 }: {
   memberId: string;
   memberNachname: string | null;
+  memberGeburtsdatum?: string | Date | null;
   canEdit: boolean;
 }) {
+  const birth = memberGeburtsdatum ? new Date(memberGeburtsdatum) : null;
+  const adultDate = new Date();
+  adultDate.setFullYear(adultDate.getFullYear() - 18);
+  const minor = !!birth && birth > adultDate;
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [endTarget, setEndTarget] = useState<{ id: string; name: string } | null>(null);
@@ -53,8 +61,8 @@ export function FamilieCard({
     mutationFn: () =>
       orpc.familien.create({
         name: memberNachname ? `Familie ${memberNachname}` : "Familie",
-        zahlerMemberId: memberId,
-        mitglieder: [{ memberId, rolle: "zahler" }],
+        zahlerMemberId: minor ? null : memberId,
+        mitglieder: [{ memberId, rolle: minor ? "kind" : "zahler" }],
       }),
     onSuccess: async () => {
       await invalidate();
@@ -128,7 +136,7 @@ export function FamilieCard({
                   className="flex items-center justify-between gap-2 py-2"
                 >
                   <div className="flex min-w-0 items-center gap-2">
-                    {m.rolle === "zahler" ? (
+                    {fam.zahlerMemberId === m.id ? (
                       <Crown className="size-3.5 shrink-0 text-brand" aria-hidden />
                     ) : null}
                     {m.id === memberId ? (
@@ -142,9 +150,33 @@ export function FamilieCard({
                         {m.name}
                       </Link>
                     )}
-                    <RolleBadge rolle={m.rolle} />
+                    <RolleBadge
+                      rolle={
+                        fam.zahlerMemberId === m.id
+                          ? "zahler"
+                          : m.rolle === "zahler"
+                            ? "angehoerig"
+                            : m.rolle
+                      }
+                    />
+                    {canEdit && fam.zahlerMemberId !== m.id && m.rolle !== "kind" ? (
+                      <FamilyPayer familieId={fam.id} memberId={m.id} onDone={invalidate} />
+                    ) : null}
+                    {m.isGuardian ? <Badge variant="outline">Sorgeberechtigt</Badge> : null}
+                    {fam.guardianMemberId === m.id ? (
+                      <Badge variant="outline">Empfänger für Kinder</Badge>
+                    ) : null}
+                    {canEdit && m.rolle !== "kind" ? (
+                      <GuardianControl
+                        familieId={fam.id}
+                        memberId={m.id}
+                        isGuardian={m.isGuardian}
+                        primary={fam.guardianMemberId === m.id}
+                        onDone={invalidate}
+                      />
+                    ) : null}
                   </div>
-                  {canEdit && m.rolle !== "zahler" ? (
+                  {canEdit && fam.zahlerMemberId !== m.id ? (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -199,7 +231,7 @@ function AddFamilienMitglied({
   onDone: () => void | Promise<void>;
 }) {
   const [q, setQ] = useState("");
-  const [rolle, setRolle] = useState<"partner" | "kind">("kind");
+  const [rolle, setRolle] = useState<"partner" | "kind" | "sorgeberechtigt">("kind");
   const [hits, setHits] = useState<
     Array<{ id: string; vorname: string | null; nachname: string | null; memberNo: string | null }>
   >([]);
@@ -233,12 +265,13 @@ function AddFamilienMitglied({
         />
         <select
           value={rolle}
-          onChange={(e) => setRolle(e.target.value as "partner" | "kind")}
+          onChange={(e) => setRolle(e.target.value as "partner" | "kind" | "sorgeberechtigt")}
           className="h-10 rounded-lg border border-input bg-card px-2 text-sm"
           aria-label="Rolle"
         >
           <option value="kind">Kind</option>
           <option value="partner">Partner</option>
+          <option value="sorgeberechtigt">Sorgeberechtigt</option>
         </select>
       </div>
       {hits.length > 0 ? (
@@ -266,5 +299,84 @@ function AddFamilienMitglied({
         <p className="text-xs text-muted-foreground">Keine Treffer.</p>
       ) : null}
     </div>
+  );
+}
+
+function GuardianControl({
+  familieId,
+  memberId,
+  isGuardian,
+  primary,
+  onDone,
+}: {
+  familieId: string;
+  memberId: string;
+  isGuardian: boolean;
+  primary: boolean;
+  onDone: () => Promise<void>;
+}) {
+  const change = useMutation({
+    mutationFn: (p: { isGuardian: boolean; primary: boolean }) =>
+      orpc.familien.setGuardian({ familieId, memberId, ...p }),
+    onSuccess: onDone,
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <div className="flex flex-wrap gap-2">
+      <label className="text-xs">
+        <input
+          type="checkbox"
+          checked={isGuardian}
+          disabled={change.isPending}
+          onChange={(e) =>
+            change.mutate({ isGuardian: e.target.checked, primary: primary && e.target.checked })
+          }
+        />{" "}
+        Sorgeberechtigt
+      </label>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={primary || change.isPending}
+        onClick={() => change.mutate({ isGuardian: true, primary: true })}
+      >
+        Empfänger für Kinder
+      </Button>
+    </div>
+  );
+}
+
+function FamilyPayer({
+  familieId,
+  memberId,
+  onDone,
+}: {
+  familieId: string;
+  memberId: string;
+  onDone: () => Promise<void>;
+}) {
+  const [confirm, setConfirm] = useState(false);
+  const save = useMutation({
+    mutationFn: () => orpc.familien.update({ id: familieId, patch: { zahlerMemberId: memberId } }),
+    onSuccess: async () => {
+      setConfirm(false);
+      await onDone();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <>
+      <Button size="sm" variant="ghost" onClick={() => setConfirm(true)}>
+        Als Familienzahler
+      </Button>
+      <ConfirmDialog
+        open={confirm}
+        onOpenChange={setConfirm}
+        title="Familienzahler ändern"
+        description="Künftige Beiträge der Familienangehörigen verwenden das Konto und Mandat dieser Person. Bereits gestellte Beiträge bleiben erhalten."
+        onConfirm={() => save.mutate()}
+        loading={save.isPending}
+      />
+    </>
   );
 }

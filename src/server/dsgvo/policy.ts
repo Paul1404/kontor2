@@ -49,6 +49,7 @@ export function buildScrubRules(memberId: string): Record<string, ErasureScrubRu
     vorname: { kind: "pseudonym", value: `Anonym-${tag}` },
     nachname: { kind: "pseudonym", value: "(gelöscht)" },
     kurzname: { kind: "null" },
+    previousMemberNo: { kind: "null" },
     anrede: { kind: "null" },
     titel1: { kind: "null" },
     // Address

@@ -4,6 +4,7 @@ import { type DB, dbForTenant } from "~/server/db/client";
 import { installShutdownBridge } from "~/server/lib/lifecycle";
 import { registerDbLogSink } from "~/server/lib/log-sink-db";
 import { logger } from "~/server/lib/logger";
+import { startBirthdayScheduler } from "~/server/mail/birthday-scheduler";
 import { startSnapshotScheduler } from "~/server/snapshots/scheduler";
 import { ensureTenantRegistryLoader } from "~/server/tenants/load";
 import type { Tenant } from "~/server/tenants/registry";
@@ -41,6 +42,7 @@ export async function createContext(request: Request): Promise<AppContext> {
     }
     try {
       startSnapshotScheduler();
+      startBirthdayScheduler();
     } catch (err) {
       logger.error("failed to start snapshot scheduler", {
         error: err instanceof Error ? err.message : String(err),
