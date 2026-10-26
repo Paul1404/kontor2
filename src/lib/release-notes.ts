@@ -41,6 +41,18 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "5.1.0",
+    date: "2026-10-26",
+    title: "Ehrungen in Fünfjahresschritten",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Die Ehrungsliste berücksichtigt ab 25 Jahren alle fünf Jahre. Die zusätzlichen Stufen gelten auch für den CSV-Export und die Standardabfrage über den KI-Zugriff.",
+      },
+    ],
+  },
+  {
     version: "5.0.0",
     date: "2026-10-26",
     title: "Mitglieder, Familien und Beitragswechsel",

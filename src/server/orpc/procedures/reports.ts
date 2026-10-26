@@ -1,5 +1,6 @@
 import { and, asc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { STANDARD_JUBILAEEN } from "~/lib/ehrungen";
 import { escapeLike } from "~/server/db/like";
 import {
   memberHasDied,
@@ -66,8 +67,6 @@ const EhrungenInput = v.object({
 const YearInput = v.object({
   year: v.pipe(v.number(), v.integer(), v.minValue(1900), v.maxValue(2200)),
 });
-
-const DEFAULT_JUBILAEEN = [25, 40, 50, 60, 70, 75];
 
 function formatDateDE(value: Date | string | null | undefined): string {
   if (!value) return "";
@@ -236,7 +235,7 @@ async function loadEhrungen(
   db: AppContext["db"],
   input: v.InferOutput<typeof EhrungenInput>,
 ): Promise<{ year: number; groups: Array<{ jubilee: number; members: JubileeMemberRow[] }> }> {
-  const jubilaeen = (input.jubilaeen?.length ? input.jubilaeen : DEFAULT_JUBILAEEN)
+  const jubilaeen = (input.jubilaeen?.length ? input.jubilaeen : STANDARD_JUBILAEEN)
     .slice()
     .sort((a, b) => b - a);
 

@@ -177,7 +177,7 @@ function ExportCenterPage() {
 
         <ExportCard
           title="Ehrungen"
-          description="Jubilare des Jahres (25, 40, 50, 60, 70, 75 Jahre)."
+          description="Vereinsjubiläen ab 25 Jahren in Fünfjahresschritten."
           busy={busy === "ehrungen"}
           onDownload={() => run("ehrungen", () => orpc.reports.ehrungenExport({ year }))}
         >

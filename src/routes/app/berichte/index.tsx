@@ -27,7 +27,7 @@ const CARDS: ReportCard[] = [
   {
     to: "/app/berichte/ehrungen",
     title: "Ehrungen",
-    description: "Jubilare des Jahres: 25, 40, 50, 60, 70, 75 Jahre Mitgliedschaft.",
+    description: "Vereinsjubiläen ab 25 Jahren in Fünfjahresschritten.",
     icon: <Trophy className="size-6" />,
   },
   {
