@@ -4,8 +4,10 @@ import { escapeLike } from "~/server/db/like";
 import {
   memberHasDied,
   memberHasExited,
+  memberHasNumber,
   memberHasPendingExit,
   memberHasRealAbteilung,
+  memberIsCurrent,
   memberIsPassiv,
   memberNotDeceased,
   memberNotDeleted,
@@ -25,6 +27,9 @@ import { isExcludedFromJubilee, jubileeDateFor, jubileeYearFor } from "~/server/
 import { CACHE_NS, cached } from "~/server/search/cache";
 
 const StatusSchema = v.picklist([
+  "aktuell",
+  "mitglieder",
+  "kontakte",
   "aktiv",
   "passiv",
   "gekuendigt",
@@ -35,7 +40,7 @@ const StatusSchema = v.picklist([
 
 const MemberExportInput = v.object({
   q: v.optional(v.string(), ""),
-  status: v.optional(StatusSchema, "aktiv"),
+  status: v.optional(StatusSchema, "aktuell"),
   abteilungId: v.optional(v.nullable(v.string()), null),
   includeAusgetretene: v.optional(v.boolean(), false),
   // When present, export exactly these members and ignore the filter
@@ -90,9 +95,15 @@ function aktivPasivLabel() {
 
 function buildMemberWhereClauses(input: v.InferOutput<typeof MemberExportInput>) {
   const conditions: ReturnType<typeof eq>[] = [];
+  if (input.status === "kontakte") conditions.push(isNull(membersTable.memberNo) as never);
+  else if (input.status !== "alle") conditions.push(memberHasNumber() as never);
+  if (input.status === "aktuell") conditions.push(memberIsCurrent() as never);
   // "Exited" means the Austritt date has arrived; a notice for a future date
   // still counts as active (see `memberNotExited`), matching the members list.
-  if (!input.includeAusgetretene && input.status !== "ausgetreten") {
+  if (
+    !input.includeAusgetretene &&
+    !["ausgetreten", "alle", "mitglieder", "kontakte"].includes(input.status)
+  ) {
     conditions.push(memberNotExited() as never);
   }
   if (input.status === "ausgetreten") {
@@ -166,6 +177,7 @@ async function loadGeburtstage(
     sql`(${membersTable.austritt} is null or ${membersTable.austritt}::date >= (make_date(${input.year}, ${input.month}, 1) + (${dayExpr} - 1)))` as never,
     sql`(${membersTable.verstorbenAm} is null or ${membersTable.verstorbenAm}::date >= (make_date(${input.year}, ${input.month}, 1) + (${dayExpr} - 1)))` as never,
     memberNotDeleted() as never,
+    memberHasNumber() as never,
     sql`${monthExpr} = ${input.month}` as never,
   ];
 
@@ -231,6 +243,7 @@ async function loadEhrungen(
   const conditions = [
     isNotNull(membersTable.eintritt) as never,
     memberNotDeleted() as never,
+    memberHasNumber() as never,
     inArray(
       sql<number>`extract(year from ${membersTable.eintritt})::int`,
       jubilaeen.map((j) => input.year - j),
@@ -298,12 +311,12 @@ async function loadAbteilungStats(
   // Exclude soft-deleted members: join to members and gate every count on
   // `deleted_at is null`, so a deleted member's Abteilung row no longer inflates
   // the statistics.
-  const notDeleted = sql`${membersTable.deletedAt} is null`;
+  const notDeleted = and(memberNotDeleted(), memberHasNumber());
   const rows = await db
     .select({
       abteilungId: abteilungenTable.id,
       name: abteilungenTable.name,
-      aktivCount: sql<number>`count(${memberAbteilungenTable.memberId}) filter (where ${memberAbteilungenTable.austrittsdatum} is null and ${notDeleted})::int`,
+      aktivCount: sql<number>`count(${memberAbteilungenTable.memberId}) filter (where (${memberAbteilungenTable.austrittsdatum} is null or ${memberAbteilungenTable.austrittsdatum}>current_date) and ${notDeleted} and ${memberNotExited()} and ${memberNotDeceased()})::int`,
       joiners: sql<number>`count(${memberAbteilungenTable.memberId}) filter (where ${memberAbteilungenTable.eintrittsdatum} between ${startOfYear}::date and ${endOfYear}::date and ${notDeleted})::int`,
       leavers: sql<number>`count(${memberAbteilungenTable.memberId}) filter (where ${memberAbteilungenTable.austrittsdatum} between ${startOfYear}::date and ${endOfYear}::date and ${notDeleted})::int`,
     })

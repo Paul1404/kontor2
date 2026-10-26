@@ -9,7 +9,16 @@
  * page (a bad entry is dropped, not thrown).
  */
 
-export type ViewStatus = "aktiv" | "passiv" | "gekuendigt" | "ausgetreten" | "verstorben" | "alle";
+export type ViewStatus =
+  | "aktuell"
+  | "mitglieder"
+  | "kontakte"
+  | "aktiv"
+  | "passiv"
+  | "gekuendigt"
+  | "ausgetreten"
+  | "verstorben"
+  | "alle";
 export type ViewSortBy = "nachname" | "mitgliedsnummer" | "ort" | "email" | "eintritt";
 export type ViewSortDir = "asc" | "desc";
 
@@ -31,6 +40,9 @@ export type SavedView = {
 };
 
 const STATUS_VALUES: ViewStatus[] = [
+  "aktuell",
+  "mitglieder",
+  "kontakte",
   "aktiv",
   "passiv",
   "gekuendigt",
@@ -46,7 +58,7 @@ function coerceSearch(raw: unknown): ViewSearch {
   const s = (raw ?? {}) as Record<string, unknown>;
   const status = STATUS_VALUES.includes(s.status as ViewStatus)
     ? (s.status as ViewStatus)
-    : "aktiv";
+    : "aktuell";
   const sortBy = SORT_VALUES.includes(s.sortBy as ViewSortBy)
     ? (s.sortBy as ViewSortBy)
     : "nachname";

@@ -582,6 +582,13 @@
       "when": 1789314066209,
       "tag": "0082_odd_siren",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1793035232409,
+      "tag": "0083_sleepy_queen_noir",
+      "breakpoints": true
     }
   ]
 }

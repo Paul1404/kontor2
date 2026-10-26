@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, Crown, Loader2, Sparkles, Trash2, UsersRound } from "lucide-react";
 import { useState } from "react";
+import { FamilyMigration } from "~/components/forms/FamilyMigration";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -47,6 +48,7 @@ function FamilienPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <FamilyMigration />
       <div className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <UsersRound className="size-6 text-brand" /> Familien

@@ -448,7 +448,7 @@ export function AustrittsbestaetigungCard({
                   {empfCandidates.length > 0 ? (
                     <div className="flex flex-col gap-1.5">
                       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Aus Beziehungen übernehmen
+                        Aus Familie übernehmen
                       </span>
                       <div className="flex flex-wrap gap-2">
                         {empfCandidates.map((b) => {
@@ -575,7 +575,7 @@ export function AustrittsbestaetigungCard({
                   {familyCandidates.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        <Users className="size-3.5" /> Aus Beziehungen
+                        <Users className="size-3.5" /> Aus Familie
                       </span>
                       {familyCandidates.map((b) => (
                         <button

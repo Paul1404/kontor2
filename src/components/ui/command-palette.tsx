@@ -1,153 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  AlertTriangle,
-  BookOpen,
-  Building2,
-  Coins,
-  FileBarChart,
-  FileSpreadsheet,
-  History,
-  Landmark,
-  Layers,
-  LayoutDashboard,
-  Mail,
-  ScrollText,
-  Search,
-  UserCog,
-  Users,
-} from "lucide-react";
+import { Coins, Landmark, ScrollText, Search, Users } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "~/lib/cn";
 import { memberRef } from "~/lib/member-ref";
+import { NAV_SECTIONS, navVisible } from "~/lib/navigation";
 import { orpc } from "~/lib/orpc";
+import { normalizeTenantPolicy } from "~/lib/tenant-settings";
 import { useRecentMembers } from "~/lib/use-recent-members";
 
-type Role = "admin" | "vorstand" | "readonly" | string;
-
-type NavCommand = {
-  kind: "nav";
-  id: string;
-  label: string;
-  icon: ReactNode;
-  path: string;
-  needs: Role[];
-};
-
-const NAV_COMMANDS: NavCommand[] = [
-  {
-    kind: "nav",
-    id: "dashboard",
-    label: "Übersicht",
-    icon: <LayoutDashboard className="size-4" />,
-    path: "/app",
-    needs: ["readonly", "vorstand", "admin"],
-  },
-  {
-    kind: "nav",
-    id: "members",
-    label: "Mitglieder",
-    icon: <Users className="size-4" />,
-    path: "/app/mitglieder",
-    needs: ["readonly", "vorstand", "admin"],
-  },
-  {
-    kind: "nav",
-    id: "members.new",
-    label: "Neues Mitglied anlegen",
-    icon: <Users className="size-4" />,
-    path: "/app/mitglieder/neu",
-    needs: ["vorstand", "admin"],
-  },
-  {
-    kind: "nav",
-    id: "fee-runs",
-    label: "Beitragsläufe",
-    icon: <Coins className="size-4" />,
-    path: "/app/beitrag",
-    needs: ["vorstand", "admin"],
-  },
-  {
-    kind: "nav",
-    id: "reports",
-    label: "Berichte",
-    icon: <FileBarChart className="size-4" />,
-    path: "/app/berichte",
-    needs: ["vorstand", "admin"],
-  },
-  {
-    kind: "nav",
-    id: "docs",
-    label: "Dokumentation",
-    icon: <BookOpen className="size-4" />,
-    path: "/app/dokumentation",
-    needs: ["vorstand", "admin"],
-  },
-  {
-    kind: "nav",
-    id: "audit",
-    label: "Änderungsprotokoll",
-    icon: <ScrollText className="size-4" />,
-    path: "/app/audit",
-    needs: ["readonly", "vorstand", "admin"],
-  },
-  {
-    kind: "nav",
-    id: "snapshots",
-    label: "Snapshots & Wiederherstellung",
-    icon: <History className="size-4" />,
-    path: "/app/admin/snapshots",
-    needs: ["admin"],
-  },
-  {
-    kind: "nav",
-    id: "danger-zone",
-    label: "Adminbereich (Gefahrenzone)",
-    icon: <AlertTriangle className="size-4" />,
-    path: "/app/admin/erweitert",
-    needs: ["admin"],
-  },
-  {
-    kind: "nav",
-    id: "import",
-    label: "Datenimport",
-    icon: <FileSpreadsheet className="size-4" />,
-    path: "/app/import",
-    needs: ["admin"],
-  },
-  {
-    kind: "nav",
-    id: "verein",
-    label: "Vereinsdaten",
-    icon: <Building2 className="size-4" />,
-    path: "/app/einstellungen/verein",
-    needs: ["admin"],
-  },
-  {
-    kind: "nav",
-    id: "abteilungen",
-    label: "Abteilungen",
-    icon: <Layers className="size-4" />,
-    path: "/app/einstellungen/abteilungen",
-    needs: ["admin"],
-  },
-  {
-    kind: "nav",
-    id: "benutzer",
-    label: "Benutzer",
-    icon: <UserCog className="size-4" />,
-    path: "/app/einstellungen/benutzer",
-    needs: ["admin"],
-  },
-  {
-    kind: "nav",
-    id: "smtp",
-    label: "SMTP",
-    icon: <Mail className="size-4" />,
-    path: "/app/einstellungen/smtp",
-    needs: ["admin"],
-  },
-];
+type Role = string;
+const NAV_COMMANDS = NAV_SECTIONS.flatMap((s) => s.items).map((item) => ({
+  ...item,
+  id: item.to,
+  path: item.to,
+}));
 
 type MemberHit = {
   id: string;
@@ -189,6 +56,13 @@ export function CommandPalette({ role }: { role: Role }) {
     }
   }, [open]);
 
+  const organization = useQuery({
+    queryKey: ["organization"],
+    queryFn: () => orpc.organization.get(),
+    enabled: role === "admin",
+    staleTime: 300_000,
+  });
+  const policy = normalizeTenantPolicy(organization.data?.tenantPolicy);
   const trimmed = query.trim();
   const memberSearch = useQuery({
     queryKey: ["members.quickSearch", trimmed],
@@ -206,11 +80,11 @@ export function CommandPalette({ role }: { role: Role }) {
   const filteredNav = useMemo(() => {
     const lowered = trimmed.toLowerCase();
     return NAV_COMMANDS.filter((cmd) => {
-      if (!cmd.needs.includes(role)) return false;
+      if (!navVisible(cmd, role, policy)) return false;
       if (!lowered) return true;
       return cmd.label.toLowerCase().includes(lowered);
     });
-  }, [trimmed, role]);
+  }, [trimmed, role, policy]);
 
   const memberHits: MemberHit[] = (memberSearch.data?.rows as MemberHit[] | undefined) ?? [];
   const contractHits = entitySearch.data?.contracts ?? [];

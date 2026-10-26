@@ -19,7 +19,7 @@ type TenantHandle = { key: string; handle: DB; conn: postgres.Sql };
  * mirroring the auth layer. The nightly run iterates these so all Vereine get
  * snapshots and status reconcile, not just the primary.
  */
-async function tenantHandles(): Promise<TenantHandle[]> {
+export async function tenantHandles(): Promise<TenantHandle[]> {
   const tenants = await loadTenants();
   const primaryKey = primaryTenant().key;
   return tenants.map((t) => {

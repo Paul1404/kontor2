@@ -7,11 +7,12 @@ import { memberNotDeleted } from "~/server/db/member-filters";
 import { familienMitgliederTable, familienTable } from "~/server/db/schema/familien";
 import { membersTable } from "~/server/db/schema/members";
 import { familienNameVorschlag, rolleVorschlag } from "~/server/domain/familie";
+import { applyFamilyInventory, familyInventory } from "~/server/domain/family-migration";
 import { memberDisplayName, memberRef } from "~/server/domain/member";
 import { authedProc, vorstandProc } from "~/server/orpc/base";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
-const RolleInput = v.picklist(["zahler", "partner", "kind"]);
+const RolleInput = v.picklist(["zahler", "partner", "kind", "sorgeberechtigt"]);
 
 async function takeFamilySnapshots(
   tx: DBOrTx,
@@ -70,6 +71,7 @@ async function loadFamilie(db: DB, familieId: string) {
     .select({
       mitgliedschaftId: familienMitgliederTable.id,
       rolle: familienMitgliederTable.rolle,
+      isGuardian: familienMitgliederTable.isGuardian,
       von: familienMitgliederTable.von,
       bis: familienMitgliederTable.bis,
       ...memberLiteColumns,
@@ -85,9 +87,11 @@ async function loadFamilie(db: DB, familieId: string) {
     name: fam.name,
     notiz: fam.notiz,
     zahlerMemberId: fam.zahlerMemberId,
+    guardianMemberId: fam.guardianMemberId,
     mitglieder: rows.map((r) => ({
       mitgliedschaftId: r.mitgliedschaftId,
       rolle: r.rolle,
+      isGuardian: r.isGuardian,
       von: r.von,
       bis: r.bis,
       aktiv: r.bis == null,
@@ -97,6 +101,19 @@ async function loadFamilie(db: DB, familieId: string) {
 }
 
 export const familienRouter = {
+  migrationPreview: vorstandProc
+    .input(v.void())
+    .handler(({ context }) => familyInventory(context.db)),
+  migrationApply: vorstandProc
+    .input(v.object({ hash: v.string(), confirm: v.literal(true) }))
+    .handler(async ({ context, input }) =>
+      context.db.transaction((tx) =>
+        applyFamilyInventory(tx, input.hash, {
+          id: context.session!.user.id,
+          email: context.session!.user.email,
+        }),
+      ),
+    ),
   /** Die aktive Familie eines Mitglieds für die Karte auf der Detailseite. */
   forMember: authedProc
     .input(v.object({ memberId: v.string() }))
@@ -286,14 +303,90 @@ export const familienRouter = {
     return [...map.values()];
   }),
 
+  setGuardian: vorstandProc
+    .input(
+      v.object({
+        familieId: v.pipe(v.string(), v.uuid()),
+        memberId: v.pipe(v.string(), v.uuid()),
+        isGuardian: v.boolean(),
+        primary: v.boolean(),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      await context.db.transaction(async (tx) => {
+        const [row] = await tx
+          .select()
+          .from(familienMitgliederTable)
+          .where(
+            and(
+              eq(familienMitgliederTable.familieId, input.familieId),
+              eq(familienMitgliederTable.memberId, input.memberId),
+              isNull(familienMitgliederTable.bis),
+            ),
+          );
+        if (!row || row.rolle === "kind")
+          throw new ORPCError("CONFLICT", {
+            message: "Nur eine erwachsene Person der Familie kann Sorgeberechtigter sein.",
+          });
+        await tx
+          .update(familienMitgliederTable)
+          .set({ isGuardian: input.isGuardian })
+          .where(eq(familienMitgliederTable.id, row.id));
+        if (input.primary && !input.isGuardian)
+          throw new ORPCError("CONFLICT", { message: "Der Empfänger muss sorgeberechtigt sein." });
+        const [fam] = await tx
+          .select()
+          .from(familienTable)
+          .where(eq(familienTable.id, input.familieId));
+        if (input.primary || (!input.isGuardian && fam?.guardianMemberId === input.memberId))
+          await tx
+            .update(familienTable)
+            .set({ guardianMemberId: input.primary ? input.memberId : null, updatedAt: new Date() })
+            .where(eq(familienTable.id, input.familieId));
+        const auditId = await appendAudit(tx, {
+          entityType: "familie",
+          entityId: input.familieId,
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          changes: {
+            guardian: { before: row.isGuardian, after: input.isGuardian },
+            recipient: {
+              before: fam?.guardianMemberId ?? null,
+              after: input.primary ? input.memberId : (fam?.guardianMemberId ?? null),
+            },
+          },
+          requestId: context.requestId ?? null,
+        });
+        const all = await tx
+          .select({ memberId: familienMitgliederTable.memberId })
+          .from(familienMitgliederTable)
+          .where(eq(familienMitgliederTable.familieId, input.familieId));
+        await takeFamilySnapshots(
+          tx,
+          all.map((r) => r.memberId),
+          { id: context.session!.user.id, email: context.session!.user.email },
+          auditId,
+        );
+      });
+      return { ok: true };
+    }),
   create: vorstandProc
     .input(
       v.object({
         name: v.pipe(v.string(), v.minLength(1)),
-        zahlerMemberId: v.string(),
+        zahlerMemberId: v.nullable(v.string()),
+        guardianMemberId: v.optional(v.nullable(v.string())),
         notiz: v.optional(v.nullable(v.string())),
         mitglieder: v.pipe(
-          v.array(v.object({ memberId: v.string(), rolle: RolleInput })),
+          v.array(
+            v.object({
+              memberId: v.string(),
+              rolle: RolleInput,
+              isGuardian: v.optional(v.boolean(), false),
+            }),
+          ),
           v.minLength(1),
         ),
       }),
@@ -305,13 +398,28 @@ export const familienRouter = {
           message: "Ein Mitglied kann nur einmal in der Familie stehen.",
         });
       }
-      if (!memberIds.includes(input.zahlerMemberId)) {
+      if (input.zahlerMemberId && !memberIds.includes(input.zahlerMemberId)) {
         throw new ORPCError("VALIDATION_FAILED", {
           message: "Der Zahler muss selbst Teil der Familie sein.",
         });
       }
+      if (
+        input.guardianMemberId &&
+        !input.mitglieder.some(
+          (m) =>
+            m.memberId === input.guardianMemberId &&
+            (m.isGuardian || m.rolle === "sorgeberechtigt") &&
+            m.rolle !== "kind",
+        )
+      )
+        throw new ORPCError("CONFLICT", {
+          message: "Der Empfänger für Kinder muss sorgeberechtigtes Familienmitglied sein.",
+        });
       const zahlerRollen = input.mitglieder.filter((m) => m.rolle === "zahler");
-      if (zahlerRollen.length !== 1 || zahlerRollen[0]!.memberId !== input.zahlerMemberId) {
+      if (
+        zahlerRollen.length > 1 ||
+        (zahlerRollen.length === 1 && zahlerRollen[0]!.memberId !== input.zahlerMemberId)
+      ) {
         throw new ORPCError("VALIDATION_FAILED", {
           message: "Genau ein Mitglied muss die Rolle Zahler haben, und zwar der Zahler selbst.",
         });
@@ -359,6 +467,7 @@ export const familienRouter = {
           .values({
             name: input.name.trim(),
             zahlerMemberId: input.zahlerMemberId,
+            guardianMemberId: input.guardianMemberId,
             notiz: input.notiz ?? null,
           })
           .returning({ id: familienTable.id });
@@ -367,6 +476,7 @@ export const familienRouter = {
             familieId: fam!.id,
             memberId: m.memberId,
             rolle: m.rolle,
+            isGuardian: m.isGuardian || m.rolle === "sorgeberechtigt",
           })),
         );
         const auditId = await appendAudit(tx, {
@@ -431,20 +541,6 @@ export const familienRouter = {
               message: "Der neue Zahler muss aktives Mitglied der Familie sein.",
             });
           }
-          await tx
-            .update(familienMitgliederTable)
-            .set({ rolle: "partner" })
-            .where(
-              and(
-                eq(familienMitgliederTable.familieId, input.id),
-                eq(familienMitgliederTable.rolle, "zahler"),
-                isNull(familienMitgliederTable.bis),
-              ),
-            );
-          await tx
-            .update(familienMitgliederTable)
-            .set({ rolle: "zahler" })
-            .where(eq(familienMitgliederTable.id, neu.id));
         }
 
         const patch: Record<string, unknown> = { updatedAt: new Date() };
@@ -527,6 +623,7 @@ export const familienRouter = {
           familieId: input.familieId,
           memberId: input.memberId,
           rolle: input.rolle,
+          isGuardian: input.rolle === "sorgeberechtigt",
         });
         const auditId = await appendAudit(tx, {
           entityType: "familie",
@@ -561,11 +658,24 @@ export const familienRouter = {
         if (!row || row.bis != null) {
           throw new ORPCError("NOT_FOUND", { message: "Aktive Zugehörigkeit nicht gefunden." });
         }
-        if (row.rolle === "zahler") {
+        const [payerFamily] = await tx
+          .select()
+          .from(familienTable)
+          .where(eq(familienTable.id, row.familieId));
+        if (payerFamily?.zahlerMemberId === row.memberId) {
           throw new ORPCError("VALIDATION_FAILED", {
             message: "Der Zahler kann nicht austreten. Erst den Zahler ändern.",
           });
         }
+        const [family] = await tx
+          .select()
+          .from(familienTable)
+          .where(eq(familienTable.id, row.familieId));
+        if (family?.guardianMemberId === row.memberId)
+          throw new ORPCError("CONFLICT", {
+            message:
+              "Diese Person ist Empfänger für die Kinder. Bitte zuerst einen anderen Sorgeberechtigten festlegen.",
+          });
         await tx
           .update(familienMitgliederTable)
           .set({ bis: sql`current_date` })

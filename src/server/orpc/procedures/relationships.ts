@@ -6,7 +6,7 @@ import { escapeLike } from "~/server/db/like";
 import { memberNotDeleted } from "~/server/db/member-filters";
 import { membersTable } from "~/server/db/schema/members";
 import { relationshipsTable } from "~/server/db/schema/relationships";
-import { vorstandProc } from "~/server/orpc/base";
+import { base, vorstandProc } from "~/server/orpc/base";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 function toDateOrNull(value: string | null | undefined, field: string): Date | null {
@@ -28,8 +28,15 @@ const RelationshipPatch = v.object({
   istVertreter: v.optional(v.boolean()),
 });
 
+const historicalOnly = base.middleware(async () => {
+  throw new ORPCError("CONFLICT", {
+    message:
+      "Beziehungen sind nur noch Herkunftsnachweise. Bitte die Familienzuordnung bearbeiten.",
+  });
+});
 export const relationshipsRouter = {
   create: vorstandProc
+    .use(historicalOnly)
     .input(
       v.object({
         fromMemberId: v.string(),
@@ -122,6 +129,7 @@ export const relationshipsRouter = {
     }),
 
   update: vorstandProc
+    .use(historicalOnly)
     .input(v.object({ id: v.string(), patch: RelationshipPatch }))
     .handler(async ({ context, input }) => {
       await context.db.transaction(async (tx) => {
@@ -203,6 +211,7 @@ export const relationshipsRouter = {
     }),
 
   remove: vorstandProc
+    .use(historicalOnly)
     .input(v.object({ id: v.string(), removeReciprocal: v.optional(v.boolean(), true) }))
     .handler(async ({ context, input }) => {
       await context.db.transaction(async (tx) => {

@@ -7,8 +7,10 @@ import { auditRouter } from "~/server/orpc/procedures/audit";
 import { authRouter } from "~/server/orpc/procedures/auth";
 import { bankDetailsRouter } from "~/server/orpc/procedures/bank-details";
 import { banksRouter } from "~/server/orpc/procedures/banks";
+import { birthdayReminderRouter } from "~/server/orpc/procedures/birthday-reminders";
 import { cancellationsRouter } from "~/server/orpc/procedures/cancellations";
 import { consoleRouter } from "~/server/orpc/procedures/console";
+import { contractSwitchRouter } from "~/server/orpc/procedures/contract-switch";
 import { contractsRouter } from "~/server/orpc/procedures/contracts";
 import { dangerZoneRouter } from "~/server/orpc/procedures/danger-zone";
 import { dashboardRouter } from "~/server/orpc/procedures/dashboard";
@@ -25,6 +27,7 @@ import { invoicesRouter } from "~/server/orpc/procedures/invoices";
 import { kulanzRouter } from "~/server/orpc/procedures/kulanz";
 import { lettersRouter } from "~/server/orpc/procedures/letters";
 import { logsRouter } from "~/server/orpc/procedures/logs";
+import { memberConversionRouter } from "~/server/orpc/procedures/member-conversion";
 import { membersRouter } from "~/server/orpc/procedures/members";
 import { organizationSettingsRouter } from "~/server/orpc/procedures/organization-settings";
 import { paymentsRouter } from "~/server/orpc/procedures/payments";
@@ -44,13 +47,16 @@ import { verbandsmeldungRouter } from "~/server/orpc/procedures/verbandsmeldung"
 
 export const appRouter = {
   auth: authRouter,
+  birthdayReminder: birthdayReminderRouter,
   members: membersRouter,
+  memberConversion: memberConversionRouter,
   applications: applicationsRouter,
   abteilungen: abteilungenRouter,
   apiKeys: apiKeysRouter,
   relationships: relationshipsRouter,
   familien: familienRouter,
   contracts: contractsRouter,
+  contractSwitch: contractSwitchRouter,
   feeTypes: feeTypesRouter,
   sepa: sepaRouter,
   sepaReturns: sepaReturnsRouter,

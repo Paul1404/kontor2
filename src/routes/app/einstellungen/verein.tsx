@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Building2, CheckCircle2, Loader2, Palette, Save, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { BirthdaySettings } from "~/components/forms/BirthdaySettings";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -266,6 +267,7 @@ function VereinsdatenPage() {
 
       <BrandingCard />
 
+      <BirthdaySettings />
       <Card>
         <CardHeader>
           <CardTitle>Stammdaten und SEPA</CardTitle>

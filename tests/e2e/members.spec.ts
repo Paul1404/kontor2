@@ -8,7 +8,7 @@ test.describe("members", () => {
   test("sorts and selects rows through the members table", async ({ appPage }) => {
     await createMember(appPage, { vorname: "Tanja", nachname: "Tabellentest" });
     await gotoMembersList(appPage);
-    await appPage.getByRole("button", { name: /Gesamt/ }).click();
+    await appPage.getByRole("button", { name: /Aktuelle Mitglieder/ }).click();
 
     const nameHeader = appPage.getByRole("button", { name: "Name" });
     await nameHeader.click();
@@ -40,14 +40,20 @@ test.describe("members", () => {
 
     await appPage.getByRole("button", { name: "Austritt", exact: true }).click();
 
-    // Confirm dialog: the Austrittsdatum defaults to today, so just confirm.
+    await appPage
+      .getByRole("button", { name: "Kein Nachweis vorhanden? Als Verwaltungseintrag erfassen" })
+      .click();
+    // This fixture has no configured notice period; the administrative date is today.
     const dialog = appPage.getByRole("dialog");
-    await expect(dialog.getByRole("heading", { name: "Mitglied austreten lassen" })).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Austritt eintragen" })).toBeVisible();
+    await dialog
+      .getByLabel("Austritt zum", { exact: false })
+      .fill(`31.12.${new Date().getFullYear() + 1}`);
     await dialog.getByRole("button", { name: "Austritt eintragen" }).click();
 
     // Success: the toast fires and the action flips to "Austritt rückgängig"
     // once the member reloads as cancelled (a durable post-condition).
-    await expect(appPage.getByText("Austritt eingetragen")).toBeVisible();
+    await expect(appPage.getByText("Austritt eingetragen", { exact: false })).toBeVisible();
     await expect(appPage.getByRole("button", { name: "Austritt rückgängig" })).toBeVisible();
   });
 });

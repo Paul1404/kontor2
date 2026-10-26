@@ -5,6 +5,7 @@ export * from "./audit";
 export * from "./auth";
 export * from "./bank-detail-changes";
 export * from "./bestandserhebungen";
+export * from "./birthday-reminders";
 export * from "./cancellations";
 export * from "./contracts";
 export * from "./data-quality-exceptions";

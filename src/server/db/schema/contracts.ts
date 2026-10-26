@@ -20,6 +20,7 @@ export const contractsTable = pgTable(
   "contracts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    seriesId: uuid("series_id"),
     memberId: uuid("member_id")
       .notNull()
       .references(() => membersTable.id, { onDelete: "cascade" }),

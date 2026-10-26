@@ -4,8 +4,8 @@ import { memberNotDeleted } from "~/server/db/member-filters";
 import { sepaReturnsTable } from "~/server/db/schema/dunning";
 import { sollStellungenTable } from "~/server/db/schema/fee-runs";
 import { membersTable } from "~/server/db/schema/members";
-import { relationshipsTable } from "~/server/db/schema/relationships";
 import { ageAt, isDunningBlocked, isMinorAt, memberDisplayName } from "~/server/domain/member";
+import { loadZahlerContext } from "~/server/sepa/zahler-context";
 
 // Canonical homes are now in `~/server/domain/member`. Re-exported here so the
 // existing dunning/kulanz/procedure imports and tests keep working unchanged.
@@ -447,56 +447,21 @@ export async function loadGuardianConnections(
   const out = new Map<string, AddressBlock>();
   if (memberIds.length === 0) return out;
 
-  const rows = await db
-    .select({
-      fromMemberId: relationshipsTable.fromMemberId,
-      relName: relationshipsTable.name,
-      relNachname: relationshipsTable.nachname,
-      relAnrede: relationshipsTable.anrede,
-      relEmail: relationshipsTable.email,
-      toMemberId: relationshipsTable.toMemberId,
-      tVorname: membersTable.vorname,
-      tNachname: membersTable.nachname,
-      tAnrede: membersTable.anrede,
-      tStrasse: membersTable.strasse,
-      tHausnummer: membersTable.hausnummer,
-      tPlz: membersTable.plz,
-      tOrt: membersTable.ort,
-      tEmail: membersTable.email,
-      tDeletedAt: membersTable.deletedAt,
-      tStatus: membersTable.status,
-    })
-    .from(relationshipsTable)
-    .leftJoin(membersTable, eq(membersTable.id, relationshipsTable.toMemberId))
-    .where(
-      and(
-        inArray(relationshipsTable.fromMemberId, memberIds),
-        eq(relationshipsTable.istVertreter, true),
-      ),
-    );
-
-  for (const r of rows) {
-    if (out.has(r.fromMemberId)) continue; // first flag wins
-    // A linked guardian only contributes data while still an active member.
-    // A soft-deleted or deceased member must not receive a minor's Mahnung at
-    // their stale address/email, so we ignore the member side and fall back to
-    // the relationship's own fields (or skip the guardian entirely).
-    const linkedUsable = !!r.toMemberId && r.tDeletedAt == null && r.tStatus !== "verstorben";
-    const name =
-      (linkedUsable ? [r.tVorname, r.tNachname].filter(Boolean).join(" ").trim() : "") ||
-      (r.relName ?? r.relNachname ?? "").trim();
-    if (!name) continue;
-    // A linked member contributes its own email; an external contact carries
-    // the relationship's email field.
-    const email = (linkedUsable ? cleanEmail(r.tEmail) : null) ?? cleanEmail(r.relEmail);
-    out.set(r.fromMemberId, {
-      anrede: (linkedUsable ? r.tAnrede : null) ?? r.relAnrede ?? null,
-      name,
-      strasse: linkedUsable ? r.tStrasse : null,
-      hausnummer: linkedUsable ? r.tHausnummer : null,
-      plz: linkedUsable ? r.tPlz : null,
-      ort: linkedUsable ? r.tOrt : null,
-      email,
+  const context = await loadZahlerContext(db, memberIds);
+  const ids = [...new Set(context.vertreterByMember.values())];
+  if (!ids.length) return out;
+  const people = await db.select().from(membersTable).where(inArray(membersTable.id, ids));
+  for (const [child, id] of context.vertreterByMember) {
+    const person = people.find((p) => p.id === id);
+    if (!person || person.deletedAt || person.verstorbenAm) continue;
+    out.set(child, {
+      anrede: person.anrede,
+      name: [person.vorname, person.nachname].filter(Boolean).join(" "),
+      strasse: person.strasse,
+      hausnummer: person.hausnummer,
+      plz: person.plz,
+      ort: person.ort,
+      email: cleanEmail(person.email),
     });
   }
   return out;
@@ -514,7 +479,10 @@ export async function resolveRecipients(
   );
   const out = new Map<string, ResolvedRecipient>();
   for (const m of members) {
-    out.set(m.memberId, resolveRecipient(m, guardians.get(m.memberId) ?? null, asOf));
+    out.set(
+      m.memberId,
+      resolveRecipient({ ...m, vertreterName: null }, guardians.get(m.memberId) ?? null, asOf),
+    );
   }
   return out;
 }

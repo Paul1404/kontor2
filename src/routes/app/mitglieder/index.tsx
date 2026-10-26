@@ -60,7 +60,16 @@ import { rangeIds } from "~/lib/selection";
 import { moveCursor } from "~/lib/table-nav";
 import { isTypingTarget, usePageShortcut } from "~/lib/use-global-shortcuts";
 
-type Status = "aktiv" | "passiv" | "gekuendigt" | "ausgetreten" | "verstorben" | "alle";
+type Status =
+  | "aktuell"
+  | "mitglieder"
+  | "kontakte"
+  | "aktiv"
+  | "passiv"
+  | "gekuendigt"
+  | "ausgetreten"
+  | "verstorben"
+  | "alle";
 type SortBy = "nachname" | "mitgliedsnummer" | "ort" | "email" | "eintritt";
 type SortDir = "asc" | "desc";
 
@@ -103,6 +112,9 @@ type MembersSearch = {
 };
 
 const STATUS_VALUES: Status[] = [
+  "aktuell",
+  "mitglieder",
+  "kontakte",
   "aktiv",
   "passiv",
   "gekuendigt",
@@ -114,7 +126,7 @@ const SORT_VALUES: SortBy[] = ["nachname", "mitgliedsnummer", "ort", "email", "e
 
 const EMPTY_SEARCH: MembersSearch = {
   q: "",
-  status: "aktiv",
+  status: "aktuell",
   abteilungId: null,
   includeAusgetretene: false,
   orphanOnly: false,
@@ -130,7 +142,7 @@ export const Route = createFileRoute("/app/mitglieder/")({
   // and survives reloads. `validateSearch` coerces arbitrary input to a
   // safe shape (the URL is user-controlled).
   validateSearch: (s: Record<string, unknown>): MembersSearch => {
-    const status = STATUS_VALUES.includes(s.status as Status) ? (s.status as Status) : "aktiv";
+    const status = STATUS_VALUES.includes(s.status as Status) ? (s.status as Status) : "aktuell";
     const sortBy = SORT_VALUES.includes(s.sortBy as SortBy) ? (s.sortBy as SortBy) : "nachname";
     const sortDir = s.sortDir === "desc" ? "desc" : "asc";
     const pageNum = Number(s.page);
@@ -736,12 +748,15 @@ function MembersListPage() {
               onChange={(e) => updateSearch({ status: e.target.value as Status })}
               className="h-10 min-w-0 rounded-lg border border-input bg-card px-3 text-sm shadow-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
             >
+              <option value="aktuell">Aktuelle Mitglieder</option>
+              <option value="mitglieder">Alle Mitglieder</option>
+              <option value="kontakte">Kontakte</option>
               <option value="aktiv">Aktiv</option>
               <option value="passiv">Passiv</option>
               <option value="gekuendigt">Gekündigt</option>
               <option value="ausgetreten">Ausgetreten</option>
               <option value="verstorben">Verstorben</option>
-              <option value="alle">Alle</option>
+              <option value="alle">Alle Datensätze</option>
             </select>
             <select
               value={search.abteilungId ?? ""}
@@ -812,7 +827,7 @@ function MembersListPage() {
           {search.status !== "aktiv" ? (
             <FilterChip
               label={`Status: ${search.status}`}
-              onRemove={() => updateSearch({ status: "aktiv" })}
+              onRemove={() => updateSearch({ status: "aktuell" })}
             />
           ) : null}
           {abteilungName ? (
@@ -1184,9 +1199,20 @@ function MemberStatsStrip({
   onPick: (status: Status) => void;
 }) {
   const tiles: { key: Status; label: string; value: number; dot: string }[] = [
-    { key: "alle", label: "Gesamt", value: stats?.total ?? 0, dot: "bg-muted-foreground/40" },
+    {
+      key: "aktuell",
+      label: "Aktuelle Mitglieder",
+      value: stats?.total ?? 0,
+      dot: "bg-muted-foreground/40",
+    },
     { key: "aktiv", label: "Aktiv", value: stats?.aktiv ?? 0, dot: "bg-success" },
     { key: "passiv", label: "Passiv", value: stats?.passiv ?? 0, dot: "bg-muted-foreground/60" },
+    {
+      key: "kontakte",
+      label: "Kontakte",
+      value: stats?.kontakte ?? 0,
+      dot: "bg-muted-foreground/40",
+    },
     // Only surface "Gekündigt" when there are pending exits (or the filter is
     // active), so the strip stays calm when nobody is leaving.
     ...(stats?.gekuendigt || activeStatus === "gekuendigt"

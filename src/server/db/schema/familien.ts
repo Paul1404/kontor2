@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   date,
   index,
   pgEnum,
@@ -24,7 +25,12 @@ import { membersTable } from "~/server/db/schema/members";
  * (noch) kein Familienbeitrag läuft. Der Seed-Assistent schlägt Gruppen aus
  * Familienbeitrag + Verknüpfungen + Adresse vor; bestätigt wird von Hand.
  */
-export const familienRolleEnum = pgEnum("familien_rolle", ["zahler", "partner", "kind"]);
+export const familienRolleEnum = pgEnum("familien_rolle", [
+  "zahler",
+  "partner",
+  "kind",
+  "sorgeberechtigt",
+]);
 
 export const familienTable = pgTable("familien", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -36,6 +42,9 @@ export const familienTable = pgTable("familien", {
    * gelöscht werden kann (Soft-Delete ist davon unberührt).
    */
   zahlerMemberId: uuid("zahler_member_id").references(() => membersTable.id, {
+    onDelete: "restrict",
+  }),
+  guardianMemberId: uuid("guardian_member_id").references(() => membersTable.id, {
     onDelete: "restrict",
   }),
   notiz: text("notiz"),
@@ -57,6 +66,7 @@ export const familienMitgliederTable = pgTable(
       .notNull()
       .references(() => membersTable.id, { onDelete: "cascade" }),
     rolle: familienRolleEnum("rolle").notNull(),
+    isGuardian: boolean("is_guardian").notNull().default(false),
     /** Zugehörigkeit mit Verlauf: `bis` gesetzt = ausgeschieden (z. B. Kind ab 18). */
     von: date("von"),
     bis: date("bis"),

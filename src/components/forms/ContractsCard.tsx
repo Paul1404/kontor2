@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Pencil, Plus, Trash2, Wallet, X } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
+import { ContractSwitchDialog } from "~/components/forms/ContractSwitchDialog";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
@@ -42,9 +43,9 @@ export function ContractsCard({
   canEdit: boolean;
 }) {
   const qc = useQueryClient();
+  const [switchId, setSwitchId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [editTarget, setEditTarget] = useState<Contract | null>(null);
-  const [zahlerTarget, setZahlerTarget] = useState<Contract | null>(null);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["members.get", mitgliedsnummer] });
 
@@ -99,18 +100,6 @@ export function ContractsCard({
           />
         ) : null}
 
-        {zahlerTarget && canEdit ? (
-          <SetZahlerForm
-            contract={zahlerTarget}
-            memberId={memberId}
-            onCancel={() => setZahlerTarget(null)}
-            onSaved={async () => {
-              setZahlerTarget(null);
-              await refresh();
-            }}
-          />
-        ) : null}
-
         {vertraege.length === 0 ? (
           <p className="text-sm text-muted-foreground">Keine Verträge.</p>
         ) : (
@@ -155,16 +144,12 @@ export function ContractsCard({
                       </td>
                       {canEdit ? (
                         <td className="py-1 text-right whitespace-nowrap align-top">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setZahlerTarget(v)}
-                            disabled={isDeleting}
-                            aria-label="Zahler festlegen"
-                            title="Zahler festlegen"
-                          >
-                            <Wallet className="size-4" />
-                          </Button>
+                          {!v.vertragEnde ? (
+                            <Button size="sm" variant="outline" onClick={() => setSwitchId(v.id)}>
+                              Tarif wechseln
+                            </Button>
+                          ) : null}
+
                           <Button
                             size="sm"
                             variant="ghost"
@@ -199,6 +184,18 @@ export function ContractsCard({
           </div>
         )}
       </CardContent>
+      {switchId ? (
+        <ContractSwitchDialog
+          contractId={switchId}
+          open
+          onOpenChange={(o) => {
+            if (!o) setSwitchId(null);
+          }}
+          onDone={() => {
+            void refresh();
+          }}
+        />
+      ) : null}
       <ConfirmDialog
         open={confirmTarget !== null}
         onOpenChange={(o) => {
@@ -444,130 +441,6 @@ function ZahlartControl({
       {toggle.isPending ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
       {label}
     </button>
-  );
-}
-
-function SetZahlerForm({
-  contract,
-  memberId,
-  onCancel,
-  onSaved,
-}: {
-  contract: Contract;
-  memberId: string;
-  onCancel: () => void;
-  onSaved: () => void | Promise<void>;
-}) {
-  // Expliziter Zahler-Override pro Vertrag (Zahler-Konzept Stufe 2). Ohne
-  // Override greift die automatische Auflösung (Familie -> Vertreter -> selbst).
-  const [q, setQ] = useState("");
-  const [hits, setHits] = useState<
-    Array<{
-      id: string;
-      vorname: string | null;
-      nachname: string | null;
-      memberNo: string | null;
-    }>
-  >([]);
-  const [error, setError] = useState<string | null>(null);
-
-  const search = useMutation({
-    mutationFn: (query: string) =>
-      orpc.relationships.searchTargets({ q: query, excludeMemberId: memberId }),
-    onSuccess: (data) => setHits(data),
-  });
-
-  const setZahler = useMutation({
-    mutationFn: (zahlerMemberId: string | null) =>
-      orpc.contracts.setZahler({ contractId: contract.id, zahlerMemberId }),
-    onSuccess: () => onSaved(),
-    onError: (e: unknown) =>
-      setError(e instanceof Error ? e.message : "Zahler konnte nicht gesetzt werden."),
-  });
-
-  return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">
-        Zahler festlegen · {contract.artName ?? `Art ${contract.art}`}
-      </div>
-
-      <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-background p-2.5 text-sm">
-        <div>
-          <span className="text-muted-foreground">Aktueller Zahler: </span>
-          {contract.zahlerName ? (
-            <span>
-              {contract.zahlerName}
-              {contract.zahlerRef ? (
-                <span className="ml-1 text-xs text-muted-foreground">({contract.zahlerRef})</span>
-              ) : null}
-            </span>
-          ) : (
-            <span>Selbstzahler (automatisch)</span>
-          )}
-        </div>
-        {contract.zahlerMemberId ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setError(null);
-              setZahler.mutate(null);
-            }}
-            disabled={setZahler.isPending}
-          >
-            <X className="size-4" /> Entfernen
-          </Button>
-        ) : null}
-      </div>
-
-      <Input
-        value={q}
-        onChange={(e) => {
-          setQ(e.target.value);
-          if (e.target.value.trim().length >= 2) search.mutate(e.target.value.trim());
-          else setHits([]);
-        }}
-        placeholder="Zahler suchen (Name oder Mitgliedsnummer)…"
-        aria-label="Zahler suchen"
-      />
-
-      {hits.length > 0 ? (
-        <ul className="flex flex-col divide-y divide-border">
-          {hits.slice(0, 8).map((h) => (
-            <li key={h.id} className="flex items-center justify-between gap-2 py-1.5">
-              <span className="truncate text-sm">
-                {[h.nachname, h.vorname].filter(Boolean).join(", ")}
-                {h.memberNo ? (
-                  <span className="ml-2 text-xs text-muted-foreground">{h.memberNo}</span>
-                ) : null}
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setError(null);
-                  setZahler.mutate(h.id);
-                }}
-                disabled={setZahler.isPending}
-              >
-                Als Zahler
-              </Button>
-            </li>
-          ))}
-        </ul>
-      ) : q.trim().length >= 2 && !search.isPending ? (
-        <p className="text-xs text-muted-foreground">Keine Treffer.</p>
-      ) : null}
-
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-      <div className="flex justify-end">
-        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-          Schließen
-        </Button>
-      </div>
-    </div>
   );
 }
 

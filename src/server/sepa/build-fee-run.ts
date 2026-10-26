@@ -1,3 +1,4 @@
+import { ORPCError } from "@orpc/server";
 import { and, eq, gt, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import type { DB } from "~/server/db/client";
 import { memberNotDeleted } from "~/server/db/member-filters";
@@ -156,7 +157,7 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
 
   // Load all active contracts for the year. JOIN to members so we can
   // filter out soft-deleted members at the DB layer.
-  const rows = await db
+  const yearRows = await db
     .select({
       contract: contractsTable,
       member: membersTable,
@@ -179,6 +180,25 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
       ),
     );
 
+  // One contract per explicit history, effective at the collection date.
+  // Standalone contracts remain independent. Preview and commit share this selection.
+  const due = params.falligkeitsdatum;
+  const rows = yearRows.filter(
+    ({ contract }) =>
+      !contract.seriesId ||
+      ((!contract.vertragBegin || contract.vertragBegin <= due) &&
+        (!contract.vertragEnde || contract.vertragEnde > due)),
+  );
+  const series = new Set<string>();
+  for (const { contract } of rows) {
+    if (!contract.seriesId) continue;
+    if (series.has(contract.seriesId))
+      throw new ORPCError("CONFLICT", {
+        message:
+          "Überlappende Verträge im selben Vertragsverlauf. Bitte vor dem Beitragslauf klären.",
+      });
+    series.add(contract.seriesId);
+  }
   if (rows.length === 0) {
     return emptyResult();
   }
@@ -196,7 +216,7 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
       contract.id,
       resolveZahler({
         memberId: member.id,
-        explicitZahlerId: contract.zahlerMemberId ?? null,
+        explicitZahlerId: null,
         familieZahlerId: zahlerCtx.familieZahlerByMember.get(member.id) ?? null,
         vertreterId: zahlerCtx.vertreterByMember.get(member.id) ?? null,
         minderjaehrig: isMinorAt(member.geburtsdatum, now),
@@ -263,16 +283,21 @@ export async function buildFeeRunPreview(db: DB, params: PreviewParams): Promise
   const alreadyBilled = new Set<string>();
   if (contractIds.length > 0) {
     const billed = await db
-      .select({ contractId: sollStellungenTable.contractId })
+      .select({ contractId: sollStellungenTable.contractId, seriesId: contractsTable.seriesId })
       .from(sollStellungenTable)
+      .innerJoin(contractsTable, eq(contractsTable.id, sollStellungenTable.contractId))
       .where(
         and(
-          inArray(sollStellungenTable.contractId, contractIds),
           eq(sollStellungenTable.billingYear, billingYear),
           ne(sollStellungenTable.status, "cancelled"),
         ),
       );
-    for (const b of billed) alreadyBilled.add(b.contractId);
+    for (const b of billed) {
+      alreadyBilled.add(b.contractId);
+      if (b.seriesId)
+        for (const { contract } of rows)
+          if (contract.seriesId === b.seriesId) alreadyBilled.add(contract.id);
+    }
   }
 
   for (const { contract, member } of rows) {
