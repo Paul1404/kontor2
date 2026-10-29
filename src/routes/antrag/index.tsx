@@ -366,8 +366,22 @@ export function AntragForm() {
   const fee = useQuery({
     queryKey: ["applications.calculateFee", geburtsdatum, antragstyp, elternteilMitglied],
     queryFn: () => orpc.applications.calculateFee({ geburtsdatum, antragstyp, elternteilMitglied }),
+    refetchInterval: 60_000,
     enabled: /^\d{4}-\d{2}-\d{2}$/.test(geburtsdatum),
   });
+
+  const previousFee = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const amount = fee.data?.jahresbeitrag;
+    if (amount && previousFee.current && previousFee.current !== amount) {
+      setSignature(null);
+      setSatzung(false);
+      setError(
+        "Der Beitrag hat sich geändert. Bitte prüfen und bestätigen Sie den aktuellen Beitrag erneut.",
+      );
+    }
+    if (amount) previousFee.current = amount;
+  }, [fee.data?.jahresbeitrag]);
 
   // The person who pays and signs: the guardian for a minor, otherwise the
   // applicant. Used as the default account holder and on the SEPA mandate.
@@ -385,6 +399,7 @@ export function AntragForm() {
   const submit = useMutation({
     mutationFn: () =>
       orpc.applications.submit({
+        expectedAnnualFee: fee.data?.jahresbeitrag ?? "",
         geschlecht,
         vorname,
         nachname,
@@ -422,8 +437,10 @@ export function AntragForm() {
       }
       setResult({ antragsnummer: res.antragsnummer, statusUrl: res.statusUrl });
     },
-    onError: (e: unknown) =>
-      setError(e instanceof Error ? e.message : "Der Antrag konnte nicht gesendet werden."),
+    onError: (e: unknown) => {
+      void fee.refetch();
+      setError(e instanceof Error ? e.message : "Der Antrag konnte nicht gesendet werden.");
+    },
   });
 
   // Final submit: run a soft duplicate check first. A hit does not block; it

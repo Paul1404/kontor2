@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq, gt, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { applicationFeeDay, applicationFeeSettings } from "~/lib/application-fee-schedule";
 import {
   realAgeFromIso,
   validateBicMessage,
@@ -67,8 +68,10 @@ import {
   parseISODate,
   realAge,
 } from "~/server/domain/application/antragstyp";
+import { antragsRolleFor } from "~/server/domain/application/fees";
 import { divergentKontoinhaber } from "~/server/domain/application/payer";
 import { resolveApplicationFee } from "~/server/domain/application/resolve-fee";
+import { scheduleApplicationContract } from "~/server/domain/application/schedule-contract";
 import { assignChildGuardian } from "~/server/domain/family-guardian";
 import {
   type DuplicateSignalInput,
@@ -120,6 +123,7 @@ const KindInput = v.object({
 });
 
 const SubmitInput = v.object({
+  expectedAnnualFee: v.pipe(v.string(), v.regex(/^\d+(\.\d{1,2})?$/)),
   geschlecht: v.optional(v.nullable(ANRede), null),
   vorname: Name,
   nachname: Name,
@@ -259,12 +263,8 @@ async function loadActiveAbteilungen(db: DBOrTx, ids: string[]): Promise<Map<str
 }
 
 /** The club's configured fee-category age boundaries from its settings row. */
-function altersgrenzenOf(org: OrganizationSettings): Altersgrenzen {
-  return {
-    kindMax: org.kategorieKindMaxAlter,
-    jugendlichMax: org.kategorieJugendlichMaxAlter,
-    jungerErwachsenerMax: org.kategorieJungerErwachsenerMaxAlter,
-  };
+function altersgrenzenOf(org: OrganizationSettings, at = new Date()): Altersgrenzen {
+  return applicationFeeSettings(org, at).altersgrenzen;
 }
 
 /**
@@ -309,12 +309,23 @@ async function buildApprovedPdf(
     signatureDataUri = `data:${sigFile.mimeType ?? "image/png"};base64,${bytes.toString("base64")}`;
   }
 
-  const fee = await resolveApplicationFee(db, {
-    kategorie: app.mitgliedschaftTyp,
-    elternteilMitglied: app.elternteilMitglied,
-    staffel: org.beitragsstaffel,
-    altersgrenzen: altersgrenzenOf(org),
-  });
+  const fee =
+    app.jahresbeitrag != null
+      ? {
+          betrag: app.jahresbeitrag,
+          label: {
+            familie: "Familie",
+            kind: "Kinder",
+            jugendlich: "Jugendliche",
+            junger_erwachsener: "Junge Erwachsene",
+            erwachsener: "Erwachsene",
+          }[app.mitgliedschaftTyp],
+        }
+      : await resolveApplicationFee(db, {
+          kategorie: app.mitgliedschaftTyp,
+          elternteilMitglied: app.elternteilMitglied,
+          ...applicationFeeSettings(org, app.createdAt),
+        });
 
   const model = buildBeitrittModel({
     antragsnummer: app.antragsnummer,
@@ -654,19 +665,28 @@ async function linkApplicationPerson(
           .map((r) => Number.parseInt(r.vertragNr, 10))
           .filter((n) => Number.isFinite(n)),
       ) + 1;
-    await tx.insert(contractsTable).values({
-      memberId: member.id,
-      adrNr: member.adrNr,
-      mitglNr: ref,
-      vertragNr: String(nextVertragNr),
-      art: opts.contract.art,
-      artName: opts.contract.artName,
-      betrag: opts.contract.betrag,
-      sollstellung: opts.contract.sollstellung,
-      vertragBegin: opts.contract.vertragBegin,
-      abwKontoInh: opts.contract.abwKontoInh ?? null,
-      isDirectDebit: opts.contract.isDirectDebit ?? false,
-    } as never);
+    const [createdContract] = await tx
+      .insert(contractsTable)
+      .values({
+        memberId: member.id,
+        adrNr: member.adrNr,
+        mitglNr: ref,
+        vertragNr: String(nextVertragNr),
+        art: opts.contract.art,
+        artName: opts.contract.artName,
+        betrag: opts.contract.betrag,
+        sollstellung: opts.contract.sollstellung,
+        vertragBegin: opts.contract.vertragBegin,
+        abwKontoInh: opts.contract.abwKontoInh ?? null,
+        isDirectDebit: opts.contract.isDirectDebit ?? false,
+      } as never)
+      .returning({ id: contractsTable.id });
+    if (createdContract && opts.contract.applicationFeeRole)
+      await scheduleApplicationContract(tx, createdContract.id, opts.contract.applicationFeeRole, {
+        id: opts.actorId,
+        email: opts.actorEmail,
+        requestId: opts.requestId,
+      });
     changes.vertragAngelegt = { before: null, after: 1 };
   }
 
@@ -1203,7 +1223,7 @@ export const applicationsRouter = {
       datenschutzUrl: org?.datenschutzUrl ?? null,
       satzungUrl: org?.satzungUrl ?? null,
       glaeubigerId: org?.glaeubigerId ?? null,
-      beitragsstaffel: org?.beitragsstaffel ?? null,
+      beitragsstaffel: org ? applicationFeeSettings(org).staffel : null,
       tenantPolicy: normalizeTenantPolicy(org?.tenantPolicy),
       abteilungen,
     };
@@ -1219,6 +1239,7 @@ export const applicationsRouter = {
       }),
     )
     .handler(async ({ context, input }) => {
+      const at = new Date();
       const dob = parseISODate(input.geburtsdatum);
       if (Number.isNaN(dob.getTime())) {
         throw new ORPCError("VALIDATION_FAILED", { message: "Ungültiges Geburtsdatum." });
@@ -1232,15 +1253,15 @@ export const applicationsRouter = {
       const kategorie = mitgliedschaftTypFor(
         input.antragstyp as Antragstyp,
         dob,
-        altersgrenzenOf(org),
+        altersgrenzenOf(org, at),
+        at,
       );
       // Quote from the Beitragsart tagged for this role; falls back to the
       // Staffel, throws if neither is configured.
       const fee = await resolveApplicationFee(context.db, {
         kategorie,
         elternteilMitglied: input.elternteilMitglied,
-        staffel: org.beitragsstaffel,
-        altersgrenzen: altersgrenzenOf(org),
+        ...applicationFeeSettings(org, at),
       });
       return { kategorie, jahresbeitrag: fee.betrag, label: fee.label, art: fee.art };
     }),
@@ -1388,6 +1409,7 @@ export const applicationsRouter = {
 
   /** Submit a new membership application. Public, rate-limited. */
   submit: publicProc.input(SubmitInput).handler(async ({ context, input }) => {
+    const applicationAt = new Date();
     const limit = await rateLimit({
       key: `antrag-submit:${clientIp(context.headers)}`,
       limit: 5,
@@ -1443,7 +1465,12 @@ export const applicationsRouter = {
       hasPartner,
       familyPartnerRequired: tenantPolicy.familyPartnerRequired,
     });
-    const kategorie = mitgliedschaftTypFor(antragstyp, dob, altersgrenzenOf(org));
+    const kategorie = mitgliedschaftTypFor(
+      antragstyp,
+      dob,
+      altersgrenzenOf(org, applicationAt),
+      applicationAt,
+    );
 
     if (antragstyp === "kind") {
       const gv = validateNameMessage(
@@ -1540,10 +1567,15 @@ export const applicationsRouter = {
     const fee = await resolveApplicationFee(context.db, {
       kategorie,
       elternteilMitglied: input.elternteilMitglied,
-      staffel: org.beitragsstaffel,
-      altersgrenzen: altersgrenzenOf(org),
+      ...applicationFeeSettings(org, applicationAt),
     });
-    const year = new Date().getUTCFullYear();
+    if (input.expectedAnnualFee != null && Number(input.expectedAnnualFee) !== Number(fee.betrag)) {
+      throw new ORPCError("CONFLICT", {
+        message:
+          "Der Beitrag hat sich geändert. Bitte prüfen und bestätigen Sie den aktuellen Beitrag erneut.",
+      });
+    }
+    const year = Number(applicationFeeDay(applicationAt).slice(0, 4));
     const geschlecht: "m" | "w" | "unbekannt" | null = input.geschlecht
       ? (GESCHLECHT_MAP[input.geschlecht] ?? "unbekannt")
       : null;
@@ -1594,6 +1626,7 @@ export const applicationsRouter = {
           kinder: (input.kinder ?? []) as AntragKind[],
           abteilungen: input.abteilungen,
           elternteilMitglied: input.elternteilMitglied,
+          createdAt: applicationAt,
           jahresbeitrag: fee.betrag,
           vorgeschlageneArt: fee.art,
           kontoinhaber: input.kontoinhaber,
@@ -2691,6 +2724,16 @@ export const applicationsRouter = {
         // (resolved via the Vertreter link in the fee run).
         isDirectDebit: ibanPlain != null,
       });
+      if (
+        contract &&
+        app.jahresbeitrag != null &&
+        Number(contract.betrag) === Number(app.jahresbeitrag)
+      ) {
+        contract.applicationFeeRole = antragsRolleFor(
+          app.mitgliedschaftTyp,
+          app.elternteilMitglied,
+        );
+      }
       const sepa = ibanPlain
         ? {
             mandatsNr: app.mandatsreferenz,

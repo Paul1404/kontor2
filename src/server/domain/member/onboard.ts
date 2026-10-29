@@ -4,13 +4,16 @@ import { appendAudit, diff } from "~/server/audit/log";
 import type { DBOrTx } from "~/server/db/client";
 import { abteilungenTable, memberAbteilungenTable } from "~/server/db/schema/abteilungen";
 import { contractsTable } from "~/server/db/schema/contracts";
+import type { AntragsRolle } from "~/server/db/schema/fee-types";
 import { membersTable } from "~/server/db/schema/members";
 import { sepaMandatesTable } from "~/server/db/schema/sepa";
+import { scheduleApplicationContract } from "~/server/domain/application/schedule-contract";
 import type { MemberStatus } from "~/server/domain/member";
 import { generateMemberNumber } from "~/server/domain/member-number";
 import { takeMemberSnapshot } from "~/server/snapshots/snapshot";
 
 export type OnboardContractValues = {
+  applicationFeeRole?: AntragsRolle;
   art: number;
   artName: string | null;
   vertragNr: string | null;
@@ -139,22 +142,31 @@ export async function onboardMember(
 
   // Optional first contract.
   if (opts.contract) {
-    await tx.insert(contractsTable).values({
-      memberId: inserted.id,
-      adrNr: nextAdrNr,
-      mitglNr: ref,
-      vertragNr:
-        opts.contract.vertragNr && opts.contract.vertragNr.trim().length > 0
-          ? opts.contract.vertragNr.trim()
-          : "1",
-      art: opts.contract.art,
-      artName: opts.contract.artName ?? null,
-      betrag: opts.contract.betrag,
-      sollstellung: opts.contract.sollstellung ?? null,
-      vertragBegin: opts.contract.vertragBegin,
-      abwKontoInh: opts.contract.abwKontoInh ?? null,
-      isDirectDebit: opts.contract.isDirectDebit ?? false,
-    } as never);
+    const [createdContract] = await tx
+      .insert(contractsTable)
+      .values({
+        memberId: inserted.id,
+        adrNr: nextAdrNr,
+        mitglNr: ref,
+        vertragNr:
+          opts.contract.vertragNr && opts.contract.vertragNr.trim().length > 0
+            ? opts.contract.vertragNr.trim()
+            : "1",
+        art: opts.contract.art,
+        artName: opts.contract.artName ?? null,
+        betrag: opts.contract.betrag,
+        sollstellung: opts.contract.sollstellung ?? null,
+        vertragBegin: opts.contract.vertragBegin,
+        abwKontoInh: opts.contract.abwKontoInh ?? null,
+        isDirectDebit: opts.contract.isDirectDebit ?? false,
+      } as never)
+      .returning({ id: contractsTable.id });
+    if (createdContract && opts.contract.applicationFeeRole)
+      await scheduleApplicationContract(tx, createdContract.id, opts.contract.applicationFeeRole, {
+        id: opts.actorId,
+        email: opts.actorEmail,
+        requestId: opts.requestId,
+      });
   }
 
   // Optional first SEPA mandate.

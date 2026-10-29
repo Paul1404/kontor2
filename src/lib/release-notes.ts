@@ -41,6 +41,27 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "6.0.0",
+    date: "2026-10-29",
+    title: "Beitragswechsel im Online-Antrag",
+    changes: [
+      {
+        category: "feature",
+        description:
+          "Beiträge und Altersgrenzen wechseln im Online-Antrag automatisch zum hinterlegten Datum. Bereits eingereichte Anträge behalten ihren gespeicherten Beitrag.",
+      },
+      {
+        category: "breaking",
+        description:
+          "Die Datenbankmigration ergänzt die geplante Beitragsstaffel in den Vereinsdaten.",
+      },
+      {
+        category: "fix",
+        description: "Eine Sicherheitsaktualisierung der MCP-Abhängigkeiten ist enthalten.",
+      },
+    ],
+  },
+  {
     version: "5.1.0",
     date: "2026-10-26",
     title: "Ehrungen in Fünfjahresschritten",

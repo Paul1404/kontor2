@@ -1,4 +1,5 @@
 import { boolean, integer, jsonb, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import type { ApplicationFeeSchedule } from "~/lib/application-fee-schedule";
 import type { TenantPolicy } from "~/lib/tenant-settings";
 import { users } from "~/server/db/schema/auth";
 import { encryptedText } from "~/server/db/types";
@@ -122,6 +123,7 @@ export const organizationSettingsTable = pgTable("organization_settings", {
   mandatsreferenzPrefix: text("mandatsreferenz_prefix").notNull().default(""),
   /** Altersabhängige Jahresbeiträge für den Online-Aufnahmeantrag. */
   beitragsstaffel: jsonb("beitragsstaffel").$type<Beitragsstaffel>(),
+  applicationFeeSchedule: jsonb("application_fee_schedule").$type<ApplicationFeeSchedule>(),
   /**
    * Exklusive Altersgrenzen (Jahre, am Stichtag) für die Beitragskategorien des
    * Online-Antrags: bis zu dieser Grenze gilt die jeweilige Kategorie. Defaults

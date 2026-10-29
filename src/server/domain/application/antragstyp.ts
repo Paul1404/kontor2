@@ -1,3 +1,4 @@
+import { applicationFeeDay } from "~/lib/application-fee-schedule";
 /**
  * Pure helpers that classify a membership application by type and age
  * category. Ported from the svums form logic (`ApplicationForm.tsx`) and
@@ -79,9 +80,10 @@ export function categoryFromAge(
   geburtsdatum: Date,
   grenzen: Altersgrenzen,
   isFamilie = false,
+  at = new Date(),
 ): AntragKategorie {
   if (isFamilie) return "familie";
-  const age = ageAt(geburtsdatum, stichtag());
+  const age = ageAt(geburtsdatum, stichtag(Number(applicationFeeDay(at).slice(0, 4))));
   if (age < grenzen.kindMax) return "kind";
   if (age < grenzen.jugendlichMax) return "jugendlich";
   if (age < grenzen.jungerErwachsenerMax) return "junger_erwachsener";
@@ -112,7 +114,8 @@ export function mitgliedschaftTypFor(
   antragstyp: Antragstyp,
   geburtsdatum: Date,
   grenzen: Altersgrenzen,
+  at = new Date(),
 ): AntragKategorie {
   if (antragstyp === "familie") return "familie";
-  return categoryFromAge(geburtsdatum, grenzen, false);
+  return categoryFromAge(geburtsdatum, grenzen, false, at);
 }

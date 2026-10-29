@@ -1,3 +1,4 @@
+import type { ApplicationFeeTypeMap } from "~/lib/application-fee-schedule";
 /**
  * Resolve the annual fee for an online membership application, preferring the
  * Beitragsart tagged for the application's role and quoting its `betrag1`, so
@@ -35,9 +36,14 @@ export async function resolveApplicationFee(
     elternteilMitglied: boolean;
     staffel: Beitragsstaffel | null;
     altersgrenzen: Altersgrenzen;
+    feeTypes?: ApplicationFeeTypeMap;
+    scheduled?: boolean;
   },
 ): Promise<ResolvedFee> {
   const rolle = antragsRolleFor(opts.kategorie, opts.elternteilMitglied);
+  if (opts.scheduled && opts.feeTypes?.[rolle] == null && opts.staffel) {
+    return { ...calculateFee({ ...opts, staffel: opts.staffel }), art: null };
+  }
   const [tagged] = await db
     .select({
       art: feeTypesTable.art,
@@ -47,7 +53,9 @@ export async function resolveApplicationFee(
     .from(feeTypesTable)
     .where(
       and(
-        eq(feeTypesTable.antragsRolle, rolle),
+        opts.feeTypes?.[rolle] != null
+          ? eq(feeTypesTable.art, opts.feeTypes[rolle]!)
+          : eq(feeTypesTable.antragsRolle, rolle),
         isNotNull(feeTypesTable.betrag1),
         // nichAktiv is the legacy "deactivated" flag; null means active.
         or(isNull(feeTypesTable.nichAktiv), ne(feeTypesTable.nichAktiv, "J")),
@@ -56,6 +64,11 @@ export async function resolveApplicationFee(
     .orderBy(asc(feeTypesTable.art))
     .limit(1);
 
+  if (opts.feeTypes?.[rolle] != null && tagged?.betrag1 == null) {
+    throw new ORPCError("PRECONDITION_FAILED", {
+      message: "Die geplante Beitragsart ist nicht verfügbar.",
+    });
+  }
   if (tagged?.betrag1 != null) {
     return {
       betrag: euro2(tagged.betrag1),
