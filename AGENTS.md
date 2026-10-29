@@ -359,3 +359,14 @@ removal, delete package metadata or hide scanner findings. Keep shell/coreutils,
 CA certificates and required C/C++ libraries. CI verifies the pruned image as its
 non-root user; exercise the real PDF/image tools and startup workflows before
 merging. Rebuild images for package updates, never mutate a running deployment.
+
+## Geplante Beiträge im Online-Antrag
+
+`organization_settings.application_fee_schedule` enthält optional Datum,
+Beiträge, Altersgrenzen und explizite Beitragsarten je Antragsrolle. Auswahl
+über `applicationFeeSettings` nach Europe/Berlin, ohne Cronjob. Ohne geplante
+Zuordnung gilt die geplante Staffel, kein alter Rollen-Tarif. Vorschau und
+Einreichung verwenden dieselbe Auswahl; gespeicherte Anträge behalten ihren
+Betrag. Der Server prüft den vom Formular bestätigten Betrag erneut. Reguläre neue
+Antragsaufnahmen vor dem Wechsel erhalten über denselben Vertragswechsel
+den geplanten Nachfolger. Beide Anlagewege bleiben in einer Transaktion.

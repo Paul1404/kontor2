@@ -1,9 +1,15 @@
 import { ORPCError } from "@orpc/server";
+import { eq } from "drizzle-orm";
 import * as v from "valibot";
+import {
+  APPLICATION_FEE_ROLE_KEYS,
+  ApplicationFeeScheduleInput,
+} from "~/lib/application-fee-schedule";
 import { normalizeHex } from "~/lib/branding-color";
 import { normalizeTenantPolicy } from "~/lib/tenant-settings";
 import { appendAudit, diff } from "~/server/audit/log";
 import { lastFour } from "~/server/crypto/encrypt";
+import { feeTypesTable } from "~/server/db/schema/fee-types";
 import { organizationSettingsTable } from "~/server/db/schema/organization-settings";
 import { adminProc, authedProc, publicProc } from "~/server/orpc/base";
 import { normalizeIban, validateIban } from "~/server/sepa/iban";
@@ -114,6 +120,58 @@ const UpdateInput = v.object({
 });
 
 export const organizationSettingsRouter = {
+  scheduleApplicationFees: adminProc
+    .input(v.object({ schedule: v.nullable(ApplicationFeeScheduleInput) }))
+    .handler(async ({ context, input }) =>
+      context.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select({
+            id: organizationSettingsTable.id,
+            schedule: organizationSettingsTable.applicationFeeSchedule,
+          })
+          .from(organizationSettingsTable)
+          .for("update")
+          .limit(1);
+        if (!existing) throw new ORPCError("NOT_FOUND", { message: "Vereinsdaten fehlen." });
+        for (const [role, art] of Object.entries(input.schedule?.feeTypes ?? {})) {
+          if (art == null) continue;
+          const [fee] = await tx
+            .select({ amount: feeTypesTable.betrag1, inactive: feeTypesTable.nichAktiv })
+            .from(feeTypesTable)
+            .where(eq(feeTypesTable.art, art));
+          const key = APPLICATION_FEE_ROLE_KEYS[role as keyof typeof APPLICATION_FEE_ROLE_KEYS];
+          if (
+            !fee ||
+            fee.inactive === "J" ||
+            fee.amount == null ||
+            Number(fee.amount) !== Number(input.schedule!.staffel[key])
+          ) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "Die geplante Beitragsart muss aktiv sein und zum geplanten Betrag passen.",
+            });
+          }
+        }
+        await tx.update(organizationSettingsTable).set({
+          applicationFeeSchedule: input.schedule,
+          updatedAt: new Date(),
+          updatedBy: context.session!.user.id,
+        });
+        await appendAudit(tx, {
+          entityType: "organization_settings",
+          entityId: String(existing.id),
+          action: "update",
+          source: "ui",
+          actorId: context.session!.user.id,
+          actorEmail: context.session!.user.email,
+          requestId: context.requestId,
+          changes: diff(
+            { applicationFeeSchedule: existing.schedule },
+            { applicationFeeSchedule: input.schedule },
+          ),
+        });
+        return { ok: true };
+      }),
+    ),
   /** Public-ish read for anyone authed: IBAN is masked to last 4. */
   get: authedProc.handler(async ({ context }) => {
     const rows = await context.db.select().from(organizationSettingsTable).limit(1);
