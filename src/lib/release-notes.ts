@@ -55,6 +55,10 @@ export const RELEASES: Release[] = [
         description:
           "Die Datenbankmigration ergänzt die geplante Beitragsstaffel in den Vereinsdaten.",
       },
+      {
+        category: "fix",
+        description: "Eine Sicherheitsaktualisierung der MCP-Abhängigkeiten ist enthalten.",
+      },
     ],
   },
   {
