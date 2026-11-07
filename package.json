@@ -45,8 +45,8 @@
     "icons:brand": "bun scripts/generate-brand-icons.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1156.0",
-    "@aws-sdk/s3-request-presigner": "^3.1156.0",
+    "@aws-sdk/client-s3": "^3.1161.0",
+    "@aws-sdk/s3-request-presigner": "^3.1161.0",
     "@better-auth/api-key": "1.7.12",
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@fontsource/spectral": "^5.3.0",
