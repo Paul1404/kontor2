@@ -1,5 +1,7 @@
 # Repository guidance
 
+> Production runs on Vertex RKE2 via Fleet, with two PostgreSQL databases and Redis on Longhorn and private versioned objects in AWS S3. The source image is published to GHCR after main CI and security scanning. Railway deployment notes below describe the retired hosting setup.
+
 `AGENTS.md` is the canonical instruction file for Kontor2. Claude Code loads it
 through `CLAUDE.md`. These repository-specific rules supplement the agent's
 general working guidance. Read them before changing code.
