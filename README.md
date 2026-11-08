@@ -1,5 +1,7 @@
 # Kontor2
 
+> Production runs on Vertex RKE2 via Fleet, with two PostgreSQL databases and Redis on Longhorn and private versioned objects in AWS S3. The source image is published to GHCR after main CI and security scanning. Railway deployment notes below describe the retired hosting setup.
+
 A self-hosted, multi-tenant back office for German clubs. Kontor2 brings
 members, families, contributions, SEPA direct debits, invoices, correspondence,
 privacy workflows, and audit history into one application with a German UI.
