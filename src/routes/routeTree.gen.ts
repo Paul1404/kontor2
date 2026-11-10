@@ -26,6 +26,7 @@ import { Route as AntragIndexRouteImport } from './antrag/index'
 import { Route as AntragPapierformularRouteImport } from './antrag/papierformular'
 import { Route as AntragStatusRouteImport } from './antrag/status'
 import { Route as ApiHealthRouteImport } from './api/health'
+import { Route as ApiLiveRouteImport } from './api/live'
 import { Route as ApiMcpRouteImport } from './api/mcp'
 import { Route as AppIndexRouteImport } from './app/index'
 import { Route as AppArchiveRouteImport } from './app/archive'
@@ -176,6 +177,11 @@ const AntragStatusRoute = AntragStatusRouteImport.update({
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLiveRoute = ApiLiveRouteImport.update({
+  id: '/api/live',
+  path: '/api/live',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMcpRoute = ApiMcpRouteImport.update({
@@ -542,6 +548,7 @@ export interface FileRoutesByFullPath {
   '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/live': typeof ApiLiveRoute
   '/api/mcp': typeof ApiMcpRoute
   '/app/archive': typeof AppArchiveRoute
   '/app/audit': typeof AppAuditRoute
@@ -623,6 +630,7 @@ export interface FileRoutesByTo {
   '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/live': typeof ApiLiveRoute
   '/api/mcp': typeof ApiMcpRoute
   '/app/archive': typeof AppArchiveRoute
   '/app/audit': typeof AppAuditRoute
@@ -709,6 +717,7 @@ export interface FileRoutesById {
   '/antrag/papierformular': typeof AntragPapierformularRoute
   '/antrag/status': typeof AntragStatusRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/live': typeof ApiLiveRoute
   '/api/mcp': typeof ApiMcpRoute
   '/app/archive': typeof AppArchiveRoute
   '/app/audit': typeof AppAuditRoute
@@ -796,6 +805,7 @@ export interface FileRouteTypes {
     | '/antrag/papierformular'
     | '/antrag/status'
     | '/api/health'
+    | '/api/live'
     | '/api/mcp'
     | '/app/archive'
     | '/app/audit'
@@ -877,6 +887,7 @@ export interface FileRouteTypes {
     | '/antrag/papierformular'
     | '/antrag/status'
     | '/api/health'
+    | '/api/live'
     | '/api/mcp'
     | '/app/archive'
     | '/app/audit'
@@ -962,6 +973,7 @@ export interface FileRouteTypes {
     | '/antrag/papierformular'
     | '/antrag/status'
     | '/api/health'
+    | '/api/live'
     | '/api/mcp'
     | '/app/archive'
     | '/app/audit'
@@ -1046,6 +1058,7 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiLiveRoute: typeof ApiLiveRoute
   ApiMcpRoute: typeof ApiMcpRoute
   InviteTokenRoute: typeof InviteTokenRoute
   ApiAttachmentsUploadIdRoute: typeof ApiAttachmentsUploadIdRoute
@@ -1178,6 +1191,13 @@ declare module '@tanstack/react-router' {
       path: '/api/health'
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/live': {
+      id: '/api/live'
+      path: '/api/live'
+      fullPath: '/api/live'
+      preLoaderRoute: typeof ApiLiveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/mcp': {
@@ -1817,6 +1837,7 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiLiveRoute: ApiLiveRoute,
   ApiMcpRoute: ApiMcpRoute,
   InviteTokenRoute: InviteTokenRoute,
   ApiAttachmentsUploadIdRoute: ApiAttachmentsUploadIdRoute,
