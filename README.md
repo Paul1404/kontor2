@@ -1,6 +1,6 @@
 # Kontor2
 
-> Production runs on Vertex RKE2 via Fleet, with two PostgreSQL databases and Redis on Longhorn and private versioned objects in AWS S3. The source image is published to GHCR after main CI and security scanning. Railway deployment notes below describe the retired hosting setup.
+> Production runs on Vertex RKE2 via Fleet, with PostgreSQL and Redis on Longhorn and private S3-compatible object storage in Garage. The source image is published to GHCR after main CI and security scanning. Railway-specific material is historical.
 
 A self-hosted, multi-tenant back office for German clubs. Kontor2 brings
 members, families, contributions, SEPA direct debits, invoices, correspondence,
@@ -41,7 +41,7 @@ ways. So the whole thing was rebuilt as software the club controls.
   SMTP passwords are AES-256-GCM, not on someone else's "deutsches
   Rechenzentrum".
 - **No per-seat pricing.** Unlimited accounts, three roles, invite-only signup.
-- **One container, one secret.** Deploys to Railway (or any Docker host) from a
+- **One container, one secret.** Runs on Vertex from a
   single `APP_SECRET`. Every other key is derived from it.
 - **Multi-tenant by design.** Each Verein gets its own database, encryption
   keyring and branding, resolved by request host. An operator console
@@ -411,8 +411,8 @@ One TanStack Start app does both SSR and client. Vite builds it into
 built server handler on `Bun.serve`, serves static assets from `dist/client` and
 `public` with a 1-day cache, runs a startup preflight, pins the process to UTC,
 301-redirects legacy hosts to the canonical one, and adds security headers plus a
-Content-Security-Policy to every HTML response. Railway terminates TLS in front
-of it.
+Content-Security-Policy to every HTML response. The Vertex Gateway terminates
+TLS in front of it.
 
 ### Request lifecycle
 
@@ -508,7 +508,8 @@ Postgres advisory lock keeps multiple replicas from running it at once. Set
 - `/api/rpc/$`. oRPC handler (all app data and mutations).
 - `/api/auth/$`. better-auth handler.
 - `/api/mcp`. Remote MCP server for AI assistants.
-- `/api/health`. Railway healthcheck.
+- `/api/live`. Dependency-independent liveness check.
+- `/api/health`. Dependency-aware readiness check.
 - `/api/files/$id`. Signed attachment download.
 - `/api/cron/snapshots`. External snapshot trigger.
 - `/api/portal/zugang/$token`, `/api/portal/logout`. Magic-link portal session.
@@ -552,34 +553,23 @@ resolver against a live database.
 
 ## Deploy
 
-Railway via the included `Dockerfile`. Multi-stage build with a dedicated
-`prod-deps` stage so peer dependencies (`kysely`, `better-call`) resolve
-correctly at runtime.
+Production runs on Vertex RKE2. The multi-stage `Dockerfile` builds the runtime
+image; after main CI and security scanning succeed, a verified GHCR image is
+promoted by digest into the private Fleet configuration. Fleet manages the app,
+PostgreSQL and Redis workloads, with Longhorn-backed volumes. Garage provides
+S3-compatible object storage for attachments, including signed browser uploads
+and downloads. The Gateway terminates HTTPS.
 
-Required Railway services:
-- Postgres. Reference `${{Postgres.DATABASE_URL}}` as `DATABASE_URL`.
-- Redis. Reference `${{Redis.REDIS_URL}}` as `REDIS_URL`.
-- Bucket (S3 Generic). Wire all `AWS_*` variables from `${{Bucket.*}}`.
-
-Manually set:
-- `APP_SECRET`. 32-byte hex. Every other secret (better-auth signing key,
-  data-at-rest key, snapshot cron HMAC) is derived from this via HKDF-SHA256.
-  See `bun scripts/print-derived-secrets.ts`.
-- `APP_SECRET_PREV`. Optional. Previous APP_SECRET(s), comma-separated, kept in
-  the keyring during a rotation so existing encrypted rows stay readable.
-  Rotation: set this to the current secret, generate a new `APP_SECRET`, deploy,
-  run Einstellungen, Verschlüsselung, Re-encrypt, then unset.
-- `BETTER_AUTH_URL`. Public URL of the deployment.
-
-`railway.toml` runs `bun run db:migrate:prod` before each deploy and points the
-healthcheck at `/api/health`. Migrations are applied to every tenant database
-with a runtime-only migrator. `drizzle-kit` stays a dev dependency and does not
-ship in the runtime image.
+A Kubernetes init container runs `bun scripts/migrate-all.ts` before the app
+starts. Runtime secrets and persistent data are provisioned outside Git.
+`/api/live` checks whether the server responds; `/api/health` checks database,
+Redis and PDF readiness. Verify both and Fleet reconciliation after rollout.
+The `.railway/` configuration is retained as historical material, not the
+current production path.
 
 The nightly snapshot scheduler runs in-process by default. To move it to an
-external scheduler (Railway Cron, GitHub Actions and the like), set
-`SNAPSHOT_CRON_DISABLED=1` and hit `POST /api/cron/snapshots` with
-`X-Kontor-Timestamp` and `X-Kontor-Signature`, signed with `SNAPSHOT_CRON_SECRET`.
+external scheduler, set `SNAPSHOT_CRON_DISABLED=1` and call the authenticated
+`POST /api/cron/snapshots` endpoint as described in the environment template.
 
 ## Environment
 
