@@ -41,6 +41,17 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    version: "6.0.1",
+    date: "2026-11-10",
+    changes: [
+      {
+        category: "internal",
+        description:
+          "Die Prüfung der Dienstverfügbarkeit unterscheidet zwischen Anwendung und abhängigen Diensten.",
+      },
+    ],
+  },
+  {
     version: "6.0.0",
     date: "2026-10-29",
     title: "Beitragswechsel im Online-Antrag",

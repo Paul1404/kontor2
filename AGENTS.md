@@ -159,6 +159,8 @@ den CSV-Export; die API behält ihre Standardwerte bei weggelassenen Filtern.
 
 ## Readiness
 
+- `/api/live` checks only that the HTTP server can respond. Keep it independent
+  of database, Redis and PDF readiness so dependency outages do not restart the app.
 - `/api/health` returns 200 only when the primary and control databases, Redis
   and PDF renderer pass; otherwise 503. Dependency checks repeat on every run,
   concurrent requests share one run, and probes have a five-second deadline.
