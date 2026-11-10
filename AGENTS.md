@@ -1,6 +1,6 @@
 # Repository guidance
 
-> Production runs on Vertex RKE2 via Fleet, with two PostgreSQL databases and Redis on Longhorn and private versioned objects in AWS S3. The source image is published to GHCR after main CI and security scanning. Railway deployment notes below describe the retired hosting setup.
+> Production runs on Vertex RKE2 via Fleet, with PostgreSQL and Redis on Longhorn and private S3-compatible object storage in Garage. The source image is published to GHCR after main CI and security scanning. Railway-specific material is historical.
 
 `AGENTS.md` is the canonical instruction file for Kontor2. Claude Code loads it
 through `CLAUDE.md`. These repository-specific rules supplement the agent's
@@ -14,8 +14,8 @@ SEPA direct debit (pain.008), a dunning workflow (Mahnwesen), a member portal
 with magic-link login, DSGVO tooling, reports, and snapshots.
 
 Stack in one line: TanStack Start (Vite) + React 19, oRPC procedures, Drizzle
-on Postgres, better-auth, Tailwind v4 + shadcn-style components, Bun. Deployed
-on Railway via Dockerfile.
+on Postgres, better-auth, Tailwind v4 + shadcn-style components, Bun. The
+Docker image runs on Vertex through Fleet.
 
 ## Layout you actually need
 
@@ -289,7 +289,7 @@ Keep it consistent with the same asset in the other managed websites. Reject
 and withdraw must stop requests, including beacon/keepalive sends. The loader
 honors DNT/GPC, excludes query-bearing and authenticated routes, and strips
 individual event data and titles. Server-side strict masking and replay limits
-are owned by web-host-gitops analytics/websites.json. Never rely on recorder
+are managed by the active Vertex Umami configuration. Never rely on recorder
 data-mask-level attributes. Keep the site's privacy notice and providers aligned.
 
 API route modules enter the client route tree. Wrap exported handlers with
@@ -327,7 +327,7 @@ component state only until the explicit application submission.
 
 ## Main-only branch lifecycle and security reporting
 
-`main` is the only retained local and remote branch for this active Railway
+`main` is the only retained local and remote branch for this active
 repository. Temporary PR branches are allowed only while work is in progress.
 Keep required checks and branch protections; never bypass them to avoid a branch.
 Before finishing, merge validated work, delete the remote and local task branches,
@@ -346,7 +346,7 @@ credentials, production records and personal data from public issues and commits
 
 ## Production security gates
 
-Railway waits for successful GitHub workflows on `main`. Keep an always-running
+Verified images are published only after successful GitHub workflows on `main`. Keep an always-running
 push workflow and do not cancel its main-branch runs. PR branch cleanup never
 justifies bypassing CI. Public repositories also enforce CodeQL results on main.
 Container security builds the production image and scans OS and library packages.
